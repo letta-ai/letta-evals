@@ -21,13 +21,19 @@ console = Console()
 @app.command()
 def run(
     suite_path: Path = typer.Argument(..., help="Path to suite YAML file"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file for results (JSON)"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
-    quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output (only show pass/fail)"),
-    max_concurrent: int = typer.Option(15, "--max-concurrent", "-c", help="Maximum concurrent evaluations"),
-    no_fancy: bool = typer.Option(False, "--no-fancy", help="Disable rich formatting for simple terminals"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Save results to JSON file"),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
+    max_concurrent: int = typer.Option(15, "--max-concurrent", help="Maximum concurrent evaluations"),
 ):
     """Run an evaluation suite."""
+
+    # auto-detect if we should disable fancy output based on terminal capabilities
+    import os
+
+    no_fancy = not console.is_terminal or os.getenv("NO_COLOR") is not None
+
+    # verbose is now the default unless --quiet is specified
+    verbose = not quiet
 
     if not suite_path.exists():
         console.print(f"[red]Error: Suite file not found: {suite_path}[/red]")
@@ -44,7 +50,7 @@ def run(
         console.print(f"[red]Error loading suite: {e}[/red]")
         raise typer.Exit(1)
 
-    if verbose and not no_fancy:
+    if not quiet and not no_fancy:
         console.print(f"[cyan]Loading suite: {suite.name}[/cyan]")
         console.print(f"[cyan]Total samples: {total_samples}[/cyan]")
         console.print(f"[cyan]Max concurrent: {max_concurrent}[/cyan]")
@@ -122,8 +128,8 @@ def validate(suite_path: Path = typer.Argument(..., help="Path to suite YAML fil
         console.print(f"  Dataset: {suite.dataset}")
         console.print(f"  Target: {suite.target.kind.value}")
         console.print(f"  Grader: {suite.grader.kind.value}")
-        if suite.gates:
-            console.print(f"  Gates: {len(suite.gates.gates)} configured")
+        if suite.gate:
+            console.print(f"  Gate: {suite.gate.op.value} {suite.gate.value}")
 
     except Exception as e:
         console.print(f"[red]Invalid suite configuration: {e}[/red]")
