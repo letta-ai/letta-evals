@@ -20,7 +20,7 @@ class Sample(BaseModel):
     """Single evaluation sample."""
 
     input: Union[str, List[str]] = Field(description="Input message(s) to send to the agent")
-    ideal: Optional[str] = Field(default=None, description="Expected ideal response for grading")
+    ground_truth: Optional[str] = Field(default=None, description="Expected ground_truth response for grading")
     metadata: SampleMetadata = Field(
         default_factory=SampleMetadata, description="Sample metadata for filtering and context"
     )
