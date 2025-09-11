@@ -59,6 +59,8 @@ gate:
 letta-evals run suite.yaml
 ```
 
+![Evaluation Progress](docs/assets/evaluation-progress.png)
+
 ## Core Concepts
 
 ### Suites
