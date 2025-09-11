@@ -76,6 +76,8 @@ class GraderSpec(BaseModel):
     extractor: str = Field(default="last_assistant", description="Strategy for extracting submission from trajectory")
     extractor_config: Optional[Dict[str, Any]] = Field(default=None, description="Configuration for the extractor")
 
+    base_dir: Optional[Path] = Field(default=None, exclude=True)
+
     def __init__(self, **data):
         super().__init__(**data)
         if self.kind == GraderKind.TOOL:

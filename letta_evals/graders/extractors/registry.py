@@ -1,4 +1,5 @@
 import inspect
+from pathlib import Path
 from typing import Dict, Type
 
 from letta_evals.graders.extractors.base import SubmissionExtractor
@@ -36,7 +37,7 @@ def register_extractor(name: str):
     return decorator
 
 
-def get_extractor(name: str, config: dict = None) -> SubmissionExtractor:
+def get_extractor(name: str, config: dict = None, base_dir: Path = None) -> SubmissionExtractor:
     """Get an extractor instance by name or file path."""
     # try registry first
     if name in EXTRACTOR_REGISTRY:
@@ -45,7 +46,7 @@ def get_extractor(name: str, config: dict = None) -> SubmissionExtractor:
 
     # try loading from file path
     if ":" in name:
-        obj = load_object(name)
+        obj = load_object(name, base_dir=base_dir)
         # if it's a class, instantiate it
         if inspect.isclass(obj) and issubclass(obj, SubmissionExtractor):
             return obj(config=config)

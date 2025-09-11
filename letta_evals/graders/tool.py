@@ -1,4 +1,5 @@
 import importlib
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from letta_client import LettaMessageUnion
@@ -52,17 +53,18 @@ class ToolGrader(Grader):
         module: Optional[str] = None,
         extractor: str = "last_assistant",
         extractor_config: Optional[dict] = None,
+        base_dir: Optional[Path] = None,
     ):
         self.function_name = function
         self.module = module
-        self.extractor = get_extractor(extractor, extractor_config)
+        self.extractor = get_extractor(extractor, extractor_config, base_dir=base_dir)
 
         # try registry first
         if function in GRADER_REGISTRY:
             self.func = GRADER_REGISTRY[function]
         # try loading from file path
         elif ":" in function:
-            self.func = load_object(function)
+            self.func = load_object(function, base_dir=base_dir)
         # fall back to module import
         elif module:
             mod = importlib.import_module(module)

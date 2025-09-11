@@ -47,6 +47,7 @@ class Runner:
                 module=self.suite.grader.module,
                 extractor=self.suite.grader.extractor,
                 extractor_config=self.suite.grader.extractor_config,
+                base_dir=self.suite.grader.base_dir,
             )
         elif self.suite.grader.kind == GraderKind.RUBRIC:
             return RubricGrader(
@@ -145,5 +146,7 @@ async def run_suite(
         yaml_data = yaml.safe_load(f)
 
     suite = SuiteSpec.from_yaml(yaml_data)
+    if suite.grader:
+        suite.grader.base_dir = suite_path.parent
     runner = Runner(suite, max_concurrent=max_concurrent, progress_callback=progress_callback)
     return await runner.run()

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 
-def load_object(spec: str) -> Any:
+def load_object(spec: str, base_dir: Path = None) -> Any:
     """Load a Python object from a file path specification."""
     if not spec:
         raise ValueError("Empty specification provided")
@@ -15,8 +15,11 @@ def load_object(spec: str) -> Any:
     file_path, obj_name = spec.rsplit(":", 1)
     path = Path(file_path)
 
+    # resolve relative paths
     if not path.is_absolute():
-        raise ValueError(f"Path must be absolute, got: {file_path}")
+        if base_dir is None:
+            raise ValueError(f"Relative path provided but no base_dir: {file_path}")
+        path = (base_dir / path).resolve()
 
     if not path.exists():
         raise FileNotFoundError(f"File not found: {path}")

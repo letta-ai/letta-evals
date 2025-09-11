@@ -7,8 +7,8 @@ target:
   base_url: http://localhost:8283
 grader:
   kind: tool
-  function: /Users/mattzhou/letta-evals-kit/examples/fruit-preferences-agent-custom-tool-grader-and-extractor/custom_evaluators.py:grade_fruit_preference
-  extractor: /Users/mattzhou/letta-evals-kit/examples/fruit-preferences-agent-custom-tool-grader-and-extractor/custom_evaluators.py:MemoryInsertExtractor
+  function: ../custom_evaluators.py:grade_fruit_preference
+  extractor: ../custom_evaluators.py:MemoryInsertExtractor
 gate:
   op: gte
-  value: 0.8
+  value: 1

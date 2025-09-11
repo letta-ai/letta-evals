@@ -43,6 +43,8 @@ def run(
         with open(suite_path, "r") as f:
             yaml_data = yaml.safe_load(f)
         suite = SuiteSpec.from_yaml(yaml_data)
+        if suite.grader:
+            suite.grader.base_dir = suite_path.parent
 
         samples = list(load_jsonl(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
         total_samples = len(samples)

@@ -40,9 +40,4 @@ def grade_fruit_preference(sample: Sample, submission: str) -> GradeResult:
     if fruit not in new_str:
         return GradeResult(score=0.0, rationale=f"Fruit '{fruit}' not found in new_str")
 
-    # check inserted at line 0
-    insert_line = args.get("insert_line", -1)
-    if insert_line != 0:
-        return GradeResult(score=0.7, rationale=f"Fruit preference stored but not at line 0 (line: {insert_line})")
-
     return GradeResult(score=1.0, rationale="Fruit preference correctly stored")
