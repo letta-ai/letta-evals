@@ -1,0 +1,5 @@
+{"input": "Insert into your core memory that I like apples", "ground_truth": "apples"}
+{"input": "Insert into your core memory that I like bananas", "ground_truth": "bananas"}
+{"input": "Insert into your core memory that I like oranges", "ground_truth": "oranges"}
+{"input": "Insert into your core memory that I like strawberries", "ground_truth": "strawberries"}
+{"input": "Insert into your core memory that I like grapes", "ground_truth": "grapes"}

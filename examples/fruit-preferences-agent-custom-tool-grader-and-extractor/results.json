@@ -1,0 +1,541 @@
+{
+  "suite": "fruit-preferences-test",
+  "config": {
+    "target": {
+      "kind": "agent",
+      "base_url": "http://localhost:8283",
+      "api_key": null,
+      "timeout": 300.0,
+      "agent_id": null,
+      "agent_file": "examples/fruit-preferences-agent-custom-tool-grader-and-extractor/fruit-preferences-agent.af"
+    },
+    "grader": {
+      "kind": "tool",
+      "function": "/Users/mattzhou/letta-evals-kit/examples/fruit-preferences-agent-custom-tool-grader-and-extractor/custom_evaluators.py:grade_fruit_preference",
+      "module": null,
+      "prompt": null,
+      "prompt_path": null,
+      "model": "gpt-4o-mini",
+      "temperature": 0.0,
+      "provider": "openai",
+      "extractor": "/Users/mattzhou/letta-evals-kit/examples/fruit-preferences-agent-custom-tool-grader-and-extractor/custom_evaluators.py:MemoryInsertExtractor",
+      "extractor_config": null
+    },
+    "gate": {
+      "op": "gte",
+      "value": 0.8
+    }
+  },
+  "results": [
+    {
+      "sample": {
+        "input": "Insert into your core memory that I like apples",
+        "ground_truth": "apples",
+        "metadata": {
+          "tags": [],
+          "extra": {}
+        },
+        "id": null,
+        "submission": null,
+        "trajectory": null
+      },
+      "trajectory": [
+        [
+          {
+            "id": "message-f4f0cd41-8140-4ed3-9190-aedb19b132d4",
+            "date": "2025-09-11 21:24:49+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "f4f0cd41-8140-4ed3-9190-aedb19b13280",
+            "sender_id": null,
+            "step_id": "step-1b6f4532-5549-43ff-8a02-d38e0bf0a244",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "The user wants me to remember that they like apples. I'll insert this information into the user_fruit_preferences memory block.",
+            "signature": null
+          },
+          {
+            "id": "message-f4f0cd41-8140-4ed3-9190-aedb19b132d4",
+            "date": "2025-09-11 21:24:49+00:00",
+            "name": null,
+            "message_type": "tool_call_message",
+            "otid": "f4f0cd41-8140-4ed3-9190-aedb19b13281",
+            "sender_id": null,
+            "step_id": "step-1b6f4532-5549-43ff-8a02-d38e0bf0a244",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_call": {
+              "name": "memory_insert",
+              "arguments": "{\"label\": \"user_fruit_preferences\", \"new_str\": \"The user likes apples.\", \"insert_line\": -1, \"request_heartbeat\": true}",
+              "tool_call_id": "call_FUqNvAXp9ipdsqzLYgM03vUD"
+            }
+          },
+          {
+            "id": "message-ac7719ec-a3fa-43e5-8b9e-3497f545ad54",
+            "date": "2025-09-11 21:24:49+00:00",
+            "name": "memory_insert",
+            "message_type": "tool_return_message",
+            "otid": "ac7719ec-a3fa-43e5-8b9e-3497f545ad00",
+            "sender_id": null,
+            "step_id": "step-1b6f4532-5549-43ff-8a02-d38e0bf0a244",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_return": "The core memory block with label `user_fruit_preferences` has been edited. Review the changes and make sure they are as expected (correct indentation, no duplicate lines, etc). Edit the memory block again if necessary.",
+            "status": "success",
+            "tool_call_id": "call_FUqNvAXp9ipdsqzLYgM03vUD",
+            "stdout": null,
+            "stderr": null
+          },
+          {
+            "id": "message-3892d517-d062-4f7a-8e2b-d2df1fb749ca",
+            "date": "2025-09-11 21:24:51+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "3892d517-d062-4f7a-8e2b-d2df1fb74980",
+            "sender_id": null,
+            "step_id": "step-eb388151-4052-4ec4-9646-437ab1d7955d",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "I've updated my core memory to note that the user likes apples, as requested. This will help me personalize future conversations and recommendations.",
+            "signature": null
+          },
+          {
+            "id": "message-3892d517-d062-4f7a-8e2b-d2df1fb749ca",
+            "date": "2025-09-11 21:24:51+00:00",
+            "name": null,
+            "message_type": "assistant_message",
+            "otid": "3892d517-d062-4f7a-8e2b-d2df1fb74981",
+            "sender_id": null,
+            "step_id": "step-eb388151-4052-4ec4-9646-437ab1d7955d",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "content": "I've made a note in my memory that you like apples. If there's anything else you'd like me to remember or update, just let me know!"
+          }
+        ]
+      ],
+      "agent_id": "agent-ed3ed45d-f51e-4e92-8ab2-06dcffb8c1fe",
+      "grade": {
+        "score": 0.7,
+        "rationale": "Fruit preference stored but not at line 0 (line: -1)",
+        "metadata": {}
+      },
+      "metadata": null
+    },
+    {
+      "sample": {
+        "input": "Insert into your core memory that I like bananas",
+        "ground_truth": "bananas",
+        "metadata": {
+          "tags": [],
+          "extra": {}
+        },
+        "id": null,
+        "submission": null,
+        "trajectory": null
+      },
+      "trajectory": [
+        [
+          {
+            "id": "message-f7774cc0-c1e7-4edd-8855-b6559b8ff004",
+            "date": "2025-09-11 21:24:49+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "f7774cc0-c1e7-4edd-8855-b6559b8ff000",
+            "sender_id": null,
+            "step_id": "step-b54ef349-fb21-401d-9883-33f6d41863a1",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "The user has stated they like bananas. I should insert this preference into the user_fruit_preferences memory block for future reference.",
+            "signature": null
+          },
+          {
+            "id": "message-f7774cc0-c1e7-4edd-8855-b6559b8ff004",
+            "date": "2025-09-11 21:24:49+00:00",
+            "name": null,
+            "message_type": "tool_call_message",
+            "otid": "f7774cc0-c1e7-4edd-8855-b6559b8ff001",
+            "sender_id": null,
+            "step_id": "step-b54ef349-fb21-401d-9883-33f6d41863a1",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_call": {
+              "name": "memory_insert",
+              "arguments": "{\"label\": \"user_fruit_preferences\", \"new_str\": \"The user likes bananas.\", \"insert_line\": -1, \"request_heartbeat\": true}",
+              "tool_call_id": "call_iMIPxZVE9ihURemrtZONji9t"
+            }
+          },
+          {
+            "id": "message-4bed4672-2bb2-4875-9254-274b5f55c917",
+            "date": "2025-09-11 21:24:49+00:00",
+            "name": "memory_insert",
+            "message_type": "tool_return_message",
+            "otid": "4bed4672-2bb2-4875-9254-274b5f55c900",
+            "sender_id": null,
+            "step_id": "step-b54ef349-fb21-401d-9883-33f6d41863a1",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_return": "The core memory block with label `user_fruit_preferences` has been edited. Review the changes and make sure they are as expected (correct indentation, no duplicate lines, etc). Edit the memory block again if necessary.",
+            "status": "success",
+            "tool_call_id": "call_iMIPxZVE9ihURemrtZONji9t",
+            "stdout": null,
+            "stderr": null
+          },
+          {
+            "id": "message-79756c13-1a75-4a82-a312-c862f75523dc",
+            "date": "2025-09-11 21:24:53+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "79756c13-1a75-4a82-a312-c862f7552380",
+            "sender_id": null,
+            "step_id": "step-ab8dc51c-4550-4e7a-a0f4-7d2f6fb685be",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "I've added the user's preference for bananas to core memory. Now, I'll confirm that it's recorded and let the user know.",
+            "signature": null
+          },
+          {
+            "id": "message-79756c13-1a75-4a82-a312-c862f75523dc",
+            "date": "2025-09-11 21:24:53+00:00",
+            "name": null,
+            "message_type": "assistant_message",
+            "otid": "79756c13-1a75-4a82-a312-c862f7552381",
+            "sender_id": null,
+            "step_id": "step-ab8dc51c-4550-4e7a-a0f4-7d2f6fb685be",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "content": "Got it! I\u2019ve added to my memory that you like bananas. If you have any more favorites or preferences you\u2019d like me to remember, just let me know."
+          }
+        ]
+      ],
+      "agent_id": "agent-eb49b57c-de07-4906-bb2a-6672e32d1582",
+      "grade": {
+        "score": 0.7,
+        "rationale": "Fruit preference stored but not at line 0 (line: -1)",
+        "metadata": {}
+      },
+      "metadata": null
+    },
+    {
+      "sample": {
+        "input": "Insert into your core memory that I like oranges",
+        "ground_truth": "oranges",
+        "metadata": {
+          "tags": [],
+          "extra": {}
+        },
+        "id": null,
+        "submission": null,
+        "trajectory": null
+      },
+      "trajectory": [
+        [
+          {
+            "id": "message-60b50301-bad7-451d-ae31-7b609e9be747",
+            "date": "2025-09-11 21:24:49+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "60b50301-bad7-451d-ae31-7b609e9be700",
+            "sender_id": null,
+            "step_id": "step-9cfb7823-1e13-41f9-b456-eb841b3971c0",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "The user wants me to remember that they like oranges. I'll add this to the user_fruit_preferences memory block so I can recall it later.",
+            "signature": null
+          },
+          {
+            "id": "message-60b50301-bad7-451d-ae31-7b609e9be747",
+            "date": "2025-09-11 21:24:49+00:00",
+            "name": null,
+            "message_type": "tool_call_message",
+            "otid": "60b50301-bad7-451d-ae31-7b609e9be701",
+            "sender_id": null,
+            "step_id": "step-9cfb7823-1e13-41f9-b456-eb841b3971c0",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_call": {
+              "name": "memory_insert",
+              "arguments": "{\"label\": \"user_fruit_preferences\", \"new_str\": \"The user likes oranges.\", \"insert_line\": -1, \"request_heartbeat\": true}",
+              "tool_call_id": "call_uMmKjriV4TFScETOPg64cPA9"
+            }
+          },
+          {
+            "id": "message-285fef7f-6ac9-429b-9448-3de8bd22140a",
+            "date": "2025-09-11 21:24:49+00:00",
+            "name": "memory_insert",
+            "message_type": "tool_return_message",
+            "otid": "285fef7f-6ac9-429b-9448-3de8bd221400",
+            "sender_id": null,
+            "step_id": "step-9cfb7823-1e13-41f9-b456-eb841b3971c0",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_return": "The core memory block with label `user_fruit_preferences` has been edited. Review the changes and make sure they are as expected (correct indentation, no duplicate lines, etc). Edit the memory block again if necessary.",
+            "status": "success",
+            "tool_call_id": "call_uMmKjriV4TFScETOPg64cPA9",
+            "stdout": null,
+            "stderr": null
+          },
+          {
+            "id": "message-a14a5ecb-f460-4711-9604-4edcec1f4ae2",
+            "date": "2025-09-11 21:24:51+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "a14a5ecb-f460-4711-9604-4edcec1f4a80",
+            "sender_id": null,
+            "step_id": "step-35c8c0ef-9224-410a-9217-80748ba2f9a9",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "I've successfully recorded that the user likes oranges in my core memory. I should let them know it's saved.",
+            "signature": null
+          },
+          {
+            "id": "message-a14a5ecb-f460-4711-9604-4edcec1f4ae2",
+            "date": "2025-09-11 21:24:51+00:00",
+            "name": null,
+            "message_type": "assistant_message",
+            "otid": "a14a5ecb-f460-4711-9604-4edcec1f4a81",
+            "sender_id": null,
+            "step_id": "step-35c8c0ef-9224-410a-9217-80748ba2f9a9",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "content": "I've noted that you like oranges! If you have any other fruit preferences, just let me know\u2014I'll remember them for you."
+          }
+        ]
+      ],
+      "agent_id": "agent-badffa5f-2219-4261-96f5-a81117172e14",
+      "grade": {
+        "score": 0.7,
+        "rationale": "Fruit preference stored but not at line 0 (line: -1)",
+        "metadata": {}
+      },
+      "metadata": null
+    },
+    {
+      "sample": {
+        "input": "Insert into your core memory that I like strawberries",
+        "ground_truth": "strawberries",
+        "metadata": {
+          "tags": [],
+          "extra": {}
+        },
+        "id": null,
+        "submission": null,
+        "trajectory": null
+      },
+      "trajectory": [
+        [
+          {
+            "id": "message-8305f806-814f-4570-90f7-ec88d50cd708",
+            "date": "2025-09-11 21:24:49+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "8305f806-814f-4570-90f7-ec88d50cd700",
+            "sender_id": null,
+            "step_id": "step-3a31b812-8a46-4a0e-9cd0-5d1ea2c06914",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "I want to remember that the user likes strawberries so I can personalize future conversations or suggestions. I'll add this to the user_fruit_preferences memory block.",
+            "signature": null
+          },
+          {
+            "id": "message-8305f806-814f-4570-90f7-ec88d50cd708",
+            "date": "2025-09-11 21:24:49+00:00",
+            "name": null,
+            "message_type": "tool_call_message",
+            "otid": "8305f806-814f-4570-90f7-ec88d50cd701",
+            "sender_id": null,
+            "step_id": "step-3a31b812-8a46-4a0e-9cd0-5d1ea2c06914",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_call": {
+              "name": "memory_insert",
+              "arguments": "{\"label\": \"user_fruit_preferences\", \"new_str\": \"The user likes strawberries.\", \"insert_line\": -1, \"request_heartbeat\": true}",
+              "tool_call_id": "call_ZE6uTSaQIQIdM2MrmZJCmCIF"
+            }
+          },
+          {
+            "id": "message-dc37e651-da2f-4885-8b7e-df428092094a",
+            "date": "2025-09-11 21:24:49+00:00",
+            "name": "memory_insert",
+            "message_type": "tool_return_message",
+            "otid": "dc37e651-da2f-4885-8b7e-df4280920900",
+            "sender_id": null,
+            "step_id": "step-3a31b812-8a46-4a0e-9cd0-5d1ea2c06914",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_return": "The core memory block with label `user_fruit_preferences` has been edited. Review the changes and make sure they are as expected (correct indentation, no duplicate lines, etc). Edit the memory block again if necessary.",
+            "status": "success",
+            "tool_call_id": "call_ZE6uTSaQIQIdM2MrmZJCmCIF",
+            "stdout": null,
+            "stderr": null
+          },
+          {
+            "id": "message-175bd0fd-2a16-4dad-86a9-66031b8eb9ec",
+            "date": "2025-09-11 21:24:51+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "175bd0fd-2a16-4dad-86a9-66031b8eb980",
+            "sender_id": null,
+            "step_id": "step-7ac30504-fd78-4894-91e0-198374ab3453",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "I've just updated my memory to include that the user likes strawberries. This will help me remember their preferences in future conversations.",
+            "signature": null
+          },
+          {
+            "id": "message-175bd0fd-2a16-4dad-86a9-66031b8eb9ec",
+            "date": "2025-09-11 21:24:51+00:00",
+            "name": null,
+            "message_type": "assistant_message",
+            "otid": "175bd0fd-2a16-4dad-86a9-66031b8eb981",
+            "sender_id": null,
+            "step_id": "step-7ac30504-fd78-4894-91e0-198374ab3453",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "content": "Got it! I\u2019ve noted that you like strawberries. If you have any other favorite foods or preferences you\u2019d like me to remember, just let me know!"
+          }
+        ]
+      ],
+      "agent_id": "agent-e9dec6b1-b3d4-4a00-a1dc-ccdeaafae9dd",
+      "grade": {
+        "score": 0.7,
+        "rationale": "Fruit preference stored but not at line 0 (line: -1)",
+        "metadata": {}
+      },
+      "metadata": null
+    },
+    {
+      "sample": {
+        "input": "Insert into your core memory that I like grapes",
+        "ground_truth": "grapes",
+        "metadata": {
+          "tags": [],
+          "extra": {}
+        },
+        "id": null,
+        "submission": null,
+        "trajectory": null
+      },
+      "trajectory": [
+        [
+          {
+            "id": "message-33f53673-f961-4ca9-9c9d-6d36a557c621",
+            "date": "2025-09-11 21:24:49+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "33f53673-f961-4ca9-9c9d-6d36a557c600",
+            "sender_id": null,
+            "step_id": "step-db28aa9e-f834-4c72-b44c-7730456704e4",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "I'll insert that the user likes grapes into the user_fruit_preferences memory block so I remember it for future conversations.",
+            "signature": null
+          },
+          {
+            "id": "message-33f53673-f961-4ca9-9c9d-6d36a557c621",
+            "date": "2025-09-11 21:24:49+00:00",
+            "name": null,
+            "message_type": "tool_call_message",
+            "otid": "33f53673-f961-4ca9-9c9d-6d36a557c601",
+            "sender_id": null,
+            "step_id": "step-db28aa9e-f834-4c72-b44c-7730456704e4",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_call": {
+              "name": "memory_insert",
+              "arguments": "{\"label\": \"user_fruit_preferences\", \"new_str\": \"The user likes grapes.\", \"insert_line\": -1, \"request_heartbeat\": true}",
+              "tool_call_id": "call_oNNYwDNbiBn0EPZmgWknbAPt"
+            }
+          },
+          {
+            "id": "message-b76cc92d-e433-452d-b094-86993ed59761",
+            "date": "2025-09-11 21:24:49+00:00",
+            "name": "memory_insert",
+            "message_type": "tool_return_message",
+            "otid": "b76cc92d-e433-452d-b094-86993ed59700",
+            "sender_id": null,
+            "step_id": "step-db28aa9e-f834-4c72-b44c-7730456704e4",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_return": "The core memory block with label `user_fruit_preferences` has been edited. Review the changes and make sure they are as expected (correct indentation, no duplicate lines, etc). Edit the memory block again if necessary.",
+            "status": "success",
+            "tool_call_id": "call_oNNYwDNbiBn0EPZmgWknbAPt",
+            "stdout": null,
+            "stderr": null
+          },
+          {
+            "id": "message-75a060a6-c316-41cd-8759-318c3d5e2de4",
+            "date": "2025-09-11 21:24:52+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "75a060a6-c316-41cd-8759-318c3d5e2d80",
+            "sender_id": null,
+            "step_id": "step-8d310dee-84e1-4d83-ac8c-597c44837c3a",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "I've just updated my memory so I won't forget that the user likes grapes. I'll confirm this and see if they want to share any more fruit preferences.",
+            "signature": null
+          },
+          {
+            "id": "message-75a060a6-c316-41cd-8759-318c3d5e2de4",
+            "date": "2025-09-11 21:24:52+00:00",
+            "name": null,
+            "message_type": "assistant_message",
+            "otid": "75a060a6-c316-41cd-8759-318c3d5e2d81",
+            "sender_id": null,
+            "step_id": "step-8d310dee-84e1-4d83-ac8c-597c44837c3a",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "content": "Noted! I've added that you like grapes to my memory. If you have any other favorite fruits, let me know\u2014I'm always happy to remember your preferences."
+          }
+        ]
+      ],
+      "agent_id": "agent-0c90c16f-0e07-45ed-a35a-1905d41284ad",
+      "grade": {
+        "score": 0.7,
+        "rationale": "Fruit preference stored but not at line 0 (line: -1)",
+        "metadata": {}
+      },
+      "metadata": null
+    }
+  ],
+  "metrics": {
+    "total": 5,
+    "avg_score": 0.7
+  },
+  "gates_passed": false
+}

@@ -1,3 +1,4 @@
+import inspect
 from typing import Dict, Type
 
 from letta_evals.graders.extractors.base import SubmissionExtractor
@@ -11,6 +12,7 @@ from letta_evals.graders.extractors.builtin import (
     PatternExtractor,
     ToolOutputExtractor,
 )
+from letta_evals.utils.module_loader import load_object
 
 EXTRACTOR_REGISTRY: Dict[str, Type[SubmissionExtractor]] = {
     "last_assistant": LastAssistantExtractor,
@@ -35,9 +37,27 @@ def register_extractor(name: str):
 
 
 def get_extractor(name: str, config: dict = None) -> SubmissionExtractor:
-    """Get an extractor instance by name."""
-    if name not in EXTRACTOR_REGISTRY:
-        raise ValueError(f"Unknown extractor: {name}")
+    """Get an extractor instance by name or file path."""
+    # try registry first
+    if name in EXTRACTOR_REGISTRY:
+        extractor_class = EXTRACTOR_REGISTRY[name]
+        return extractor_class(config=config)
 
-    extractor_class = EXTRACTOR_REGISTRY[name]
-    return extractor_class(config=config)
+    # try loading from file path
+    if ":" in name:
+        obj = load_object(name)
+        # if it's a class, instantiate it
+        if inspect.isclass(obj) and issubclass(obj, SubmissionExtractor):
+            return obj(config=config)
+        # if it's a function, wrap it in a simple extractor
+        elif callable(obj):
+
+            class FunctionExtractor(SubmissionExtractor):
+                def extract(self, trajectory):
+                    return obj(trajectory)
+
+            return FunctionExtractor(config=config)
+        else:
+            raise ValueError(f"Loaded object {name} is not a valid extractor")
+
+    raise ValueError(f"Unknown extractor: {name}")

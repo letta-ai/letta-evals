@@ -23,6 +23,8 @@ class AgentTarget(Target):
         self, sample: Sample, progress_callback: Optional[object] = None, sample_id: Optional[int] = None
     ) -> TargetResult:
         """Run the agent on a sample."""
+        agent_id = self.agent_id
+
         if self.agent_file:
             if progress_callback and sample_id is not None:
                 await progress_callback.agent_loading(sample_id)
@@ -36,7 +38,7 @@ class AgentTarget(Target):
                         f"Expected single agent from .af file, got {len(resp.agent_ids)} agents. We don't support multi-agent evals yet."
                     )
 
-                self.agent_id = resp.agent_ids[0]
+                agent_id = resp.agent_ids[0]
 
         trajectory = []
 
@@ -48,9 +50,9 @@ class AgentTarget(Target):
                 await progress_callback.message_sending(sample_id, i + 1, total_messages)
 
             letta_resp = await self.client.agents.messages.create(
-                agent_id=self.agent_id,
+                agent_id=agent_id,
                 messages=[MessageCreate(role="user", content=input_msg)],
             )
             trajectory.append(letta_resp.messages)
 
-        return TargetResult(trajectory=trajectory, agent_id=self.agent_id)
+        return TargetResult(trajectory=trajectory, agent_id=agent_id)
