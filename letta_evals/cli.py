@@ -1,0 +1,232 @@
+import asyncio
+import json
+import sys
+from pathlib import Path
+from typing import Optional
+
+import typer
+import yaml
+from rich.console import Console
+from rich.table import Table
+
+from letta_evals.datasets.loader import load_jsonl
+from letta_evals.models import RunnerResult, SuiteSpec
+from letta_evals.runner.engine import run_suite
+from letta_evals.visualization.progress import DisplayMode, EvalProgress
+
+app = typer.Typer(help="Letta Evals - Evaluation framework for Letta AI agents")
+console = Console()
+
+
+@app.command()
+def run(
+    suite_path: Path = typer.Argument(..., help="Path to suite YAML file"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file for results (JSON)"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output (only show pass/fail)"),
+    max_concurrent: int = typer.Option(15, "--max-concurrent", "-c", help="Maximum concurrent evaluations"),
+    no_fancy: bool = typer.Option(False, "--no-fancy", help="Disable rich formatting for simple terminals"),
+):
+    """Run an evaluation suite."""
+
+    if not suite_path.exists():
+        console.print(f"[red]Error: Suite file not found: {suite_path}[/red]")
+        raise typer.Exit(1)
+
+    try:
+        with open(suite_path, "r") as f:
+            yaml_data = yaml.safe_load(f)
+        suite = SuiteSpec.from_yaml(yaml_data)
+
+        samples = list(load_jsonl(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
+        total_samples = len(samples)
+    except Exception as e:
+        console.print(f"[red]Error loading suite: {e}[/red]")
+        raise typer.Exit(1)
+
+    if verbose and not no_fancy:
+        console.print(f"[cyan]Loading suite: {suite.name}[/cyan]")
+        console.print(f"[cyan]Total samples: {total_samples}[/cyan]")
+        console.print(f"[cyan]Max concurrent: {max_concurrent}[/cyan]")
+
+    async def run_with_progress():
+        if no_fancy or quiet:
+            if not quiet:
+                console.print(f"Running evaluation suite: {suite.name}")
+                console.print(f"Evaluating {total_samples} samples...")
+            return await run_suite(suite_path, max_concurrent=max_concurrent)
+        else:
+            progress = EvalProgress(
+                suite_name=suite.name,
+                total_samples=total_samples,
+                target_kind=suite.target.kind.value,
+                grader_kind=suite.grader.kind.value,
+                max_concurrent=max_concurrent,
+                display_mode=DisplayMode.DETAILED,
+                console=console,
+                show_samples=True,
+            )
+
+            await progress.start()
+            try:
+                result = await run_suite(suite_path, max_concurrent=max_concurrent, progress_callback=progress)
+                return result
+            finally:
+                progress.stop()
+
+    try:
+        result = asyncio.run(run_with_progress())
+
+        if not quiet:
+            display_results(result, verbose)
+
+        if output:
+            save_results(result, output)
+            if not quiet:
+                console.print(f"[green]Results saved to {output}[/green]")
+
+        if result.gates_passed:
+            if not quiet:
+                console.print("[green]✓ All gates passed[/green]")
+            sys.exit(0)
+        else:
+            if not quiet:
+                console.print("[red]✗ Some gates failed[/red]")
+            sys.exit(1)
+
+    except Exception as e:
+        console.print(f"[red]Error running suite: {e}[/red]")
+        if verbose:
+            import traceback
+
+            traceback.print_exc()
+        raise typer.Exit(1)
+
+
+@app.command()
+def validate(suite_path: Path = typer.Argument(..., help="Path to suite YAML file")):
+    """Validate a suite configuration without running it."""
+
+    if not suite_path.exists():
+        console.print(f"[red]Error: Suite file not found: {suite_path}[/red]")
+        raise typer.Exit(1)
+
+    try:
+        with open(suite_path, "r") as f:
+            yaml_data = yaml.safe_load(f)
+
+        suite = SuiteSpec.from_yaml(yaml_data)
+        console.print(f"[green]✓ Suite '{suite.name}' is valid[/green]")
+
+        console.print("\n[bold]Configuration:[/bold]")
+        console.print(f"  Dataset: {suite.dataset}")
+        console.print(f"  Target: {suite.target.kind.value}")
+        console.print(f"  Grader: {suite.grader.kind.value}")
+        if suite.gates:
+            console.print(f"  Gates: {len(suite.gates.gates)} configured")
+
+    except Exception as e:
+        console.print(f"[red]Invalid suite configuration: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command("list-extractors")
+def list_extractors():
+    """List available submission extractors."""
+
+    from letta_evals.graders.extractors.registry import EXTRACTOR_REGISTRY
+
+    table = Table(title="Available Extractors")
+    table.add_column("Name", style="cyan")
+    table.add_column("Description", style="white")
+
+    descriptions = {
+        "last_assistant": "Extract the last assistant message",
+        "first_assistant": "Extract the first assistant message",
+        "all_assistant": "Concatenate all assistant messages",
+        "last_turn": "Extract assistant messages from last turn",
+        "pattern": "Extract using regex pattern",
+        "json": "Extract JSON field from response",
+        "tool_output": "Extract specific tool output",
+        "after_marker": "Extract content after marker",
+    }
+
+    for name in sorted(EXTRACTOR_REGISTRY.keys()):
+        desc = descriptions.get(name, "")
+        table.add_row(name, desc)
+
+    console.print(table)
+
+
+@app.command("list-graders")
+def list_graders():
+    """List available built-in grader functions."""
+
+    from letta_evals.graders.tool import GRADER_REGISTRY
+
+    table = Table(title="Built-in Graders")
+    table.add_column("Name", style="cyan")
+    table.add_column("Type", style="yellow")
+
+    for name in sorted(GRADER_REGISTRY.keys()):
+        table.add_row(name, "tool")
+
+    console.print(table)
+    console.print("\n[dim]You can also use 'rubric' graders with custom prompts[/dim]")
+
+
+def display_results(result: RunnerResult, verbose: bool = False):
+    console.print(f"\n[bold]Evaluation Results: {result.suite}[/bold]")
+    console.print("=" * 50)
+
+    metrics = result.metrics
+    console.print("\n[bold]Metrics:[/bold]")
+    console.print(f"  Total samples: {metrics.total}")
+    console.print(f"  Average score: {metrics.avg_score:.2f}")
+
+    gate = result.config["gate"]
+    gate_op = gate["op"]
+    gate_value = gate["value"]
+
+    op_symbols = {"gt": ">", "gte": "≥", "lt": "<", "lte": "≤", "eq": "="}
+    op_symbol = op_symbols.get(gate_op, gate_op)
+
+    status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
+    console.print(
+        f"\n[bold]Gate:[/bold] avg_score {op_symbol} {gate_value:.2f} → {status} (actual: {metrics.avg_score:.2f})"
+    )
+
+    if verbose:
+        console.print("\n[bold]Sample Results:[/bold]")
+        table = Table()
+        table.add_column("Sample", style="cyan")
+        table.add_column("Passed", style="white")
+        table.add_column("Score", style="white")
+        table.add_column("Rationale", style="dim")
+
+        from letta_evals.models import GateSpec
+
+        gate_spec = GateSpec(**result.config["gate"])
+
+        for i, sample_result in enumerate(result.results):
+            score_val = sample_result.grade.score
+            passed = "✓" if gate_spec.check_score(score_val) else "✗"
+            score = f"{score_val:.2f}"
+            rationale = sample_result.grade.rationale or ""
+            if len(rationale) > 50:
+                rationale = rationale[:47] + "..."
+
+            table.add_row(f"Sample {i + 1}", passed, score, rationale)
+
+        console.print(table)
+
+
+def save_results(result: RunnerResult, output_path: Path):
+    result_dict = result.dict()
+
+    with open(output_path, "w") as f:
+        json.dump(result_dict, f, indent=2, default=str)
+
+
+if __name__ == "__main__":
+    app()
