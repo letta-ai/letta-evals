@@ -5,9 +5,6 @@ Evaluation framework for testing Letta AI agents.
 <p align="center">
   <img src="docs/assets/evaluation-progress.png" alt="Letta Evals Kit running an evaluation suite with real-time progress tracking" width="800">
 </p>
-<p align="center">
-  <em>Real-time evaluation progress with detailed metrics and per-sample results</em>
-</p>
 
 ## Project Structure
 
