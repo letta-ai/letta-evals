@@ -6,6 +6,7 @@ from letta_client import LettaMessageUnion
 from letta_evals.graders.base import Grader
 from letta_evals.graders.extractors.registry import get_extractor
 from letta_evals.models import GradeResult, Sample
+from letta_evals.utils.module_loader import load_object
 
 GRADER_REGISTRY: Dict[str, callable] = {}
 
@@ -56,8 +57,13 @@ class ToolGrader(Grader):
         self.module = module
         self.extractor = get_extractor(extractor, extractor_config)
 
+        # try registry first
         if function in GRADER_REGISTRY:
             self.func = GRADER_REGISTRY[function]
+        # try loading from file path
+        elif ":" in function:
+            self.func = load_object(function)
+        # fall back to module import
         elif module:
             mod = importlib.import_module(module)
             self.func = getattr(mod, function)
