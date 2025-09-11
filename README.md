@@ -37,8 +37,8 @@ uv sync --extra dev
 
 1. **Create a test dataset** (`dataset.jsonl`):
 ```jsonl
-{"input": "What's the capital of France?", "ideal": "Paris"}
-{"input": "Calculate 2+2", "ideal": "4"}
+{"input": "What's the capital of France?", "ground_truth": "Paris"}
+{"input": "Calculate 2+2", "ground_truth": "4"}
 ```
 
 2. **Write a suite configuration** (`suite.yaml`):
@@ -71,7 +71,7 @@ YAML configuration files that define your evaluation parameters. Each suite spec
 ### Datasets
 JSONL files where each line contains a test sample with:
 - `input`: The prompt to send to the agent
-- `ideal`: The expected response (for tool graders)
+- `ground_truth`: The expected response (for tool graders)
 - `metadata`: Optional additional context
 
 ### Targets

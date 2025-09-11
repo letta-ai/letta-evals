@@ -22,24 +22,24 @@ def register_grader(name: str):
 
 @register_grader("exact_match")
 def exact_match(sample: Sample, submission: str) -> GradeResult:
-    """Check if submission exactly matches ideal."""
-    if not sample.ideal:
-        return GradeResult(score=0.0, rationale="No ideal answer provided")
+    """Check if submission exactly matches ground_truth."""
+    if not sample.ground_truth:
+        return GradeResult(score=0.0, rationale="No ground_truth answer provided")
 
-    matches = submission.strip() == sample.ideal.strip()
+    matches = submission.strip() == sample.ground_truth.strip()
     score = 1.0 if matches else 0.0
     return GradeResult(score=score, rationale=f"Exact match: {matches}")
 
 
 @register_grader("contains")
 def contains(sample: Sample, submission: str) -> GradeResult:
-    """Check if submission contains ideal answer."""
-    if not sample.ideal:
-        return GradeResult(score=0.0, rationale="No ideal answer provided")
+    """Check if submission contains ground_truth answer."""
+    if not sample.ground_truth:
+        return GradeResult(score=0.0, rationale="No ground_truth answer provided")
 
-    found = sample.ideal.lower() in submission.lower()
+    found = sample.ground_truth.lower() in submission.lower()
     score = 1.0 if found else 0.0
-    return GradeResult(score=score, rationale=f"Contains ideal: {found}")
+    return GradeResult(score=score, rationale=f"Contains ground_truth: {found}")
 
 
 class ToolGrader(Grader):

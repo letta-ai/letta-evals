@@ -1,50 +1,50 @@
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. What are the common names for this plant, especially one that has an animal in the name?", "ideal": "lamb's tongue"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. List at least three of its common names.", "ideal": "ribwort plantain, narrowleaf plantain, English plantain"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name refers to a lamb?", "ideal": "lamb's tongue"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Provide all the common names separated by semicolons.", "ideal": "ribwort plantain; narrowleaf plantain; English plantain; ribleaf; lamb's tongue; buckhorn"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name includes a farm animal?", "ideal": "lamb's tongue"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. What is the colloquial name involving sheep?", "ideal": "lamb's tongue"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Identify the animal-based folk name.", "ideal": "lamb's tongue"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name includes 'tongue'?", "ideal": "lamb's tongue"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name includes the word 'buck'?", "ideal": "buckhorn"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name is two words and starts with 'English'?", "ideal": "English plantain"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. When did Robert K. Corbin pass away? Express as MM/DD/YYYY.", "ideal": "09/09/2025"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Provide his date of death in US format.", "ideal": "09/09/2025"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. On what date did he die? MM/DD/YYYY.", "ideal": "09/09/2025"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Return his death date in MM/DD/YYYY.", "ideal": "09/09/2025"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Give the full date of death.", "ideal": "09/09/2025"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. What is the month and day of his death?", "ideal": "09/09"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. What year did he pass away?", "ideal": "2025"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. State his death year only.", "ideal": "2025"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. What year was his death reported?", "ideal": "2025"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Which day in September 2025 did he die?", "ideal": "09"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name contains 'rib'?", "ideal": "ribleaf"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name starts with 'Ribwort'?", "ideal": "ribwort plantain"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name contains 'leaf'?", "ideal": "ribleaf"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name has 'narrow' in it?", "ideal": "narrowleaf plantain"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name mentions 'English'?", "ideal": "English plantain"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name mentions a horned animal?", "ideal": "buckhorn"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Provide the name beginning with 'ribwort'.", "ideal": "ribwort plantain"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which is the simplest one-word common name?", "ideal": "ribleaf"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. What common name refers to its narrow leaves?", "ideal": "narrowleaf plantain"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. What is the common name that pairs 'ribwort' with 'plantain'?", "ideal": "ribwort plantain"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Extract his death date.", "ideal": "09/09/2025"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Provide day of death only.", "ideal": "09"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Provide month of death only.", "ideal": "09"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Provide year of death only.", "ideal": "2025"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. What month in 2025 did he pass away?", "ideal": "09"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. What date did he die, with month name?", "ideal": "September 9, 2025"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Which season did his death occur in?", "ideal": "Fall"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Did he die in 2024 or 2025?", "ideal": "2025"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Was his death in September?", "ideal": "Yes"}
-{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Was his death in August?", "ideal": "No"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name has 'buck'?", "ideal": "buckhorn"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name refers to England?", "ideal": "English plantain"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name is used in folk herbalism with 'tongue'?", "ideal": "lamb's tongue"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name suggests livestock imagery?", "ideal": "lamb's tongue"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name is two syllables only?", "ideal": "ribleaf"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name combines 'narrow' and 'leaf'?", "ideal": "narrowleaf plantain"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name describes ribs of leaves?", "ideal": "ribwort plantain"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name includes 'horn'?", "ideal": "buckhorn"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name includes 'rib' and 'wort'?", "ideal": "ribwort plantain"}
-{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name contains 'English'?", "ideal": "English plantain"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. What are the common names for this plant, especially one that has an animal in the name?", "ground_truth": "lamb's tongue"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. List at least three of its common names.", "ground_truth": "ribwort plantain, narrowleaf plantain, English plantain"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name refers to a lamb?", "ground_truth": "lamb's tongue"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Provide all the common names separated by semicolons.", "ground_truth": "ribwort plantain; narrowleaf plantain; English plantain; ribleaf; lamb's tongue; buckhorn"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name includes a farm animal?", "ground_truth": "lamb's tongue"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. What is the colloquial name involving sheep?", "ground_truth": "lamb's tongue"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Identify the animal-based folk name.", "ground_truth": "lamb's tongue"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name includes 'tongue'?", "ground_truth": "lamb's tongue"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name includes the word 'buck'?", "ground_truth": "buckhorn"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name is two words and starts with 'English'?", "ground_truth": "English plantain"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. When did Robert K. Corbin pass away? Express as MM/DD/YYYY.", "ground_truth": "09/09/2025"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Provide his date of death in US format.", "ground_truth": "09/09/2025"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. On what date did he die? MM/DD/YYYY.", "ground_truth": "09/09/2025"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Return his death date in MM/DD/YYYY.", "ground_truth": "09/09/2025"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Give the full date of death.", "ground_truth": "09/09/2025"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. What is the month and day of his death?", "ground_truth": "09/09"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. What year did he pass away?", "ground_truth": "2025"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. State his death year only.", "ground_truth": "2025"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. What year was his death reported?", "ground_truth": "2025"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Which day in September 2025 did he die?", "ground_truth": "09"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name contains 'rib'?", "ground_truth": "ribleaf"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name starts with 'Ribwort'?", "ground_truth": "ribwort plantain"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name contains 'leaf'?", "ground_truth": "ribleaf"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name has 'narrow' in it?", "ground_truth": "narrowleaf plantain"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name mentions 'English'?", "ground_truth": "English plantain"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name mentions a horned animal?", "ground_truth": "buckhorn"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Provide the name beginning with 'ribwort'.", "ground_truth": "ribwort plantain"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which is the simplest one-word common name?", "ground_truth": "ribleaf"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. What common name refers to its narrow leaves?", "ground_truth": "narrowleaf plantain"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. What is the common name that pairs 'ribwort' with 'plantain'?", "ground_truth": "ribwort plantain"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Extract his death date.", "ground_truth": "09/09/2025"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Provide day of death only.", "ground_truth": "09"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Provide month of death only.", "ground_truth": "09"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Provide year of death only.", "ground_truth": "2025"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. What month in 2025 did he pass away?", "ground_truth": "09"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. What date did he die, with month name?", "ground_truth": "September 9, 2025"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Which season did his death occur in?", "ground_truth": "Fall"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Did he die in 2024 or 2025?", "ground_truth": "2025"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Was his death in September?", "ground_truth": "Yes"}
+{"input": "Read `https://en.wikipedia.org/wiki/Robert_K._Corbin`. Was his death in August?", "ground_truth": "No"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name has 'buck'?", "ground_truth": "buckhorn"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name refers to England?", "ground_truth": "English plantain"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name is used in folk herbalism with 'tongue'?", "ground_truth": "lamb's tongue"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name suggests livestock imagery?", "ground_truth": "lamb's tongue"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name is two syllables only?", "ground_truth": "ribleaf"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name combines 'narrow' and 'leaf'?", "ground_truth": "narrowleaf plantain"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name describes ribs of leaves?", "ground_truth": "ribwort plantain"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name includes 'horn'?", "ground_truth": "buckhorn"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name includes 'rib' and 'wort'?", "ground_truth": "ribwort plantain"}
+{"input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name contains 'English'?", "ground_truth": "English plantain"}

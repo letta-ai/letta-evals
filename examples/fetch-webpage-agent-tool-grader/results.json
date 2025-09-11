@@ -30,7 +30,7 @@
     {
       "sample": {
         "input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. What are the common names for this plant, especially one that has an animal in the name?",
-        "ideal": "lamb's tongue",
+        "ground_truth": "lamb's tongue",
         "metadata": {
           "tags": [],
           "extra": {}
@@ -123,7 +123,7 @@
       "agent_id": "agent-ca84e41d-c994-4009-9ce4-6b21abd0a79b",
       "grade": {
         "score": 1.0,
-        "rationale": "Contains ideal: True",
+        "rationale": "Contains ground_truth: True",
         "metadata": {}
       },
       "metadata": null
@@ -131,7 +131,7 @@
     {
       "sample": {
         "input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. List at least three of its common names.",
-        "ideal": "ribwort plantain, narrowleaf plantain, English plantain",
+        "ground_truth": "ribwort plantain, narrowleaf plantain, English plantain",
         "metadata": {
           "tags": [],
           "extra": {}
@@ -224,7 +224,7 @@
       "agent_id": "agent-d5069765-062d-424a-b32c-501e84a322d5",
       "grade": {
         "score": 0.0,
-        "rationale": "Contains ideal: False",
+        "rationale": "Contains ground_truth: False",
         "metadata": {}
       },
       "metadata": null
@@ -232,7 +232,7 @@
     {
       "sample": {
         "input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name refers to a lamb?",
-        "ideal": "lamb's tongue",
+        "ground_truth": "lamb's tongue",
         "metadata": {
           "tags": [],
           "extra": {}
@@ -325,7 +325,7 @@
       "agent_id": "agent-3ba2db58-dc27-4157-a4a9-dd20539f3c27",
       "grade": {
         "score": 1.0,
-        "rationale": "Contains ideal: True",
+        "rationale": "Contains ground_truth: True",
         "metadata": {}
       },
       "metadata": null
@@ -333,7 +333,7 @@
     {
       "sample": {
         "input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Provide all the common names separated by semicolons.",
-        "ideal": "ribwort plantain; narrowleaf plantain; English plantain; ribleaf; lamb's tongue; buckhorn",
+        "ground_truth": "ribwort plantain; narrowleaf plantain; English plantain; ribleaf; lamb's tongue; buckhorn",
         "metadata": {
           "tags": [],
           "extra": {}
@@ -426,7 +426,7 @@
       "agent_id": "agent-d5d2e90f-454b-4e01-ba4f-ca1a633c4316",
       "grade": {
         "score": 1.0,
-        "rationale": "Contains ideal: True",
+        "rationale": "Contains ground_truth: True",
         "metadata": {}
       },
       "metadata": null
@@ -434,7 +434,7 @@
     {
       "sample": {
         "input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name includes a farm animal?",
-        "ideal": "lamb's tongue",
+        "ground_truth": "lamb's tongue",
         "metadata": {
           "tags": [],
           "extra": {}
@@ -527,7 +527,7 @@
       "agent_id": "agent-687d0761-d63f-45de-bb34-14ccde15294b",
       "grade": {
         "score": 1.0,
-        "rationale": "Contains ideal: True",
+        "rationale": "Contains ground_truth: True",
         "metadata": {}
       },
       "metadata": null
@@ -535,7 +535,7 @@
     {
       "sample": {
         "input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. What is the colloquial name involving sheep?",
-        "ideal": "lamb's tongue",
+        "ground_truth": "lamb's tongue",
         "metadata": {
           "tags": [],
           "extra": {}
@@ -628,7 +628,7 @@
       "agent_id": "agent-d5671e91-198a-4138-9f68-6e249b84a901",
       "grade": {
         "score": 1.0,
-        "rationale": "Contains ideal: True",
+        "rationale": "Contains ground_truth: True",
         "metadata": {}
       },
       "metadata": null
@@ -636,7 +636,7 @@
     {
       "sample": {
         "input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Identify the animal-based folk name.",
-        "ideal": "lamb's tongue",
+        "ground_truth": "lamb's tongue",
         "metadata": {
           "tags": [],
           "extra": {}
@@ -729,7 +729,7 @@
       "agent_id": "agent-1c571ceb-36a4-41ef-abff-9b2651304915",
       "grade": {
         "score": 1.0,
-        "rationale": "Contains ideal: True",
+        "rationale": "Contains ground_truth: True",
         "metadata": {}
       },
       "metadata": null
@@ -737,7 +737,7 @@
     {
       "sample": {
         "input": "Read `https://en.wikipedia.org/wiki/Plantago_lanceolata`. Which common name includes 'tongue'?",
-        "ideal": "lamb's tongue",
+        "ground_truth": "lamb's tongue",
         "metadata": {
           "tags": [],
           "extra": {}

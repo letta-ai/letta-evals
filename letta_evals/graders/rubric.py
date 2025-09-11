@@ -114,8 +114,8 @@ IMPORTANT:
         prompt = prompt.replace("{input}", str(sample.input))
         prompt = prompt.replace("{submission}", submission)
 
-        if sample.ideal:
-            prompt = prompt.replace("{ideal}", sample.ideal)
+        if sample.ground_truth:
+            prompt = prompt.replace("{ground_truth}", sample.ground_truth)
 
         if "{metadata}" in prompt and sample.metadata:
             metadata_str = json.dumps(sample.metadata.model_dump(), indent=2)
@@ -129,8 +129,8 @@ IMPORTANT:
             str(sample.input),
         ]
 
-        if sample.ideal:
-            parts.extend(["", "## Ideal Answer", sample.ideal])
+        if sample.ground_truth:
+            parts.extend(["", "## Ground Truth Answer", sample.ground_truth])
 
         parts.extend(
             [

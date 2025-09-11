@@ -25,7 +25,9 @@ def load_jsonl(
                 if not any(tag in metadata.tags for tag in sample_tags):
                     continue
 
-            sample = Sample(input=data["input"], ideal=data.get("ideal"), metadata=metadata, id=data.get("id"))
+            sample = Sample(
+                input=data["input"], ground_truth=data.get("ground_truth"), metadata=metadata, id=data.get("id")
+            )
 
             yield sample
             count += 1
