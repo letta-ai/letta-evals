@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Union
 from letta_client import LettaMessageUnion
 from pydantic import BaseModel, Field, field_validator
 
-from letta_evals.config.types import GraderKind, LLMProvider, MetricOp, TargetKind
+from letta_evals.types import GraderKind, LLMProvider, MetricOp, TargetKind
 
 # Dataset models
 

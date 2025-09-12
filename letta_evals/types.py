@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Optional, Protocol, runtime_checkable
 
 
@@ -28,3 +29,24 @@ class ProgressCallback(Protocol):
     async def sample_error(self, sample_id: int, error: str) -> None:
         """Called when a sample evaluation encounters an error."""
         ...
+
+
+class TargetKind(str, Enum):
+    AGENT = "agent"
+
+
+class GraderKind(str, Enum):
+    TOOL = "tool"
+    RUBRIC = "rubric"
+
+
+class MetricOp(str, Enum):
+    GT = "gt"
+    GTE = "gte"
+    LT = "lt"
+    LTE = "lte"
+    EQ = "eq"
+
+
+class LLMProvider(str, Enum):
+    OPENAI = "openai"

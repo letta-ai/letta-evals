@@ -130,20 +130,16 @@ def agent_factory(func: Callable) -> Callable:
     sig = inspect.signature(func)
     params = list(sig.parameters.values())
 
-    # check parameter count
     if len(params) != 1:
         raise TypeError(f"Agent factory {func.__name__} must have exactly 1 parameter (client), " f"got {len(params)}")
 
-    # check parameter name
     param_name = params[0].name
     if param_name != "client":
         raise TypeError(f"Agent factory {func.__name__} must have parameter named 'client', " f"got '{param_name}'")
 
-    # check if it's async
     if not inspect.iscoroutinefunction(func):
         raise TypeError(f"Agent factory {func.__name__} must be an async function")
 
-    # check return type annotation if present
     if sig.return_annotation != inspect.Signature.empty:
         if sig.return_annotation is not str:
             raise TypeError(

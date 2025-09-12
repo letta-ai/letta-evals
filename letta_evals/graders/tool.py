@@ -7,7 +7,7 @@ from letta_evals.decorators import GRADER_REGISTRY
 from letta_evals.extractors import get_extractor
 from letta_evals.graders.base import Grader
 from letta_evals.models import GradeResult, Sample
-from letta_evals.utils.module_loader import load_object
+from letta_evals.utils import load_object
 
 
 class ToolGrader(Grader):

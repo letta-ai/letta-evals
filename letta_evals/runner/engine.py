@@ -4,7 +4,6 @@ from typing import List, Optional
 
 import yaml
 
-from letta_evals.config.types import GraderKind, TargetKind
 from letta_evals.datasets.loader import load_jsonl
 from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
@@ -12,7 +11,7 @@ from letta_evals.graders.tool import ToolGrader
 from letta_evals.models import Metrics, RunnerResult, Sample, SampleResult, SuiteSpec
 from letta_evals.targets.agent import AgentTarget
 from letta_evals.targets.base import Target
-from letta_evals.types import ProgressCallback
+from letta_evals.types import GraderKind, ProgressCallback, TargetKind
 
 
 class Runner:
