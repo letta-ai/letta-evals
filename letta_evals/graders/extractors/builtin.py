@@ -1,15 +1,13 @@
-import json
 import re
 from typing import List
 
-from letta_client import AssistantMessage, LettaMessageUnion
+from letta_client import AssistantMessage, LettaMessageUnion, ToolCallMessage, ToolReturnMessage
 
 from letta_evals.graders.extractors.base import SubmissionExtractor
 from letta_evals.graders.extractors.utils import (
     flatten_content,
     get_assistant_messages,
     get_last_turn_messages,
-    get_tool_calls,
 )
 
 
@@ -80,29 +78,20 @@ class PatternExtractor(SubmissionExtractor):
         return ""
 
 
-class JSONExtractor(SubmissionExtractor):
-    """Extract JSON fields from structured responses."""
+class ToolArgumentsExtractor(SubmissionExtractor):
+    """Extract arguments from specific tool calls."""
 
     def extract(self, trajectory: List[List[LettaMessageUnion]]) -> str:
-        field = self.config["field"]
+        tool_name = self.config["tool_name"]
 
-        messages = get_assistant_messages(trajectory)
+        for turn in trajectory:
+            for message in turn:
+                if isinstance(message, ToolCallMessage):
+                    for tool_call in message.tool_calls:
+                        if tool_call.function.name == tool_name:
+                            return tool_call.function.arguments
 
-        for msg in reversed(messages):
-            content = flatten_content(msg.content)
-            json_start = content.find("{")
-            json_end = content.rfind("}") + 1
-            if json_start >= 0 and json_end > json_start:
-                json_str = content[json_start:json_end]
-                data = json.loads(json_str)
-                fields = field.split(".")
-                value = data
-                for f in fields:
-                    value = value[f]
-
-                return str(value)
-
-        return ""
+        return "{}"
 
 
 class ToolOutputExtractor(SubmissionExtractor):
@@ -110,18 +99,27 @@ class ToolOutputExtractor(SubmissionExtractor):
 
     def extract(self, trajectory: List[List[LettaMessageUnion]]) -> str:
         tool_name = self.config["tool_name"]
-        field = self.config.get("field")
 
-        tool_pairs = get_tool_calls(trajectory)
+        # find the tool call first
+        tool_call_id = None
+        for turn in trajectory:
+            for message in turn:
+                if isinstance(message, ToolCallMessage):
+                    for tool_call in message.tool_calls:
+                        if tool_call.function.name == tool_name:
+                            tool_call_id = tool_call.id
+                            break
+                    if tool_call_id:
+                        break
+            if tool_call_id:
+                break
 
-        for call, ret in reversed(tool_pairs):
-            for tool_call in call.tool_calls:
-                if tool_call.function.name == tool_name:
-                    output = ret.tool_return
-                    if field:
-                        return str(getattr(output, field))
-                    else:
-                        return str(output)
+        # if we found a matching tool call, find its return
+        if tool_call_id:
+            for turn in trajectory:
+                for message in turn:
+                    if isinstance(message, ToolReturnMessage) and message.tool_call_id == tool_call_id:
+                        return message.tool_return
 
         return ""
 

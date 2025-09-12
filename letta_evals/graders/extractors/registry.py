@@ -7,10 +7,10 @@ from letta_evals.graders.extractors.builtin import (
     AfterMarkerExtractor,
     AllAssistantExtractor,
     FirstAssistantExtractor,
-    JSONExtractor,
     LastAssistantExtractor,
     LastTurnExtractor,
     PatternExtractor,
+    ToolArgumentsExtractor,
     ToolOutputExtractor,
 )
 from letta_evals.utils.module_loader import load_object
@@ -21,7 +21,7 @@ EXTRACTOR_REGISTRY: Dict[str, Type[SubmissionExtractor]] = {
     "all_assistant": AllAssistantExtractor,
     "last_turn": LastTurnExtractor,
     "pattern": PatternExtractor,
-    "json": JSONExtractor,
+    "tool_arguments": ToolArgumentsExtractor,
     "tool_output": ToolOutputExtractor,
     "after_marker": AfterMarkerExtractor,
 }
