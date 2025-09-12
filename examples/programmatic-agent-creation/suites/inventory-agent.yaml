@@ -1,0 +1,16 @@
+name: programmatic-inventory-agent-test
+description: Test inventory agent created programmatically via Python script
+dataset: examples/programmatic-agent-creation/datasets/inventory.jsonl
+target:
+  kind: agent
+  agent_script: examples/programmatic-agent-creation/create_agent.py:InventoryAgentFactory
+  base_url: http://localhost:8283
+grader:
+  kind: tool
+  function: contains
+  extractor: tool_output
+  extractor_config:
+    tool_name: manage_inventory
+gate:
+  op: gte
+  value: 1.0

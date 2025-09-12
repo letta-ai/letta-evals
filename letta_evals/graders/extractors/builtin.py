@@ -87,9 +87,8 @@ class ToolArgumentsExtractor(SubmissionExtractor):
         for turn in trajectory:
             for message in turn:
                 if isinstance(message, ToolCallMessage):
-                    for tool_call in message.tool_calls:
-                        if tool_call.function.name == tool_name:
-                            return tool_call.function.arguments
+                    if message.tool_call.name == tool_name:
+                        return message.tool_call.arguments
 
         return "{}"
 
@@ -105,10 +104,9 @@ class ToolOutputExtractor(SubmissionExtractor):
         for turn in trajectory:
             for message in turn:
                 if isinstance(message, ToolCallMessage):
-                    for tool_call in message.tool_calls:
-                        if tool_call.function.name == tool_name:
-                            tool_call_id = tool_call.id
-                            break
+                    if message.tool_call.name == tool_name:
+                        tool_call_id = message.tool_call.tool_call_id
+                        break
                     if tool_call_id:
                         break
             if tool_call_id:

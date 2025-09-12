@@ -1,0 +1,3 @@
+{"input": "Add 10 units of SKU-123 (Widget A) at $19.99 in electronics category", "ground_truth": "Widget A"}
+{"input": "Remove 5 units of SKU-456 (Gadget B) from inventory", "ground_truth": "Gadget B"}
+{"input": "Update stock for SKU-789 (Device C) with quantity change of +20", "ground_truth": "Device C"}

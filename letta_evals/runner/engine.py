@@ -34,6 +34,7 @@ class Runner:
                 base_url=self.suite.target.base_url,
                 agent_id=self.suite.target.agent_id,
                 agent_file=self.suite.target.agent_file,
+                agent_script=self.suite.target.agent_script,
                 api_key=self.suite.target.api_key,
                 timeout=self.suite.target.timeout,
             )

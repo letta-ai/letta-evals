@@ -43,6 +43,9 @@ class TargetSpec(BaseModel):
 
     agent_id: Optional[str] = Field(default=None, description="ID of existing agent to use")
     agent_file: Optional[Path] = Field(default=None, description="Path to .af agent file to upload")
+    agent_script: Optional[str] = Field(
+        default=None, description="Path to Python script with AgentFactory (e.g., script.py:FactoryClass)"
+    )
 
     @field_validator("agent_file")
     def validate_agent_file(cls, v: Optional[Path]) -> Optional[Path]:
@@ -53,10 +56,13 @@ class TargetSpec(BaseModel):
     def __init__(self, **data):
         super().__init__(**data)
         if self.kind == TargetKind.AGENT:
-            if not self.agent_id and not self.agent_file:
-                raise ValueError("Agent target requires either agent_id or agent_file")
-            if self.agent_id and self.agent_file:
-                raise ValueError("Agent target cannot have both agent_id and agent_file")
+            sources = [self.agent_id, self.agent_file, self.agent_script]
+            provided = sum(1 for s in sources if s is not None)
+
+            if provided == 0:
+                raise ValueError("Agent target requires one of: agent_id, agent_file, or agent_script")
+            if provided > 1:
+                raise ValueError("Agent target can only have one of: agent_id, agent_file, or agent_script")
 
 
 class GraderSpec(BaseModel):
