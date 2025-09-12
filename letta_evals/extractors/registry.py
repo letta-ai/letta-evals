@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Callable
 
 from letta_evals.decorators import EXTRACTOR_REGISTRY
-from letta_evals.utils.module_loader import load_object
+from letta_evals.utils import load_object
 
 
 def get_extractor(name: str, config: dict = None, base_dir: Path = None) -> Callable:

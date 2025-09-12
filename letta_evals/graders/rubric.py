@@ -6,10 +6,10 @@ from dotenv import load_dotenv
 from letta_client import LettaMessageUnion
 from openai import AsyncOpenAI
 
-from letta_evals.config.types import LLMProvider
 from letta_evals.extractors import get_extractor
 from letta_evals.graders.base import Grader
 from letta_evals.models import GradeResult, Sample
+from letta_evals.types import LLMProvider
 
 load_dotenv()
 
