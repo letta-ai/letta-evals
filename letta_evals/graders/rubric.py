@@ -7,8 +7,8 @@ from letta_client import LettaMessageUnion
 from openai import AsyncOpenAI
 
 from letta_evals.config.types import LLMProvider
+from letta_evals.extractors import get_extractor
 from letta_evals.graders.base import Grader
-from letta_evals.graders.extractors.registry import get_extractor
 from letta_evals.models import GradeResult, Sample
 
 load_dotenv()
@@ -49,7 +49,7 @@ class RubricGrader(Grader):
 
     async def grade(self, sample: Sample, trajectory: List[List[LettaMessageUnion]]) -> GradeResult:
         """Grade using LLM judge with rubric."""
-        submission = self.extractor.extract(trajectory)
+        submission = self.extractor(trajectory)
 
         judge_prompt = self._build_judge_prompt(sample, submission)
 

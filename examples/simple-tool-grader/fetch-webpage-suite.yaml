@@ -1,9 +1,9 @@
 name: fetch-webpage-test
 description: Test if agent can fetch webpage content and extract information
-dataset: examples/fetch-webpage-agent-tool-grader/datasets/fetch-webpage.jsonl
+dataset: fetch-webpage-dataset.jsonl
 target:
   kind: agent
-  agent_file: examples/fetch-webpage-agent-tool-grader/test-fetch-webpage-simple-agent.af
+  agent_file: test-fetch-webpage-simple-agent.af
   base_url: http://localhost:8283
 grader:
   kind: tool

@@ -47,6 +47,9 @@ class TargetSpec(BaseModel):
         default=None, description="Path to Python script with AgentFactory (e.g., script.py:FactoryClass)"
     )
 
+    # internal field for path resolution
+    base_dir: Optional[Path] = Field(default=None, exclude=True)
+
     @field_validator("agent_file")
     def validate_agent_file(cls, v: Optional[Path]) -> Optional[Path]:
         if v and not str(v).endswith(".af"):
@@ -71,7 +74,6 @@ class GraderSpec(BaseModel):
     kind: GraderKind = Field(description="Type of grader (tool or rubric)")
 
     function: Optional[str] = Field(default=None, description="Name of grading function for tool grader")
-    module: Optional[str] = Field(default=None, description="Python module containing grading function")
 
     prompt: Optional[str] = Field(default=None, description="Rubric prompt for LLM judge")
     prompt_path: Optional[Path] = Field(default=None, description="Path to file containing rubric prompt")
@@ -134,8 +136,35 @@ class SuiteSpec(BaseModel):
     sample_tags: Optional[List[str]] = Field(default=None, description="Only evaluate samples with these tags")
 
     @classmethod
-    def from_yaml(cls, yaml_data: Dict[str, Any]) -> "SuiteSpec":
+    def from_yaml(cls, yaml_data: Dict[str, Any], base_dir: Optional[Path] = None) -> "SuiteSpec":
         """Create from parsed YAML data."""
+        if base_dir:
+            # resolve dataset path
+            if "dataset" in yaml_data and not Path(yaml_data["dataset"]).is_absolute():
+                yaml_data["dataset"] = str((base_dir / yaml_data["dataset"]).resolve())
+
+            # resolve target paths
+            if "target" in yaml_data:
+                if "agent_file" in yaml_data["target"] and yaml_data["target"]["agent_file"]:
+                    if not Path(yaml_data["target"]["agent_file"]).is_absolute():
+                        yaml_data["target"]["agent_file"] = str(
+                            (base_dir / yaml_data["target"]["agent_file"]).resolve()
+                        )
+
+                # store base_dir in target for agent_script resolution
+                yaml_data["target"]["base_dir"] = base_dir
+
+            # resolve grader paths
+            if "grader" in yaml_data:
+                if "prompt_path" in yaml_data["grader"] and yaml_data["grader"]["prompt_path"]:
+                    if not Path(yaml_data["grader"]["prompt_path"]).is_absolute():
+                        yaml_data["grader"]["prompt_path"] = str(
+                            (base_dir / yaml_data["grader"]["prompt_path"]).resolve()
+                        )
+
+                # store base_dir in grader for custom function resolution
+                yaml_data["grader"]["base_dir"] = base_dir
+
         if "gate" in yaml_data and isinstance(yaml_data["gate"], dict):
             yaml_data["gate"] = GateSpec(**yaml_data["gate"])
         return cls(**yaml_data)

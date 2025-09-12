@@ -1,13 +1,13 @@
 name: ascii-art-rubric-test
 description: Test if agent can generate ASCII art correctly using rubric grading
-dataset: examples/ascii-art-agent-rubric-grader/datasets/ascii-prompts.jsonl
+dataset: ascii-art-dataset.jsonl
 target:
   kind: agent
-  agent_file: examples/ascii-art-agent-rubric-grader/ascii-art-agent.af
+  agent_file: ascii-art-agent.af
   base_url: http://localhost:8283
 grader:
   kind: rubric
-  prompt_path: examples/ascii-art-agent-rubric-grader/rubric.txt
+  prompt_path: rubric.txt
   model: gpt-4.1
   temperature: 0.0
   provider: openai

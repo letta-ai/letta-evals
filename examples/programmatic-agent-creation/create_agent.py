@@ -4,7 +4,7 @@ from letta_client import AsyncLetta, CreateBlock
 from letta_client.client import BaseTool
 from pydantic import BaseModel
 
-from letta_evals.targets.agent_factory import AgentFactory
+from letta_evals.decorators import agent_factory
 
 
 class InventoryItem(BaseModel):
@@ -35,31 +35,29 @@ class ManageInventoryTool(BaseTool):
         return f"Updated inventory for {data.item.name} with a quantity change of {quantity_change}"
 
 
-class InventoryAgentFactory(AgentFactory):
-    """Factory that creates an inventory management agent with custom tools."""
-
-    async def create(self, client: AsyncLetta) -> str:
-        """Create an inventory management agent using the Letta SDK."""
-        # Use the tool if it already exists
-        tools = await client.tools.list(name="manage_inventory")
-        if tools:
-            tool = tools[0]
-        else:
-            tool = await client.tools.add(
-                tool=ManageInventoryTool(),
-            )
-
-        agent = await client.agents.create(
-            memory_blocks=[
-                CreateBlock(
-                    label="persona",
-                    value="You are a helpful inventory management assistant.",
-                ),
-            ],
-            model="openai/gpt-4o-mini",
-            embedding="openai/text-embedding-3-small",
-            tool_ids=[tool.id],
-            include_base_tools=False,
+@agent_factory
+async def create_inventory_agent(client: AsyncLetta) -> str:
+    """Create an inventory management agent using the Letta SDK."""
+    # use the tool if it already exists
+    tools = await client.tools.list(name="manage_inventory")
+    if tools:
+        tool = tools[0]
+    else:
+        tool = await client.tools.add(
+            tool=ManageInventoryTool(),
         )
 
-        return agent.id
+    agent = await client.agents.create(
+        memory_blocks=[
+            CreateBlock(
+                label="persona",
+                value="You are a helpful inventory management assistant.",
+            ),
+        ],
+        model="openai/gpt-4o-mini",
+        embedding="openai/text-embedding-3-small",
+        tool_ids=[tool.id],
+        include_base_tools=False,
+    )
+
+    return agent.id
