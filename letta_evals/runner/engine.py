@@ -1,6 +1,6 @@
 import asyncio
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import List, Optional
 
 import yaml
 
@@ -12,12 +12,13 @@ from letta_evals.graders.tool import ToolGrader
 from letta_evals.models import Metrics, RunnerResult, Sample, SampleResult, SuiteSpec
 from letta_evals.targets.agent import AgentTarget
 from letta_evals.targets.base import Target
+from letta_evals.types import ProgressCallback
 
 
 class Runner:
     """Main evaluation runner."""
 
-    def __init__(self, suite: SuiteSpec, max_concurrent: int, progress_callback: Optional[Callable] = None):
+    def __init__(self, suite: SuiteSpec, max_concurrent: int, progress_callback: Optional[ProgressCallback] = None):
         self.suite: SuiteSpec = suite
         self.target: Target = self._create_target()
         self.grader: Grader = self._create_grader()
@@ -139,7 +140,7 @@ class Runner:
 
 
 async def run_suite(
-    suite_path: Path, max_concurrent: int, progress_callback: Optional[Callable] = None
+    suite_path: Path, max_concurrent: int, progress_callback: Optional[ProgressCallback] = None
 ) -> RunnerResult:
     """Load and run a suite from YAML file."""
     with open(suite_path, "r") as f:
