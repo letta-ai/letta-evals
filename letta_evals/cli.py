@@ -42,9 +42,7 @@ def run(
     try:
         with open(suite_path, "r") as f:
             yaml_data = yaml.safe_load(f)
-        suite = SuiteSpec.from_yaml(yaml_data)
-        if suite.grader:
-            suite.grader.base_dir = suite_path.parent
+        suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent)
 
         samples = list(load_jsonl(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
         total_samples = len(samples)
@@ -123,7 +121,7 @@ def validate(suite_path: Path = typer.Argument(..., help="Path to suite YAML fil
         with open(suite_path, "r") as f:
             yaml_data = yaml.safe_load(f)
 
-        suite = SuiteSpec.from_yaml(yaml_data)
+        suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent)
         console.print(f"[green]✓ Suite '{suite.name}' is valid[/green]")
 
         console.print("\n[bold]Configuration:[/bold]")
@@ -142,7 +140,7 @@ def validate(suite_path: Path = typer.Argument(..., help="Path to suite YAML fil
 def list_extractors():
     """List available submission extractors."""
 
-    from letta_evals.graders.extractors.registry import EXTRACTOR_REGISTRY
+    from letta_evals.extractors import EXTRACTOR_REGISTRY
 
     table = Table(title="Available Extractors")
     table.add_column("Name", style="cyan")

@@ -1,47 +1,13 @@
-import importlib
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from letta_client import LettaMessageUnion
 
+from letta_evals.decorators import GRADER_REGISTRY
+from letta_evals.extractors import get_extractor
 from letta_evals.graders.base import Grader
-from letta_evals.graders.extractors.registry import get_extractor
 from letta_evals.models import GradeResult, Sample
 from letta_evals.utils.module_loader import load_object
-
-GRADER_REGISTRY: Dict[str, callable] = {}
-
-
-def register_grader(name: str):
-    """Decorator to register a grader function."""
-
-    def decorator(func):
-        GRADER_REGISTRY[name] = func
-        return func
-
-    return decorator
-
-
-@register_grader("exact_match")
-def exact_match(sample: Sample, submission: str) -> GradeResult:
-    """Check if submission exactly matches ground_truth."""
-    if not sample.ground_truth:
-        return GradeResult(score=0.0, rationale="No ground_truth answer provided")
-
-    matches = submission.strip() == sample.ground_truth.strip()
-    score = 1.0 if matches else 0.0
-    return GradeResult(score=score, rationale=f"Exact match: {matches}")
-
-
-@register_grader("contains")
-def contains(sample: Sample, submission: str) -> GradeResult:
-    """Check if submission contains ground_truth answer."""
-    if not sample.ground_truth:
-        return GradeResult(score=0.0, rationale="No ground_truth answer provided")
-
-    found = sample.ground_truth.lower() in submission.lower()
-    score = 1.0 if found else 0.0
-    return GradeResult(score=score, rationale=f"Contains ground_truth: {found}")
 
 
 class ToolGrader(Grader):
@@ -50,29 +16,28 @@ class ToolGrader(Grader):
     def __init__(
         self,
         function: str,
-        module: Optional[str] = None,
         extractor: str = "last_assistant",
         extractor_config: Optional[dict] = None,
         base_dir: Optional[Path] = None,
     ):
         self.function_name = function
-        self.module = module
         self.extractor = get_extractor(extractor, extractor_config, base_dir=base_dir)
 
-        # try registry first
         if function in GRADER_REGISTRY:
             self.func = GRADER_REGISTRY[function]
-        # try loading from file path
         elif ":" in function:
-            self.func = load_object(function, base_dir=base_dir)
-        # fall back to module import
-        elif module:
-            mod = importlib.import_module(module)
-            self.func = getattr(mod, function)
+            obj = load_object(function, base_dir=base_dir)
+            if callable(obj) and hasattr(obj, "_is_grader"):
+                self.func = obj
+            else:
+                raise ValueError(
+                    f"Loaded object {function} is not a valid @grader decorated function. "
+                    f"Please use the @grader decorator."
+                )
         else:
-            raise ValueError(f"Grader function '{function}' not found in registry and no module specified")
+            raise ValueError(f"Grader function '{function}' not found in registry")
 
     async def grade(self, sample: Sample, trajectory: List[List[LettaMessageUnion]]) -> GradeResult:
         """Grade using the tool function."""
-        submission = self.extractor.extract(trajectory)
+        submission = self.extractor(trajectory)
         return self.func(sample, submission)

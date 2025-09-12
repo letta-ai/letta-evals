@@ -37,6 +37,7 @@ class Runner:
                 agent_script=self.suite.target.agent_script,
                 api_key=self.suite.target.api_key,
                 timeout=self.suite.target.timeout,
+                base_dir=self.suite.target.base_dir,
             )
         else:
             raise ValueError(f"Unknown target kind: {self.suite.target.kind}")
@@ -46,7 +47,6 @@ class Runner:
         if self.suite.grader.kind == GraderKind.TOOL:
             return ToolGrader(
                 function=self.suite.grader.function,
-                module=self.suite.grader.module,
                 extractor=self.suite.grader.extractor,
                 extractor_config=self.suite.grader.extractor_config,
                 base_dir=self.suite.grader.base_dir,
@@ -147,8 +147,7 @@ async def run_suite(
     with open(suite_path, "r") as f:
         yaml_data = yaml.safe_load(f)
 
-    suite = SuiteSpec.from_yaml(yaml_data)
-    if suite.grader:
-        suite.grader.base_dir = suite_path.parent
+    suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent)
+
     runner = Runner(suite, max_concurrent=max_concurrent, progress_callback=progress_callback)
     return await runner.run()

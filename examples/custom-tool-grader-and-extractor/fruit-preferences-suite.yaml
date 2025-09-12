@@ -1,0 +1,14 @@
+name: fruit-preferences-test
+description: Test if agent correctly stores fruit preferences in memory
+dataset: fruit-preferences-dataset.jsonl
+target:
+  kind: agent
+  agent_file: fruit-preferences-agent.af
+  base_url: http://localhost:8283
+grader:
+  kind: tool
+  function: custom_evaluators.py:grade_fruit_preference
+  extractor: custom_evaluators.py:memory_insert_extractor
+gate:
+  op: gte
+  value: 1
