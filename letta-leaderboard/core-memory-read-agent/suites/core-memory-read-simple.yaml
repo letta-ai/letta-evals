@@ -1,0 +1,16 @@
+name: core-memory-read-simple
+description: Simple test for core memory reading with setup script to populate facts
+dataset: /Users/kevinlin/Documents/letta-evals-kit/core-memory-read-agent/datasets/core_memory_read.jsonl
+max_samples: 3  # Start with just 3 samples for debugging
+target:
+  kind: agent
+  agent_file: /Users/kevinlin/Documents/letta-evals-kit/core-memory-read-agent/core-memory-read-agent-v2.af
+  base_url: http://localhost:8283
+  setup_script: /Users/kevinlin/Documents/letta-evals-kit/core-memory-read-agent/setup_agent.py:setup_core_memory
+grader:
+  kind: tool
+  function: /Users/kevinlin/Documents/letta-evals-kit/core-memory-read-agent/core_memory_evaluators.py:grade_core_memory_read
+  extractor: /Users/kevinlin/Documents/letta-evals-kit/core-memory-read-agent/core_memory_evaluators.py:CoreMemoryResponseExtractor
+gate:
+  op: gte
+  value: 0.75  # Higher threshold since we now have the facts in memory

@@ -1,0 +1,16 @@
+name: core-memory-read-test
+description: Test if agent can correctly read information from core memory to answer questions about people and facts
+dataset: /Users/kevinlin/Documents/letta-evals-kit/core-memory-read-agent/datasets/core_memory_read.jsonl
+max_samples: 100  # Limit to first 100 samples for faster testing
+target:
+  kind: agent
+  agent_file: /Users/kevinlin/Documents/letta-evals-kit/core-memory-read-agent/core-memory-read-agent-v2.af
+  base_url: http://localhost:8283
+  setup_script: /Users/kevinlin/Documents/letta-evals-kit/core-memory-read-agent/setup_agent.py:setup_core_memory
+grader:
+  kind: tool
+  function: /Users/kevinlin/Documents/letta-evals-kit/core-memory-read-agent/core_memory_evaluators.py:grade_core_memory_read
+  extractor: /Users/kevinlin/Documents/letta-evals-kit/core-memory-read-agent/core_memory_evaluators.py:CoreMemoryResponseExtractor
+gate:
+  op: gte
+  value: 0.75  # Require 75% accuracy
