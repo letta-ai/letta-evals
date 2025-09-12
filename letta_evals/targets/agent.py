@@ -53,11 +53,9 @@ class AgentTarget(Target):
             if progress_callback and sample_id is not None:
                 await progress_callback.agent_loading(sample_id)
 
-            # load the agent factory class from the script
-            base_dir = Path.cwd()  # use current working directory as base
+            base_dir = Path.cwd()
             factory_class = load_object(self.agent_script, base_dir)
 
-            # instantiate the factory and create the agent
             factory = factory_class()
             agent_id = await factory.create(self.client)
 
