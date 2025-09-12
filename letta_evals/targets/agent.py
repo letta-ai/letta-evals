@@ -6,17 +6,25 @@ from letta_client import AsyncLetta, MessageCreate
 from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.base import Target
 from letta_evals.types import ProgressCallback
+from letta_evals.utils.module_loader import load_object
 
 
 class AgentTarget(Target):
     """Letta agent target for evaluation."""
 
     def __init__(
-        self, base_url: str, agent_id: str = None, agent_file: Path = None, api_key: str = None, timeout: float = 300.0
+        self,
+        base_url: str,
+        agent_id: str = None,
+        agent_file: Path = None,
+        agent_script: str = None,
+        api_key: str = None,
+        timeout: float = 300.0,
     ):
         self.base_url = base_url
         self.agent_id = agent_id
         self.agent_file = agent_file
+        self.agent_script = agent_script
 
         self.client = AsyncLetta(base_url=self.base_url, token=api_key, timeout=timeout)
 
@@ -40,6 +48,18 @@ class AgentTarget(Target):
                     )
 
                 agent_id = resp.agent_ids[0]
+
+        elif self.agent_script:
+            if progress_callback and sample_id is not None:
+                await progress_callback.agent_loading(sample_id)
+
+            # load the agent factory class from the script
+            base_dir = Path.cwd()  # use current working directory as base
+            factory_class = load_object(self.agent_script, base_dir)
+
+            # instantiate the factory and create the agent
+            factory = factory_class()
+            agent_id = await factory.create(self.client)
 
         trajectory = []
 

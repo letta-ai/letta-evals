@@ -1,0 +1,405 @@
+{
+  "suite": "programmatic-inventory-agent-test",
+  "config": {
+    "target": {
+      "kind": "agent",
+      "base_url": "http://localhost:8283",
+      "api_key": null,
+      "timeout": 300.0,
+      "agent_id": null,
+      "agent_file": null,
+      "agent_script": "examples/programmatic-agent-creation/create_agent.py:InventoryAgentFactory"
+    },
+    "grader": {
+      "kind": "tool",
+      "function": "contains",
+      "module": null,
+      "prompt": null,
+      "prompt_path": null,
+      "model": "gpt-4o-mini",
+      "temperature": 0.0,
+      "provider": "openai",
+      "extractor": "tool_output",
+      "extractor_config": {
+        "tool_name": "manage_inventory"
+      }
+    },
+    "gate": {
+      "op": "gte",
+      "value": 1.0
+    }
+  },
+  "results": [
+    {
+      "sample": {
+        "input": "Add 10 units of SKU-123 (Widget A) at $19.99 in electronics category",
+        "ground_truth": "Widget A",
+        "metadata": {
+          "tags": [],
+          "extra": {}
+        },
+        "id": null,
+        "submission": null,
+        "trajectory": null
+      },
+      "trajectory": [
+        [
+          {
+            "id": "message-9a499c96-b94d-4298-bf14-c155405f6516",
+            "date": "2025-09-12 18:05:55+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "9a499c96-b94d-4298-bf14-c155405f6500",
+            "sender_id": null,
+            "step_id": "step-ee5324dc-7702-4b56-bf00-bda54c557f13",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "Processing request to add inventory for SKU-123. Verifying details: 10 units of Widget A at $19.99 under electronics category. Preparing to execute the inventory management function.",
+            "signature": null
+          },
+          {
+            "id": "message-9a499c96-b94d-4298-bf14-c155405f6516",
+            "date": "2025-09-12 18:05:55+00:00",
+            "name": null,
+            "message_type": "tool_call_message",
+            "otid": "9a499c96-b94d-4298-bf14-c155405f6501",
+            "sender_id": null,
+            "step_id": "step-ee5324dc-7702-4b56-bf00-bda54c557f13",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_call": {
+              "name": "manage_inventory",
+              "arguments": "{\"data\": {\"timestamp\": 1694544350, \"item\": {\"sku\": \"SKU-123\", \"name\": \"Widget A\", \"price\": 19.99, \"category\": \"electronics\"}, \"transaction_id\": \"TXN-001\"}, \"quantity_change\": 10, \"request_heartbeat\": true}",
+              "tool_call_id": "call_ViO02Nkj8g2EYMdu3tOgzEXB"
+            }
+          },
+          {
+            "id": "message-2b811f4e-6f5e-42ea-a097-c98e44c9e37c",
+            "date": "2025-09-12 18:05:55+00:00",
+            "name": "manage_inventory",
+            "message_type": "tool_return_message",
+            "otid": "2b811f4e-6f5e-42ea-a097-c98e44c9e300",
+            "sender_id": null,
+            "step_id": "step-ee5324dc-7702-4b56-bf00-bda54c557f13",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_return": "Updated inventory for Widget A with a quantity change of 10",
+            "status": "success",
+            "tool_call_id": "call_ViO02Nkj8g2EYMdu3tOgzEXB",
+            "stdout": [],
+            "stderr": []
+          },
+          {
+            "id": "message-9f3d3a24-d315-4534-8c4a-faee6a391ee7",
+            "date": "2025-09-12 18:05:57+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "9f3d3a24-d315-4534-8c4a-faee6a391e80",
+            "sender_id": null,
+            "step_id": "step-9b7b451d-2abb-4e35-8e6e-ff8acbf13ec9",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "I just updated the inventory for Widget A successfully! Now, I'll let the user know about it. It's always nice to keep them informed about changes.",
+            "signature": null
+          },
+          {
+            "id": "message-9f3d3a24-d315-4534-8c4a-faee6a391ee7",
+            "date": "2025-09-12 18:05:57+00:00",
+            "name": null,
+            "message_type": "tool_call_message",
+            "otid": "9f3d3a24-d315-4534-8c4a-faee6a391e81",
+            "sender_id": null,
+            "step_id": "step-9b7b451d-2abb-4e35-8e6e-ff8acbf13ec9",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_call": {
+              "name": "manage_inventory",
+              "arguments": "{\"data\": {\"timestamp\": 1694544350, \"item\": {\"sku\": \"SKU-123\", \"name\": \"Widget A\", \"price\": 19.99, \"category\": \"electronics\"}, \"transaction_id\": \"TXN-001\"}, \"quantity_change\": 10, \"request_heartbeat\": false}",
+              "tool_call_id": "call_j384Wuv4NUFQaBSIlzUyUcxs"
+            }
+          },
+          {
+            "id": "message-2a646d78-2737-4704-ad35-3a8f29e8f1e1",
+            "date": "2025-09-12 18:05:57+00:00",
+            "name": "manage_inventory",
+            "message_type": "tool_return_message",
+            "otid": "2a646d78-2737-4704-ad35-3a8f29e8f180",
+            "sender_id": null,
+            "step_id": "step-9b7b451d-2abb-4e35-8e6e-ff8acbf13ec9",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_return": "Updated inventory for Widget A with a quantity change of 10",
+            "status": "success",
+            "tool_call_id": "call_j384Wuv4NUFQaBSIlzUyUcxs",
+            "stdout": [],
+            "stderr": []
+          }
+        ]
+      ],
+      "agent_id": "agent-7517cb2c-be56-4e6d-976f-5acc463c156f",
+      "grade": {
+        "score": 1.0,
+        "rationale": "Contains ground_truth: True",
+        "metadata": {}
+      },
+      "metadata": null
+    },
+    {
+      "sample": {
+        "input": "Remove 5 units of SKU-456 (Gadget B) from inventory",
+        "ground_truth": "Gadget B",
+        "metadata": {
+          "tags": [],
+          "extra": {}
+        },
+        "id": null,
+        "submission": null,
+        "trajectory": null
+      },
+      "trajectory": [
+        [
+          {
+            "id": "message-96389357-ca07-4d2a-bc21-a97e59e3c1a6",
+            "date": "2025-09-12 18:05:53+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "96389357-ca07-4d2a-bc21-a97e59e3c180",
+            "sender_id": null,
+            "step_id": "step-10f20a1c-7e69-4a92-8249-1fb8b48ac3c2",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "I need to remove 5 units of SKU-456 (Gadget B) from inventory. Let me prepare the data for this transaction.",
+            "signature": null
+          },
+          {
+            "id": "message-96389357-ca07-4d2a-bc21-a97e59e3c1a6",
+            "date": "2025-09-12 18:05:53+00:00",
+            "name": null,
+            "message_type": "tool_call_message",
+            "otid": "96389357-ca07-4d2a-bc21-a97e59e3c181",
+            "sender_id": null,
+            "step_id": "step-10f20a1c-7e69-4a92-8249-1fb8b48ac3c2",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_call": {
+              "name": "manage_inventory",
+              "arguments": "{\"data\": {\"timestamp\": 1694549150, \"item\": {\"sku\": \"456\", \"name\": \"Gadget B\", \"price\": 99.99, \"category\": \"Gadgets\"}, \"transaction_id\": \"txn-001\"}, \"quantity_change\": -5, \"request_heartbeat\": true}",
+              "tool_call_id": "call_tYOdZUTY77yNCnMdV2AHURxQ"
+            }
+          },
+          {
+            "id": "message-1724618f-9880-4566-b188-4d8038f5292e",
+            "date": "2025-09-12 18:05:53+00:00",
+            "name": "manage_inventory",
+            "message_type": "tool_return_message",
+            "otid": "1724618f-9880-4566-b188-4d8038f52900",
+            "sender_id": null,
+            "step_id": "step-10f20a1c-7e69-4a92-8249-1fb8b48ac3c2",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_return": "Updated inventory for Gadget B with a quantity change of -5",
+            "status": "success",
+            "tool_call_id": "call_tYOdZUTY77yNCnMdV2AHURxQ",
+            "stdout": [],
+            "stderr": []
+          },
+          {
+            "id": "message-8911e11a-073d-40fd-99c1-bec420c9e634",
+            "date": "2025-09-12 18:05:56+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "8911e11a-073d-40fd-99c1-bec420c9e600",
+            "sender_id": null,
+            "step_id": "step-b8825cbb-80c4-4ee2-9162-ff9f79f2ce24",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "Now that I've successfully removed 5 units of Gadget B, I should confirm this action and provide the user with an update.",
+            "signature": null
+          },
+          {
+            "id": "message-8911e11a-073d-40fd-99c1-bec420c9e634",
+            "date": "2025-09-12 18:05:56+00:00",
+            "name": null,
+            "message_type": "tool_call_message",
+            "otid": "8911e11a-073d-40fd-99c1-bec420c9e601",
+            "sender_id": null,
+            "step_id": "step-b8825cbb-80c4-4ee2-9162-ff9f79f2ce24",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_call": {
+              "name": "manage_inventory",
+              "arguments": "{\"data\": {\"timestamp\": 1694549150, \"item\": {\"sku\": \"456\", \"name\": \"Gadget B\", \"price\": 99.99, \"category\": \"Gadgets\"}, \"transaction_id\": \"txn-001\"}, \"quantity_change\": -5, \"request_heartbeat\": false}",
+              "tool_call_id": "call_SX3dM73G3eblkJlP0gzzt8fS"
+            }
+          },
+          {
+            "id": "message-ed3b2780-998b-4d9d-b9e6-6e6db856a1d2",
+            "date": "2025-09-12 18:05:56+00:00",
+            "name": "manage_inventory",
+            "message_type": "tool_return_message",
+            "otid": "ed3b2780-998b-4d9d-b9e6-6e6db856a180",
+            "sender_id": null,
+            "step_id": "step-b8825cbb-80c4-4ee2-9162-ff9f79f2ce24",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_return": "Updated inventory for Gadget B with a quantity change of -5",
+            "status": "success",
+            "tool_call_id": "call_SX3dM73G3eblkJlP0gzzt8fS",
+            "stdout": [],
+            "stderr": []
+          }
+        ]
+      ],
+      "agent_id": "agent-01d5ce70-e6cb-42a1-9613-02e2dc30c190",
+      "grade": {
+        "score": 1.0,
+        "rationale": "Contains ground_truth: True",
+        "metadata": {}
+      },
+      "metadata": null
+    },
+    {
+      "sample": {
+        "input": "Update stock for SKU-789 (Device C) with quantity change of +20",
+        "ground_truth": "Device C",
+        "metadata": {
+          "tags": [],
+          "extra": {}
+        },
+        "id": null,
+        "submission": null,
+        "trajectory": null
+      },
+      "trajectory": [
+        [
+          {
+            "id": "message-aff5a5a3-8637-4f50-a727-a57f3485311f",
+            "date": "2025-09-12 18:05:54+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "aff5a5a3-8637-4f50-a727-a57f34853100",
+            "sender_id": null,
+            "step_id": "step-7923479a-4a1e-4114-9afe-61c0f945fd3d",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "I need to update the stock for SKU-789 with a positive quantity change. I'll ensure that the details are correct before executing this function.",
+            "signature": null
+          },
+          {
+            "id": "message-aff5a5a3-8637-4f50-a727-a57f3485311f",
+            "date": "2025-09-12 18:05:54+00:00",
+            "name": null,
+            "message_type": "tool_call_message",
+            "otid": "aff5a5a3-8637-4f50-a727-a57f34853101",
+            "sender_id": null,
+            "step_id": "step-7923479a-4a1e-4114-9afe-61c0f945fd3d",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_call": {
+              "name": "manage_inventory",
+              "arguments": "{\"data\": {\"timestamp\": 1694549150, \"item\": {\"sku\": \"SKU-789\", \"name\": \"Device C\", \"price\": 299.99, \"category\": \"Electronics\"}, \"transaction_id\": \"TXN-001\"}, \"quantity_change\": 20, \"request_heartbeat\": true}",
+              "tool_call_id": "call_IxDujSgFknkzr7JbuHItT7LF"
+            }
+          },
+          {
+            "id": "message-8686e4c0-5fbc-4d25-94cb-198a24c17740",
+            "date": "2025-09-12 18:05:54+00:00",
+            "name": "manage_inventory",
+            "message_type": "tool_return_message",
+            "otid": "8686e4c0-5fbc-4d25-94cb-198a24c17700",
+            "sender_id": null,
+            "step_id": "step-7923479a-4a1e-4114-9afe-61c0f945fd3d",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_return": "Updated inventory for Device C with a quantity change of 20",
+            "status": "success",
+            "tool_call_id": "call_IxDujSgFknkzr7JbuHItT7LF",
+            "stdout": [],
+            "stderr": []
+          },
+          {
+            "id": "message-d52b9a74-2c0b-4840-91b0-35b7e2d4b9bd",
+            "date": "2025-09-12 18:05:57+00:00",
+            "name": null,
+            "message_type": "reasoning_message",
+            "otid": "d52b9a74-2c0b-4840-91b0-35b7e2d4b980",
+            "sender_id": null,
+            "step_id": "step-61d82e5e-7fb6-4050-844e-4022daaba1fc",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "source": "non_reasoner_model",
+            "reasoning": "Now that the stock for Device C has been updated successfully, I should communicate this to the user. Confirming the details of the update is essential to keep everything clear.",
+            "signature": null
+          },
+          {
+            "id": "message-d52b9a74-2c0b-4840-91b0-35b7e2d4b9bd",
+            "date": "2025-09-12 18:05:57+00:00",
+            "name": null,
+            "message_type": "tool_call_message",
+            "otid": "d52b9a74-2c0b-4840-91b0-35b7e2d4b981",
+            "sender_id": null,
+            "step_id": "step-61d82e5e-7fb6-4050-844e-4022daaba1fc",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_call": {
+              "name": "manage_inventory",
+              "arguments": "{\"data\": {\"timestamp\": 1694549150, \"item\": {\"sku\": \"SKU-789\", \"name\": \"Device C\", \"price\": 299.99, \"category\": \"Electronics\"}, \"transaction_id\": \"TXN-001\"}, \"quantity_change\": 20, \"request_heartbeat\": false}",
+              "tool_call_id": "call_XC7q5qXEnDV2v6cfFZcrfA6S"
+            }
+          },
+          {
+            "id": "message-347c8502-c2e9-46b9-a62d-287342c6a238",
+            "date": "2025-09-12 18:05:57+00:00",
+            "name": "manage_inventory",
+            "message_type": "tool_return_message",
+            "otid": "347c8502-c2e9-46b9-a62d-287342c6a200",
+            "sender_id": null,
+            "step_id": "step-61d82e5e-7fb6-4050-844e-4022daaba1fc",
+            "is_err": null,
+            "seq_id": null,
+            "run_id": null,
+            "tool_return": "Updated inventory for Device C with a quantity change of 20",
+            "status": "success",
+            "tool_call_id": "call_XC7q5qXEnDV2v6cfFZcrfA6S",
+            "stdout": [],
+            "stderr": []
+          }
+        ]
+      ],
+      "agent_id": "agent-dfa08ab4-d781-4374-84e7-5ac6cd80b71b",
+      "grade": {
+        "score": 1.0,
+        "rationale": "Contains ground_truth: True",
+        "metadata": {}
+      },
+      "metadata": null
+    }
+  ],
+  "metrics": {
+    "total": 3,
+    "avg_score": 1.0
+  },
+  "gates_passed": true
+}
