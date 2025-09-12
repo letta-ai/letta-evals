@@ -5,6 +5,7 @@ from letta_client import AsyncLetta, MessageCreate
 
 from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.base import Target
+from letta_evals.types import ProgressCallback
 
 
 class AgentTarget(Target):
@@ -20,7 +21,7 @@ class AgentTarget(Target):
         self.client = AsyncLetta(base_url=self.base_url, token=api_key, timeout=timeout)
 
     async def run(
-        self, sample: Sample, progress_callback: Optional[object] = None, sample_id: Optional[int] = None
+        self, sample: Sample, progress_callback: Optional[ProgressCallback] = None, sample_id: Optional[int] = None
     ) -> TargetResult:
         """Run the agent on a sample."""
         agent_id = self.agent_id
@@ -49,10 +50,23 @@ class AgentTarget(Target):
             if progress_callback and sample_id is not None:
                 await progress_callback.message_sending(sample_id, i + 1, total_messages)
 
-            letta_resp = await self.client.agents.messages.create(
+            stream = self.client.agents.messages.create_stream(
                 agent_id=agent_id,
                 messages=[MessageCreate(role="user", content=input_msg)],
             )
-            trajectory.append(letta_resp.messages)
+
+            messages = []
+            prev_message_type = None
+            async for chunk in stream:
+                # skip non-message types like stop_reason and usage_statistics
+                if hasattr(chunk, "message_type"):
+                    if chunk.message_type in ["stop_reason", "usage_statistics"]:
+                        continue
+                    current_message_type = chunk.message_type
+                    if prev_message_type != current_message_type:
+                        messages.append(chunk)
+                    prev_message_type = current_message_type
+
+            trajectory.append(messages)
 
         return TargetResult(trajectory=trajectory, agent_id=agent_id)

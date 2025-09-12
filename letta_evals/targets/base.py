@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from letta_evals.models import Sample, TargetResult
+from letta_evals.types import ProgressCallback
 
 
 class Target(ABC):
@@ -9,7 +10,7 @@ class Target(ABC):
 
     @abstractmethod
     async def run(
-        self, sample: Sample, progress_callback: Optional[object] = None, sample_id: Optional[int] = None
+        self, sample: Sample, progress_callback: Optional[ProgressCallback] = None, sample_id: Optional[int] = None
     ) -> TargetResult:
         """Run the target on a sample and return result."""
         pass
