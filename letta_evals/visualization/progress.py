@@ -43,6 +43,7 @@ class SampleProgress:
 
     sample_id: int
     state: SampleState = SampleState.QUEUED
+    model_name: Optional[str] = None
     passed: Optional[bool] = None
     score: Optional[float] = None
     error: Optional[str] = None
@@ -350,6 +351,7 @@ class EvalProgress:
         )
 
         table.add_column("#", style="cyan", width=4)
+        table.add_column("Model", style="yellow", width=20)
         table.add_column("Status", width=20)
         table.add_column("Score", width=6, justify="right")
         table.add_column("Time", width=6, justify="right")
@@ -388,6 +390,7 @@ class EvalProgress:
 
             table.add_row(
                 str(s.sample_id + 1),
+                s.model_name or "-",
                 self._get_state_text(s),
                 score_text,
                 time_text,
@@ -476,12 +479,17 @@ class EvalProgress:
             if self.live:
                 self.live.update(self._render())
 
-    async def sample_started(self, sample_id: int):
+    async def sample_started(self, sample_id: int, model_name: Optional[str] = None):
         """Mark sample as started"""
+        if sample_id not in self.samples:
+            self.samples[sample_id] = SampleProgress(sample_id)
+        self.samples[sample_id].model_name = model_name
         await self.update_sample_state(sample_id, SampleState.LOADING_AGENT)
 
-    async def agent_loading(self, sample_id: int):
+    async def agent_loading(self, sample_id: int, model_name: Optional[str] = None):
         """Mark sample as loading agent"""
+        if model_name and sample_id in self.samples:
+            self.samples[sample_id].model_name = model_name
         await self.update_sample_state(sample_id, SampleState.LOADING_AGENT)
 
     async def message_sending(self, sample_id: int, message_num: int, total_messages: int):

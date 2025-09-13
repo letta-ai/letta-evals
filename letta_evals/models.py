@@ -47,6 +47,11 @@ class TargetSpec(BaseModel):
         default=None, description="Path to Python script with AgentFactory (e.g., script.py:FactoryClass)"
     )
 
+    # model configs to test (names without .json extension)
+    model_configs: Optional[List[str]] = Field(
+        default=None, description="List of model config names from llm_model_configs directory"
+    )
+
     # internal field for path resolution
     base_dir: Optional[Path] = Field(default=None, exclude=True)
 
@@ -181,6 +186,7 @@ class TargetResult(BaseModel):
     )
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
     metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata from target execution")
+    model_name: Optional[str] = Field(default=None, description="Model configuration name used for this target")
 
 
 class GradeResult(BaseModel):
@@ -200,11 +206,24 @@ class GradeResult(BaseModel):
 # Runner models
 
 
+class ModelMetrics(BaseModel):
+    """Metrics for a specific model configuration."""
+
+    model_name: str = Field(description="Model configuration name")
+    total: int = Field(description="Total number of samples evaluated")
+    avg_score: float = Field(description="Average score across all samples (0.0 to 1.0)")
+    passed_samples: int = Field(description="Number of samples that passed the gate")
+    failed_samples: int = Field(description="Number of samples that failed the gate")
+
+
 class Metrics(BaseModel):
     """Evaluation metrics."""
 
     total: int = Field(description="Total number of samples evaluated")
     avg_score: float = Field(description="Average score across all samples (0.0 to 1.0)")
+    per_model: Optional[List[ModelMetrics]] = Field(
+        default=None, description="Metrics broken down by model configuration"
+    )
 
 
 class SampleResult(BaseModel):
@@ -215,6 +234,7 @@ class SampleResult(BaseModel):
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
     grade: GradeResult = Field(description="Grading result for this sample")
     metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional execution metadata")
+    model_name: Optional[str] = Field(default=None, description="Model configuration name used for this sample")
 
 
 class RunnerResult(BaseModel):

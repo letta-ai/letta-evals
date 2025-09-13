@@ -1,0 +1,31 @@
+# Rubric: ASCII-Art Response Quality & Compliance
+
+## The user asked for: {input}
+
+## Scoring dimensions (sum → 1.0)
+1. Instruction compliance (0.30)  
+   0.30: Art wrapped in backticks as requested (```art```); exactly one send_message; no extra content outside backticks
+   0.15: Art present but formatting issues (missing/extra backticks, minor extra text)
+   0.00: No backticks, extra commentary, multiple tool calls, or mixed content
+
+2. Requested item match (0.30)  
+   0.30: Depicts the requested animal (or item) with unmistakable, item-specific features (e.g., trunk for elephant, long neck for giraffe, beak + wings for bird)  
+   0.15: Vaguely animal-like or generic creature; could be the item but weakly indicated  
+   0.00: Wrong subject or unrelated shapes
+
+3. Recognizability and silhouette (0.20)  
+   0.20: Clear silhouette; core anatomy reads at a glance (in monospaced font)  
+   0.10: Recognizable with effort; proportions or anatomy are a bit off  
+   0.00: Unrecognizable
+
+4. Craftsmanship and layout (0.10)  
+   0.10: Good alignment and spacing; consistent line lengths; no tabs or trailing escape codes; holds shape in monospaced render  
+   0.05: Minor alignment issues; still coherent  
+   0.00: Misaligned or broken on monospaced display
+
+5. Effort / “best version” signal (0.10)  
+   0.10: Shows detail, multi-line effort, and clear attempt at quality  
+   0.05: Minimal or simplistic attempt, but functional  
+   0.00: Trivial or careless (e.g., one character)
+
+IMPORTANT: Make sure to clearly express your rationale and scoring.

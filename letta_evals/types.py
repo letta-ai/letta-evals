@@ -6,11 +6,11 @@ from typing import Optional, Protocol, runtime_checkable
 class ProgressCallback(Protocol):
     """Protocol for progress tracking during evaluation runs."""
 
-    async def sample_started(self, sample_id: int) -> None:
+    async def sample_started(self, sample_id: int, model_name: Optional[str] = None) -> None:
         """Called when a sample evaluation starts."""
         ...
 
-    async def agent_loading(self, sample_id: int) -> None:
+    async def agent_loading(self, sample_id: int, model_name: Optional[str] = None) -> None:
         """Called when an agent is being loaded."""
         ...
 
