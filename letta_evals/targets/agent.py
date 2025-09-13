@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Optional
 
-from letta_client import AsyncLetta, MessageCreate
+from letta_client import AsyncLetta, LlmConfig, MessageCreate
 
 from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.base import Target
@@ -21,12 +21,14 @@ class AgentTarget(Target):
         api_key: str = None,
         timeout: float = 300.0,
         base_dir: Path = None,
+        llm_config: Optional[LlmConfig] = None,
     ):
         self.base_url = base_url
         self.agent_id = agent_id
         self.agent_file = agent_file
         self.agent_script = agent_script
         self.base_dir = base_dir or Path.cwd()
+        self.llm_config = llm_config
 
         self.client = AsyncLetta(base_url=self.base_url, token=api_key, timeout=timeout)
 
@@ -37,9 +39,6 @@ class AgentTarget(Target):
         agent_id = self.agent_id
 
         if self.agent_file:
-            if progress_callback and sample_id is not None:
-                await progress_callback.agent_loading(sample_id)
-
             with open(self.agent_file, "rb") as f:
                 resp = await self.client.agents.import_file(
                     file=f, append_copy_suffix=False, override_existing_tools=False
@@ -52,13 +51,18 @@ class AgentTarget(Target):
                 agent_id = resp.agent_ids[0]
 
         elif self.agent_script:
-            if progress_callback and sample_id is not None:
-                await progress_callback.agent_loading(sample_id)
-
             agent_factory_func = load_object(self.agent_script, self.base_dir)
-
-            # call the decorated function directly
             agent_id = await agent_factory_func(self.client)
+
+        if self.llm_config and agent_id:
+            await self.client.agents.modify(agent_id=agent_id, llm_config=self.llm_config)
+
+        agent = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=[])
+        model_name = self.llm_config.model if self.llm_config else agent.llm_config.model
+
+        # notify progress callback with model name
+        if progress_callback and sample_id is not None and (self.agent_file or self.agent_script):
+            await progress_callback.agent_loading(sample_id, model_name=model_name)
 
         trajectory = []
 
@@ -79,7 +83,7 @@ class AgentTarget(Target):
             async for chunk in stream:
                 # skip non-message types like stop_reason and usage_statistics
                 if hasattr(chunk, "message_type"):
-                    if chunk.message_type in ["stop_reason", "usage_statistics"]:
+                    if chunk.message_type in ["stop_reason", "usage_statistics", "ping"]:
                         continue
                     current_message_type = chunk.message_type
                     if prev_message_type != current_message_type:
@@ -88,4 +92,4 @@ class AgentTarget(Target):
 
             trajectory.append(messages)
 
-        return TargetResult(trajectory=trajectory, agent_id=agent_id)
+        return TargetResult(trajectory=trajectory, agent_id=agent_id, model_name=model_name)
