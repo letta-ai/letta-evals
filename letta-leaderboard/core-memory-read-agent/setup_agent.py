@@ -63,14 +63,3 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
         import traceback
         traceback.print_exc()
         raise
-
-
-async def setup_core_memory(client: AsyncLetta, agent_id: str, sample: Sample) -> None:
-    """
-    Legacy function for setting up core memory.
-
-    Note: Core memory is now populated directly during agent creation in setup_agent().
-    This function is kept for backward compatibility but is now a no-op.
-    """
-    print(f"[SETUP] Core memory already populated during agent creation. No additional setup needed for agent {agent_id}")
-    pass
