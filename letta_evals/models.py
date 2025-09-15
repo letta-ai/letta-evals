@@ -24,6 +24,7 @@ class Sample(BaseModel):
     metadata: SampleMetadata = Field(
         default_factory=SampleMetadata, description="Sample metadata for filtering and context"
     )
+    agent_args: Optional[Dict[str, Any]] = Field(default=None, description="Custom arguments for agent creation")
 
     id: Optional[str] = Field(default=None, description="Unique identifier for the sample")
     submission: Optional[Union[str, List[str]]] = Field(default=None, description="Actual response(s) from the agent")

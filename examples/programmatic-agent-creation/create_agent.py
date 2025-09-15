@@ -5,6 +5,7 @@ from letta_client.client import BaseTool
 from pydantic import BaseModel
 
 from letta_evals.decorators import agent_factory
+from letta_evals.models import Sample
 
 
 class InventoryItem(BaseModel):
@@ -36,9 +37,11 @@ class ManageInventoryTool(BaseTool):
 
 
 @agent_factory
-async def create_inventory_agent(client: AsyncLetta) -> str:
-    """Create an inventory management agent using the Letta SDK."""
-    # use the tool if it already exists
+async def create_inventory_agent(client: AsyncLetta, sample: Sample) -> str:
+    """Create an inventory management agent using the Letta SDK.
+
+    The agent is customized with item details from sample.agent_args.
+    """
     tools = await client.tools.list(name="manage_inventory")
     if tools:
         tool = tools[0]
@@ -47,14 +50,25 @@ async def create_inventory_agent(client: AsyncLetta) -> str:
             tool=ManageInventoryTool(),
         )
 
+    item = sample.agent_args["item"]
+    item_context = f"""Target Item Details:
+- SKU: {item.get('sku', 'Unknown')}
+- Name: {item.get('name', 'Unknown')}
+- Price: ${item.get('price', 0.00)}
+- Category: {item.get('category', 'Unknown')}"""
+
     agent = await client.agents.create(
         memory_blocks=[
             CreateBlock(
                 label="persona",
                 value="You are a helpful inventory management assistant.",
             ),
+            CreateBlock(
+                label="item_context",
+                value=item_context,
+            ),
         ],
-        model="openai/gpt-4o-mini",
+        model="openai/gpt-4.1-mini",
         embedding="openai/text-embedding-3-small",
         tool_ids=[tool.id],
         include_base_tools=False,

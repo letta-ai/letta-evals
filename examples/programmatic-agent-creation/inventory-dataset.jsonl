@@ -1,3 +1,15 @@
-{"input": "Add 10 units of SKU-123 (Widget A) at $19.99 in electronics category", "ground_truth": "Widget A"}
-{"input": "Remove 5 units of SKU-456 (Gadget B) from inventory", "ground_truth": "Gadget B"}
-{"input": "Update stock for SKU-789 (Device C) with quantity change of +20", "ground_truth": "Device C"}
+{"input": "Add 10 units to inventory", "ground_truth": "Widget A", "agent_args": {"item": {"sku": "SKU-123", "name": "Widget A", "price": 19.99, "category": "electronics"}}}
+{"input": "Remove 5 units from inventory", "ground_truth": "Gadget B", "agent_args": {"item": {"sku": "SKU-456", "name": "Gadget B", "price": 29.99, "category": "accessories"}}}
+{"input": "Update stock with quantity change of +20", "ground_truth": "Device C", "agent_args": {"item": {"sku": "SKU-789", "name": "Device C", "price": 49.99, "category": "hardware"}}}
+{"input": "Add 15 units to inventory", "ground_truth": "Smart Speaker", "agent_args": {"item": {"sku": "SKU-101", "name": "Smart Speaker", "price": 89.99, "category": "smart home"}}}
+{"input": "Remove 8 units from inventory", "ground_truth": "USB Cable", "agent_args": {"item": {"sku": "SKU-202", "name": "USB Cable", "price": 9.99, "category": "accessories"}}}
+{"input": "Update stock with quantity change of -12", "ground_truth": "Wireless Mouse", "agent_args": {"item": {"sku": "SKU-303", "name": "Wireless Mouse", "price": 34.99, "category": "peripherals"}}}
+{"input": "Add 25 units to inventory", "ground_truth": "Laptop Stand", "agent_args": {"item": {"sku": "SKU-404", "name": "Laptop Stand", "price": 45.99, "category": "accessories"}}}
+{"input": "Update stock with quantity change of +50", "ground_truth": "Phone Case", "agent_args": {"item": {"sku": "SKU-505", "name": "Phone Case", "price": 14.99, "category": "mobile"}}}
+{"input": "Remove 3 units from inventory", "ground_truth": "4K Monitor", "agent_args": {"item": {"sku": "SKU-606", "name": "4K Monitor", "price": 399.99, "category": "displays"}}}
+{"input": "Add 100 units to inventory", "ground_truth": "Screen Protector", "agent_args": {"item": {"sku": "SKU-707", "name": "Screen Protector", "price": 7.99, "category": "mobile"}}}
+{"input": "Update stock with quantity change of -30", "ground_truth": "Mechanical Keyboard", "agent_args": {"item": {"sku": "SKU-808", "name": "Mechanical Keyboard", "price": 129.99, "category": "peripherals"}}}
+{"input": "Add 7 units to inventory", "ground_truth": "Webcam HD", "agent_args": {"item": {"sku": "SKU-909", "name": "Webcam HD", "price": 59.99, "category": "video"}}}
+{"input": "Remove 15 units from inventory", "ground_truth": "Power Bank", "agent_args": {"item": {"sku": "SKU-010", "name": "Power Bank", "price": 24.99, "category": "mobile"}}}
+{"input": "Update stock with quantity change of +18", "ground_truth": "Bluetooth Earbuds", "agent_args": {"item": {"sku": "SKU-111", "name": "Bluetooth Earbuds", "price": 79.99, "category": "audio"}}}
+{"input": "Add 40 units to inventory", "ground_truth": "HDMI Cable", "agent_args": {"item": {"sku": "SKU-212", "name": "HDMI Cable", "price": 12.99, "category": "cables"}}}
