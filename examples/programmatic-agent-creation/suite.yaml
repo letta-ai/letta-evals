@@ -1,6 +1,6 @@
 name: programmatic-inventory-agent-test
 description: Test inventory agent created programmatically via Python script
-dataset: inventory-dataset.jsonl
+dataset: dataset.jsonl
 target:
   kind: agent
   agent_script: create_agent.py:create_inventory_agent
