@@ -2,7 +2,7 @@ import time
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 from rich.align import Align
 from rich.box import MINIMAL_DOUBLE_HEAD, ROUNDED
@@ -22,6 +22,8 @@ from rich.progress import (
 )
 from rich.table import Table
 from rich.text import Text
+
+from letta_evals.types import GraderKind
 
 
 class SampleState(Enum):
@@ -70,6 +72,7 @@ class EvalProgress:
         total_samples: int,
         target_kind: str = "agent",
         grader_kind: str = "tool",
+        rubric_model: Optional[str] = None,
         max_concurrent: int = 15,
         display_mode: DisplayMode = DisplayMode.STANDARD,
         console: Optional[Console] = None,
@@ -80,6 +83,7 @@ class EvalProgress:
         self.total_samples = total_samples
         self.target_kind = target_kind
         self.grader_kind = grader_kind
+        self.rubric_model = rubric_model
         self.max_concurrent = max_concurrent
         self.display_mode = display_mode
         self.show_samples = show_samples
@@ -350,6 +354,8 @@ class EvalProgress:
 
         table.add_column("#", style="cyan", width=4)
         table.add_column("Model", style="yellow", width=20)
+        if self.grader_kind == GraderKind.RUBRIC.value and self.rubric_model:
+            table.add_column("Rubric Model", style="magenta", width=15)
         table.add_column("Status", width=20)
         table.add_column("Score", width=6, justify="right")
         table.add_column("Time", width=6, justify="right")
@@ -386,14 +392,19 @@ class EvalProgress:
             else:
                 details = ""
 
-            table.add_row(
+            row_data = [
                 str(s.sample_id + 1),
                 s.model_name or "-",
+            ]
+            if self.grader_kind == GraderKind.RUBRIC.value and self.rubric_model:
+                row_data.append(self.rubric_model)
+            row_data.extend([
                 self._get_state_text(s),
                 score_text,
                 time_text,
                 details,
-            )
+            ])
+            table.add_row(*row_data)
 
         return table
 

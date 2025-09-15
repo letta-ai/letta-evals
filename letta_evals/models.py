@@ -16,9 +16,6 @@ class Sample(BaseModel):
     ground_truth: Optional[str] = Field(default=None, description="Expected ground_truth response for grading")
     agent_args: Optional[Dict[str, Any]] = Field(default=None, description="Custom arguments for agent creation")
 
-    submission: Optional[Union[str, List[str]]] = Field(default=None, description="Actual response(s) from the agent")
-    trajectory: Optional[List[Dict[str, Any]]] = Field(default=None, description="Full conversation trajectory")
-
 
 # Config models
 
@@ -219,6 +216,7 @@ class SampleResult(BaseModel):
     """Result for a single sample evaluation."""
 
     sample: Sample = Field(description="The original sample that was evaluated")
+    submission: str = Field(description="Extracted response from the trajectory")
     trajectory: List[List[LettaMessageUnion]] = Field(description="Full conversation trajectory from the agent")
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
     grade: GradeResult = Field(description="Grading result for this sample")
