@@ -26,7 +26,11 @@ def load_jsonl(
                     continue
 
             sample = Sample(
-                input=data["input"], ground_truth=data.get("ground_truth"), metadata=metadata, id=data.get("id")
+                input=data["input"],
+                ground_truth=data.get("ground_truth"),
+                metadata=metadata,
+                id=data.get("id"),
+                agent_args=data.get("agent_args"),
             )
 
             yield sample

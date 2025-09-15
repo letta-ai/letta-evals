@@ -52,7 +52,7 @@ class AgentTarget(Target):
 
         elif self.agent_script:
             agent_factory_func = load_object(self.agent_script, self.base_dir)
-            agent_id = await agent_factory_func(self.client)
+            agent_id = await agent_factory_func(self.client, sample)
 
         if self.llm_config and agent_id:
             await self.client.agents.modify(agent_id=agent_id, llm_config=self.llm_config)
