@@ -100,7 +100,7 @@ class Runner:
                 if self.progress_callback:
                     await self.progress_callback.grading_started(sample_id)
 
-                grade_result = await self.grader.grade(sample, target_result.trajectory)
+                grade_result, submission = await self.grader.grade(sample, target_result.trajectory)
 
                 if self.progress_callback:
                     passed = self._check_score_against_gate(grade_result.score)
@@ -109,6 +109,7 @@ class Runner:
 
                 return SampleResult(
                     sample=sample,
+                    submission=submission,
                     trajectory=target_result.trajectory,
                     agent_id=target_result.agent_id,
                     grade=grade_result,

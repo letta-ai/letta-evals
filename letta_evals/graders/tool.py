@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from letta_client import LettaMessageUnion
 
@@ -37,7 +37,7 @@ class ToolGrader(Grader):
         else:
             raise ValueError(f"Grader function '{function}' not found in registry")
 
-    async def grade(self, sample: Sample, trajectory: List[List[LettaMessageUnion]]) -> GradeResult:
+    async def grade(self, sample: Sample, trajectory: List[List[LettaMessageUnion]]) -> Tuple[GradeResult, str]:
         """Grade using the tool function."""
         submission = self.extractor(trajectory)
-        return self.func(sample, submission)
+        return self.func(sample, submission), submission

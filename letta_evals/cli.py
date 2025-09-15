@@ -12,6 +12,7 @@ from rich.table import Table
 from letta_evals.datasets.loader import load_jsonl
 from letta_evals.models import RunnerResult, SuiteSpec
 from letta_evals.runner import run_suite
+from letta_evals.types import GraderKind
 from letta_evals.visualization.progress import DisplayMode, EvalProgress
 
 app = typer.Typer(help="Letta Evals - Evaluation framework for Letta AI agents")
@@ -71,11 +72,16 @@ def run(
                 console.print(f"Evaluating {total_evaluations} samples...")
             return await run_suite(suite_path, max_concurrent=max_concurrent)
         else:
+            rubric_model = None
+            if suite.grader.kind == GraderKind.RUBRIC and hasattr(suite.grader, 'model'):
+                rubric_model = suite.grader.model
+            
             progress = EvalProgress(
                 suite_name=suite.name,
                 total_samples=total_evaluations,
                 target_kind=suite.target.kind.value,
                 grader_kind=suite.grader.kind.value,
+                rubric_model=rubric_model,
                 max_concurrent=max_concurrent,
                 display_mode=DisplayMode.DETAILED,
                 console=console,
