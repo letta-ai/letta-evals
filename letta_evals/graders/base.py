@@ -12,4 +12,4 @@ class Grader(ABC):
     @abstractmethod
     async def grade(self, sample: Sample, trajectory: List[List[LettaMessageUnion]]) -> Tuple[GradeResult, str]:
         """Grade a trajectory and return the result and extracted submission."""
-        raise NotImplementedError
+        pass
