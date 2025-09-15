@@ -4,6 +4,8 @@ CLAUDE.md
 .DS_Store
 .idea/
 
+examples/*/results.json
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
