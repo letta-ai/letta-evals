@@ -45,26 +45,35 @@ def run(
         suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent)
 
         samples = list(load_jsonl(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
-        total_samples = len(samples)
+        num_samples = len(samples)
+
+        # calculate total evaluations (samples × models)
+        num_models = len(suite.target.model_configs) if suite.target.model_configs else 1
+        total_evaluations = num_samples * num_models
     except Exception as e:
         console.print(f"[red]Error loading suite: {e}[/red]")
         raise typer.Exit(1)
 
     if not quiet and not no_fancy:
         console.print(f"[cyan]Loading suite: {suite.name}[/cyan]")
-        console.print(f"[cyan]Total samples: {total_samples}[/cyan]")
+        if num_models > 1:
+            console.print(
+                f"[cyan]Total evaluations: {total_evaluations} ({num_samples} samples × {num_models} models)[/cyan]"
+            )
+        else:
+            console.print(f"[cyan]Total samples: {num_samples}[/cyan]")
         console.print(f"[cyan]Max concurrent: {max_concurrent}[/cyan]")
 
     async def run_with_progress():
         if no_fancy or quiet:
             if not quiet:
                 console.print(f"Running evaluation suite: {suite.name}")
-                console.print(f"Evaluating {total_samples} samples...")
+                console.print(f"Evaluating {total_evaluations} samples...")
             return await run_suite(suite_path, max_concurrent=max_concurrent)
         else:
             progress = EvalProgress(
                 suite_name=suite.name,
-                total_samples=total_samples,
+                total_samples=total_evaluations,
                 target_kind=suite.target.kind.value,
                 grader_kind=suite.grader.kind.value,
                 max_concurrent=max_concurrent,
@@ -186,9 +195,30 @@ def display_results(result: RunnerResult, verbose: bool = False):
     console.print("=" * 50)
 
     metrics = result.metrics
-    console.print("\n[bold]Metrics:[/bold]")
+    console.print("\n[bold]Overall Metrics:[/bold]")
     console.print(f"  Total samples: {metrics.total}")
     console.print(f"  Average score: {metrics.avg_score:.2f}")
+
+    # show per-model metrics if available
+    if metrics.per_model:
+        console.print("\n[bold]Per-Model Metrics:[/bold]")
+        model_table = Table()
+        model_table.add_column("Model", style="cyan")
+        model_table.add_column("Samples", style="white")
+        model_table.add_column("Avg Score", style="white")
+        model_table.add_column("Passed", style="green")
+        model_table.add_column("Failed", style="red")
+
+        for model_metrics in metrics.per_model:
+            model_table.add_row(
+                model_metrics.model_name,
+                str(model_metrics.total),
+                f"{model_metrics.avg_score:.2f}",
+                str(model_metrics.passed_samples),
+                str(model_metrics.failed_samples),
+            )
+
+        console.print(model_table)
 
     gate = result.config["gate"]
     gate_op = gate["op"]
@@ -206,6 +236,7 @@ def display_results(result: RunnerResult, verbose: bool = False):
         console.print("\n[bold]Sample Results:[/bold]")
         table = Table()
         table.add_column("Sample", style="cyan")
+        table.add_column("Model", style="yellow")
         table.add_column("Passed", style="white")
         table.add_column("Score", style="white")
         table.add_column("Rationale", style="dim")
@@ -222,7 +253,7 @@ def display_results(result: RunnerResult, verbose: bool = False):
             if len(rationale) > 50:
                 rationale = rationale[:47] + "..."
 
-            table.add_row(f"Sample {i + 1}", passed, score, rationale)
+            table.add_row(f"Sample {i + 1}", sample_result.model_name, passed, score, rationale)
 
         console.print(table)
 

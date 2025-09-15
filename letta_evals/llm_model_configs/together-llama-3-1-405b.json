@@ -1,0 +1,6 @@
+{
+    "context_window": 16000,
+    "model": "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo",
+    "model_endpoint_type": "openai",
+    "model_endpoint": "https://api.together.ai/v1"
+}
