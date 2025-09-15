@@ -35,7 +35,7 @@ class Runner:
             return [None]  # no model configs, use default
 
         configs = []
-        model_configs_dir = Path(__file__).parent.parent / "llm_model_configs"
+        model_configs_dir = Path(__file__).parent / "llm_model_configs"
 
         for config_name in self.suite.target.model_configs:
             config_path = model_configs_dir / f"{config_name}.json"

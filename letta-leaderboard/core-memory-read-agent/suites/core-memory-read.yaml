@@ -6,6 +6,9 @@ target:
   kind: agent
   base_url: http://localhost:8283
   agent_script: /Users/kevinlin/Documents/letta-evals-kit/letta-leaderboard/core-memory-read-agent/setup_agent.py:setup_agent
+  model_configs:
+    - openai-gpt-4.1
+    - openai-gpt-4.1-nano
 grader:
   kind: tool
   function: /Users/kevinlin/Documents/letta-evals-kit/letta-leaderboard/core-memory-read-agent/core_memory_evaluators.py:grade_core_memory_read
