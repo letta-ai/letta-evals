@@ -117,10 +117,6 @@ IMPORTANT:
         if sample.ground_truth:
             prompt = prompt.replace("{ground_truth}", sample.ground_truth)
 
-        if "{metadata}" in prompt and sample.metadata:
-            metadata_str = json.dumps(sample.metadata.model_dump(), indent=2)
-            prompt = prompt.replace("{metadata}", metadata_str)
-
         parts = [
             "## Rubric",
             prompt,

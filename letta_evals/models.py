@@ -9,24 +9,13 @@ from letta_evals.types import GraderKind, LLMProvider, MetricOp, TargetKind
 # Dataset models
 
 
-class SampleMetadata(BaseModel):
-    """Metadata for a sample."""
-
-    tags: List[str] = Field(default_factory=list, description="Tags for filtering or categorizing samples")
-    extra: Dict[str, Any] = Field(default_factory=dict, description="Additional arbitrary metadata")
-
-
 class Sample(BaseModel):
     """Single evaluation sample."""
 
     input: Union[str, List[str]] = Field(description="Input message(s) to send to the agent")
     ground_truth: Optional[str] = Field(default=None, description="Expected ground_truth response for grading")
-    metadata: SampleMetadata = Field(
-        default_factory=SampleMetadata, description="Sample metadata for filtering and context"
-    )
     agent_args: Optional[Dict[str, Any]] = Field(default=None, description="Custom arguments for agent creation")
 
-    id: Optional[str] = Field(default=None, description="Unique identifier for the sample")
     submission: Optional[Union[str, List[str]]] = Field(default=None, description="Actual response(s) from the agent")
     trajectory: Optional[List[Dict[str, Any]]] = Field(default=None, description="Full conversation trajectory")
 
@@ -186,7 +175,6 @@ class TargetResult(BaseModel):
         description="List of conversation turns, each containing Letta messages"
     )
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
-    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata from target execution")
     model_name: Optional[str] = Field(default=None, description="Model configuration name used for this target")
 
 
@@ -234,7 +222,6 @@ class SampleResult(BaseModel):
     trajectory: List[List[LettaMessageUnion]] = Field(description="Full conversation trajectory from the agent")
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
     grade: GradeResult = Field(description="Grading result for this sample")
-    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional execution metadata")
     model_name: Optional[str] = Field(default=None, description="Model configuration name used for this sample")
 
 

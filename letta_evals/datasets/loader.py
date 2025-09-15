@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Iterator, List, Optional
 
-from letta_evals.models import Sample, SampleMetadata
+from letta_evals.models import Sample
 
 
 def load_jsonl(
@@ -17,19 +17,14 @@ def load_jsonl(
 
             data = json.loads(line.strip())
 
-            metadata = SampleMetadata()
-            if "metadata" in data:
-                metadata = SampleMetadata(**data["metadata"])
-
+            # skip filtering by tags since metadata is removed
             if sample_tags:
-                if not any(tag in metadata.tags for tag in sample_tags):
-                    continue
+                # tags filtering no longer supported without metadata
+                pass
 
             sample = Sample(
                 input=data["input"],
                 ground_truth=data.get("ground_truth"),
-                metadata=metadata,
-                id=data.get("id"),
                 agent_args=data.get("agent_args"),
             )
 

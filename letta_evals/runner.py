@@ -112,7 +112,6 @@ class Runner:
                     trajectory=target_result.trajectory,
                     agent_id=target_result.agent_id,
                     grade=grade_result,
-                    metadata=target_result.metadata,
                     model_name=target_result.model_name,
                 )
             except Exception as e:
