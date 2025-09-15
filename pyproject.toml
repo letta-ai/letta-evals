@@ -1,9 +1,11 @@
 [project]
-name = "letta-evals-kit"
-version = "0.1.0"
+name = "letta-evals"
+version = "0.1.0b1"
 description = "Evaluation framework for Letta AI agents"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = "<3.14,>=3.11"
+authors = [{name = "Letta AI", email = "contact@letta.com"}]
+license = {text = "Apache-2.0"}
 dependencies = [
     "letta-client>=0.1.319",
     "typer>=0.12.0",
@@ -17,6 +19,11 @@ dependencies = [
     "anyio==4.10.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/letta-ai/letta-evals-kit"
+Repository = "https://github.com/letta-ai/letta-evals-kit"
+Issues = "https://github.com/letta-ai/letta-evals-kit/issues"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
@@ -29,8 +36,8 @@ dev = [
 letta-evals = "letta_evals.cli:app"
 
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.ruff]
 line-length = 120
@@ -41,4 +48,9 @@ select = ["E", "F", "I"]
 ignore = [
     "E501",  # line too long (cannot be autofixed)
     "E731",  # lambda assignment (cannot be autofixed)
+]
+
+[tool.hatch.build]
+include = [
+    "letta_evals/**/*.json",
 ]
