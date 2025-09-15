@@ -1,9 +1,9 @@
-import asyncio
 import json
 from collections import defaultdict
 from pathlib import Path
 from typing import List, Optional
 
+import anyio
 import yaml
 from letta_client import LlmConfig
 
@@ -25,7 +25,7 @@ class Runner:
         self.grader: Grader = self._create_grader()
         self.results: List[SampleResult] = []
         self.max_concurrent = max_concurrent
-        self.semaphore = asyncio.Semaphore(max_concurrent)
+        self.semaphore = anyio.Semaphore(max_concurrent)
         self.progress_callback = progress_callback
         self.model_configs = self._load_model_configs()
 
@@ -126,16 +126,20 @@ class Runner:
             load_jsonl(self.suite.dataset, max_samples=self.suite.max_samples, sample_tags=self.suite.sample_tags)
         )
 
-        tasks = []
+        self.results = []
         sample_id = 0
 
-        # run each sample with each model config
-        for llm_config in self.model_configs:
-            for sample in samples:
-                tasks.append(self.run_sample(sample, sample_id=sample_id, llm_config=llm_config))
-                sample_id += 1
+        async with anyio.create_task_group() as tg:
+            for llm_config in self.model_configs:
+                for sample in samples:
 
-        self.results = await asyncio.gather(*tasks)
+                    async def run_and_append(sid, s, cfg):
+                        result = await self.run_sample(s, sample_id=sid, llm_config=cfg)
+                        self.results.append(result)
+
+                    tg.start_soon(run_and_append, sample_id, sample, llm_config)
+                    sample_id += 1
+
         metrics = self._calculate_metrics()
         gates_passed = self._check_gates(metrics)
 

@@ -1,9 +1,9 @@
-import asyncio
 import json
 import sys
 from pathlib import Path
 from typing import Optional
 
+import anyio
 import typer
 import yaml
 from rich.console import Console
@@ -90,7 +90,7 @@ def run(
                 progress.stop()
 
     try:
-        result = asyncio.run(run_with_progress())
+        result = anyio.run(run_with_progress)  # type: ignore[arg-type]
 
         if not quiet:
             display_results(result, verbose)
