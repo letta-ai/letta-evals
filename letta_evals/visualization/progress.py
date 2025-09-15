@@ -1,4 +1,3 @@
-import asyncio
 import time
 from dataclasses import dataclass
 from datetime import timedelta
@@ -102,7 +101,6 @@ class EvalProgress:
             expand=True,
         )
         self.main_task_id = None
-        self._lock = asyncio.Lock()
 
         self.passed_count = 0
         self.failed_count = 0
@@ -440,44 +438,43 @@ class EvalProgress:
 
     async def update_sample_state(self, sample_id: int, state: SampleState, **kwargs):
         """Update state of a sample"""
-        async with self._lock:
-            if sample_id not in self.samples:
-                self.samples[sample_id] = SampleProgress(sample_id)
+        if sample_id not in self.samples:
+            self.samples[sample_id] = SampleProgress(sample_id)
 
-            sample = self.samples[sample_id]
-            sample.state = state
+        sample = self.samples[sample_id]
+        sample.state = state
 
-            if state == SampleState.LOADING_AGENT and sample.start_time is None:
-                sample.start_time = time.time()
-            elif state in [SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR]:
-                sample.end_time = time.time()
+        if state == SampleState.LOADING_AGENT and sample.start_time is None:
+            sample.start_time = time.time()
+        elif state in [SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR]:
+            sample.end_time = time.time()
 
-            for key, value in kwargs.items():
-                if hasattr(sample, key):
-                    setattr(sample, key, value)
-            # update last update timestamp for smart viewport
-            sample.last_update_ts = time.time()
+        for key, value in kwargs.items():
+            if hasattr(sample, key):
+                setattr(sample, key, value)
+        # update last update timestamp for smart viewport
+        sample.last_update_ts = time.time()
 
-            if state == SampleState.COMPLETED:
-                if sample.passed is True:
-                    self.passed_count += 1
-                elif sample.passed is False:
-                    self.failed_count += 1
+        if state == SampleState.COMPLETED:
+            if sample.passed is True:
+                self.passed_count += 1
+            elif sample.passed is False:
+                self.failed_count += 1
 
-                if sample.score is not None:
-                    self.total_score += sample.score
-                    self.score_count += 1
+            if sample.score is not None:
+                self.total_score += sample.score
+                self.score_count += 1
 
-                completed = self.passed_count + self.failed_count + self.error_count
-                self.main_progress.update(self.main_task_id, completed=completed)
+            completed = self.passed_count + self.failed_count + self.error_count
+            self.main_progress.update(self.main_task_id, completed=completed)
 
-            elif state == SampleState.ERROR:
-                self.error_count += 1
-                completed = self.passed_count + self.failed_count + self.error_count
-                self.main_progress.update(self.main_task_id, completed=completed)
+        elif state == SampleState.ERROR:
+            self.error_count += 1
+            completed = self.passed_count + self.failed_count + self.error_count
+            self.main_progress.update(self.main_task_id, completed=completed)
 
-            if self.live:
-                self.live.update(self._render())
+        if self.live:
+            self.live.update(self._render())
 
     async def sample_started(self, sample_id: int, model_name: Optional[str] = None):
         """Mark sample as started"""
