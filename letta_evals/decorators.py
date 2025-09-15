@@ -119,23 +119,27 @@ def agent_factory(func: Callable) -> Callable:
     """
     Decorator for agent factory functions.
 
-    Validates that the function has signature: async (client: AsyncLetta) -> str
+    Validates that the function has signature: async (client: AsyncLetta, sample: Sample) -> str
 
     Usage:
         @agent_factory
-        async def create_inventory_agent(client: AsyncLetta) -> str:
-            # create agent using client
+        async def create_inventory_agent(client: AsyncLetta, sample: Sample) -> str:
+            # create agent using client and sample data
             return agent_id
     """
     sig = inspect.signature(func)
     params = list(sig.parameters.values())
 
-    if len(params) != 1:
-        raise TypeError(f"Agent factory {func.__name__} must have exactly 1 parameter (client), " f"got {len(params)}")
+    if len(params) != 2:
+        raise TypeError(
+            f"Agent factory {func.__name__} must have exactly 2 parameters (client, sample), " f"got {len(params)}"
+        )
 
-    param_name = params[0].name
-    if param_name != "client":
-        raise TypeError(f"Agent factory {func.__name__} must have parameter named 'client', " f"got '{param_name}'")
+    param_names = [p.name for p in params]
+    if param_names != ["client", "sample"]:
+        raise TypeError(
+            f"Agent factory {func.__name__} must have parameters named 'client' and 'sample', " f"got {param_names}"
+        )
 
     if not inspect.iscoroutinefunction(func):
         raise TypeError(f"Agent factory {func.__name__} must be an async function")

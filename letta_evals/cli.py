@@ -1,9 +1,9 @@
-import asyncio
 import json
 import sys
 from pathlib import Path
 from typing import Optional
 
+import anyio
 import typer
 import yaml
 from rich.console import Console
@@ -11,7 +11,7 @@ from rich.table import Table
 
 from letta_evals.datasets.loader import load_jsonl
 from letta_evals.models import RunnerResult, SuiteSpec
-from letta_evals.runner.engine import run_suite
+from letta_evals.runner import run_suite
 from letta_evals.visualization.progress import DisplayMode, EvalProgress
 
 app = typer.Typer(help="Letta Evals - Evaluation framework for Letta AI agents")
@@ -90,7 +90,7 @@ def run(
                 progress.stop()
 
     try:
-        result = asyncio.run(run_with_progress())
+        result = anyio.run(run_with_progress)  # type: ignore[arg-type]
 
         if not quiet:
             display_results(result, verbose)
@@ -149,7 +149,7 @@ def validate(suite_path: Path = typer.Argument(..., help="Path to suite YAML fil
 def list_extractors():
     """List available submission extractors."""
 
-    from letta_evals.extractors import EXTRACTOR_REGISTRY
+    from letta_evals.decorators import EXTRACTOR_REGISTRY
 
     table = Table(title="Available Extractors")
     table.add_column("Name", style="cyan")

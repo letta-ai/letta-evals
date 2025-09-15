@@ -1,3 +1,5 @@
+import re
+
 from letta_evals.decorators import grader
 from letta_evals.models import GradeResult, Sample
 
@@ -22,3 +24,18 @@ def contains(sample: Sample, submission: str) -> GradeResult:
     found = sample.ground_truth.lower() in submission.lower()
     score = 1.0 if found else 0.0
     return GradeResult(score=score, rationale=f"Contains ground_truth: {found}")
+
+
+@grader
+def regex_match(sample: Sample, submission: str) -> GradeResult:
+    """Check if submission matches ground_truth regex pattern."""
+    if not sample.ground_truth:
+        return GradeResult(score=0.0, rationale="No ground_truth regex pattern provided")
+
+    try:
+        pattern = re.compile(sample.ground_truth)
+        matches = bool(pattern.search(submission))
+        score = 1.0 if matches else 0.0
+        return GradeResult(score=score, rationale=f"Regex match: {matches}")
+    except re.error as e:
+        return GradeResult(score=0.0, rationale=f"Invalid regex pattern: {e}")

@@ -7,7 +7,7 @@ target:
   base_url: http://localhost:8283
 grader:
   kind: tool
-  function: contains
+  function: regex_match
   extractor: tool_output
   extractor_config:
     tool_name: manage_inventory

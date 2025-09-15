@@ -303,6 +303,7 @@ name = "letta-evals-kit"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "anyio" },
     { name = "jinja2" },
     { name = "jsonpath-ng" },
     { name = "letta-client" },
@@ -324,6 +325,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", specifier = "==4.10.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "jsonpath-ng", specifier = ">=1.6.0" },
     { name = "letta-client", specifier = ">=0.1.319" },
