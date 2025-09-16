@@ -186,8 +186,12 @@ class Runner:
                 for sample in samples:
 
                     async def run_and_append(s, cfg):
-                        result = await self.run_sample(s, llm_config=cfg)
-                        self.results.append(result)
+                        try:
+                            result = await self.run_sample(s, llm_config=cfg)
+                            self.results.append(result)
+                        except Exception as e:
+                            if self.progress_callback:
+                                await self.progress_callback.sample_error(s.id, str(e))
 
                     tg.start_soon(run_and_append, sample, llm_config)
 

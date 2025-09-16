@@ -1,0 +1,7 @@
+{
+    "context_window": 270000,
+    "model": "gpt-5-2025-08-07",
+    "model_endpoint_type": "openai",
+    "model_endpoint": "https://api.openai.com/v1",
+    "model_wrapper": null
+}
