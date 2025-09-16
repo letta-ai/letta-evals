@@ -12,6 +12,7 @@ from letta_evals.types import GraderKind, LLMProvider, MetricOp, TargetKind
 class Sample(BaseModel):
     """Single evaluation sample."""
 
+    id: int = Field(description="Sample ID (0-based index from dataset)")
     input: Union[str, List[str]] = Field(description="Input message(s) to send to the agent")
     ground_truth: Optional[str] = Field(default=None, description="Expected ground_truth response for grading")
     agent_args: Optional[Dict[str, Any]] = Field(default=None, description="Custom arguments for agent creation")
@@ -171,8 +172,8 @@ class TargetResult(BaseModel):
     trajectory: List[List[LettaMessageUnion]] = Field(
         description="List of conversation turns, each containing Letta messages"
     )
-    agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
-    model_name: Optional[str] = Field(default=None, description="Model configuration name used for this target")
+    agent_id: str = Field(description="ID of the agent that generated this trajectory")
+    model_name: str = Field(description="Model configuration name used for this target")
 
 
 class GradeResult(BaseModel):
@@ -218,9 +219,9 @@ class SampleResult(BaseModel):
     sample: Sample = Field(description="The original sample that was evaluated")
     submission: str = Field(description="Extracted response from the trajectory")
     trajectory: List[List[LettaMessageUnion]] = Field(description="Full conversation trajectory from the agent")
-    agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
+    agent_id: str = Field(description="ID of the agent that generated this trajectory")
     grade: GradeResult = Field(description="Grading result for this sample")
-    model_name: Optional[str] = Field(default=None, description="Model configuration name used for this sample")
+    model_name: Optional[str] = Field(description="Model configuration name used for this sample")
 
 
 class RunnerResult(BaseModel):

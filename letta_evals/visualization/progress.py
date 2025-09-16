@@ -2,7 +2,7 @@ import time
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 from rich.align import Align
 from rich.box import MINIMAL_DOUBLE_HEAD, ROUNDED
@@ -78,6 +78,7 @@ class EvalProgress:
         console: Optional[Console] = None,
         update_freq: float = 10.0,
         show_samples: bool = True,
+        cached_mode: bool = False,
     ):
         self.suite_name = suite_name
         self.total_samples = total_samples
@@ -89,6 +90,7 @@ class EvalProgress:
         self.show_samples = show_samples
         self.console = console or Console()
         self.update_freq = update_freq
+        self.cached_mode = cached_mode
 
         self.samples: Dict[int, SampleProgress] = {}
         self.start_time = None
@@ -398,12 +400,14 @@ class EvalProgress:
             ]
             if self.grader_kind == GraderKind.RUBRIC.value and self.rubric_model:
                 row_data.append(self.rubric_model)
-            row_data.extend([
-                self._get_state_text(s),
-                score_text,
-                time_text,
-                details,
-            ])
+            row_data.extend(
+                [
+                    self._get_state_text(s),
+                    score_text,
+                    time_text,
+                    details,
+                ]
+            )
             table.add_row(*row_data)
 
         return table
@@ -423,8 +427,9 @@ class EvalProgress:
     async def start(self):
         """Start the progress display"""
         self.start_time = time.time()
+        task_description = "Re-grading cached trajectories" if self.cached_mode else "Evaluating samples"
         self.main_task_id = self.main_progress.add_task(
-            "Evaluating samples",
+            task_description,
             total=self.total_samples,
             completed=0,
         )
@@ -492,7 +497,9 @@ class EvalProgress:
         if sample_id not in self.samples:
             self.samples[sample_id] = SampleProgress(sample_id)
         self.samples[sample_id].model_name = model_name
-        await self.update_sample_state(sample_id, SampleState.LOADING_AGENT)
+        # skip loading state if using cached trajectories
+        if not self.cached_mode:
+            await self.update_sample_state(sample_id, SampleState.LOADING_AGENT)
 
     async def agent_loading(self, sample_id: int, model_name: Optional[str] = None):
         """Mark sample as loading agent"""
