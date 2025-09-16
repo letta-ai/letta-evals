@@ -11,8 +11,8 @@ target:
     - openai-gpt-4.1-nano
 grader:
   kind: tool
-  function: /Users/kevinlin/Documents/letta-evals-kit/letta-leaderboard/core-memory-read-agent/core_memory_evaluators.py:grade_core_memory_read
-  extractor: /Users/kevinlin/Documents/letta-evals-kit/letta-leaderboard/core-memory-read-agent/core_memory_evaluators.py:CoreMemoryResponseExtractor
+  function: contains
+  extractor: last_assistant
 gate:
   op: gte
   value: 0.75  # Require 75% accuracy
