@@ -219,7 +219,9 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
     metrics = result.metrics
     console.print("\n[bold]Overall Metrics:[/bold]")
     console.print(f"  Total samples: {metrics.total}")
+    console.print(f"  Total attempted: {metrics.total_attempted}")
     console.print(f"  Average score: {metrics.avg_score:.2f}")
+    console.print(f"  Accuracy: {metrics.accuracy:.1f}%")
 
     # show per-model metrics if available
     if metrics.per_model:
@@ -227,7 +229,9 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
         model_table = Table()
         model_table.add_column("Model", style="cyan")
         model_table.add_column("Samples", style="white")
+        model_table.add_column("Attempted", style="white")
         model_table.add_column("Avg Score", style="white")
+        model_table.add_column("Accuracy", style="white")
         model_table.add_column("Passed", style="green")
         model_table.add_column("Failed", style="red")
 
@@ -235,7 +239,9 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
             model_table.add_row(
                 model_metrics.model_name,
                 str(model_metrics.total),
+                str(model_metrics.total_attempted),
                 f"{model_metrics.avg_score:.2f}",
+                f"{model_metrics.accuracy:.1f}%",
                 str(model_metrics.passed_samples),
                 str(model_metrics.failed_samples),
             )

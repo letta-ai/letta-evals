@@ -197,17 +197,21 @@ class ModelMetrics(BaseModel):
     """Metrics for a specific model configuration."""
 
     model_name: str = Field(description="Model configuration name")
-    total: int = Field(description="Total number of samples evaluated")
+    total: int = Field(description="Total number of samples evaluated successfully")
+    total_attempted: int = Field(description="Total number of samples attempted (including errors)")
     avg_score: float = Field(description="Average score across all samples (0.0 to 1.0)")
     passed_samples: int = Field(description="Number of samples that passed the gate")
     failed_samples: int = Field(description="Number of samples that failed the gate")
+    accuracy: float = Field(description="Accuracy percentage (passed samples / total attempted)")
 
 
 class Metrics(BaseModel):
     """Evaluation metrics."""
 
-    total: int = Field(description="Total number of samples evaluated")
+    total: int = Field(description="Total number of samples evaluated successfully")
+    total_attempted: int = Field(description="Total number of samples attempted (including errors)")
     avg_score: float = Field(description="Average score across all samples (0.0 to 1.0)")
+    accuracy: float = Field(description="Overall accuracy percentage (passed samples / total attempted)")
     per_model: Optional[List[ModelMetrics]] = Field(
         default=None, description="Metrics broken down by model configuration"
     )

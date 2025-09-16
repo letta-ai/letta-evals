@@ -180,6 +180,9 @@ class Runner:
         )
 
         self.results = []
+        
+        # Calculate total attempted evaluations (samples × models)
+        total_attempted = len(samples) * len(self.model_configs)
 
         async with anyio.create_task_group() as tg:
             for llm_config in self.model_configs:
@@ -195,7 +198,7 @@ class Runner:
 
                     tg.start_soon(run_and_append, sample, llm_config)
 
-        metrics = self._calculate_metrics()
+        metrics = self._calculate_metrics(total_attempted, len(samples))
         gates_passed = self._check_gates(metrics)
 
         config = {
@@ -208,14 +211,18 @@ class Runner:
             suite=self.suite.name, config=config, results=self.results, metrics=metrics, gates_passed=gates_passed
         )
 
-    def _calculate_metrics(self) -> Metrics:
+    def _calculate_metrics(self, total_attempted: int, samples_count: int) -> Metrics:
         """Calculate aggregate metrics."""
         total = len(self.results)
-        if total == 0:
-            return Metrics(total=0, avg_score=0.0)
+        if total_attempted == 0:
+            return Metrics(total=0, total_attempted=0, avg_score=0.0, accuracy=0.0)
 
         scores = [r.grade.score for r in self.results]
         avg_score = sum(scores) / len(scores) if scores else 0.0
+        
+        # Calculate overall accuracy using total_attempted (including errors)
+        passed_samples = sum(1 for r in self.results if self._check_score_against_gate(r.grade.score))
+        accuracy = (passed_samples / total_attempted) * 100 if total_attempted > 0 else 0.0
 
         per_model = None
         if self.suite.target.model_configs:
@@ -229,18 +236,24 @@ class Runner:
                 model_avg = sum(model_scores) / len(model_scores) if model_scores else 0.0
                 passed = sum(1 for r in results if self._check_score_against_gate(r.grade.score))
                 failed = len(results) - passed
+                
+                # For per-model, samples_per_model is the number of samples attempted for this specific model
+                # This is the same as the total number of samples in the dataset
+                model_accuracy = (passed / samples_count) * 100 if samples_count > 0 else 0.0
 
                 per_model.append(
                     ModelMetrics(
                         model_name=model_name,
                         total=len(results),
+                        total_attempted=samples_count,
                         avg_score=model_avg,
                         passed_samples=passed,
                         failed_samples=failed,
+                        accuracy=model_accuracy,
                     )
                 )
 
-        return Metrics(total=total, avg_score=avg_score, per_model=per_model)
+        return Metrics(total=total, total_attempted=total_attempted, avg_score=avg_score, accuracy=accuracy, per_model=per_model)
 
     def _check_score_against_gate(self, score: float) -> bool:
         """Check if an individual score satisfies the gate."""
