@@ -118,7 +118,7 @@ class Runner:
             except Exception as e:
                 if self.progress_callback:
                     await self.progress_callback.sample_error(sample_id, str(e))
-                raise
+                raise  # Re-raise to be caught by run_and_append
 
     async def run(self) -> RunnerResult:
         """Run evaluation on all samples."""
@@ -134,8 +134,14 @@ class Runner:
                 for sample in samples:
 
                     async def run_and_append(sid, s, cfg):
-                        result = await self.run_sample(s, sample_id=sid, llm_config=cfg)
-                        self.results.append(result)
+                        try:
+                            result = await self.run_sample(s, sample_id=sid, llm_config=cfg)
+                            self.results.append(result)
+                        except Exception as e:
+                            # Log the error and continue with other samples
+                            print(f"Sample {sid} failed with error: {e}")
+                            if self.progress_callback:
+                                await self.progress_callback.sample_error(sid, str(e))
 
                     tg.start_soon(run_and_append, sample_id, sample, llm_config)
                     sample_id += 1
