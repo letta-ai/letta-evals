@@ -25,10 +25,10 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
         str: The ID of the created agent
     """
 
-    # Extract facts from sample metadata
+    # Extract facts from sample agent_args
     facts = []
-    if sample.metadata and hasattr(sample.metadata, 'extra') and sample.metadata.extra:
-        facts = sample.metadata.extra.get('facts', [])
+    if sample.agent_args and 'extra' in sample.agent_args and sample.agent_args['extra']:
+        facts = sample.agent_args['extra'].get('facts', [])
 
     if not facts:
         raise ValueError(f"No facts available for sample: {sample.input}")
