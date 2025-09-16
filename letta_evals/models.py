@@ -128,6 +128,13 @@ class SuiteSpec(BaseModel):
     max_samples: Optional[int] = Field(default=None, description="Maximum number of samples to evaluate")
     sample_tags: Optional[List[str]] = Field(default=None, description="Only evaluate samples with these tags")
 
+    setup_script: Optional[str] = Field(
+        default=None, description="Path to Python script with setup function (e.g., setup.py:prepare_evaluation)"
+    )
+
+    # internal field for path resolution
+    base_dir: Optional[Path] = Field(default=None, exclude=True)
+
     @classmethod
     def from_yaml(cls, yaml_data: Dict[str, Any], base_dir: Optional[Path] = None) -> "SuiteSpec":
         """Create from parsed YAML data."""
@@ -157,6 +164,9 @@ class SuiteSpec(BaseModel):
 
                 # store base_dir in grader for custom function resolution
                 yaml_data["grader"]["base_dir"] = base_dir
+
+            # store base_dir in SuiteSpec for setup_script resolution
+            yaml_data["base_dir"] = base_dir
 
         if "gate" in yaml_data and isinstance(yaml_data["gate"], dict):
             yaml_data["gate"] = GateSpec(**yaml_data["gate"])
