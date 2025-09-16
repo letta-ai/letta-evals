@@ -171,7 +171,7 @@ class Runner:
             except Exception as e:
                 if self.progress_callback:
                     await self.progress_callback.sample_error(sample_id, str(e))
-                raise  # Re-raise to be caught by run_and_append
+                raise
 
     async def run(self) -> RunnerResult:
         """Run evaluation on all samples."""
@@ -184,12 +184,12 @@ class Runner:
         async with anyio.create_task_group() as tg:
             for llm_config in self.model_configs:
                 for sample in samples:
+
                     async def run_and_append(s, cfg):
                         try:
                             result = await self.run_sample(s, llm_config=cfg)
                             self.results.append(result)
                         except Exception as e:
-                            print(f"Sample {s.id} failed with error: {e}")
                             if self.progress_callback:
                                 await self.progress_callback.sample_error(s.id, str(e))
 
