@@ -32,9 +32,7 @@ class AgentTarget(Target):
 
         self.client = AsyncLetta(base_url=self.base_url, token=api_key, timeout=timeout)
 
-    async def run(
-        self, sample: Sample, progress_callback: Optional[ProgressCallback] = None, sample_id: Optional[int] = None
-    ) -> TargetResult:
+    async def run(self, sample: Sample, progress_callback: Optional[ProgressCallback] = None) -> TargetResult:
         """Run the agent on a sample."""
         agent_id = self.agent_id
 
@@ -61,8 +59,8 @@ class AgentTarget(Target):
         model_name = self.llm_config.model if self.llm_config else agent.llm_config.model
 
         # notify progress callback with model name
-        if progress_callback and sample_id is not None and (self.agent_file or self.agent_script):
-            await progress_callback.agent_loading(sample_id, model_name=model_name)
+        if progress_callback and (self.agent_file or self.agent_script):
+            await progress_callback.agent_loading(sample.id, model_name=model_name)
 
         trajectory = []
 
@@ -70,8 +68,8 @@ class AgentTarget(Target):
         total_messages = len(inputs)
 
         for i, input_msg in enumerate(inputs):
-            if progress_callback and sample_id is not None:
-                await progress_callback.message_sending(sample_id, i + 1, total_messages)
+            if progress_callback:
+                await progress_callback.message_sending(sample.id, i + 1, total_messages)
 
             stream = self.client.agents.messages.create_stream(
                 agent_id=agent_id,
