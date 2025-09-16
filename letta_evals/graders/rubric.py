@@ -1,6 +1,6 @@
 import json
 import os
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from dotenv import load_dotenv
 from letta_client import LettaMessageUnion
@@ -47,7 +47,7 @@ class RubricGrader(Grader):
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
-    async def grade(self, sample: Sample, trajectory: List[List[LettaMessageUnion]]) -> GradeResult:
+    async def grade(self, sample: Sample, trajectory: List[List[LettaMessageUnion]]) -> Tuple[GradeResult, str]:
         """Grade using LLM judge with rubric."""
         submission = self.extractor(trajectory)
 
@@ -83,10 +83,10 @@ class RubricGrader(Grader):
                 score=score,
                 rationale=result_json.get("rationale", ""),
                 metadata={"model": self.model, "usage": response.usage.model_dump() if response.usage else None},
-            )
+            ), submission
 
         except Exception as e:
-            return GradeResult(score=0.0, rationale=f"Error during grading: {str(e)}", metadata={"error": str(e)})
+            return GradeResult(score=0.0, rationale=f"Error during grading: {str(e)}", metadata={"error": str(e)}), submission
 
     def _get_system_prompt(self) -> str:
         """Get the system prompt for the judge."""
@@ -116,10 +116,6 @@ IMPORTANT:
 
         if sample.ground_truth:
             prompt = prompt.replace("{ground_truth}", sample.ground_truth)
-
-        if "{metadata}" in prompt and sample.metadata:
-            metadata_str = json.dumps(sample.metadata.model_dump(), indent=2)
-            prompt = prompt.replace("{metadata}", metadata_str)
 
         parts = [
             "## Rubric",

@@ -1,6 +1,6 @@
 name: fetch-webpage-test
 description: Test if agent can fetch webpage content and extract information
-dataset: fetch-webpage-dataset.jsonl
+dataset: dataset.jsonl
 target:
   kind: agent
   agent_file: test-fetch-webpage-simple-agent.af

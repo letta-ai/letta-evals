@@ -1,4 +1,3 @@
-import json
 import sys
 from pathlib import Path
 from typing import Optional
@@ -12,6 +11,7 @@ from rich.table import Table
 from letta_evals.datasets.loader import load_jsonl
 from letta_evals.models import RunnerResult, SuiteSpec
 from letta_evals.runner import run_suite
+from letta_evals.types import GraderKind
 from letta_evals.visualization.progress import DisplayMode, EvalProgress
 
 app = typer.Typer(help="Letta Evals - Evaluation framework for Letta AI agents")
@@ -24,6 +24,9 @@ def run(
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Save results to JSON file"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
     max_concurrent: int = typer.Option(15, "--max-concurrent", help="Maximum concurrent evaluations"),
+    cached: Optional[Path] = typer.Option(
+        None, "--cached", "-c", help="Path to cached results.json for re-grading trajectories"
+    ),
 ):
     """Run an evaluation suite."""
 
@@ -64,27 +67,44 @@ def run(
             console.print(f"[cyan]Total samples: {num_samples}[/cyan]")
         console.print(f"[cyan]Max concurrent: {max_concurrent}[/cyan]")
 
+        if cached:
+            console.print(f"[yellow]Using cached trajectories from: {cached}[/yellow]")
+            console.print(
+                f"[yellow]Re-grading {total_evaluations} trajectories with updated grader configuration[/yellow]"
+            )
+
     async def run_with_progress():
         if no_fancy or quiet:
             if not quiet:
                 console.print(f"Running evaluation suite: {suite.name}")
-                console.print(f"Evaluating {total_evaluations} samples...")
-            return await run_suite(suite_path, max_concurrent=max_concurrent)
+                if cached:
+                    console.print(f"[yellow]Re-grading {total_evaluations} cached trajectories...[/yellow]")
+                else:
+                    console.print(f"Evaluating {total_evaluations} samples...")
+            return await run_suite(suite_path, max_concurrent=max_concurrent, cached_results_path=cached)
         else:
+            rubric_model = None
+            if suite.grader.kind == GraderKind.RUBRIC and hasattr(suite.grader, "model"):
+                rubric_model = suite.grader.model
+
             progress = EvalProgress(
                 suite_name=suite.name,
                 total_samples=total_evaluations,
                 target_kind=suite.target.kind.value,
                 grader_kind=suite.grader.kind.value,
+                rubric_model=rubric_model,
                 max_concurrent=max_concurrent,
                 display_mode=DisplayMode.DETAILED,
                 console=console,
                 show_samples=True,
+                cached_mode=(cached is not None),
             )
 
             await progress.start()
             try:
-                result = await run_suite(suite_path, max_concurrent=max_concurrent, progress_callback=progress)
+                result = await run_suite(
+                    suite_path, max_concurrent=max_concurrent, progress_callback=progress, cached_results_path=cached
+                )
                 return result
             finally:
                 progress.stop()
@@ -93,7 +113,7 @@ def run(
         result = anyio.run(run_with_progress)  # type: ignore[arg-type]
 
         if not quiet:
-            display_results(result, verbose)
+            display_results(result, verbose, cached_mode=(cached is not None))
 
         if output:
             save_results(result, output)
@@ -190,8 +210,10 @@ def list_graders():
     console.print("\n[dim]You can also use 'rubric' graders with custom prompts[/dim]")
 
 
-def display_results(result: RunnerResult, verbose: bool = False):
+def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bool = False):
     console.print(f"\n[bold]Evaluation Results: {result.suite}[/bold]")
+    if cached_mode:
+        console.print("[dim]Note: Results re-graded from cached trajectories[/dim]")
     console.print("=" * 50)
 
     metrics = result.metrics
@@ -259,10 +281,10 @@ def display_results(result: RunnerResult, verbose: bool = False):
 
 
 def save_results(result: RunnerResult, output_path: Path):
-    result_dict = result.dict()
+    result_json = result.model_dump_json(indent=2)
 
     with open(output_path, "w") as f:
-        json.dump(result_dict, f, indent=2, default=str)
+        f.write(result_json)
 
 
 if __name__ == "__main__":
