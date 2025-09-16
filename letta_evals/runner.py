@@ -203,7 +203,7 @@ class Runner:
                                 sample=s,
                                 submission="",
                                 trajectory=[],
-                                agent_id=None,
+                                agent_id="placeholder",
                                 grade=GradeResult(score=0.0, rationale=f"Error: {str(e)[:200]}"),
                                 model_name=model_name,
                             )
