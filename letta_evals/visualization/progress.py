@@ -23,6 +23,8 @@ from rich.progress import (
 from rich.table import Table
 from rich.text import Text
 
+from letta_evals.types import GraderKind
+
 
 class SampleState(Enum):
     """States a sample can be in during evaluation"""
@@ -70,21 +72,25 @@ class EvalProgress:
         total_samples: int,
         target_kind: str = "agent",
         grader_kind: str = "tool",
+        rubric_model: Optional[str] = None,
         max_concurrent: int = 15,
         display_mode: DisplayMode = DisplayMode.STANDARD,
         console: Optional[Console] = None,
         update_freq: float = 10.0,
         show_samples: bool = True,
+        cached_mode: bool = False,
     ):
         self.suite_name = suite_name
         self.total_samples = total_samples
         self.target_kind = target_kind
         self.grader_kind = grader_kind
+        self.rubric_model = rubric_model
         self.max_concurrent = max_concurrent
         self.display_mode = display_mode
         self.show_samples = show_samples
         self.console = console or Console()
         self.update_freq = update_freq
+        self.cached_mode = cached_mode
 
         self.samples: Dict[int, SampleProgress] = {}
         self.start_time = None
@@ -350,6 +356,8 @@ class EvalProgress:
 
         table.add_column("#", style="cyan", width=4)
         table.add_column("Model", style="yellow", width=20)
+        if self.grader_kind == GraderKind.RUBRIC.value and self.rubric_model:
+            table.add_column("Rubric Model", style="magenta", width=15)
         table.add_column("Status", width=20)
         table.add_column("Score", width=6, justify="right")
         table.add_column("Time", width=6, justify="right")
@@ -386,14 +394,21 @@ class EvalProgress:
             else:
                 details = ""
 
-            table.add_row(
+            row_data = [
                 str(s.sample_id + 1),
                 s.model_name or "-",
-                self._get_state_text(s),
-                score_text,
-                time_text,
-                details,
+            ]
+            if self.grader_kind == GraderKind.RUBRIC.value and self.rubric_model:
+                row_data.append(self.rubric_model)
+            row_data.extend(
+                [
+                    self._get_state_text(s),
+                    score_text,
+                    time_text,
+                    details,
+                ]
             )
+            table.add_row(*row_data)
 
         return table
 
@@ -412,8 +427,9 @@ class EvalProgress:
     async def start(self):
         """Start the progress display"""
         self.start_time = time.time()
+        task_description = "Re-grading cached trajectories" if self.cached_mode else "Evaluating samples"
         self.main_task_id = self.main_progress.add_task(
-            "Evaluating samples",
+            task_description,
             total=self.total_samples,
             completed=0,
         )
@@ -481,7 +497,9 @@ class EvalProgress:
         if sample_id not in self.samples:
             self.samples[sample_id] = SampleProgress(sample_id)
         self.samples[sample_id].model_name = model_name
-        await self.update_sample_state(sample_id, SampleState.LOADING_AGENT)
+        # skip loading state if using cached trajectories
+        if not self.cached_mode:
+            await self.update_sample_state(sample_id, SampleState.LOADING_AGENT)
 
     async def agent_loading(self, sample_id: int, model_name: Optional[str] = None):
         """Mark sample as loading agent"""
