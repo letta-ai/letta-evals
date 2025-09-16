@@ -53,6 +53,7 @@ class SampleProgress:
     start_time: Optional[float] = None
     end_time: Optional[float] = None
     last_update_ts: Optional[float] = None
+    from_cache: bool = False
 
 
 class DisplayMode(Enum):
@@ -92,7 +93,7 @@ class EvalProgress:
         self.update_freq = update_freq
         self.cached_mode = cached_mode
 
-        self.samples: Dict[int, SampleProgress] = {}
+        self.samples: Dict[tuple, SampleProgress] = {}  # key: (sample_id, model_name)
         self.start_time = None
         self.live: Optional[Live] = None
         self.main_progress = Progress(
@@ -177,10 +178,12 @@ class EvalProgress:
         if not self.show_samples or self.display_mode == DisplayMode.COMPACT:
             return Panel("")
 
-        state_groups = {state: [] for state in SampleState}
-        for sample_id in range(self.total_samples):
-            sample = self.samples.get(sample_id, SampleProgress(sample_id))
-            state_groups[sample.state].append(sample_id)
+        # collect all samples by their base sample_id
+        sample_by_id = {}
+        for key, sample in self.samples.items():
+            sample_id, _ = key
+            if sample_id not in sample_by_id or sample.last_update_ts > (sample_by_id[sample_id].last_update_ts or 0):
+                sample_by_id[sample_id] = sample
 
         rows = []
         samples_per_row = 15
@@ -189,7 +192,7 @@ class EvalProgress:
             row_text = Text(f"[{i+1:3d}-{min(i+samples_per_row, self.total_samples):3d}] ", style="dim")
 
             for j in range(i, min(i + samples_per_row, self.total_samples)):
-                sample = self.samples.get(j, SampleProgress(j))
+                sample = sample_by_id.get(j, SampleProgress(j))
                 icon = self._get_state_icon(sample.state)
                 if j > i:
                     row_text.append(" ")  # space between icons
@@ -259,7 +262,7 @@ class EvalProgress:
             metrics_table.add_row("📈 Avg Score:", avg_score_text)
 
         if self.failed_count > 0:
-            failed_samples = [str(i + 1) for i, s in self.samples.items() if s.passed is False][:5]
+            failed_samples = [str(key[0] + 1) for key, s in self.samples.items() if s.passed is False][:5]
             failed_text = ", ".join(failed_samples)
             if len(failed_samples) < self.failed_count:
                 failed_text += f" ... ({self.failed_count} total)"
@@ -306,7 +309,8 @@ class EvalProgress:
         active_states = {SampleState.LOADING_AGENT, SampleState.SENDING_MESSAGES, SampleState.GRADING}
         completed_states = {SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR}
 
-        samples_list = [self.samples.get(i, SampleProgress(i)) for i in range(self.total_samples)]
+        # gather all samples
+        samples_list = list(self.samples.values())
         active = [s for s in samples_list if s.state in active_states]
         active.sort(key=last_update_key, reverse=True)
 
@@ -346,7 +350,7 @@ class EvalProgress:
         )
 
         table = Table(
-            title=title,
+            title=f"{title}  (♻ means cached)",
             show_header=True,
             header_style="bold cyan",
             border_style="blue",
@@ -354,7 +358,7 @@ class EvalProgress:
             expand=True,
         )
 
-        table.add_column("#", style="cyan", width=4)
+        table.add_column("#", style="cyan", width=12)
         table.add_column("Model", style="yellow", width=20)
         if self.grader_kind == GraderKind.RUBRIC.value and self.rubric_model:
             table.add_column("Rubric Model", style="magenta", width=15)
@@ -382,7 +386,7 @@ class EvalProgress:
                 bar = "▰" * filled + "▱" * (bar_width - filled)
                 details = f"{bar}  msg {s.messages_sent}/{s.total_messages}"
             elif s.state == SampleState.LOADING_AGENT:
-                details = "Loading agent…"
+                details = "Loading from cache…" if s.from_cache else "Loading agent…"
             elif s.state == SampleState.GRADING:
                 details = "Grading response…"
             elif s.state == SampleState.COMPLETED:
@@ -394,8 +398,12 @@ class EvalProgress:
             else:
                 details = ""
 
+            sample_num = str(s.sample_id + 1)
+            if s.from_cache:
+                sample_num = f"{sample_num} ♻"
+
             row_data = [
-                str(s.sample_id + 1),
+                sample_num,
                 s.model_name or "-",
             ]
             if self.grader_kind == GraderKind.RUBRIC.value and self.rubric_model:
@@ -434,8 +442,8 @@ class EvalProgress:
             completed=0,
         )
 
-        for i in range(self.total_samples):
-            self.samples[i] = SampleProgress(i)
+        # initialize samples placeholder - actual entries will be created as evaluations start
+        # no longer pre-populate since we need model_name for the key
 
         self.live = Live(
             self._render(),
@@ -452,12 +460,13 @@ class EvalProgress:
             self.live.stop()
             self.console.print()
 
-    async def update_sample_state(self, sample_id: int, state: SampleState, **kwargs):
+    async def update_sample_state(self, sample_id: int, state: SampleState, model_name: Optional[str] = None, **kwargs):
         """Update state of a sample"""
-        if sample_id not in self.samples:
-            self.samples[sample_id] = SampleProgress(sample_id)
+        key = (sample_id, model_name)
+        if key not in self.samples:
+            self.samples[key] = SampleProgress(sample_id, model_name=model_name)
 
-        sample = self.samples[sample_id]
+        sample = self.samples[key]
         sample.state = state
 
         if state == SampleState.LOADING_AGENT and sample.start_time is None:
@@ -494,45 +503,60 @@ class EvalProgress:
 
     async def sample_started(self, sample_id: int, model_name: Optional[str] = None):
         """Mark sample as started"""
-        if sample_id not in self.samples:
-            self.samples[sample_id] = SampleProgress(sample_id)
-        self.samples[sample_id].model_name = model_name
+        key = (sample_id, model_name)
+        if key not in self.samples:
+            self.samples[key] = SampleProgress(sample_id, model_name=model_name)
         # skip loading state if using cached trajectories
         if not self.cached_mode:
-            await self.update_sample_state(sample_id, SampleState.LOADING_AGENT)
+            await self.update_sample_state(sample_id, SampleState.LOADING_AGENT, model_name=model_name)
 
-    async def agent_loading(self, sample_id: int, model_name: Optional[str] = None):
+    async def agent_loading(self, sample_id: int, model_name: Optional[str] = None, from_cache: bool = False):
         """Mark sample as loading agent"""
-        if model_name and sample_id in self.samples:
-            self.samples[sample_id].model_name = model_name
-        await self.update_sample_state(sample_id, SampleState.LOADING_AGENT)
+        await self.update_sample_state(
+            sample_id, SampleState.LOADING_AGENT, model_name=model_name, from_cache=from_cache
+        )
 
-    async def message_sending(self, sample_id: int, message_num: int, total_messages: int):
+    async def message_sending(
+        self, sample_id: int, message_num: int, total_messages: int, model_name: Optional[str] = None
+    ):
         """Update message sending progress"""
         await self.update_sample_state(
             sample_id,
             SampleState.SENDING_MESSAGES,
+            model_name=model_name,
             messages_sent=message_num,
             total_messages=total_messages,
         )
 
-    async def grading_started(self, sample_id: int):
+    async def grading_started(self, sample_id: int, model_name: Optional[str] = None):
         """Mark sample as being graded"""
-        await self.update_sample_state(sample_id, SampleState.GRADING)
+        key = (sample_id, model_name)
+        existing_from_cache = self.samples[key].from_cache if key in self.samples else False
+        await self.update_sample_state(
+            sample_id, SampleState.GRADING, model_name=model_name, from_cache=existing_from_cache
+        )
 
-    async def sample_completed(self, sample_id: int, passed: bool, score: Optional[float] = None):
+    async def sample_completed(
+        self, sample_id: int, passed: bool, score: Optional[float] = None, model_name: Optional[str] = None
+    ):
         """Mark sample as completed"""
+        # preserve from_cache flag if it was set
+        key = (sample_id, model_name)
+        existing_from_cache = self.samples[key].from_cache if key in self.samples else False
         await self.update_sample_state(
             sample_id,
             SampleState.COMPLETED,
+            model_name=model_name,
             passed=passed,
             score=score,
+            from_cache=existing_from_cache,
         )
 
-    async def sample_error(self, sample_id: int, error: str):
+    async def sample_error(self, sample_id: int, error: str, model_name: Optional[str] = None):
         """Mark sample as having an error"""
         await self.update_sample_state(
             sample_id,
             SampleState.ERROR,
+            model_name=model_name,
             error=error,
         )

@@ -275,7 +275,9 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
             if len(rationale) > 50:
                 rationale = rationale[:47] + "..."
 
-            table.add_row(f"Sample {i + 1}", sample_result.model_name, passed, score, rationale)
+            table.add_row(
+                f"Sample {sample_result.sample.id + 1}", sample_result.model_name or "-", passed, score, rationale
+            )
 
         console.print(table)
 

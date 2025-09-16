@@ -10,23 +10,27 @@ class ProgressCallback(Protocol):
         """Called when a sample evaluation starts."""
         ...
 
-    async def agent_loading(self, sample_id: int, model_name: Optional[str] = None) -> None:
+    async def agent_loading(self, sample_id: int, model_name: Optional[str] = None, from_cache: bool = False) -> None:
         """Called when an agent is being loaded."""
         ...
 
-    async def message_sending(self, sample_id: int, message_num: int, total_messages: int) -> None:
+    async def message_sending(
+        self, sample_id: int, message_num: int, total_messages: int, model_name: Optional[str] = None
+    ) -> None:
         """Called when sending messages to the agent."""
         ...
 
-    async def grading_started(self, sample_id: int) -> None:
+    async def grading_started(self, sample_id: int, model_name: Optional[str] = None) -> None:
         """Called when grading of a sample begins."""
         ...
 
-    async def sample_completed(self, sample_id: int, passed: bool, score: Optional[float] = None) -> None:
+    async def sample_completed(
+        self, sample_id: int, passed: bool, score: Optional[float] = None, model_name: Optional[str] = None
+    ) -> None:
         """Called when a sample evaluation completes successfully."""
         ...
 
-    async def sample_error(self, sample_id: int, error: str) -> None:
+    async def sample_error(self, sample_id: int, error: str, model_name: Optional[str] = None) -> None:
         """Called when a sample evaluation encounters an error."""
         ...
 
