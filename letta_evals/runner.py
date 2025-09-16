@@ -45,12 +45,12 @@ class Runner:
             return [None]  # no model configs, use default
 
         configs = []
-        model_configs_dir = Path(__file__).parent.parent / "llm_model_configs"
+        model_configs_dir = Path(__file__).parent / "llm_model_configs"
 
         for config_name in self.suite.target.model_configs:
             config_path = model_configs_dir / f"{config_name}.json"
             if not config_path.exists():
-                raise ValueError(f"Model config not found: {config_name}")
+                raise ValueError(f"Model config not found at path: {config_path}")
 
             with open(config_path, "r") as f:
                 config_data = json.load(f)
@@ -104,9 +104,10 @@ class Runner:
                 cache[result.sample.id][result.model_name] = result
         return cache
 
-    async def run_sample(self, sample: Sample, sample_id: int, llm_config: Optional[LlmConfig] = None) -> SampleResult:
+    async def run_sample(self, sample: Sample, llm_config: Optional[LlmConfig] = None) -> SampleResult:
         """Run a single sample through target and grader."""
         use_cached = self.cached_results is not None
+        sample_id = sample.id
 
         async with self.semaphore:
             try:
@@ -114,23 +115,23 @@ class Runner:
 
                 if use_cached:
                     # check if we have cached results for this sample
-                    if sample.id not in self._cached_trajectories:
-                        raise ValueError(f"Cached trajectory not found for sample {sample.id}")
+                    if sample_id not in self._cached_trajectories:
+                        raise ValueError(f"Cached trajectory not found for sample {sample_id}")
 
-                    cached_models = self._cached_trajectories[sample.id]
+                    cached_models = self._cached_trajectories[sample_id]
 
                     # if we have a specific model requested, use it
                     if model_name is not None:
                         if model_name not in cached_models:
                             raise ValueError(
-                                f"Cached trajectory not found for model {model_name} and sample {sample.id}"
+                                f"Cached trajectory not found for model {model_name} and sample {sample_id}"
                             )
                         cached_result = cached_models[model_name]
                     else:
                         # no specific model requested - must be single model case
                         if len(cached_models) != 1:
                             raise ValueError(
-                                f"Expected single model in cache for sample {sample.id}, found {len(cached_models)}: {list(cached_models.keys())}"
+                                f"Expected single model in cache for sample {sample_id}, found {len(cached_models)}: {list(cached_models.keys())}"
                             )
                         # get the single model's result
                         cached_result = next(iter(cached_models.values()))
@@ -179,18 +180,16 @@ class Runner:
         )
 
         self.results = []
-        sample_id = 0
 
         async with anyio.create_task_group() as tg:
             for llm_config in self.model_configs:
                 for sample in samples:
 
-                    async def run_and_append(sid, s, cfg):
-                        result = await self.run_sample(s, sample_id=sid, llm_config=cfg)
+                    async def run_and_append(s, cfg):
+                        result = await self.run_sample(s, llm_config=cfg)
                         self.results.append(result)
 
-                    tg.start_soon(run_and_append, sample_id, sample, llm_config)
-                    sample_id += 1
+                    tg.start_soon(run_and_append, sample, llm_config)
 
         metrics = self._calculate_metrics()
         gates_passed = self._check_gates(metrics)
