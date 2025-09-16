@@ -5,6 +5,7 @@ CLAUDE.md
 .idea/
 
 examples/*/results.json
+examples/*/cache.json
 letta-leaderboard/*/results/results.json
 
 
