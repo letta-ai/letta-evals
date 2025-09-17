@@ -1,3 +1,4 @@
+import inspect
 import json
 import logging
 from collections import defaultdict
@@ -6,7 +7,7 @@ from typing import Dict, List, Optional
 
 import anyio
 import yaml
-from letta_client import LettaMessageUnion, LlmConfig
+from letta_client import AsyncLetta, LettaMessageUnion, LlmConfig
 
 from letta_evals.datasets.loader import load_jsonl
 from letta_evals.graders.base import Grader
@@ -16,6 +17,7 @@ from letta_evals.models import Metrics, ModelMetrics, RunnerResult, Sample, Samp
 from letta_evals.targets.agent import AgentTarget
 from letta_evals.targets.base import Target
 from letta_evals.types import GraderKind, ProgressCallback, TargetKind
+from letta_evals.utils import load_object
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,11 @@ class Runner:
         self.cached_results = cached_results
         self._cached_trajectories: Dict[int, Dict[str, SampleResult]] = (
             self._build_trajectory_cache() if cached_results else {}
+        )
+        self._setup_executed = False
+
+        self.client = AsyncLetta(
+            base_url=self.suite.target.base_url, token=self.suite.target.api_key, timeout=self.suite.target.timeout
         )
 
     def _load_model_configs(self) -> List[Optional[LlmConfig]]:
@@ -66,12 +73,10 @@ class Runner:
         """Create target from spec, optionally with model config."""
         if self.suite.target.kind == TargetKind.AGENT:
             return AgentTarget(
-                base_url=self.suite.target.base_url,
+                client=self.client,
                 agent_id=self.suite.target.agent_id,
                 agent_file=self.suite.target.agent_file,
                 agent_script=self.suite.target.agent_script,
-                api_key=self.suite.target.api_key,
-                timeout=self.suite.target.timeout,
                 base_dir=self.suite.target.base_dir,
                 llm_config=llm_config,
             )
@@ -98,6 +103,32 @@ class Runner:
             )
         else:
             raise ValueError(f"Unknown grader kind: {self.suite.grader.kind}")
+
+    async def _run_setup(self) -> None:
+        """Execute the setup function if specified."""
+        if self._setup_executed:
+            return
+
+        if not self.suite.setup_script:
+            return
+
+        try:
+            logger.info(f"Running setup script: {self.suite.setup_script}")
+            setup_func = load_object(self.suite.setup_script, self.suite.base_dir)
+            if not hasattr(setup_func, "_is_suite_setup"):
+                raise ValueError(f"Setup function must be decorated with @suite_setup: {self.suite.setup_script}")
+
+            if inspect.iscoroutinefunction(setup_func):
+                await setup_func(self.client)
+            else:
+                setup_func(self.client)
+
+            self._setup_executed = True
+            logger.info("Setup completed successfully")
+
+        except Exception as e:
+            logger.error(f"Error running setup script: {e}")
+            raise RuntimeError(f"Setup failed: {e}") from e
 
     def _build_trajectory_cache(self) -> Dict[int, Dict[str, SampleResult]]:
         """Build a cache of sample results indexed by sample_id -> model_name -> SampleResult."""
@@ -174,6 +205,8 @@ class Runner:
 
     async def run(self) -> RunnerResult:
         """Run evaluation on all samples."""
+        await self._run_setup()
+
         samples = list(
             load_jsonl(self.suite.dataset, max_samples=self.suite.max_samples, sample_tags=self.suite.sample_tags)
         )

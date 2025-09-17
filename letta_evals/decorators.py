@@ -158,3 +158,52 @@ def agent_factory(func: Callable) -> Callable:
         return await func(*args, **kwargs)
 
     return wrapper
+
+
+def suite_setup(func: Callable) -> Callable:
+    """
+    Decorator for suite setup functions.
+
+    Validates that the function has signature: async (client: AsyncLetta) -> None
+    Also supports sync functions: (client: AsyncLetta) -> None
+
+    Usage:
+        @suite_setup
+        async def prepare_evaluation(client: AsyncLetta) -> None:
+            # perform setup operations with client
+            await client.tools.add(tool=MyCustomTool())
+
+        @suite_setup
+        def prepare_evaluation_sync(client: AsyncLetta) -> None:
+            # perform sync setup operations
+            pass
+    """
+    sig = inspect.signature(func)
+    params = list(sig.parameters.values())
+
+    if len(params) != 1:
+        raise TypeError(f"Suite setup {func.__name__} must have exactly 1 parameter (client), got {len(params)}")
+
+    param_names = [p.name for p in params]
+    if param_names != ["client"]:
+        raise TypeError(f"Suite setup {func.__name__} must have parameter named 'client', got {param_names}")
+
+    if sig.return_annotation != inspect.Signature.empty:
+        if sig.return_annotation is not None and sig.return_annotation is not None:
+            raise TypeError(f"Suite setup {func.__name__} must return None, got {sig.return_annotation}")
+
+    # mark as validated suite setup
+    func._is_suite_setup = True
+
+    if inspect.iscoroutinefunction(func):
+
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            return await func(*args, **kwargs)
+    else:
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+
+    return wrapper
