@@ -1,0 +1,21 @@
+name: filesystem-test
+description: Test if agent can correctly retrieve and analyze information from filesystem data files
+dataset: ../datasets/filesystem.jsonl
+max_samples: 10  # Limit to first 10 samples for faster testing
+target:
+  kind: agent
+  base_url: http://localhost:8283
+  agent_script: ../setup_agent.py:setup_agent
+  model_configs:
+    - together-kimi-k2
+    # - openai-gpt-4.1
+    # - openai-gpt-4.1-nano
+    # - openai-gpt-5-nano
+    # - together-deepseek-v3
+grader:
+  kind: tool
+  function: contains
+  extractor: last_assistant
+gate:
+  op: gte
+  value: 0.70  # Require 70% accuracy
