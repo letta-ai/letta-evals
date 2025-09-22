@@ -229,7 +229,7 @@ class SampleResult(BaseModel):
     sample: Sample = Field(description="The original sample that was evaluated")
     submission: str = Field(description="Extracted response from the trajectory")
     trajectory: List[List[LettaMessageUnion]] = Field(description="Full conversation trajectory from the agent")
-    agent_id: str = Field(description="ID of the agent that generated this trajectory")
+    agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
     grade: GradeResult = Field(description="Grading result for this sample")
     model_name: Optional[str] = Field(description="Model configuration name used for this sample")
 

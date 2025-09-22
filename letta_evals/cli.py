@@ -21,11 +21,11 @@ console = Console()
 @app.command()
 def run(
     suite_path: Path = typer.Argument(..., help="Path to suite YAML file"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Save results to JSON file"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Stream results to JSONL file"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
     max_concurrent: int = typer.Option(15, "--max-concurrent", help="Maximum concurrent evaluations"),
     cached: Optional[Path] = typer.Option(
-        None, "--cached", "-c", help="Path to cached results.json for re-grading trajectories"
+        None, "--cached", "-c", help="Path to cached results (JSONL) for re-grading trajectories"
     ),
 ):
     """Run an evaluation suite."""
@@ -81,7 +81,12 @@ def run(
                     console.print(f"[yellow]Re-grading {total_evaluations} cached trajectories...[/yellow]")
                 else:
                     console.print(f"Evaluating {total_evaluations} samples...")
-            return await run_suite(suite_path, max_concurrent=max_concurrent, cached_results_path=cached)
+            return await run_suite(
+                suite_path,
+                max_concurrent=max_concurrent,
+                cached_results_path=cached,
+                output_path=output,
+            )
         else:
             rubric_model = None
             if suite.grader.kind == GraderKind.RUBRIC and hasattr(suite.grader, "model"):
@@ -103,7 +108,11 @@ def run(
             await progress.start()
             try:
                 result = await run_suite(
-                    suite_path, max_concurrent=max_concurrent, progress_callback=progress, cached_results_path=cached
+                    suite_path,
+                    max_concurrent=max_concurrent,
+                    progress_callback=progress,
+                    cached_results_path=cached,
+                    output_path=output,
                 )
                 return result
             finally:
@@ -115,10 +124,8 @@ def run(
         if not quiet:
             display_results(result, verbose, cached_mode=(cached is not None))
 
-        if output:
-            save_results(result, output)
-            if not quiet:
-                console.print(f"[green]Results saved to {output}[/green]")
+        if output and not quiet:
+            console.print(f"[green]Results streamed to {output} (JSONL)[/green]")
 
         if result.gates_passed:
             if not quiet:
