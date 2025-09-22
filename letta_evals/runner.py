@@ -13,7 +13,8 @@ from letta_evals.datasets.loader import load_jsonl
 from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
-from letta_evals.models import Metrics, ModelMetrics, RunnerResult, Sample, SampleResult, SuiteSpec
+from letta_evals.models import GradeResult, Metrics, ModelMetrics, RunnerResult, Sample, SampleResult, SuiteSpec
+from letta_evals.streaming import StreamingReader, StreamingWriter
 from letta_evals.targets.agent import AgentTarget
 from letta_evals.targets.base import Target
 from letta_evals.types import GraderKind, ProgressCallback, TargetKind
@@ -31,6 +32,7 @@ class Runner:
         max_concurrent: int,
         progress_callback: Optional[ProgressCallback] = None,
         cached_results: Optional[RunnerResult] = None,
+        output_path: Optional[Path] = None,
     ):
         self.suite: SuiteSpec = suite
         self.grader: Grader = self._create_grader()
@@ -44,6 +46,8 @@ class Runner:
             self._build_trajectory_cache() if cached_results else {}
         )
         self._setup_executed = False
+        self.stream_writer: Optional[StreamingWriter] = None
+        self.output_path = output_path
 
         self.client = AsyncLetta(
             base_url=self.suite.target.base_url, token=self.suite.target.api_key, timeout=self.suite.target.timeout
@@ -135,7 +139,9 @@ class Runner:
         cache: Dict[int, Dict[str, SampleResult]] = defaultdict(dict)
         if self.cached_results:
             for result in self.cached_results.results:
-                cache[result.sample.id][result.model_name] = result
+                # use model_name as key, or None if not specified
+                model_key = result.model_name if result.model_name else None
+                cache[result.sample.id][model_key] = result
         return cache
 
     async def _get_or_run_trajectory(
@@ -213,46 +219,69 @@ class Runner:
 
         self.results = []
 
-        async with anyio.create_task_group() as tg:
-            for llm_config in self.model_configs:
-                for sample in samples:
-
-                    async def run_and_append(s, cfg):
-                        try:
-                            result = await self.run_sample(s, llm_config=cfg)
-                            self.results.append(result)
-                        except Exception as e:
-                            model_name = cfg.model if cfg else None
-                            logger.error(f"Error running sample {s.id} with model {model_name}: {e}")
-                            if self.progress_callback:
-                                await self.progress_callback.sample_error(s.id, str(e), model_name=model_name)
-                            # create a failed result so it's included in the final output
-                            from letta_evals.models import GradeResult
-
-                            error_result = SampleResult(
-                                sample=s,
-                                submission="",
-                                trajectory=[],
-                                agent_id=None,
-                                grade=GradeResult(score=0.0, rationale=f"Error: {str(e)[:200]}"),
-                                model_name=model_name,
-                            )
-                            self.results.append(error_result)
-
-                    tg.start_soon(run_and_append, sample, llm_config)
-
-        metrics = self._calculate_metrics()
-        gates_passed = self._check_gates(metrics)
-
+        # prepare config for both streaming and final result
         config = {
-            "target": self.suite.target.model_dump(),
-            "grader": self.suite.grader.model_dump(),
-            "gate": self.suite.gate.model_dump(),
+            "target": json.loads(self.suite.target.model_dump_json()),
+            "grader": json.loads(self.suite.grader.model_dump_json()),
+            "gate": json.loads(self.suite.gate.model_dump_json()),
         }
 
-        return RunnerResult(
-            suite=self.suite.name, config=config, results=self.results, metrics=metrics, gates_passed=gates_passed
-        )
+        # initialize streaming writer if output path is provided
+        if self.output_path:
+            self.stream_writer = StreamingWriter(self.output_path, self.suite.name, config)
+            await self.stream_writer.initialize()
+
+        try:
+            async with anyio.create_task_group() as tg:
+                for llm_config in self.model_configs:
+                    for sample in samples:
+
+                        async def run_and_append(s, cfg):
+                            try:
+                                result = await self.run_sample(s, llm_config=cfg)
+                                self.results.append(result)
+                                if self.stream_writer:
+                                    await self.stream_writer.append_result(result)
+                            except Exception as e:
+                                model_name = cfg.model if cfg else None
+                                logger.error(f"Error running sample {s.id} with model {model_name}: {e}")
+                                if self.progress_callback:
+                                    await self.progress_callback.sample_error(s.id, str(e), model_name=model_name)
+
+                                error_result = SampleResult(
+                                    sample=s,
+                                    submission="",
+                                    trajectory=[],
+                                    agent_id=None,
+                                    grade=GradeResult(score=0.0, rationale=f"Error: {str(e)[:200]}"),
+                                    model_name=model_name,
+                                )
+                                self.results.append(error_result)
+                                if self.stream_writer:
+                                    await self.stream_writer.append_result(error_result)
+
+                        tg.start_soon(run_and_append, sample, llm_config)
+
+            metrics = self._calculate_metrics()
+            gates_passed = self._check_gates(metrics)
+
+            # write final metrics if streaming
+            if self.stream_writer:
+                await self.stream_writer.write_metrics(metrics, gates_passed)
+
+            return RunnerResult(
+                suite=self.suite.name, config=config, results=self.results, metrics=metrics, gates_passed=gates_passed
+            )
+        except BaseException:
+            # On interruption or errors, write a best-effort summary for a valid JSONL
+            try:
+                metrics = self._calculate_metrics()
+                gates_passed = self._check_gates(metrics)
+                if self.stream_writer:
+                    await self.stream_writer.write_metrics(metrics, gates_passed)
+            finally:
+                # Re-raise to preserve original error/interrupt semantics
+                raise
 
     def _calculate_metrics(self) -> Metrics:
         """Calculate aggregate metrics."""
@@ -302,6 +331,7 @@ async def run_suite(
     max_concurrent: int,
     progress_callback: Optional[ProgressCallback] = None,
     cached_results_path: Optional[Path] = None,
+    output_path: Optional[Path] = None,
 ) -> RunnerResult:
     """Load and run a suite from YAML file."""
     with open(suite_path, "r") as f:
@@ -314,9 +344,8 @@ async def run_suite(
         if not cached_results_path.exists():
             raise ValueError(f"Cached results file not found: {cached_results_path}")
 
-        with open(cached_results_path, "r") as f:
-            cached_data = json.load(f)
-            cached_results = RunnerResult(**cached_data)
+        # cached files are now in JSONL streaming format
+        cached_results = await StreamingReader.to_runner_result(cached_results_path)
 
         cached_sample_map = {result.sample.id: result.sample for result in cached_results.results}
         samples = list(load_jsonl(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
@@ -330,6 +359,10 @@ async def run_suite(
                     )
 
     runner = Runner(
-        suite, max_concurrent=max_concurrent, progress_callback=progress_callback, cached_results=cached_results
+        suite,
+        max_concurrent=max_concurrent,
+        progress_callback=progress_callback,
+        cached_results=cached_results,
+        output_path=output_path,
     )
     return await runner.run()
