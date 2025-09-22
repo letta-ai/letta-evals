@@ -14,23 +14,19 @@ class AgentTarget(Target):
 
     def __init__(
         self,
-        base_url: str,
+        client: AsyncLetta,
         agent_id: str = None,
         agent_file: Path = None,
         agent_script: str = None,
-        api_key: str = None,
-        timeout: float = 300.0,
         base_dir: Path = None,
         llm_config: Optional[LlmConfig] = None,
     ):
-        self.base_url = base_url
+        self.client = client
         self.agent_id = agent_id
         self.agent_file = agent_file
         self.agent_script = agent_script
         self.base_dir = base_dir or Path.cwd()
         self.llm_config = llm_config
-
-        self.client = AsyncLetta(base_url=self.base_url, token=api_key, timeout=timeout)
 
     async def run(self, sample: Sample, progress_callback: Optional[ProgressCallback] = None) -> TargetResult:
         """Run the agent on a sample."""
@@ -69,7 +65,7 @@ class AgentTarget(Target):
 
         for i, input_msg in enumerate(inputs):
             if progress_callback:
-                await progress_callback.message_sending(sample.id, i + 1, total_messages)
+                await progress_callback.message_sending(sample.id, i + 1, total_messages, model_name=model_name)
 
             stream = self.client.agents.messages.create_stream(
                 agent_id=agent_id,
