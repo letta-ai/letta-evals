@@ -218,7 +218,6 @@ class Runner:
         )
 
         self.results = []
-
         # prepare config for both streaming and final result
         config = {
             "target": json.loads(self.suite.target.model_dump_json()),
@@ -284,13 +283,31 @@ class Runner:
                 raise
 
     def _calculate_metrics(self) -> Metrics:
-        """Calculate aggregate metrics."""
+        """Calculate aggregate metrics from results.
+
+        - total: success + error (all results)
+        - total_attempted: success only (completed without error)
+        - accuracy: percent of attempted that passed the gate
+        - avg_score: mean across all results (including error results)
+        - per_model: same semantics per model
+        """
         total = len(self.results)
         if total == 0:
-            return Metrics(total=0, avg_score=0.0)
+            return Metrics(total=0, total_attempted=0, avg_score=0.0, accuracy=0.0)
+
+        # success = completed without error; error results have empty trajectory or missing agent_id
+        def is_success(r: SampleResult) -> bool:
+            return (r.agent_id is not None) and bool(r.trajectory)
+
+        attempted = sum(1 for r in self.results if is_success(r))
 
         scores = [r.grade.score for r in self.results]
         avg_score = sum(scores) / len(scores) if scores else 0.0
+
+        passed_attempts = sum(
+            1 for r in self.results if is_success(r) and self._check_score_against_gate(r.grade.score)
+        )
+        accuracy = (passed_attempts / attempted) * 100.0 if attempted > 0 else 0.0
 
         per_model = None
         if self.suite.target.model_configs:
@@ -300,22 +317,33 @@ class Runner:
 
             per_model = []
             for model_name, results in model_results.items():
+                model_attempted = sum(1 for r in results if is_success(r))
                 model_scores = [r.grade.score for r in results]
                 model_avg = sum(model_scores) / len(model_scores) if model_scores else 0.0
-                passed = sum(1 for r in results if self._check_score_against_gate(r.grade.score))
-                failed = len(results) - passed
+                model_passed = sum(
+                    1 for r in results if is_success(r) and self._check_score_against_gate(r.grade.score)
+                )
+                model_accuracy = (model_passed / model_attempted) * 100.0 if model_attempted > 0 else 0.0
 
                 per_model.append(
                     ModelMetrics(
                         model_name=model_name,
                         total=len(results),
+                        total_attempted=model_attempted,
                         avg_score=model_avg,
-                        passed_samples=passed,
-                        failed_samples=failed,
+                        passed_samples=model_passed,
+                        failed_samples=(model_attempted - model_passed),
+                        accuracy=model_accuracy,
                     )
                 )
 
-        return Metrics(total=total, avg_score=avg_score, per_model=per_model)
+        return Metrics(
+            total=total,
+            total_attempted=attempted,
+            avg_score=avg_score,
+            accuracy=accuracy,
+            per_model=per_model,
+        )
 
     def _check_score_against_gate(self, score: float) -> bool:
         """Check if an individual score satisfies the gate."""

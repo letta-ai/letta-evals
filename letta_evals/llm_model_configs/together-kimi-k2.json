@@ -1,6 +1,6 @@
 {
-    "context_window": 8192,
-    "model": "Qwen/Qwen2.5-7B-Instruct-Turbo",
+    "context_window": 256000,
+    "model": "moonshotai/Kimi-K2-Instruct-0905",
     "model_endpoint_type": "together",
     "model_endpoint": "https://api.together.ai/v1"
 }

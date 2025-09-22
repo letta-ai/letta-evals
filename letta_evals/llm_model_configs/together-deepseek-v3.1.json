@@ -1,6 +1,6 @@
 {
-    "context_window": 8192,
-    "model": "Qwen/Qwen2.5-7B-Instruct-Turbo",
+    "context_window": 128000,
+    "model": "deepseek-ai/DeepSeek-V3.1",
     "model_endpoint_type": "together",
     "model_endpoint": "https://api.together.ai/v1"
 }

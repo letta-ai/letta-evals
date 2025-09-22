@@ -1,6 +1,6 @@
 {
     "context_window": 8192,
     "model": "mistralai/Mistral-Small-24B-Instruct-2501",
-    "model_endpoint_type": "openai",
+    "model_endpoint_type": "together",
     "model_endpoint": "https://api.together.ai/v1"
 }

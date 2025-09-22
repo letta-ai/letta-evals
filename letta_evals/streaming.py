@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple
 
 import anyio
 
-from letta_evals.models import Metrics, ModelMetrics, RunnerResult, SampleResult
+from letta_evals.models import Metrics, RunnerResult, SampleResult
 
 
 class StreamingWriter:
@@ -75,44 +75,11 @@ class StreamingReader:
 
         suite, config, results, metrics, gates_passed = await anyio.to_thread.run_sync(_read)
 
-        # derive defaults if header/summary are missing
-        if suite is None:
-            suite = "unknown"
-        if config is None:
-            config = {}
+        if suite is None or config is None:
+            raise ValueError("Results JSONL missing header record")
         if metrics is None:
-            metrics = StreamingReader._calculate_metrics(results)
+            raise ValueError("Results JSONL missing summary record")
 
         return RunnerResult(suite=suite, config=config, results=results, metrics=metrics, gates_passed=gates_passed)
 
-    @staticmethod
-    def _calculate_metrics(results: List[SampleResult]) -> Metrics:
-        total = len(results)
-        if total == 0:
-            return Metrics(total=0, avg_score=0.0)
-
-        scores = [r.grade.score for r in results]
-        avg_score = sum(scores) / len(scores) if scores else 0.0
-
-        # per-model breakdown if model_name present
-        model_buckets = {}
-        for r in results:
-            key = r.model_name or "default"
-            model_buckets.setdefault(key, []).append(r)
-
-        per_model_list: List[ModelMetrics] = []
-        for model_name, bucket in model_buckets.items():
-            model_scores = [r.grade.score for r in bucket]
-            model_avg = sum(model_scores) / len(model_scores) if model_scores else 0.0
-            # pass/fail counts can't be determined without gate spec; store zeros
-            per_model_list.append(
-                ModelMetrics(
-                    model_name=model_name,
-                    total=len(bucket),
-                    avg_score=model_avg,
-                    passed_samples=0,
-                    failed_samples=0,
-                )
-            )
-
-        return Metrics(total=total, avg_score=avg_score, per_model=per_model_list or None)
+    # No fallback metrics: summary is required in JSONL results.

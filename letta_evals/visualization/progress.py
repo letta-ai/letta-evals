@@ -246,8 +246,11 @@ class EvalProgress:
         if completed == 0:
             accuracy_text = "N/A"
             avg_score_text = "N/A"
+            correct_count = 0
         else:
-            accuracy = (self.passed_count / completed) * 100 if completed > 0 else 0
+            # Count failed agents and errors as incorrect (denominator = completed)
+            correct_count = self.passed_count
+            accuracy = (correct_count / completed) * 100 if completed > 0 else 0
             accuracy_text = f"{accuracy:.1f}%"
             avg_score = self.total_score / self.score_count if self.score_count > 0 else 0
             avg_score_text = f"{avg_score:.3f}"
@@ -256,7 +259,7 @@ class EvalProgress:
         metrics_table.add_column(style="cyan", justify="right")
         metrics_table.add_column(style="white")
 
-        metrics_table.add_row("📊 Accuracy:", f"{accuracy_text} ({self.passed_count}/{completed})")
+        metrics_table.add_row("📊 Accuracy:", f"{accuracy_text} ({correct_count}/{completed})")
 
         if self.score_count > 0:
             metrics_table.add_row("📈 Avg Score:", avg_score_text)
