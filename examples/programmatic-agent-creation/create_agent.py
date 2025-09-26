@@ -43,12 +43,9 @@ async def create_inventory_agent(client: AsyncLetta, sample: Sample) -> str:
     The agent is customized with item details from sample.agent_args.
     """
     tools = await client.tools.list(name="manage_inventory")
-    if tools:
-        tool = tools[0]
-    else:
-        tool = await client.tools.add(
-            tool=ManageInventoryTool(),
-        )
+    if not tools:
+        raise RuntimeError("Tool 'manage_inventory' not found. Please ensure setup has been run.")
+    tool = tools[0]
 
     item = sample.agent_args["item"]
     item_context = f"""Target Item Details:
