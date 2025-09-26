@@ -2,5 +2,6 @@
     "context_window": 256000,
     "model": "moonshotai/Kimi-K2-Instruct-0905",
     "model_endpoint_type": "together",
-    "model_endpoint": "https://api.together.ai/v1"
+    "model_endpoint": "https://api.together.ai/v1",
+    "agent_type": "letta_v1_agent"
 }

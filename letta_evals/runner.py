@@ -304,10 +304,6 @@ class Runner:
         scores = [r.grade.score for r in self.results]
         avg_score = sum(scores) / len(scores) if scores else 0.0
         
-        # Calculate overall accuracy using total_attempted (including errors)
-        passed_samples = sum(1 for r in self.results if self._check_score_against_gate(r.grade.score))
-        accuracy = (passed_samples / total_attempted) * 100 if total_attempted > 0 else 0.0
-
         passed_attempts = sum(
             1 for r in self.results if is_success(r) and self._check_score_against_gate(r.grade.score)
         )

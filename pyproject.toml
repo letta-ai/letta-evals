@@ -17,6 +17,8 @@ dependencies = [
     "openai>=1.0.0",
     "python-dotenv>=1.0.0",
     "anyio==4.10.0",
+    "pandas>=2.3.2",
+    "matplotlib>=3.10.6",
 ]
 
 [project.urls]

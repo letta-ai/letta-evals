@@ -8,13 +8,11 @@ target:
   agent_script: ../setup_agent.py:setup_agent
   model_configs:
     # - openai-gpt-4.1
-    - openai-gpt-4.1-nano
+    # - openai-gpt-4.1-nano
+    # - openai-gpt-4.1-nano
     - openai-gpt-5-nano
     - openai-gpt-5-mini
     - openai-gpt-5
-    - claude-4.1-opus
-    - together-deepseek-v3
-    - together-kimi-k2
 grader:
   kind: tool
   function: contains
