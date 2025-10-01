@@ -1,4 +1,4 @@
-s
+{
     "context_window": 128000,
     "model": "deepseek-ai/DeepSeek-V3",
     "model_endpoint_type": "together",

@@ -71,58 +71,72 @@ class AgentTarget(Target):
         
         # Send contradicting fact first if available
         if contradicting_fact:
-            stream = self.client.agents.messages.create_stream(
-                agent_id=agent_id,
-                messages=[MessageCreate(role="user", content=f"Please update your knowledge with this new information: {contradicting_fact}")],
-                stream_tokens=True
-            )
-            
-            # Process the stream to ensure the message is sent
-            async for chunk in stream:
-                # Process each chunk as needed - we just need to consume the stream
+            try:
+                stream = self.client.agents.messages.create_stream(
+                    agent_id=agent_id,
+                    messages=[MessageCreate(role="user", content=f"Please update your knowledge with this new information: {contradicting_fact}")],
+                    stream_tokens=True
+                )
+                
+                # Process the stream to ensure the message is sent
+                async for chunk in stream:
+                    # Process each chunk as needed - we just need to consume the stream
+                    pass
+            except Exception as e:
+                # Continue even if there's an exception
                 pass
 
         for i, input_msg in enumerate(inputs):
             if progress_callback:
                 await progress_callback.message_sending(sample.id, i + 1, total_messages, model_name=model_name)
 
-            stream = self.client.agents.messages.create_stream(
-                agent_id=agent_id,
-                messages=[MessageCreate(role="user", content=input_msg)],
-                stream_tokens=True
-            )
-
             messages = []
             current_message_chunks = []
             current_message_id = None
             
-            async for chunk in stream:
-                print(chunk)
-                # skip non-message types like stop_reason and usage_statistics
-                if hasattr(chunk, "message_type"):
-                    if chunk.message_type in ["stop_reason", "usage_statistics", "ping"]:
-                        continue
-                    
-                    # Check if this is a new message (different ID)
-                    chunk_id = getattr(chunk, 'id', None)
-                    if current_message_id != chunk_id:
-                        # Process previous message chunks if any exist
-                        if current_message_chunks:
-                            combined_message = self._combine_message_chunks(current_message_chunks)
-                            messages.append(combined_message)
+            try:
+                stream = self.client.agents.messages.create_stream(
+                    agent_id=agent_id,
+                    messages=[MessageCreate(role="user", content=input_msg)],
+                    stream_tokens=True
+                )
+                
+                async for chunk in stream:
+                    print(f"DEBUG: Chunk: {chunk}")
+                    # skip non-message types like stop_reason and usage_statistics
+                    if hasattr(chunk, "message_type"):
+                        if chunk.message_type in ["stop_reason", "usage_statistics", "ping"]:
+                            continue
                         
-                        # Start new message
-                        current_message_chunks = [chunk]
-                        current_message_id = chunk_id
-                    else:
-                        # Same message, add to chunks
-                        current_message_chunks.append(chunk)
+                        # Check if this is a new message (different otid)
+                        chunk_otid = getattr(chunk, 'otid', None)
+                        if current_message_id != chunk_otid:
+                            # Process previous message chunks if any exist
+                            if current_message_chunks:
+                                combined_message = self._combine_message_chunks(current_message_chunks)
+                                # Only add assistant messages to the trajectory
+                                if hasattr(combined_message, 'message_type') and combined_message.message_type == 'assistant_message':
+                                    messages.append(combined_message)
+                            
+                            # Start new message
+                            current_message_chunks = [chunk]
+                            current_message_id = chunk_otid
+                        else:
+                            # Same message, add to chunks
+                            current_message_chunks.append(chunk)
+                
+                # Process the last message chunks
+                if current_message_chunks:
+                    combined_message = self._combine_message_chunks(current_message_chunks)
+                    # Only add assistant messages to the trajectory
+                    if hasattr(combined_message, 'message_type') and combined_message.message_type == 'assistant_message':
+                        messages.append(combined_message)
+                    
+            except Exception as e:
+                # Continue with empty messages if there's an exception
+                messages = []
             
-            # Process the last message chunks
-            if current_message_chunks:
-                combined_message = self._combine_message_chunks(current_message_chunks)
-                messages.append(combined_message)
-
+            print(f"DEBUG: Messages: {messages}")
             trajectory.append(messages)
             
 
