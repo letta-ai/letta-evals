@@ -207,21 +207,21 @@ class ModelMetrics(BaseModel):
     """Metrics for a specific model configuration."""
 
     model_name: str = Field(description="Model configuration name")
-    total: int = Field(description="Total number of samples evaluated successfully")
-    total_attempted: int = Field(description="Total number of samples attempted (including errors)")
-    avg_score: float = Field(description="Average score across all samples (0.0 to 1.0)")
-    passed_samples: int = Field(description="Number of samples that passed the gate")
-    failed_samples: int = Field(description="Number of samples that failed the gate")
-    accuracy: float = Field(description="Accuracy percentage (passed samples / total attempted)")
+    total: int = Field(description="Total results (success + error)")
+    total_attempted: int = Field(description="Total successfully attempted (completed without error)")
+    avg_score: float = Field(description="Average score across all results (0.0 to 1.0)")
+    passed_samples: int = Field(description="Number of attempted samples that passed the gate")
+    failed_samples: int = Field(description="Number of attempted samples that failed the gate")
+    accuracy: float = Field(description="Attempt accuracy percentage (passed / total_attempted)")
 
 
 class Metrics(BaseModel):
     """Evaluation metrics."""
 
-    total: int = Field(description="Total number of samples evaluated successfully")
-    total_attempted: int = Field(description="Total number of samples attempted (including errors)")
-    avg_score: float = Field(description="Average score across all samples (0.0 to 1.0)")
-    accuracy: float = Field(description="Overall accuracy percentage (passed samples / total attempted)")
+    total: int = Field(description="Total results (success + error)")
+    total_attempted: int = Field(description="Total successfully attempted (completed without error)")
+    avg_score: float = Field(description="Average score across all results (0.0 to 1.0)")
+    accuracy: float = Field(description="Attempt accuracy percentage (passed / total_attempted)")
     per_model: Optional[List[ModelMetrics]] = Field(
         default=None, description="Metrics broken down by model configuration"
     )
@@ -233,7 +233,7 @@ class SampleResult(BaseModel):
     sample: Sample = Field(description="The original sample that was evaluated")
     submission: str = Field(description="Extracted response from the trajectory")
     trajectory: List[List[LettaMessageUnion]] = Field(description="Full conversation trajectory from the agent")
-    agent_id: str = Field(description="ID of the agent that generated this trajectory")
+    agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
     grade: GradeResult = Field(description="Grading result for this sample")
     model_name: Optional[str] = Field(description="Model configuration name used for this sample")
 

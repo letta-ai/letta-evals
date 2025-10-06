@@ -246,10 +246,10 @@ class EvalProgress:
         if completed == 0:
             accuracy_text = "N/A"
             avg_score_text = "N/A"
+            correct_count = 0
         else:
-            # Count failed agents and errors as incorrect
+            # Count failed agents and errors as incorrect (denominator = completed)
             correct_count = self.passed_count
-            incorrect_count = self.failed_count + self.error_count
             accuracy = (correct_count / completed) * 100 if completed > 0 else 0
             accuracy_text = f"{accuracy:.1f}%"
             avg_score = self.total_score / self.score_count if self.score_count > 0 else 0
