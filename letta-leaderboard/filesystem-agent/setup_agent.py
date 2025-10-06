@@ -44,9 +44,11 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
             embedding="openai/text-embedding-3-small",
             include_base_tools=False,
             tool_ids=required_tool_ids,
-            tool_rules=[RequiredBeforeExitToolRule(tool_name="send_message")],
+            # tool_rules=[RequiredBeforeExitToolRule(tool_name="send_message")],
             max_files_open=10,  # Allow up to 10 files to be open simultaneously
-            per_file_view_window_char_limit=8000  # Limit view window per file
+            per_file_view_window_char_limit=8000,  # Limit view window per file
+            agent_type="letta_v1_agent",
+
         )
         
         # Find the folder by name
