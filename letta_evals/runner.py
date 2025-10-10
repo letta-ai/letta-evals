@@ -146,8 +146,8 @@ class Runner:
 
     async def _get_or_run_trajectory(
         self, sample: Sample, llm_config: Optional[LlmConfig]
-    ) -> tuple[List[List[LettaMessageUnion]], str, str]:
-        """Return (trajectory, agent_id, model_name) using cache or by running the target.
+    ) -> tuple[List[List[LettaMessageUnion]], str, str, Optional[list[dict]]]:
+        """Return (trajectory, agent_id, model_name, agent_usage) using cache or by running the target.
 
         If cache is enabled and contains an exact match, use it; otherwise run the target.
         """
@@ -169,11 +169,13 @@ class Runner:
             if cached_result is not None:
                 if self.progress_callback:
                     await self.progress_callback.agent_loading(sample_id, model_name=model_name, from_cache=True)
-                return cached_result.trajectory, cached_result.agent_id, model_name
+                return cached_result.trajectory, cached_result.agent_id, model_name, getattr(
+                    cached_result, "agent_usage", None
+                )
 
         target = self._create_target(llm_config)
         target_result = await target.run(sample, progress_callback=self.progress_callback)
-        return target_result.trajectory, target_result.agent_id, target_result.model_name
+        return target_result.trajectory, target_result.agent_id, target_result.model_name, target_result.agent_usage
 
     async def run_sample(self, sample: Sample, llm_config: Optional[LlmConfig] = None) -> SampleResult:
         """Run a single sample through target and grader."""
@@ -182,7 +184,7 @@ class Runner:
 
         async with self.semaphore:
             try:
-                trajectory, agent_id, model_name = await self._get_or_run_trajectory(sample, llm_config)
+                trajectory, agent_id, model_name, agent_usage = await self._get_or_run_trajectory(sample, llm_config)
 
                 if self.progress_callback:
                     await self.progress_callback.grading_started(sample_id, model_name=model_name)
@@ -203,6 +205,7 @@ class Runner:
                     agent_id=agent_id,
                     grade=grade_result,
                     model_name=model_name,
+                    agent_usage=agent_usage,
                 )
             except Exception as e:
                 if self.progress_callback:
@@ -254,6 +257,7 @@ class Runner:
                                     agent_id=None,
                                     grade=GradeResult(score=0.0, rationale=f"Error: {str(e)[:200]}"),
                                     model_name=model_name,
+                                    agent_usage=None,
                                 )
                                 self.results.append(error_result)
                                 if self.stream_writer:
