@@ -59,6 +59,7 @@ class AgentTarget(Target):
             await progress_callback.agent_loading(sample.id, model_name=model_name)
 
         trajectory = []
+        usage_stats: list[dict] = []
 
         inputs = sample.input if isinstance(sample.input, list) else [sample.input]
         total_messages = len(inputs)
@@ -75,9 +76,32 @@ class AgentTarget(Target):
             messages = []
             prev_message_type = None
             async for chunk in stream:
-                # skip non-message types like stop_reason and usage_statistics
+                # handle usage statistics and skip other non-message types
                 if hasattr(chunk, "message_type"):
-                    if chunk.message_type in ["stop_reason", "usage_statistics", "ping"]:
+                    if chunk.message_type == "usage_statistics":
+                        # best-effort convert to JSON-serializable dict
+                        usage_rec = None
+                        if hasattr(chunk, "model_dump") and callable(getattr(chunk, "model_dump")):
+                            try:
+                                usage_rec = chunk.model_dump()
+                            except Exception:
+                                usage_rec = None
+                        if usage_rec is None and hasattr(chunk, "dict") and callable(getattr(chunk, "dict")):
+                            try:
+                                usage_rec = chunk.dict()  # type: ignore[attr-defined]
+                            except Exception:
+                                usage_rec = None
+                        if usage_rec is None and hasattr(chunk, "__dict__"):
+                            try:
+                                usage_rec = dict(chunk.__dict__)
+                            except Exception:
+                                usage_rec = None
+                        if usage_rec is None:
+                            # final fallback to string
+                            usage_rec = {"raw": str(chunk)}
+                        usage_stats.append(usage_rec)
+                        continue
+                    if chunk.message_type in ["stop_reason", "ping"]:
                         continue
                     current_message_type = chunk.message_type
                     if prev_message_type != current_message_type:
@@ -86,4 +110,4 @@ class AgentTarget(Target):
 
             trajectory.append(messages)
 
-        return TargetResult(trajectory=trajectory, agent_id=agent_id, model_name=model_name)
+        return TargetResult(trajectory=trajectory, agent_id=agent_id, model_name=model_name, agent_usage=usage_stats)

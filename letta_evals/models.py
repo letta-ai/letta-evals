@@ -184,6 +184,9 @@ class TargetResult(BaseModel):
     )
     agent_id: str = Field(description="ID of the agent that generated this trajectory")
     model_name: str = Field(description="Model configuration name used for this target")
+    agent_usage: Optional[List[dict]] = Field(
+        default=None, description="Usage statistics emitted by the agent during the run"
+    )
 
 
 class GradeResult(BaseModel):
@@ -236,6 +239,9 @@ class SampleResult(BaseModel):
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
     grade: GradeResult = Field(description="Grading result for this sample")
     model_name: Optional[str] = Field(description="Model configuration name used for this sample")
+    agent_usage: Optional[List[dict]] = Field(
+        default=None, description="Usage statistics emitted by the agent during the run"
+    )
 
 
 class RunnerResult(BaseModel):
