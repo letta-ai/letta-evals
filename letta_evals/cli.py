@@ -89,20 +89,34 @@ def run(
             )
         else:
             rubric_model = None
-            if suite.grader.kind == GraderKind.RUBRIC and hasattr(suite.grader, "model"):
+            if suite.graders:
+                # choose a rubric model if any grader is rubric
+                for key, gspec in suite.graders.items():
+                    if gspec.kind == GraderKind.RUBRIC and hasattr(gspec, "model"):
+                        rubric_model = gspec.model
+                        break
+            elif suite.grader and suite.grader.kind == GraderKind.RUBRIC and hasattr(suite.grader, "model"):
                 rubric_model = suite.grader.model
 
+            metric_names = (
+                [gspec.display_name or key for key, gspec in suite.graders.items()] if suite.graders else None
+            )
+            # Build metric labels mapping for live progress (key -> display)
+            metric_labels = None
+            if suite.graders:
+                metric_labels = {key: (gspec.display_name or key) for key, gspec in suite.graders.items()}
             progress = EvalProgress(
                 suite_name=suite.name,
                 total_samples=total_evaluations,
                 target_kind=suite.target.kind.value,
-                grader_kind=suite.grader.kind.value,
+                grader_kind=("multi" if suite.graders else suite.grader.kind.value),
                 rubric_model=rubric_model,
                 max_concurrent=max_concurrent,
                 display_mode=DisplayMode.DETAILED,
                 console=console,
                 show_samples=True,
                 cached_mode=(cached is not None),
+                metric_labels=metric_labels,
             )
 
             await progress.start()
@@ -163,9 +177,18 @@ def validate(suite_path: Path = typer.Argument(..., help="Path to suite YAML fil
         console.print("\n[bold]Configuration:[/bold]")
         console.print(f"  Dataset: {suite.dataset}")
         console.print(f"  Target: {suite.target.kind.value}")
-        console.print(f"  Grader: {suite.grader.kind.value}")
+        if suite.graders:
+            console.print("  Graders:")
+            for key, gspec in suite.graders.items():
+                label = gspec.display_name or key
+                console.print(f"    - {label}: {gspec.kind.value}")
+        elif suite.grader:
+            console.print(f"  Grader: {suite.grader.kind.value}")
         if suite.gate:
-            console.print(f"  Gate: {suite.gate.op.value} {suite.gate.value}")
+            metric_key = suite.gate.metric_key or "<default>"
+            console.print(
+                f"  Gate: metric_key={metric_key} aggregate={suite.gate.metric.value} {suite.gate.op.value} {suite.gate.value}"
+            )
 
     except Exception as e:
         console.print(f"[red]Invalid suite configuration: {e}[/red]")
@@ -227,8 +250,31 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
     console.print("\n[bold]Overall Metrics:[/bold]")
     console.print(f"  Total samples: {metrics.total}")
     console.print(f"  Total attempted: {metrics.total_attempted}")
-    console.print(f"  Average score: {metrics.avg_score:.2f}")
-    console.print(f"  Accuracy: {metrics.accuracy:.1f}%")
+    errors = metrics.total - metrics.total_attempted
+    errors_pct = (errors / metrics.total * 100.0) if metrics.total > 0 else 0.0
+    console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{metrics.total})")
+    console.print(f"  Average score (gate metric): {metrics.avg_score:.2f}")
+    console.print(f"  Passed attempts (gate metric): {metrics.passed_attempts}")
+    console.print(f"  Failed attempts (gate metric): {metrics.failed_attempts}")
+
+    # Print per-metric aggregates if available
+    if hasattr(metrics, "by_metric") and metrics.by_metric:
+        console.print("\n[bold]Metrics by Metric:[/bold]")
+        table = Table()
+        table.add_column("Metric", style="cyan")
+        table.add_column("Avg Score", style="white")
+        table.add_column("Passed", style="green")
+        table.add_column("Failed", style="red")
+        # Build key->label mapping from config
+        label_map = {}
+        if "graders" in result.config and isinstance(result.config["graders"], dict):
+            for key, gspec in result.config["graders"].items():
+                label_map[key] = gspec.get("display_name") or key
+
+        for key, agg in metrics.by_metric.items():
+            label = label_map.get(key, key)
+            table.add_row(label, f"{agg.avg_score:.2f}", str(agg.passed_attempts), str(agg.failed_attempts))
+        console.print(table)
 
     # show per-model metrics if available
     if metrics.per_model:
@@ -238,7 +284,6 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
         model_table.add_column("Samples", style="white")
         model_table.add_column("Attempted", style="white")
         model_table.add_column("Avg Score", style="white")
-        model_table.add_column("Accuracy", style="white")
         model_table.add_column("Passed", style="green")
         model_table.add_column("Failed", style="red")
 
@@ -248,7 +293,6 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
                 str(model_metrics.total),
                 str(model_metrics.total_attempted),
                 f"{model_metrics.avg_score:.2f}",
-                f"{model_metrics.accuracy:.1f}%",
                 str(model_metrics.passed_samples),
                 str(model_metrics.failed_samples),
             )
@@ -258,13 +302,24 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
     gate = result.config["gate"]
     gate_op = gate["op"]
     gate_value = gate["value"]
+    gate_metric = gate.get("metric", "avg_score")
+    gate_metric_key = gate.get("metric_key")
 
     op_symbols = {"gt": ">", "gte": "≥", "lt": "<", "lte": "≤", "eq": "="}
     op_symbol = op_symbols.get(gate_op, gate_op)
 
     status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
+    actual = metrics.avg_score if gate_metric == "avg_score" else metrics.accuracy
+    suffix = "%" if gate_metric == "accuracy" else ""
+    # Prefer display name for gate metric key
+    display_label = None
+    if gate_metric_key and "graders" in result.config and isinstance(result.config["graders"], dict):
+        gspec = result.config["graders"].get(gate_metric_key)
+        if gspec:
+            display_label = gspec.get("display_name")
+    metric_key_suffix = f" on '{display_label or gate_metric_key}'" if gate_metric_key else ""
     console.print(
-        f"\n[bold]Gate:[/bold] avg_score {op_symbol} {gate_value:.2f} → {status} (actual: {metrics.avg_score:.2f})"
+        f"\n[bold]Gate:{metric_key_suffix}[/bold] {gate_metric} {op_symbol} {gate_value:.2f}{suffix} → {status} (actual: {actual:.2f}{suffix})"
     )
 
     if verbose:
@@ -282,7 +337,7 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
 
         for i, sample_result in enumerate(result.results):
             score_val = sample_result.grade.score
-            passed = "✓" if gate_spec.check_score(score_val) else "✗"
+            passed = "✓" if gate_spec.check_sample(score_val) else "✗"
             score = f"{score_val:.2f}"
             rationale = sample_result.grade.rationale or ""
             if len(rationale) > 50:
