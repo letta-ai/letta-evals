@@ -1,0 +1,27 @@
+name: ascii-art-two-metrics
+description: Test ASCII art quality and ASCII-only characters using two graders
+dataset: dataset.jsonl
+target:
+  kind: agent
+  agent_file: ascii-art-agent.af
+  base_url: http://localhost:8283
+graders:
+  quality:
+    kind: rubric
+    display_name: "rubric score"
+    prompt_path: rubric.txt
+    model: gpt-4.1
+    temperature: 0.0
+    provider: openai
+    extractor: last_assistant
+  ascii_only:
+    kind: tool
+    display_name: "ascii character check"
+    function: ascii_printable_only
+    extractor: last_assistant
+gate:
+  # Gate on quality average score >= 0.6
+  metric_key: quality
+  metric: avg_score
+  op: gte
+  value: 0.6
