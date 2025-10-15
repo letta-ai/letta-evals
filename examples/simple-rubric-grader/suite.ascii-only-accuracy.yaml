@@ -1,0 +1,30 @@
+name: ascii-art-two-metrics-ascii-gate
+description: Gate on ASCII-only accuracy while still reporting quality
+dataset: dataset.jsonl
+target:
+  kind: agent
+  agent_file: ascii-art-agent.af
+  base_url: http://localhost:8283
+graders:
+  quality:
+    kind: rubric
+    display_name: "rubric score"
+    prompt_path: rubric.txt
+    model: gpt-4.1
+    temperature: 0.0
+    provider: openai
+    extractor: last_assistant
+  ascii_only:
+    kind: tool
+    display_name: "ascii character check"
+    function: ascii_printable_only
+    extractor: last_assistant
+gate:
+  # Gate on 100% ASCII-only messages (all attempts must be valid ASCII art characters)
+  metric_key: ascii_only
+  metric: accuracy
+  op: gte
+  value: 100
+  # Define per-sample pass criteria for accuracy calculation: require perfect ASCII-only score per sample
+  pass_op: gte
+  pass_value: 1.0
