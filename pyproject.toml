@@ -2,10 +2,25 @@
 name = "letta-evals"
 version = "0.1.0b1"
 description = "Evaluation framework for Letta AI agents"
-readme = "README.md"
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = "<3.14,>=3.11"
 authors = [{name = "Letta AI", email = "contact@letta.com"}]
 license = {text = "Apache-2.0"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Natural Language :: English",
+]
 dependencies = [
     "letta-client>=0.1.319",
     "typer>=0.12.0",
@@ -43,7 +58,7 @@ build-backend = "hatchling.build"
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
