@@ -2,12 +2,11 @@
 
 Setup script to create agent with filesystem access for answering questions about structured data files.
 """
-import uuid
-from typing import List
 
-from letta_client import AsyncLetta, CreateBlock, RequiredBeforeExitToolRule
-from letta_evals.models import Sample
+from letta_client import AsyncLetta
+
 from letta_evals.decorators import agent_factory
+from letta_evals.models import Sample
 
 
 @agent_factory
@@ -29,7 +28,7 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
         # Get required tools for filesystem operations
         required_tool_names = {"send_message", "open_files", "grep_files"}
         required_tool_ids = []
-        
+
         for tool_name in required_tool_names:
             tools = await client.tools.list(name=tool_name)
             if tools:
@@ -48,9 +47,8 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
             max_files_open=10,  # Allow up to 10 files to be open simultaneously
             per_file_view_window_char_limit=8000,  # Limit view window per file
             agent_type="letta_v1_agent",
-
         )
-        
+
         # Find the folder by name
         folder_name = "filesystem_data"
         folders = await client.folders.list()
@@ -75,5 +73,6 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
     except Exception as e:
         print(f"✗ Error creating agent: {e}")
         import traceback
+
         traceback.print_exc()
         raise
