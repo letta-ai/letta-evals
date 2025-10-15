@@ -95,6 +95,11 @@ class AgentTarget(Target):
             if progress_callback:
                 await progress_callback.message_sending(sample.id, i + 1, total_messages, model_name=model_name)
 
+            stream = self.client.agents.messages.create_stream(
+                agent_id=agent_id,
+                messages=[MessageCreate(role="user", content=input_msg)],
+            )
+
             messages = []
 
             prev_message_type = None
