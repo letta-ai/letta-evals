@@ -108,6 +108,18 @@ letta-evals list-extractors
 letta-evals list-graders
 ```
 
+## Example: Multi-Metric Suite
+
+- Path: `examples/simple-rubric-grader/suite.two-metrics.yaml`
+- Two graders: `quality` (rubric using `rubric.txt`) and `ascii_only` (tool `ascii_printable_only`)
+- Gate: `metric_key: quality`, `metric: avg_score`, `op: gte`, `value: 0.6`
+
+Run:
+
+```
+letta-evals run examples/simple-rubric-grader/suite.two-metrics.yaml
+```
+
 ## Configuration
 
 ### Suite YAML Structure
