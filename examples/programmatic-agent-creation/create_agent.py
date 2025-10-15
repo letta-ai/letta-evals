@@ -65,6 +65,7 @@ async def create_inventory_agent(client: AsyncLetta, sample: Sample) -> str:
                 value=item_context,
             ),
         ],
+        agent_type="letta_v1_agent",
         model="openai/gpt-4.1-mini",
         embedding="openai/text-embedding-3-small",
         tool_ids=[tool.id],
