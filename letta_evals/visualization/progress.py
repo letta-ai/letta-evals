@@ -47,6 +47,7 @@ class SampleProgress:
     model_name: Optional[str] = None
     passed: Optional[bool] = None
     score: Optional[float] = None
+    rationale: Optional[str] = None
     error: Optional[str] = None
     messages_sent: int = 0
     total_messages: int = 0
@@ -54,6 +55,9 @@ class SampleProgress:
     end_time: Optional[float] = None
     last_update_ts: Optional[float] = None
     from_cache: bool = False
+    # Per-metric live data (for multi-grader runs)
+    metric_scores: Optional[Dict[str, float]] = None
+    metric_rationales: Optional[Dict[str, str]] = None
 
 
 class DisplayMode(Enum):
@@ -80,6 +84,7 @@ class EvalProgress:
         update_freq: float = 10.0,
         show_samples: bool = True,
         cached_mode: bool = False,
+        metric_labels: Optional[Dict[str, str]] = None,
     ):
         self.suite_name = suite_name
         self.total_samples = total_samples
@@ -92,6 +97,12 @@ class EvalProgress:
         self.console = console or Console()
         self.update_freq = update_freq
         self.cached_mode = cached_mode
+        self.metric_labels: Dict[str, str] = metric_labels or {}
+        # live aggregates per metric key
+        self.metric_totals: Dict[str, float] = {}
+        self.metric_counts: Dict[str, int] = {}
+        self.metric_passed: Dict[str, int] = {}
+        self.metric_failed: Dict[str, int] = {}
 
         self.samples: Dict[tuple, SampleProgress] = {}  # key: (sample_id, model_name)
         self.start_time = None
@@ -164,7 +175,13 @@ class EvalProgress:
         subtitle.append(f"Grader: {self.grader_kind}  •  ", style="dim")
         subtitle.append(f"Concurrent: {self.max_concurrent}", style="dim")
 
-        content = Group(Align.center(header_title), Align.center(subtitle))
+        rows: List[Text] = [Align.center(header_title), Align.center(subtitle)]
+        if self.metric_labels:
+            metrics_line = Text("Metrics: ", style="dim")
+            metrics_line.append(", ".join(self.metric_labels.values()), style="white")
+            rows.append(Align.center(metrics_line))
+
+        content = Group(*rows)
 
         return Panel(
             content,
@@ -215,18 +232,33 @@ class EvalProgress:
         completed = self.passed_count + self.failed_count + self.error_count
 
         if completed == 0:
-            accuracy_text = "Accuracy: N/A"
-            avg_score_text = "Avg: N/A"
+            errors_text = "Errored: N/A"
         else:
-            accuracy = (self.passed_count / completed) * 100 if completed > 0 else 0
-            accuracy_text = f"Accuracy: {accuracy:.1f}%"
-            avg_score = self.total_score / self.score_count if self.score_count > 0 else 0
-            avg_score_text = f"Avg: {avg_score:.2f}"
+            errors_pct = (self.error_count / completed * 100.0) if completed > 0 else 0.0
+            errors_text = f"Errored: {errors_pct:.1f}%"
 
         chips = Text()
-        chips.append(f"  {accuracy_text}", style="bold white")
-        chips.append("   ")
-        chips.append(avg_score_text, style="bold white")
+        chips.append(f"  {errors_text}", style="bold white")
+        # add per-metric aggregates if available
+        if self.metric_totals:
+            chips.append("   ")
+            first = True
+            keys = list(self.metric_labels.keys()) if self.metric_labels else list(self.metric_totals.keys())
+            for key in keys:
+                if key not in self.metric_totals:
+                    continue
+                total = self.metric_totals[key]
+                cnt = self.metric_counts.get(key, 0)
+                if cnt == 0:
+                    continue
+                avg = total / cnt if cnt > 0 else 0.0
+                acc_cnt = self.metric_passed.get(key, 0) + self.metric_failed.get(key, 0)
+                acc = (self.metric_passed.get(key, 0) / acc_cnt * 100.0) if acc_cnt > 0 else 0.0
+                label = self.metric_labels.get(key, key)
+                if not first:
+                    chips.append("   ")
+                chips.append(f"{label}: {avg:.2f}, {acc:.0f}%", style="bold white")
+                first = False
         chips.append("   ")
         chips.append(f"✓ {self.passed_count}", style="green")
         chips.append("   ")
@@ -244,22 +276,15 @@ class EvalProgress:
         completed = self.passed_count + self.failed_count + self.error_count
 
         if completed == 0:
-            accuracy_text = "N/A"
-            avg_score_text = "N/A"
-            correct_count = 0
+            errors_text_row = "N/A"
         else:
-            # Count failed agents and errors as incorrect (denominator = completed)
-            correct_count = self.passed_count
-            accuracy = (correct_count / completed) * 100 if completed > 0 else 0
-            accuracy_text = f"{accuracy:.1f}%"
-            avg_score = self.total_score / self.score_count if self.score_count > 0 else 0
-            avg_score_text = f"{avg_score:.3f}"
+            errors_text_row = f"{(self.error_count / completed * 100.0):.1f}%"
 
         metrics_table = Table.grid(padding=1)
         metrics_table.add_column(style="cyan", justify="right")
         metrics_table.add_column(style="white")
 
-        metrics_table.add_row("📊 Accuracy:", f"{accuracy_text} ({correct_count}/{completed})")
+        metrics_table.add_row("🛡️ Errored:", f"{errors_text_row} ({self.error_count}/{completed})")
 
         if self.score_count > 0:
             metrics_table.add_row("📈 Avg Score:", avg_score_text)
@@ -273,6 +298,21 @@ class EvalProgress:
 
         if self.error_count > 0:
             metrics_table.add_row("⚠️ Errors:", str(self.error_count))
+
+        # Per-metric grid
+        if self.metric_totals:
+            metrics_table.add_row("", "")
+            metrics_table.add_row("[bold]By Metric[/bold]", "")
+            for key in (self.metric_labels.keys() or self.metric_totals.keys()):
+                if key not in self.metric_totals:
+                    continue
+                total = self.metric_totals.get(key, 0.0)
+                cnt = self.metric_counts.get(key, 0)
+                avg = total / cnt if cnt > 0 else 0.0
+                att = self.metric_passed.get(key, 0) + self.metric_failed.get(key, 0)
+                acc = (self.metric_passed.get(key, 0) / att * 100.0) if att > 0 else 0.0
+                label = self.metric_labels.get(key, key)
+                metrics_table.add_row(f"• {label}:", f"avg={avg:.2f}, acc={acc:.1f}%")
 
         if self.start_time and completed > 0 and completed < self.total_samples:
             elapsed = time.time() - self.start_time
@@ -366,7 +406,16 @@ class EvalProgress:
         if self.grader_kind == GraderKind.RUBRIC.value and self.rubric_model:
             table.add_column("Rubric Model", style="magenta", width=15)
         table.add_column("Status", width=20)
-        table.add_column("Score", width=6, justify="right")
+        # Add per-metric columns (score + rationale) or single score/rationale
+        metric_keys = list(self.metric_labels.keys())
+        if metric_keys:
+            for mk in metric_keys:
+                lbl = self.metric_labels.get(mk, mk)
+                table.add_column(f"{lbl} score", width=8, justify="right")
+                table.add_column(f"{lbl} rationale", width=40, justify="left")
+        else:
+            table.add_column("score", width=8, justify="right")
+            table.add_column("rationale", width=40, justify="left")
         table.add_column("Time", width=6, justify="right")
         table.add_column("Details", justify="left")
 
@@ -380,7 +429,26 @@ class EvalProgress:
             else:
                 time_text = "-"
 
-            score_text = f"{s.score:.2f}" if s.score is not None else "-"
+            # Build score/rationale cells
+            cells: List[str] = []
+            if self.metric_labels:
+                for mk in metric_keys:
+                    val = None
+                    rat = ""
+                    if s.metric_scores and mk in s.metric_scores:
+                        val = s.metric_scores.get(mk)
+                    if s.metric_rationales and mk in s.metric_rationales:
+                        rat = s.metric_rationales.get(mk) or ""
+                    score_cell = f"{val:.2f}" if isinstance(val, (int, float)) and val is not None else "-"
+                    if rat and len(rat) > 50:
+                        rat = rat[:47] + "..."
+                    cells.extend([score_cell, rat])
+            else:
+                score_cell = f"{s.score:.2f}" if s.score is not None else "-"
+                rat = s.rationale or ""
+                if rat and len(rat) > 50:
+                    rat = rat[:47] + "..."
+                cells.extend([score_cell, rat])
 
             if s.state == SampleState.SENDING_MESSAGES and s.total_messages > 0:
                 p = s.messages_sent / s.total_messages
@@ -411,14 +479,7 @@ class EvalProgress:
             ]
             if self.grader_kind == GraderKind.RUBRIC.value and self.rubric_model:
                 row_data.append(self.rubric_model)
-            row_data.extend(
-                [
-                    self._get_state_text(s),
-                    score_text,
-                    time_text,
-                    details,
-                ]
-            )
+            row_data.extend([self._get_state_text(s), *cells, time_text, details])
             table.add_row(*row_data)
 
         return table
@@ -540,7 +601,15 @@ class EvalProgress:
         )
 
     async def sample_completed(
-        self, sample_id: int, passed: bool, score: Optional[float] = None, model_name: Optional[str] = None
+        self,
+        sample_id: int,
+        passed: bool,
+        score: Optional[float] = None,
+        model_name: Optional[str] = None,
+        metric_scores: Optional[Dict[str, float]] = None,
+        metric_pass: Optional[Dict[str, bool]] = None,
+        rationale: Optional[str] = None,
+        metric_rationales: Optional[Dict[str, str]] = None,
     ):
         """Mark sample as completed"""
         # preserve from_cache flag if it was set
@@ -552,8 +621,21 @@ class EvalProgress:
             model_name=model_name,
             passed=passed,
             score=score,
+            rationale=rationale,
             from_cache=existing_from_cache,
+            metric_scores=metric_scores,
+            metric_rationales=metric_rationales,
         )
+        # update per-metric aggregates
+        if metric_scores:
+            for mkey, mscore in metric_scores.items():
+                self.metric_totals[mkey] = self.metric_totals.get(mkey, 0.0) + (mscore or 0.0)
+                self.metric_counts[mkey] = self.metric_counts.get(mkey, 0) + 1
+                if metric_pass and mkey in metric_pass:
+                    if metric_pass[mkey]:
+                        self.metric_passed[mkey] = self.metric_passed.get(mkey, 0) + 1
+                    else:
+                        self.metric_failed[mkey] = self.metric_failed.get(mkey, 0) + 1
 
     async def sample_error(self, sample_id: int, error: str, model_name: Optional[str] = None):
         """Mark sample as having an error"""

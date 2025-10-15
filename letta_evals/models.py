@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Union
 from letta_client import LettaMessageUnion
 from pydantic import BaseModel, Field, field_validator
 
-from letta_evals.types import GraderKind, LLMProvider, MetricOp, TargetKind
+from letta_evals.types import GateMetric, GraderKind, LLMProvider, MetricOp, TargetKind
 
 # Dataset models
 
@@ -66,6 +66,9 @@ class GraderSpec(BaseModel):
 
     kind: GraderKind = Field(description="Type of grader (tool or rubric)")
 
+    # Optional display name for UI/CLI output
+    display_name: Optional[str] = Field(default=None, description="Human-friendly name for this metric")
+
     function: Optional[str] = Field(default=None, description="Name of grading function for tool grader")
 
     prompt: Optional[str] = Field(default=None, description="Rubric prompt for LLM judge")
@@ -97,22 +100,55 @@ class GraderSpec(BaseModel):
 class GateSpec(BaseModel):
     """Gate configuration for pass/fail criteria."""
 
-    op: MetricOp = Field(description="Comparison operator for avg_score")
-    value: float = Field(description="Threshold value for avg_score")
+    # Which aggregate metric kind to compare (e.g., avg_score or accuracy)
+    metric: GateMetric = Field(default=GateMetric.AVG_SCORE, description="Aggregate kind to apply gate on")
 
-    def check_score(self, score: float) -> bool:
-        """Check if a score satisfies this gate."""
-        if self.op == MetricOp.GT:
-            return score > self.value
-        elif self.op == MetricOp.GTE:
-            return score >= self.value
-        elif self.op == MetricOp.LT:
-            return score < self.value
-        elif self.op == MetricOp.LTE:
-            return score <= self.value
-        elif self.op == MetricOp.EQ:
-            return score == self.value
+    # Which metric key (grader name) to evaluate; if None, uses the single configured grader
+    metric_key: Optional[str] = Field(default=None, description="Metric key (grader name) to gate on")
+
+    # Gate comparison for the selected aggregate metric
+    op: MetricOp = Field(description="Comparison operator for the selected metric")
+    value: float = Field(description="Threshold value for the selected metric")
+
+    # Optional, separate per-sample pass criteria (used for accuracy computation)
+    pass_op: Optional[MetricOp] = Field(
+        default=None, description="Comparison operator for per-sample pass (defaults to op)"
+    )
+    pass_value: Optional[float] = Field(
+        default=None, description="Threshold value for per-sample pass (defaults to value)"
+    )
+
+    def _compare(self, a: float, op: MetricOp, b: float) -> bool:
+        if op == MetricOp.GT:
+            return a > b
+        elif op == MetricOp.GTE:
+            return a >= b
+        elif op == MetricOp.LT:
+            return a < b
+        elif op == MetricOp.LTE:
+            return a <= b
+        elif op == MetricOp.EQ:
+            return a == b
         return False
+
+    def check_sample(self, score: float) -> bool:
+        """Check if an individual sample score passes.
+
+        Uses pass_op/pass_value if provided; otherwise falls back to op/value.
+        """
+        # If gate is on accuracy aggregate and no explicit per-sample threshold set,
+        # default per-sample pass to score >= 1.0 (perfect) using GTE.
+        if self.pass_value is None and self.metric == GateMetric.ACCURACY:
+            op = MetricOp.GTE
+            value = 1.0
+        else:
+            op = self.pass_op or self.op
+            value = self.pass_value if self.pass_value is not None else self.value
+        return self._compare(score, op, value)
+
+    # Back-compat alias
+    def check_score(self, score: float) -> bool:
+        return self.check_sample(score)
 
 
 class SuiteSpec(BaseModel):
@@ -122,7 +158,9 @@ class SuiteSpec(BaseModel):
     description: Optional[str] = Field(default=None, description="Description of what this suite evaluates")
     dataset: Path = Field(description="Path to JSONL dataset file")
     target: TargetSpec = Field(description="Target configuration")
-    grader: GraderSpec = Field(description="Grader configuration")
+    graders: Optional[Dict[str, GraderSpec]] = Field(
+        default=None, description="Multiple graders keyed by metric name"
+    )
     gate: GateSpec = Field(description="Pass/fail criteria for avg_score (required)")
 
     max_samples: Optional[int] = Field(default=None, description="Maximum number of samples to evaluate")
@@ -154,16 +192,16 @@ class SuiteSpec(BaseModel):
                 # store base_dir in target for agent_script resolution
                 yaml_data["target"]["base_dir"] = base_dir
 
-            # resolve grader paths
-            if "grader" in yaml_data:
-                if "prompt_path" in yaml_data["grader"] and yaml_data["grader"]["prompt_path"]:
-                    if not Path(yaml_data["grader"]["prompt_path"]).is_absolute():
-                        yaml_data["grader"]["prompt_path"] = str(
-                            (base_dir / yaml_data["grader"]["prompt_path"]).resolve()
-                        )
-
-                # store base_dir in grader for custom function resolution
-                yaml_data["grader"]["base_dir"] = base_dir
+            # resolve multi-graders (required)
+            if "graders" in yaml_data and isinstance(yaml_data["graders"], dict):
+                resolved_graders: Dict[str, Any] = {}
+                for key, gspec in yaml_data["graders"].items():
+                    if "prompt_path" in gspec and gspec["prompt_path"]:
+                        if not Path(gspec["prompt_path"]).is_absolute():
+                            gspec["prompt_path"] = str((base_dir / gspec["prompt_path"]).resolve())
+                    gspec["base_dir"] = base_dir
+                    resolved_graders[key] = gspec
+                yaml_data["graders"] = resolved_graders
 
             # store base_dir in SuiteSpec for setup_script resolution
             yaml_data["base_dir"] = base_dir
@@ -218,6 +256,15 @@ class ModelMetrics(BaseModel):
     accuracy: float = Field(description="Attempt accuracy percentage (passed / total_attempted)")
 
 
+class MetricAggregate(BaseModel):
+    """Aggregate metrics for a single metric key (grader)."""
+
+    avg_score: float = Field(description="Average score for this metric")
+    accuracy: float = Field(description="Accuracy for this metric (percent)")
+    passed_attempts: int = Field(description="Number of attempted samples that passed for this metric")
+    failed_attempts: int = Field(description="Number of attempted samples that failed for this metric")
+
+
 class Metrics(BaseModel):
     """Evaluation metrics."""
 
@@ -225,8 +272,13 @@ class Metrics(BaseModel):
     total_attempted: int = Field(description="Total successfully attempted (completed without error)")
     avg_score: float = Field(description="Average score across all results (0.0 to 1.0)")
     accuracy: float = Field(description="Attempt accuracy percentage (passed / total_attempted)")
+    passed_attempts: int = Field(default=0, description="Number of attempted samples that passed")
+    failed_attempts: int = Field(default=0, description="Number of attempted samples that failed")
     per_model: Optional[List[ModelMetrics]] = Field(
         default=None, description="Metrics broken down by model configuration"
+    )
+    by_metric: Optional[Dict[str, MetricAggregate]] = Field(
+        default=None, description="Aggregates for each metric key"
     )
 
 
@@ -235,9 +287,11 @@ class SampleResult(BaseModel):
 
     sample: Sample = Field(description="The original sample that was evaluated")
     submission: str = Field(description="Extracted response from the trajectory")
+    submissions: Optional[Dict[str, str]] = Field(default=None, description="Per-metric extracted submissions")
     trajectory: List[List[LettaMessageUnion]] = Field(description="Full conversation trajectory from the agent")
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
     grade: GradeResult = Field(description="Grading result for this sample")
+    grades: Optional[Dict[str, GradeResult]] = Field(default=None, description="Per-metric grading results")
     model_name: Optional[str] = Field(description="Model configuration name used for this sample")
     agent_usage: Optional[List[dict]] = Field(
         default=None, description="Usage statistics emitted by the agent during the run"
