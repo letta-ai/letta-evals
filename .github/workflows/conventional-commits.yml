@@ -1,4 +1,4 @@
-name: Conventional Commits
+name: Validate Conventional Commits
 
 on:
   pull_request:

@@ -1,4 +1,4 @@
-name: Lint
+name: Run Lint and Packaging Checks
 
 on:
   pull_request:
