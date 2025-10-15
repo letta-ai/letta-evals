@@ -6,12 +6,14 @@ target:
   kind: agent
   agent_script: create_agent.py:create_inventory_agent
   base_url: http://localhost:8283
-grader:
-  kind: tool
-  function: regex_match
-  extractor: tool_output
-  extractor_config:
-    tool_name: manage_inventory
+graders:
+  inventory_check:
+    kind: tool
+    function: regex_match
+    extractor: tool_output
+    extractor_config:
+      tool_name: manage_inventory
 gate:
+  metric_key: inventory_check
   op: gte
   value: 1.0
