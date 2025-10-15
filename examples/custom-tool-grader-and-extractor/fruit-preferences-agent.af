@@ -28,11 +28,6 @@
           "tool_name": "memory_replace",
           "type": "continue_loop",
           "prompt_template": "<tool_rule>\n{{ tool_name }} requires continuing your response when called\n</tool_rule>"
-        },
-        {
-          "tool_name": "send_message",
-          "type": "exit_loop",
-          "prompt_template": "<tool_rule>\n{{ tool_name }} ends your response (yields control) when called\n</tool_rule>"
         }
       ],
       "tags": [],
@@ -158,6 +153,65 @@
   "sources": [],
   "tools": [
     {
+      "id": "tool-0",
+      "tool_type": "letta_core",
+      "description": "Search prior conversation history using hybrid search (text + semantic similarity).\n\nExamples:\n        # Search all messages\n        conversation_search(query=\"project updates\")\n\n        # Search only assistant messages\n        conversation_search(query=\"error handling\", roles=[\"assistant\"])\n\n        # Search with date range (inclusive of both dates)\n        conversation_search(query=\"meetings\", start_date=\"2024-01-15\", end_date=\"2024-01-20\")\n        # This includes all messages from Jan 15 00:00:00 through Jan 20 23:59:59\n\n        # Search messages from a specific day (inclusive)\n        conversation_search(query=\"bug reports\", start_date=\"2024-09-04\", end_date=\"2024-09-04\")\n        # This includes ALL messages from September 4, 2024\n\n        # Search with specific time boundaries\n        conversation_search(query=\"deployment\", start_date=\"2024-01-15T09:00\", end_date=\"2024-01-15T17:30\")\n        # This includes messages from 9 AM to 5:30 PM on Jan 15\n\n        # Search with limit\n        conversation_search(query=\"debugging\", limit=10)\n\n    Returns:\n        str: Query result string containing matching messages with timestamps and content.",
+      "source_type": "python",
+      "name": "conversation_search",
+      "tags": [
+        "letta_core"
+      ],
+      "source_code": null,
+      "json_schema": {
+        "name": "conversation_search",
+        "description": "Search prior conversation history using hybrid search (text + semantic similarity).\n\nExamples:\n        # Search all messages\n        conversation_search(query=\"project updates\")\n\n        # Search only assistant messages\n        conversation_search(query=\"error handling\", roles=[\"assistant\"])\n\n        # Search with date range (inclusive of both dates)\n        conversation_search(query=\"meetings\", start_date=\"2024-01-15\", end_date=\"2024-01-20\")\n        # This includes all messages from Jan 15 00:00:00 through Jan 20 23:59:59\n\n        # Search messages from a specific day (inclusive)\n        conversation_search(query=\"bug reports\", start_date=\"2024-09-04\", end_date=\"2024-09-04\")\n        # This includes ALL messages from September 4, 2024\n\n        # Search with specific time boundaries\n        conversation_search(query=\"deployment\", start_date=\"2024-01-15T09:00\", end_date=\"2024-01-15T17:30\")\n        # This includes messages from 9 AM to 5:30 PM on Jan 15\n\n        # Search with limit\n        conversation_search(query=\"debugging\", limit=10)\n\n    Returns:\n        str: Query result string containing matching messages with timestamps and content.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "String to search for using both text matching and semantic similarity."
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "assistant",
+                  "user",
+                  "tool"
+                ]
+              },
+              "description": "Optional list of message roles to filter by."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Maximum number of results to return. Uses system default if not specified."
+            },
+            "start_date": {
+              "type": "string",
+              "description": "Filter results to messages created on or after this date (INCLUSIVE). When using date-only format (e.g., \"2024-01-15\"), includes messages starting from 00:00:00 of that day. ISO 8601 format: \"YYYY-MM-DD\" or \"YYYY-MM-DDTHH:MM\". Examples: \"2024-01-15\" (from start of Jan 15), \"2024-01-15T14:30\" (from 2:30 PM on Jan 15)."
+            },
+            "end_date": {
+              "type": "string",
+              "description": "Filter results to messages created on or before this date (INCLUSIVE). When using date-only format (e.g., \"2024-01-20\"), includes all messages from that entire day. ISO 8601 format: \"YYYY-MM-DD\" or \"YYYY-MM-DDTHH:MM\". Examples: \"2024-01-20\" (includes all of Jan 20), \"2024-01-20T17:00\" (up to 5 PM on Jan 20)."
+            }
+          },
+          "required": [
+            "query"
+          ]
+        }
+      },
+      "args_json_schema": null,
+      "return_char_limit": 50000,
+      "pip_requirements": null,
+      "npm_requirements": null,
+      "default_requires_approval": null,
+      "created_by_id": "user-00000000-0000-4000-8000-000000000000",
+      "last_updated_by_id": "user-00000000-0000-4000-8000-000000000000",
+      "metadata_": {}
+    },
+    {
       "id": "tool-1",
       "tool_type": "letta_sleeptime_core",
       "description": "The memory_insert command allows you to insert text at a specific location in a memory block.\n\nExamples:\n        # Update a block containing information about the user (append to the end of the block)\n        memory_insert(label=\"customer\", new_str=\"The customer's ticket number is 12345\")\n\n        # Update a block containing information about the user (insert at the beginning of the block)\n        memory_insert(label=\"customer\", new_str=\"The customer's ticket number is 12345\", insert_line=0)\n\n    Returns:\n        Optional[str]: None is always returned as this function does not produce a response.",
@@ -197,12 +251,12 @@
       "pip_requirements": null,
       "npm_requirements": null,
       "default_requires_approval": null,
-      "created_by_id": "user-115f9d36-03b0-4cd2-af5a-772be7f0e725",
-      "last_updated_by_id": "user-474c06ef-e1ed-4131-922a-1d99fb3063f2",
+      "created_by_id": "user-00000000-0000-4000-8000-000000000000",
+      "last_updated_by_id": "user-00000000-0000-4000-8000-000000000000",
       "metadata_": {}
     },
     {
-      "id": "tool-0",
+      "id": "tool-2",
       "tool_type": "letta_sleeptime_core",
       "description": "The memory_replace command allows you to replace a specific string in a memory block with a new string. This is used for making precise edits.\n\nExamples:\n        # Update a block containing information about the user\n        memory_replace(label=\"human\", old_str=\"Their name is Alice\", new_str=\"Their name is Bob\")\n\n        # Update a block containing a todo list\n        memory_replace(label=\"todos\", old_str=\"- [ ] Step 5: Search the web\", new_str=\"- [x] Step 5: Search the web\")\n\n        # Pass an empty string to\n        memory_replace(label=\"human\", old_str=\"Their name is Alice\", new_str=\"\")\n\n        # Bad example - do NOT add (view-only) line numbers to the args\n        memory_replace(label=\"human\", old_str=\"Line 1: Their name is Alice\", new_str=\"Line 1: Their name is Bob\")\n\n        # Bad example - do NOT include the number number warning either\n        memory_replace(label=\"human\", old_str=\"# NOTE: Line numbers shown below are to help during editing. Do NOT include line number prefixes in your memory edit tool calls.\\nLine 1: Their name is Alice\", new_str=\"Line 1: Their name is Bob\")\n\n        # Good example - no line numbers or line number warning (they are view-only), just the text\n        memory_replace(label=\"human\", old_str=\"Their name is Alice\", new_str=\"Their name is Bob\")\n\n    Returns:\n        str: The success message",
       "source_type": "python",
@@ -242,43 +296,8 @@
       "pip_requirements": null,
       "npm_requirements": null,
       "default_requires_approval": null,
-      "created_by_id": "user-115f9d36-03b0-4cd2-af5a-772be7f0e725",
-      "last_updated_by_id": "user-474c06ef-e1ed-4131-922a-1d99fb3063f2",
-      "metadata_": {}
-    },
-    {
-      "id": "tool-2",
-      "tool_type": "letta_core",
-      "description": "Sends a message to the human user.",
-      "source_type": "python",
-      "name": "send_message",
-      "tags": [
-        "letta_core"
-      ],
-      "source_code": null,
-      "json_schema": {
-        "name": "send_message",
-        "description": "Sends a message to the human user.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "message": {
-              "type": "string",
-              "description": "Message contents. All unicode (including emojis) are supported."
-            }
-          },
-          "required": [
-            "message"
-          ]
-        }
-      },
-      "args_json_schema": null,
-      "return_char_limit": 50000,
-      "pip_requirements": null,
-      "npm_requirements": null,
-      "default_requires_approval": null,
       "created_by_id": "user-00000000-0000-4000-8000-000000000000",
-      "last_updated_by_id": "user-474c06ef-e1ed-4131-922a-1d99fb3063f2",
+      "last_updated_by_id": "user-00000000-0000-4000-8000-000000000000",
       "metadata_": {}
     }
   ],

@@ -6,32 +6,10 @@
       "tools": [],
       "tool_ids": [
         "tool-0",
-        "tool-1"
       ],
       "source_ids": [],
       "block_ids": [],
-      "tool_rules": [
-        {
-          "tool_name": "conversation_search",
-          "type": "continue_loop",
-          "prompt_template": "<tool_rule>\n{{ tool_name }} requires continuing your response when called\n</tool_rule>"
-        },
-        {
-          "tool_name": "send_message",
-          "type": "exit_loop",
-          "prompt_template": "<tool_rule>\n{{ tool_name }} ends your response (yields control) when called\n</tool_rule>"
-        },
-        {
-          "tool_name": "memory_insert",
-          "type": "continue_loop",
-          "prompt_template": "<tool_rule>\n{{ tool_name }} requires continuing your response when called\n</tool_rule>"
-        },
-        {
-          "tool_name": "memory_replace",
-          "type": "continue_loop",
-          "prompt_template": "<tool_rule>\n{{ tool_name }} requires continuing your response when called\n</tool_rule>"
-        }
-      ],
+      "tool_rules": [],
       "tags": [],
       "system": "<base_instructions>\nYou are a helpful self-improving agent with advanced memory and file system capabilities.\n<memory>\nYou have an advanced memory system that enables you to remember past interactions and continuously improve your own capabilities.\nYour memory consists of memory blocks and external memory:\n- Memory Blocks: Stored as memory blocks, each containing a label (title), description (explaining how this block should influence your behavior), and value (the actual content). Memory blocks have size limits. Memory blocks are embedded within your system instructions and remain constantly available in-context.\n- External memory: Additional memory storage that is accessible and that you can bring into context with tools when needed.\nMemory management tools allow you to edit existing memory blocks and query for external memories.\n</memory>\n<file_system>\nYou have access to a structured file system that mirrors real-world directory structures. Each directory can contain multiple files.\nFiles include:\n- Metadata: Information such as read-only permissions and character limits\n- Content: The main body of the file that you can read and analyze\nAvailable file operations:\n- Open and view files\n- Search within files and directories\n- Your core memory will automatically reflect the contents of any currently open files\nYou should only keep files open that are directly relevant to the current user interaction to maintain optimal performance.\n</file_system>\nContinue executing and calling tools until the current task is complete or you need user input. To continue: call another tool. To yield control: end your response without calling a tool.\nBase instructions complete.\n</base_instructions>",
       "agent_type": "letta_v1_agent",
@@ -167,41 +145,6 @@
       "npm_requirements": null,
       "default_requires_approval": null,
       "created_by_id": "user-f9ba1dbe-4bda-492a-8333-dc647f3566c6",
-      "last_updated_by_id": "user-474c06ef-e1ed-4131-922a-1d99fb3063f2",
-      "metadata_": {}
-    },
-    {
-      "id": "tool-1",
-      "tool_type": "letta_core",
-      "description": "Sends a message to the human user.",
-      "source_type": "python",
-      "name": "send_message",
-      "tags": [
-        "letta_core"
-      ],
-      "source_code": null,
-      "json_schema": {
-        "name": "send_message",
-        "description": "Sends a message to the human user.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "message": {
-              "type": "string",
-              "description": "Message contents. All unicode (including emojis) are supported."
-            }
-          },
-          "required": [
-            "message"
-          ]
-        }
-      },
-      "args_json_schema": null,
-      "return_char_limit": 50000,
-      "pip_requirements": null,
-      "npm_requirements": null,
-      "default_requires_approval": null,
-      "created_by_id": "user-00000000-0000-4000-8000-000000000000",
       "last_updated_by_id": "user-474c06ef-e1ed-4131-922a-1d99fb3063f2",
       "metadata_": {}
     }
