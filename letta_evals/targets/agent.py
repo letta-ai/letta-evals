@@ -98,6 +98,7 @@ class AgentTarget(Target):
             stream = self.client.agents.messages.create_stream(
                 agent_id=agent_id,
                 messages=[MessageCreate(role="user", content=input_msg)],
+                stream_tokens=True,
             )
 
             messages = []
