@@ -49,13 +49,15 @@ target:
   kind: agent
   agent_file: my_agent.af  # or use agent_id for existing agents
   base_url: http://localhost:8283
-grader:
-  kind: tool
-  function: contains  # or exact_match
-  extractor: last_assistant
+graders:
+  quality:
+    kind: tool
+    function: contains  # or exact_match
+    extractor: last_assistant
 gate:
+  metric_key: quality
   op: gte
-  value: 0.75  # require 75% accuracy
+  value: 0.75  # require 75% pass threshold
 ```
 
 3. **Run the evaluation**:
@@ -79,14 +81,16 @@ What you're evaluating. Currently supports:
 - **Letta agents**: Via `agent_file` (.af files) or existing `agent_id`
 
 ### Graders
-How responses are scored:
-- **Tool graders**: Use built-in functions (`exact_match`, `contains`) or custom Python functions
-- **Rubric graders**: Use LLMs as judges with custom scoring prompts
+How responses are scored (define one or many under `graders`):
+- Tool graders: built-ins (`exact_match`, `contains`, etc.) or custom Python functions
+- Rubric graders: LLM judges with custom prompts (`prompt_path`, `model`, `provider`)
 
 ### Gates
 Pass/fail thresholds for your evaluation:
+- `metric_key`: Which grader to gate on (key in `graders`)
+- `metric`: Aggregate to compare (`avg_score` or `accuracy`)
 - `op`: Comparison operator (`gte`, `gt`, `lte`, `lt`, `eq`)
-- `value`: Threshold value (e.g., 0.8 for 80% accuracy)
+- `value`: Threshold value (decimal for `avg_score`, percent for `accuracy`)
 
 ## CLI Commands
 
@@ -136,16 +140,18 @@ target:
   agent_file: path/to/agent.af  # or agent_id: existing-id
   base_url: http://localhost:8283
 
-grader:
-  kind: tool  # or rubric
-  function: contains  # for tool graders
-  extractor: last_assistant  # what to extract from response
-  # for rubric graders:
-  # prompt_path: path/to/rubric.txt
-  # model: gpt-4
-  # provider: openai
+graders:
+  my_metric:
+    kind: tool  # or rubric
+    function: contains  # for tool graders
+    extractor: last_assistant  # what to extract from response
+    # for rubric graders:
+    # prompt_path: path/to/rubric.txt
+    # model: gpt-4.1
+    # provider: openai
 
 gate:
+  metric_key: my_metric
   op: gte  # gte, gt, lte, lt, eq
   value: 0.8
 ```

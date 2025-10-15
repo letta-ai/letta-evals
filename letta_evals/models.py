@@ -158,7 +158,6 @@ class SuiteSpec(BaseModel):
     description: Optional[str] = Field(default=None, description="Description of what this suite evaluates")
     dataset: Path = Field(description="Path to JSONL dataset file")
     target: TargetSpec = Field(description="Target configuration")
-    grader: Optional[GraderSpec] = Field(default=None, description="Single grader configuration (deprecated)")
     graders: Optional[Dict[str, GraderSpec]] = Field(
         default=None, description="Multiple graders keyed by metric name"
     )
@@ -193,18 +192,7 @@ class SuiteSpec(BaseModel):
                 # store base_dir in target for agent_script resolution
                 yaml_data["target"]["base_dir"] = base_dir
 
-            # resolve grader paths
-            if "grader" in yaml_data and yaml_data.get("grader"):
-                if "prompt_path" in yaml_data["grader"] and yaml_data["grader"]["prompt_path"]:
-                    if not Path(yaml_data["grader"]["prompt_path"]).is_absolute():
-                        yaml_data["grader"]["prompt_path"] = str(
-                            (base_dir / yaml_data["grader"]["prompt_path"]).resolve()
-                        )
-
-                # store base_dir in grader for custom function resolution
-                yaml_data["grader"]["base_dir"] = base_dir
-
-            # resolve multi-graders if present
+            # resolve multi-graders (required)
             if "graders" in yaml_data and isinstance(yaml_data["graders"], dict):
                 resolved_graders: Dict[str, Any] = {}
                 for key, gspec in yaml_data["graders"].items():

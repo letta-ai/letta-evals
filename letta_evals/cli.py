@@ -95,21 +95,24 @@ def run(
                     if gspec.kind == GraderKind.RUBRIC and hasattr(gspec, "model"):
                         rubric_model = gspec.model
                         break
-            elif suite.grader and suite.grader.kind == GraderKind.RUBRIC and hasattr(suite.grader, "model"):
-                rubric_model = suite.grader.model
 
-            metric_names = (
-                [gspec.display_name or key for key, gspec in suite.graders.items()] if suite.graders else None
-            )
+            metric_names = [gspec.display_name or key for key, gspec in suite.graders.items()] if suite.graders else None
             # Build metric labels mapping for live progress (key -> display)
             metric_labels = None
             if suite.graders:
                 metric_labels = {key: (gspec.display_name or key) for key, gspec in suite.graders.items()}
+            # Determine grader kind label for progress
+            if suite.graders and len(suite.graders) == 1:
+                only_kind = next(iter(suite.graders.values())).kind.value
+                grader_kind_label = only_kind
+            else:
+                grader_kind_label = "multi"
+
             progress = EvalProgress(
                 suite_name=suite.name,
                 total_samples=total_evaluations,
                 target_kind=suite.target.kind.value,
-                grader_kind=("multi" if suite.graders else suite.grader.kind.value),
+                grader_kind=grader_kind_label,
                 rubric_model=rubric_model,
                 max_concurrent=max_concurrent,
                 display_mode=DisplayMode.DETAILED,
@@ -182,8 +185,6 @@ def validate(suite_path: Path = typer.Argument(..., help="Path to suite YAML fil
             for key, gspec in suite.graders.items():
                 label = gspec.display_name or key
                 console.print(f"    - {label}: {gspec.kind.value}")
-        elif suite.grader:
-            console.print(f"  Grader: {suite.grader.kind.value}")
         if suite.gate:
             metric_key = suite.gate.metric_key or "<default>"
             console.print(
@@ -334,13 +335,6 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
             for k, gspec in result.config["graders"].items():
                 metric_keys.append(k)
                 metric_labels[k] = gspec.get("display_name") or k
-        else:
-            # single grader case
-            label = "score"
-            if "grader" in result.config and isinstance(result.config["grader"], dict):
-                label = result.config["grader"].get("display_name") or label
-            metric_keys.append("__single__")
-            metric_labels["__single__"] = label
 
         # Add two sub-columns per metric: score + rationale
         for mk in metric_keys:
@@ -359,10 +353,7 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
             # Build per-metric cells in config order
             cells = []
             for mk in metric_keys:
-                if mk == "__single__":
-                    g = sample_result.grade
-                else:
-                    g = sample_result.grades.get(mk) if sample_result.grades else None
+                g = sample_result.grades.get(mk) if sample_result.grades else None
                 if g is None:
                     cells.extend(["-", ""])
                 else:

@@ -44,8 +44,7 @@ class Runner:
         output_path: Optional[Path] = None,
     ):
         self.suite: SuiteSpec = suite
-        # Support single or multiple graders
-        self.grader: Optional[Grader] = None
+        # Use a unified multi-grader path; single-metric suites are normalized to one entry
         self.graders: Optional[Dict[str, Grader]] = None
         self._init_graders()
         self.results: List[SampleResult] = []
@@ -122,28 +121,8 @@ class Runner:
                     )
                 else:
                     raise ValueError(f"Unknown grader kind: {gspec.kind}")
-        elif self.suite.grader:
-            gspec = self.suite.grader
-            if gspec.kind == GraderKind.TOOL:
-                self.grader = ToolGrader(
-                    function=gspec.function,
-                    extractor=gspec.extractor,
-                    extractor_config=gspec.extractor_config,
-                    base_dir=gspec.base_dir,
-                )
-            elif gspec.kind == GraderKind.RUBRIC:
-                self.grader = RubricGrader(
-                    prompt=gspec.prompt,
-                    model=gspec.model,
-                    temperature=gspec.temperature,
-                    provider=gspec.provider,
-                    extractor=gspec.extractor,
-                    extractor_config=gspec.extractor_config,
-                )
-            else:
-                raise ValueError(f"Unknown grader kind: {gspec.kind}")
         else:
-            raise ValueError("Suite must define either 'grader' or 'graders'")
+            raise ValueError("Suite must define 'graders'")
 
     async def _run_setup(self) -> None:
         """Execute the setup function if specified."""
@@ -228,24 +207,19 @@ class Runner:
                 if self.progress_callback:
                     await self.progress_callback.grading_started(sample_id, model_name=model_name)
 
-                grades_dict: Optional[Dict[str, GradeResult]] = None
-                submissions_dict: Optional[Dict[str, str]] = None
-                if self.graders is not None:
-                    grades_dict = {}
-                    submissions_dict = {}
-                    for key, grader in self.graders.items():
-                        gr, sub = await grader.grade(sample, trajectory)
-                        grades_dict[key] = gr
-                        submissions_dict[key] = sub
-                    # Determine gating metric key
-                    gate_key = self._gate_metric_key()
-                    gate_grade = grades_dict.get(gate_key) if gate_key in grades_dict else next(iter(grades_dict.values()))
-                    gate_submission = submissions_dict.get(gate_key) if gate_key in submissions_dict else next(
-                        iter(submissions_dict.values())
-                    )
-                    grade_result, submission = gate_grade, gate_submission
-                else:
-                    grade_result, submission = await self.grader.grade(sample, trajectory)  # type: ignore[arg-type]
+                grades_dict: Optional[Dict[str, GradeResult]] = {}
+                submissions_dict: Optional[Dict[str, str]] = {}
+                for key, grader in self.graders.items():  # type: ignore[union-attr]
+                    gr, sub = await grader.grade(sample, trajectory)
+                    grades_dict[key] = gr
+                    submissions_dict[key] = sub
+                # Determine gating metric key
+                gate_key = self._gate_metric_key()
+                gate_grade = grades_dict.get(gate_key) if gate_key in grades_dict else next(iter(grades_dict.values()))
+                gate_submission = submissions_dict.get(gate_key) if gate_key in submissions_dict else next(
+                    iter(submissions_dict.values())
+                )
+                grade_result, submission = gate_grade, gate_submission
 
                 if self.progress_callback:
                     passed = self._check_sample_pass(grade_result.score)
@@ -299,8 +273,6 @@ class Runner:
         }
         if self.suite.graders:
             config["graders"] = {k: json.loads(v.model_dump_json()) for k, v in self.suite.graders.items()}
-        elif self.suite.grader:
-            config["grader"] = json.loads(self.suite.grader.model_dump_json())
 
         # initialize streaming writer if output path is provided
         if self.output_path:
@@ -468,34 +440,29 @@ class Runner:
     def _check_gates(self, metrics: Metrics) -> bool:
         """Check if the configured gate metric is satisfied."""
         metric_kind = self.suite.gate.metric
-        # determine which metric key (grader) we're gating on
         gate_key = self._gate_metric_key()
-        # derive value from either per-metric or top-level
-        if self.graders is not None:
-            # recompute a lightweight aggregate for gate metric from current results to avoid dependency
-            if metric_kind == GateMetric.AVG_SCORE:
-                scores = [
-                    r.grades[gate_key].score
-                    for r in self.results
-                    if r.grades and gate_key in r.grades
-                ]
-                value = (sum(scores) / len(scores)) if scores else 0.0
-            elif metric_kind == GateMetric.ACCURACY:
-                # accuracy over attempted
-                def is_success(r: SampleResult) -> bool:
-                    return (r.agent_id is not None) and bool(r.trajectory)
+        # recompute a lightweight aggregate for gate metric from current results
+        if metric_kind == GateMetric.AVG_SCORE:
+            scores = [
+                r.grades[gate_key].score
+                for r in self.results
+                if r.grades and gate_key in r.grades
+            ]
+            value = (sum(scores) / len(scores)) if scores else 0.0
+        elif metric_kind == GateMetric.ACCURACY:
+            # accuracy over attempted
+            def is_success(r: SampleResult) -> bool:
+                return (r.agent_id is not None) and bool(r.trajectory)
 
-                attempted = sum(1 for r in self.results if is_success(r))
-                passed = sum(
-                    1
-                    for r in self.results
-                    if is_success(r) and r.grades and gate_key in r.grades and self._check_sample_pass(r.grades[gate_key].score)
-                )
-                value = (passed / attempted) * 100.0 if attempted > 0 else 0.0
-            else:
-                value = 0.0
+            attempted = sum(1 for r in self.results if is_success(r))
+            passed = sum(
+                1
+                for r in self.results
+                if is_success(r) and r.grades and gate_key in r.grades and self._check_sample_pass(r.grades[gate_key].score)
+            )
+            value = (passed / attempted) * 100.0 if attempted > 0 else 0.0
         else:
-            value = metrics.avg_score if metric_kind == GateMetric.AVG_SCORE else metrics.accuracy
+            value = 0.0
         return self.suite.gate._compare(value, self.suite.gate.op, self.suite.gate.value)
 
     def _gate_metric_key(self) -> str:
