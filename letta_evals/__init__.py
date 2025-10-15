@@ -12,7 +12,7 @@ from letta_evals.targets.agent import AgentTarget
 try:
     __version__: str = _pkg_version("letta-evals")
 except PackageNotFoundError:
-    __version__ = "0.0.0"
+    __version__ = "0.2.0"
 
 __all__ = [
     "Sample",
