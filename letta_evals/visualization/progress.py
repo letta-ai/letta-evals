@@ -47,6 +47,7 @@ class SampleProgress:
     model_name: Optional[str] = None
     passed: Optional[bool] = None
     score: Optional[float] = None
+    rationale: Optional[str] = None
     error: Optional[str] = None
     messages_sent: int = 0
     total_messages: int = 0
@@ -54,6 +55,9 @@ class SampleProgress:
     end_time: Optional[float] = None
     last_update_ts: Optional[float] = None
     from_cache: bool = False
+    # Per-metric live data (for multi-grader runs)
+    metric_scores: Optional[Dict[str, float]] = None
+    metric_rationales: Optional[Dict[str, str]] = None
 
 
 class DisplayMode(Enum):
@@ -402,7 +406,16 @@ class EvalProgress:
         if self.grader_kind == GraderKind.RUBRIC.value and self.rubric_model:
             table.add_column("Rubric Model", style="magenta", width=15)
         table.add_column("Status", width=20)
-        table.add_column("Score", width=6, justify="right")
+        # Add per-metric columns (score + rationale) or single score/rationale
+        metric_keys = list(self.metric_labels.keys())
+        if metric_keys:
+            for mk in metric_keys:
+                lbl = self.metric_labels.get(mk, mk)
+                table.add_column(f"{lbl} score", width=8, justify="right")
+                table.add_column(f"{lbl} rationale", width=40, justify="left")
+        else:
+            table.add_column("score", width=8, justify="right")
+            table.add_column("rationale", width=40, justify="left")
         table.add_column("Time", width=6, justify="right")
         table.add_column("Details", justify="left")
 
@@ -416,7 +429,26 @@ class EvalProgress:
             else:
                 time_text = "-"
 
-            score_text = f"{s.score:.2f}" if s.score is not None else "-"
+            # Build score/rationale cells
+            cells: List[str] = []
+            if self.metric_labels:
+                for mk in metric_keys:
+                    val = None
+                    rat = ""
+                    if s.metric_scores and mk in s.metric_scores:
+                        val = s.metric_scores.get(mk)
+                    if s.metric_rationales and mk in s.metric_rationales:
+                        rat = s.metric_rationales.get(mk) or ""
+                    score_cell = f"{val:.2f}" if isinstance(val, (int, float)) and val is not None else "-"
+                    if rat and len(rat) > 50:
+                        rat = rat[:47] + "..."
+                    cells.extend([score_cell, rat])
+            else:
+                score_cell = f"{s.score:.2f}" if s.score is not None else "-"
+                rat = s.rationale or ""
+                if rat and len(rat) > 50:
+                    rat = rat[:47] + "..."
+                cells.extend([score_cell, rat])
 
             if s.state == SampleState.SENDING_MESSAGES and s.total_messages > 0:
                 p = s.messages_sent / s.total_messages
@@ -447,14 +479,7 @@ class EvalProgress:
             ]
             if self.grader_kind == GraderKind.RUBRIC.value and self.rubric_model:
                 row_data.append(self.rubric_model)
-            row_data.extend(
-                [
-                    self._get_state_text(s),
-                    score_text,
-                    time_text,
-                    details,
-                ]
-            )
+            row_data.extend([self._get_state_text(s), *cells, time_text, details])
             table.add_row(*row_data)
 
         return table
@@ -583,6 +608,8 @@ class EvalProgress:
         model_name: Optional[str] = None,
         metric_scores: Optional[Dict[str, float]] = None,
         metric_pass: Optional[Dict[str, bool]] = None,
+        rationale: Optional[str] = None,
+        metric_rationales: Optional[Dict[str, str]] = None,
     ):
         """Mark sample as completed"""
         # preserve from_cache flag if it was set
@@ -594,7 +621,10 @@ class EvalProgress:
             model_name=model_name,
             passed=passed,
             score=score,
+            rationale=rationale,
             from_cache=existing_from_cache,
+            metric_scores=metric_scores,
+            metric_rationales=metric_rationales,
         )
         # update per-metric aggregates
         if metric_scores:

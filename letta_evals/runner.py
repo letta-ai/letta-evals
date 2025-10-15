@@ -251,9 +251,11 @@ class Runner:
                     passed = self._check_sample_pass(grade_result.score)
                     metric_scores = None
                     metric_pass = None
+                    metric_rationales = None
                     if self.graders is not None and grades_dict is not None:
                         metric_scores = {k: v.score for k, v in grades_dict.items()}
                         metric_pass = {k: self._check_sample_pass(v) for k, v in metric_scores.items()}
+                        metric_rationales = {k: (v.rationale or "") for k, v in grades_dict.items()}
                     await self.progress_callback.sample_completed(
                         sample_id,
                         passed=passed,
@@ -261,6 +263,8 @@ class Runner:
                         model_name=model_name,
                         metric_scores=metric_scores,
                         metric_pass=metric_pass,
+                        rationale=grade_result.rationale,
+                        metric_rationales=metric_rationales,
                     )
 
                 return SampleResult(

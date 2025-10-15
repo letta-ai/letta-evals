@@ -263,8 +263,6 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
         table = Table()
         table.add_column("Metric", style="cyan")
         table.add_column("Avg Score", style="white")
-        table.add_column("Passed", style="green")
-        table.add_column("Failed", style="red")
         # Build key->label mapping from config
         label_map = {}
         if "graders" in result.config and isinstance(result.config["graders"], dict):
@@ -273,7 +271,7 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
 
         for key, agg in metrics.by_metric.items():
             label = label_map.get(key, key)
-            table.add_row(label, f"{agg.avg_score:.2f}", str(agg.passed_attempts), str(agg.failed_attempts))
+            table.add_row(label, f"{agg.avg_score:.2f}")
         console.print(table)
 
     # show per-model metrics if available
@@ -328,23 +326,64 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
         table.add_column("Sample", style="cyan")
         table.add_column("Model", style="yellow")
         table.add_column("Passed", style="white")
-        table.add_column("Score", style="white")
-        table.add_column("Rationale", style="dim")
+
+        # Determine available metrics and display labels
+        metric_keys = []
+        metric_labels = {}
+        if "graders" in result.config and isinstance(result.config["graders"], dict):
+            for k, gspec in result.config["graders"].items():
+                metric_keys.append(k)
+                metric_labels[k] = gspec.get("display_name") or k
+        else:
+            # single grader case
+            label = "score"
+            if "grader" in result.config and isinstance(result.config["grader"], dict):
+                label = result.config["grader"].get("display_name") or label
+            metric_keys.append("__single__")
+            metric_labels["__single__"] = label
+
+        # Add two sub-columns per metric: score + rationale
+        for mk in metric_keys:
+            lbl = metric_labels.get(mk, mk)
+            table.add_column(f"{lbl} score", style="white")
+            table.add_column(f"{lbl} rationale", style="dim")
 
         from letta_evals.models import GateSpec
 
         gate_spec = GateSpec(**result.config["gate"])
 
-        for i, sample_result in enumerate(result.results):
+        for sample_result in result.results:
             score_val = sample_result.grade.score
             passed = "✓" if gate_spec.check_sample(score_val) else "✗"
-            score = f"{score_val:.2f}"
-            rationale = sample_result.grade.rationale or ""
-            if len(rationale) > 50:
-                rationale = rationale[:47] + "..."
+
+            # Build per-metric cells in config order
+            cells = []
+            for mk in metric_keys:
+                if mk == "__single__":
+                    g = sample_result.grade
+                else:
+                    g = sample_result.grades.get(mk) if sample_result.grades else None
+                if g is None:
+                    cells.extend(["-", ""])
+                else:
+                    try:
+                        s_val = float(getattr(g, "score", None))
+                        r_text = getattr(g, "rationale", None) or ""
+                    except Exception:
+                        # dict fallback
+                        try:
+                            s_val = float(g.get("score"))  # type: ignore[attr-defined]
+                            r_text = g.get("rationale", "")  # type: ignore[attr-defined]
+                        except Exception:
+                            s_val = None
+                            r_text = ""
+                    score_cell = f"{s_val:.2f}" if s_val is not None else "-"
+                    if r_text and len(r_text) > 50:
+                        r_text = r_text[:47] + "..."
+                    cells.extend([score_cell, r_text])
 
             table.add_row(
-                f"Sample {sample_result.sample.id + 1}", sample_result.model_name or "-", passed, score, rationale
+                f"Sample {sample_result.sample.id + 1}", sample_result.model_name or "-", passed, *cells
             )
 
         console.print(table)
