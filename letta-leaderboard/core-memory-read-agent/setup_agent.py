@@ -33,7 +33,7 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
         raise ValueError(f"No facts available for sample: {sample.input}")
 
     # Format facts as numbered list for core memory
-    facts_context = "\n".join(f"{i+1}. {fact}" for i, fact in enumerate(facts))
+    facts_context = "\n".join(f"{i + 1}. {fact}" for i, fact in enumerate(facts))
 
     try:
         # Create agent with facts pre-populated in core memory

@@ -206,7 +206,7 @@ class EvalProgress:
         samples_per_row = 15
 
         for i in range(0, self.total_samples, samples_per_row):
-            row_text = Text(f"[{i+1:3d}-{min(i+samples_per_row, self.total_samples):3d}] ", style="dim")
+            row_text = Text(f"[{i + 1:3d}-{min(i + samples_per_row, self.total_samples):3d}] ", style="dim")
 
             for j in range(i, min(i + samples_per_row, self.total_samples)):
                 sample = sample_by_id.get(j, SampleProgress(j))

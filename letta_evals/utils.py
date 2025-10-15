@@ -38,8 +38,6 @@ def load_object(spec: str, base_dir: Path = None) -> Any:
 
     if not hasattr(module, obj_name):
         available = [name for name in dir(module) if not name.startswith("_")]
-        raise AttributeError(
-            f"Module '{path}' has no attribute '{obj_name}'. " f"Available: {', '.join(available[:10])}"
-        )
+        raise AttributeError(f"Module '{path}' has no attribute '{obj_name}'. Available: {', '.join(available[:10])}")
 
     return getattr(module, obj_name)
