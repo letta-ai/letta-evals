@@ -86,7 +86,9 @@ class RubricGrader(Grader):
             ), submission
 
         except Exception as e:
-            return GradeResult(score=0.0, rationale=f"Error during grading: {str(e)}", metadata={"error": str(e)}), submission
+            return GradeResult(
+                score=0.0, rationale=f"Error during grading: {str(e)}", metadata={"error": str(e)}
+            ), submission
 
     def _get_system_prompt(self) -> str:
         """Get the system prompt for the judge."""

@@ -1,12 +1,11 @@
 """
 Setup script to create agent with core memory populated with facts for each test case.
 """
-import json
-from typing import Dict, Any
 
 from letta_client import AsyncLetta, CreateBlock
-from letta_evals.models import Sample
+
 from letta_evals.decorators import agent_factory
+from letta_evals.models import Sample
 
 
 @agent_factory
@@ -27,14 +26,14 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
 
     # Extract facts from sample agent_args
     facts = []
-    if sample.agent_args and 'extra' in sample.agent_args and sample.agent_args['extra']:
-        facts = sample.agent_args['extra'].get('facts', [])
+    if sample.agent_args and "extra" in sample.agent_args and sample.agent_args["extra"]:
+        facts = sample.agent_args["extra"].get("facts", [])
 
     if not facts:
         raise ValueError(f"No facts available for sample: {sample.input}")
 
     # Format facts as numbered list for core memory
-    facts_context = "\n".join(f"{i+1}. {fact}" for i, fact in enumerate(facts))
+    facts_context = "\n".join(f"{i + 1}. {fact}" for i, fact in enumerate(facts))
 
     try:
         # Create agent with facts pre-populated in core memory
@@ -43,15 +42,12 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
             memory_blocks=[
                 CreateBlock(
                     label="persona",
-                    value="You are an AI assistant that answers questions based on the facts stored in your core memory. Use only the information provided in your Supporting Facts memory block to answer questions accurately."
+                    value="You are an AI assistant that answers questions based on the facts stored in your core memory. Use only the information provided in your Supporting Facts memory block to answer questions accurately.",
                 ),
-                CreateBlock(
-                    label="Supporting Facts",
-                    value=facts_context
-                )
+                CreateBlock(label="Supporting Facts", value=facts_context),
             ],
             model="openai/gpt-4o-mini",
-            embedding="openai/text-embedding-3-small"
+            embedding="openai/text-embedding-3-small",
         )
 
         print(f"✓ Created agent {agent.id} with {len(facts)} supporting facts in core memory")
@@ -61,5 +57,6 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
     except Exception as e:
         print(f"✗ Error creating agent: {e}")
         import traceback
+
         traceback.print_exc()
         raise

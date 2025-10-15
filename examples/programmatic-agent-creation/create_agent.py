@@ -49,10 +49,10 @@ async def create_inventory_agent(client: AsyncLetta, sample: Sample) -> str:
 
     item = sample.agent_args["item"]
     item_context = f"""Target Item Details:
-- SKU: {item.get('sku', 'Unknown')}
-- Name: {item.get('name', 'Unknown')}
-- Price: ${item.get('price', 0.00)}
-- Category: {item.get('category', 'Unknown')}"""
+- SKU: {item.get("sku", "Unknown")}
+- Name: {item.get("name", "Unknown")}
+- Price: ${item.get("price", 0.00)}
+- Category: {item.get("category", "Unknown")}"""
 
     agent = await client.agents.create(
         memory_blocks=[

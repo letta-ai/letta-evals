@@ -96,7 +96,6 @@ def run(
                         rubric_model = gspec.model
                         break
 
-            metric_names = [gspec.display_name or key for key, gspec in suite.graders.items()] if suite.graders else None
             # Build metric labels mapping for live progress (key -> display)
             metric_labels = None
             if suite.graders:
@@ -373,9 +372,7 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
                         r_text = r_text[:47] + "..."
                     cells.extend([score_cell, r_text])
 
-            table.add_row(
-                f"Sample {sample_result.sample.id + 1}", sample_result.model_name or "-", passed, *cells
-            )
+            table.add_row(f"Sample {sample_result.sample.id + 1}", sample_result.model_name or "-", passed, *cells)
 
         console.print(table)
 

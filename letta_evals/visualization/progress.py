@@ -206,7 +206,7 @@ class EvalProgress:
         samples_per_row = 15
 
         for i in range(0, self.total_samples, samples_per_row):
-            row_text = Text(f"[{i+1:3d}-{min(i+samples_per_row, self.total_samples):3d}] ", style="dim")
+            row_text = Text(f"[{i + 1:3d}-{min(i + samples_per_row, self.total_samples):3d}] ", style="dim")
 
             for j in range(i, min(i + samples_per_row, self.total_samples)):
                 sample = sample_by_id.get(j, SampleProgress(j))
@@ -287,7 +287,8 @@ class EvalProgress:
         metrics_table.add_row("🛡️ Errored:", f"{errors_text_row} ({self.error_count}/{completed})")
 
         if self.score_count > 0:
-            metrics_table.add_row("📈 Avg Score:", avg_score_text)
+            avg_score = self.total_score / self.score_count
+            metrics_table.add_row("📈 Avg Score:", f"{avg_score:.2f}")
 
         if self.failed_count > 0:
             failed_samples = [str(key[0] + 1) for key, s in self.samples.items() if s.passed is False][:5]
@@ -303,7 +304,7 @@ class EvalProgress:
         if self.metric_totals:
             metrics_table.add_row("", "")
             metrics_table.add_row("[bold]By Metric[/bold]", "")
-            for key in (self.metric_labels.keys() or self.metric_totals.keys()):
+            for key in self.metric_labels.keys() or self.metric_totals.keys():
                 if key not in self.metric_totals:
                     continue
                 total = self.metric_totals.get(key, 0.0)

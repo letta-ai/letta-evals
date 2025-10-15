@@ -38,12 +38,12 @@ def grader(func: Callable = None, *, name: str = None):
         param_names = [p.name for p in params]
         if param_names != ["sample", "submission"]:
             raise TypeError(
-                f"Grader {f.__name__} must have parameters named 'sample' and 'submission', " f"got {param_names}"
+                f"Grader {f.__name__} must have parameters named 'sample' and 'submission', got {param_names}"
             )
 
         if sig.return_annotation != inspect.Signature.empty:
             if sig.return_annotation != GradeResult:
-                raise TypeError(f"Grader {f.__name__} must return GradeResult, " f"got {sig.return_annotation}")
+                raise TypeError(f"Grader {f.__name__} must return GradeResult, got {sig.return_annotation}")
 
         registry_name = name or f.__name__
         GRADER_REGISTRY[registry_name] = f
@@ -85,18 +85,18 @@ def extractor(func: Callable = None, *, name: str = None):
 
         if len(params) != 2:
             raise TypeError(
-                f"Extractor {f.__name__} must have exactly 2 parameters (trajectory, config), " f"got {len(params)}"
+                f"Extractor {f.__name__} must have exactly 2 parameters (trajectory, config), got {len(params)}"
             )
 
         param_names = [p.name for p in params]
         if param_names != ["trajectory", "config"]:
             raise TypeError(
-                f"Extractor {f.__name__} must have parameters named 'trajectory' and 'config', " f"got {param_names}"
+                f"Extractor {f.__name__} must have parameters named 'trajectory' and 'config', got {param_names}"
             )
 
         if sig.return_annotation != inspect.Signature.empty:
             if sig.return_annotation is not str:
-                raise TypeError(f"Extractor {f.__name__} must return str, " f"got {sig.return_annotation}")
+                raise TypeError(f"Extractor {f.__name__} must return str, got {sig.return_annotation}")
 
         registry_name = name or f.__name__
         EXTRACTOR_REGISTRY[registry_name] = f
@@ -132,13 +132,13 @@ def agent_factory(func: Callable) -> Callable:
 
     if len(params) != 2:
         raise TypeError(
-            f"Agent factory {func.__name__} must have exactly 2 parameters (client, sample), " f"got {len(params)}"
+            f"Agent factory {func.__name__} must have exactly 2 parameters (client, sample), got {len(params)}"
         )
 
     param_names = [p.name for p in params]
     if param_names != ["client", "sample"]:
         raise TypeError(
-            f"Agent factory {func.__name__} must have parameters named 'client' and 'sample', " f"got {param_names}"
+            f"Agent factory {func.__name__} must have parameters named 'client' and 'sample', got {param_names}"
         )
 
     if not inspect.iscoroutinefunction(func):
@@ -146,9 +146,7 @@ def agent_factory(func: Callable) -> Callable:
 
     if sig.return_annotation != inspect.Signature.empty:
         if sig.return_annotation is not str:
-            raise TypeError(
-                f"Agent factory {func.__name__} must return str (agent_id), " f"got {sig.return_annotation}"
-            )
+            raise TypeError(f"Agent factory {func.__name__} must return str (agent_id), got {sig.return_annotation}")
 
     # mark as validated agent factory
     func._is_agent_factory = True

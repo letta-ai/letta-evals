@@ -158,9 +158,7 @@ class SuiteSpec(BaseModel):
     description: Optional[str] = Field(default=None, description="Description of what this suite evaluates")
     dataset: Path = Field(description="Path to JSONL dataset file")
     target: TargetSpec = Field(description="Target configuration")
-    graders: Optional[Dict[str, GraderSpec]] = Field(
-        default=None, description="Multiple graders keyed by metric name"
-    )
+    graders: Optional[Dict[str, GraderSpec]] = Field(default=None, description="Multiple graders keyed by metric name")
     gate: GateSpec = Field(description="Pass/fail criteria for avg_score (required)")
 
     max_samples: Optional[int] = Field(default=None, description="Maximum number of samples to evaluate")
@@ -277,9 +275,7 @@ class Metrics(BaseModel):
     per_model: Optional[List[ModelMetrics]] = Field(
         default=None, description="Metrics broken down by model configuration"
     )
-    by_metric: Optional[Dict[str, MetricAggregate]] = Field(
-        default=None, description="Aggregates for each metric key"
-    )
+    by_metric: Optional[Dict[str, MetricAggregate]] = Field(default=None, description="Aggregates for each metric key")
 
 
 class SampleResult(BaseModel):
