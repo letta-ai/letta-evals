@@ -185,8 +185,11 @@ class Runner:
             if cached_result is not None:
                 if self.progress_callback:
                     await self.progress_callback.agent_loading(sample_id, model_name=model_name, from_cache=True)
-                return cached_result.trajectory, cached_result.agent_id, model_name, getattr(
-                    cached_result, "agent_usage", None
+                return (
+                    cached_result.trajectory,
+                    cached_result.agent_id,
+                    model_name,
+                    getattr(cached_result, "agent_usage", None),
                 )
 
         target = self._create_target(llm_config)
@@ -216,8 +219,10 @@ class Runner:
                 # Determine gating metric key
                 gate_key = self._gate_metric_key()
                 gate_grade = grades_dict.get(gate_key) if gate_key in grades_dict else next(iter(grades_dict.values()))
-                gate_submission = submissions_dict.get(gate_key) if gate_key in submissions_dict else next(
-                    iter(submissions_dict.values())
+                gate_submission = (
+                    submissions_dict.get(gate_key)
+                    if gate_key in submissions_dict
+                    else next(iter(submissions_dict.values()))
                 )
                 grade_result, submission = gate_grade, gate_submission
 
@@ -345,7 +350,9 @@ class Runner:
         """
         total = len(self.results)
         if total == 0:
-            return Metrics(total=0, total_attempted=0, avg_score=0.0, accuracy=0.0, passed_attempts=0, failed_attempts=0)
+            return Metrics(
+                total=0, total_attempted=0, avg_score=0.0, accuracy=0.0, passed_attempts=0, failed_attempts=0
+            )
 
         # success = completed without error; error results have empty trajectory or missing agent_id
         def is_success(r: SampleResult) -> bool:
@@ -369,13 +376,20 @@ class Runner:
                 )
                 m_accuracy = (m_passed / attempted) * 100.0 if attempted > 0 else 0.0
                 by_metric[metric_key] = MetricAggregate(
-                    avg_score=m_avg, accuracy=m_accuracy, passed_attempts=m_passed, failed_attempts=(attempted - m_passed)
+                    avg_score=m_avg,
+                    accuracy=m_accuracy,
+                    passed_attempts=m_passed,
+                    failed_attempts=(attempted - m_passed),
                 )
 
         # Choose base metric values for top-level fields
         if self.graders is not None:
             gate_key = self._gate_metric_key()
-            agg = by_metric.get(gate_key) if gate_key in by_metric else (next(iter(by_metric.values())) if by_metric else None)
+            agg = (
+                by_metric.get(gate_key)
+                if gate_key in by_metric
+                else (next(iter(by_metric.values())) if by_metric else None)
+            )
             avg_score = agg.avg_score if agg else 0.0
             passed_attempts = agg.passed_attempts if agg else 0
             accuracy = agg.accuracy if agg else 0.0
@@ -396,13 +410,14 @@ class Runner:
                 model_attempted = sum(1 for r in results if is_success(r))
                 if self.graders is not None:
                     gate_key = self._gate_metric_key()
-                    model_scores = [
-                        r.grades[gate_key].score for r in results if r.grades and gate_key in r.grades
-                    ]
+                    model_scores = [r.grades[gate_key].score for r in results if r.grades and gate_key in r.grades]
                     model_passed = sum(
                         1
                         for r in results
-                        if is_success(r) and r.grades and gate_key in r.grades and self._check_sample_pass(r.grades[gate_key].score)
+                        if is_success(r)
+                        and r.grades
+                        and gate_key in r.grades
+                        and self._check_sample_pass(r.grades[gate_key].score)
                     )
                 else:
                     model_scores = [r.grade.score for r in results]
@@ -443,11 +458,7 @@ class Runner:
         gate_key = self._gate_metric_key()
         # recompute a lightweight aggregate for gate metric from current results
         if metric_kind == GateMetric.AVG_SCORE:
-            scores = [
-                r.grades[gate_key].score
-                for r in self.results
-                if r.grades and gate_key in r.grades
-            ]
+            scores = [r.grades[gate_key].score for r in self.results if r.grades and gate_key in r.grades]
             value = (sum(scores) / len(scores)) if scores else 0.0
         elif metric_kind == GateMetric.ACCURACY:
             # accuracy over attempted
@@ -458,7 +469,10 @@ class Runner:
             passed = sum(
                 1
                 for r in self.results
-                if is_success(r) and r.grades and gate_key in r.grades and self._check_sample_pass(r.grades[gate_key].score)
+                if is_success(r)
+                and r.grades
+                and gate_key in r.grades
+                and self._check_sample_pass(r.grades[gate_key].score)
             )
             value = (passed / attempted) * 100.0 if attempted > 0 else 0.0
         else:
