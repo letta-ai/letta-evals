@@ -1,4 +1,4 @@
-name: Release Please
+name: Create Release PR
 
 on:
   push:
