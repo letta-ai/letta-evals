@@ -1,6 +1,0 @@
-{
-    "context_window": 32000,
-    "model": "Qwen/Qwen3-235B-A22B-fp8-tput",
-    "model_endpoint_type": "together",
-    "model_endpoint": "https://api.together.xyz/v1"
-}
