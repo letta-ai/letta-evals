@@ -71,20 +71,17 @@ class AgentTarget(Target):
 
             stream = self.client.agents.messages.create_stream(
                 agent_id=agent_id,
-                messages=[MessageCreate(role="user", content=input_msg)],
-            )
-
-            messages = []
-
-            prev_message_type = None
-            stream = self.client.agents.messages.create_stream(
-                agent_id=agent_id,
                 messages=[MessageCreate(role="user", content=str(input_msg))],
                 stream_tokens=True,
             )
 
+            run_id = None
             async for chunk in stream:
-                # handle usage statistics and skip other non-message types
+                # derive run_id from very first chunk, all should have the same
+                if not run_id:
+                    run_id = chunk.run_id
+
+                # handle usage statistics in a streaming fashion
                 if hasattr(chunk, "message_type"):
                     if chunk.message_type == "usage_statistics":
                         # best-effort convert to JSON-serializable dict
@@ -109,13 +106,12 @@ class AgentTarget(Target):
                             usage_rec = {"raw": str(chunk)}
                         usage_stats.append(usage_rec)
                         continue
-                    if chunk.message_type in ["stop_reason", "ping"]:
-                        continue
-                    current_message_type = chunk.message_type
-                    if prev_message_type != current_message_type:
-                        messages.append(chunk)
-                    prev_message_type = current_message_type
 
+            if not run_id:
+                raise RuntimeError("Unexpected error: no run ID was returned from streaming chunks.")
+
+            # TODO: Set limit here potentially, this is capped to 100
+            messages = await self.client.runs.messages.list(run_id=run_id)
             trajectory.append(messages)
 
         return TargetResult(trajectory=trajectory, agent_id=agent_id, model_name=model_name, agent_usage=usage_stats)
