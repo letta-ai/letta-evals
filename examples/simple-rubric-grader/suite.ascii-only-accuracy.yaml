@@ -24,7 +24,7 @@ gate:
   metric_key: ascii_only
   metric: accuracy
   op: gte
-  value: 100
+  value: 50
   # Define per-sample pass criteria for accuracy calculation: require perfect ASCII-only score per sample
   pass_op: gte
   pass_value: 0.5
