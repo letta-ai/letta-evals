@@ -12,7 +12,7 @@ graders:
     function: regex_match
     extractor: tool_output
     extractor_config:
-      tool_name: manage_inventory
+      tool_name: evals_ci_manage_inventory_tool
 gate:
   metric_key: inventory_check
   op: gte
