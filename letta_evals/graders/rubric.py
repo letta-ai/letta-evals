@@ -34,8 +34,6 @@ class RubricGrader(Grader):
         self.provider = provider
         self.extractor = get_extractor(extractor, extractor_config)
 
-        print(f"max_retries: {max_retries}, timeout: {timeout}")
-
         if provider == LLMProvider.OPENAI:
             api_key = os.getenv("OPENAI_API_KEY")
             if not api_key:
