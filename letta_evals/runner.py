@@ -151,6 +151,8 @@ class Runner:
                         model=gspec.model,
                         temperature=gspec.temperature,
                         provider=gspec.provider,
+                        max_retries=gspec.max_retries,
+                        timeout=gspec.timeout,
                         extractor=gspec.extractor,
                         extractor_config=gspec.extractor_config,
                     )

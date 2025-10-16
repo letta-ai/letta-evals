@@ -82,6 +82,8 @@ class GraderSpec(BaseModel):
     model: Optional[str] = Field(default="gpt-4o-mini", description="LLM model to use for rubric grading")
     temperature: Optional[float] = Field(default=0.0, description="Temperature for LLM judge")
     provider: Optional[LLMProvider] = Field(default=LLMProvider.OPENAI, description="LLM provider for rubric grading")
+    max_retries: Optional[int] = Field(default=5, description="Maximum number of retries for rubric grading")
+    timeout: Optional[float] = Field(default=120.0, description="Timeout for rubric grading in seconds")
 
     extractor: str = Field(default="last_assistant", description="Strategy for extracting submission from trajectory")
     extractor_config: Optional[Dict[str, Any]] = Field(default=None, description="Configuration for the extractor")
