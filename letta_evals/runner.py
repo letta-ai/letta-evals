@@ -81,36 +81,54 @@ class Runner:
 
         self.client = AsyncLetta(**client_kwargs)
 
-    def _load_model_configs(self) -> List[Optional[LlmConfig]]:
-        """Load model configurations if specified."""
-        if not self.suite.target.model_configs:
-            return [None]  # no model configs, use default
+    def _load_model_configs(self) -> List[Optional[LlmConfig | str]]:
+        """Load model configurations and handles if specified."""
+        has_configs = self.suite.target.model_configs is not None
+        has_handles = self.suite.target.model_handles is not None
+
+        if not has_configs and not has_handles:
+            return [None]  # no model configs or handles, use default
+
+        if has_configs and has_handles:
+            raise ValueError("Cannot specify both model_configs and model_handles in target spec")
 
         configs = []
-        model_configs_dir = Path(__file__).parent / "llm_model_configs"
 
-        for config_name in self.suite.target.model_configs:
-            config_path = model_configs_dir / f"{config_name}.json"
-            if not config_path.exists():
-                raise ValueError(f"Model config not found at path: {config_path}")
+        # load model configs from JSON files
+        if has_configs:
+            model_configs_dir = Path(__file__).parent / "llm_model_configs"
+            for config_name in self.suite.target.model_configs:
+                config_path = model_configs_dir / f"{config_name}.json"
+                if not config_path.exists():
+                    raise ValueError(f"Model config not found at path: {config_path}")
 
-            with open(config_path, "r") as f:
-                config_data = json.load(f)
-                llm_config = LlmConfig(**config_data)
-                configs.append(llm_config)
+                with open(config_path, "r") as f:
+                    config_data = json.load(f)
+                    llm_config = LlmConfig(**config_data)
+                    configs.append(llm_config)
+
+        # load model handles as strings
+        if has_handles:
+            for handle in self.suite.target.model_handles:
+                configs.append(handle)
 
         return configs
 
-    def _create_target(self, llm_config: Optional[LlmConfig] = None) -> Target:
-        """Create target from spec, optionally with model config."""
+    def _create_target(self, llm_config: Optional[LlmConfig | str] = None) -> Target:
+        """Create target from spec, optionally with model config or handle."""
         if self.suite.target.kind == TargetKind.AGENT:
+            # check both before reassigning
+            model_handle = llm_config if isinstance(llm_config, str) else None
+            actual_llm_config = llm_config if isinstance(llm_config, LlmConfig) else None
+
             return AgentTarget(
                 client=self.client,
                 agent_id=self.suite.target.agent_id,
                 agent_file=self.suite.target.agent_file,
                 agent_script=self.suite.target.agent_script,
                 base_dir=self.suite.target.base_dir,
-                llm_config=llm_config,
+                llm_config=actual_llm_config,
+                model_handle=model_handle,
             )
         else:
             raise ValueError(f"Unknown target kind: {self.suite.target.kind}")
@@ -180,14 +198,20 @@ class Runner:
         return cache
 
     async def _get_or_run_trajectory(
-        self, sample: Sample, llm_config: Optional[LlmConfig]
+        self, sample: Sample, llm_config: Optional[LlmConfig | str]
     ) -> tuple[List[List[LettaMessageUnion]], str, str, Optional[list[dict]]]:
         """Return (trajectory, agent_id, model_name, agent_usage) using cache or by running the target.
 
         If cache is enabled and contains an exact match, use it; otherwise run the target.
         """
         sample_id = sample.id
-        model_name = llm_config.model if llm_config else None
+        # extract model name from either LlmConfig or string handle
+        if isinstance(llm_config, LlmConfig):
+            model_name = llm_config.model
+        elif isinstance(llm_config, str):
+            model_name = llm_config
+        else:
+            model_name = None
 
         if self.cached_results:
             cached_result: Optional[SampleResult] = None
@@ -215,10 +239,16 @@ class Runner:
         target_result = await target.run(sample, progress_callback=self.progress_callback, project_id=self.project_id)
         return target_result.trajectory, target_result.agent_id, target_result.model_name, target_result.agent_usage
 
-    async def run_sample(self, sample: Sample, llm_config: Optional[LlmConfig] = None) -> SampleResult:
+    async def run_sample(self, sample: Sample, llm_config: Optional[LlmConfig | str] = None) -> SampleResult:
         """Run a single sample through target and grader."""
         sample_id = sample.id
-        model_name = llm_config.model if llm_config else None
+        # extract model name from either LlmConfig or string handle
+        if isinstance(llm_config, LlmConfig):
+            model_name = llm_config.model
+        elif isinstance(llm_config, str):
+            model_name = llm_config
+        else:
+            model_name = None
 
         async with self.semaphore:
             try:
@@ -315,7 +345,13 @@ class Runner:
                                 if self.stream_writer:
                                     await self.stream_writer.append_result(result)
                             except Exception as e:
-                                model_name = cfg.model if cfg else None
+                                # extract model name from either LlmConfig or string handle
+                                if isinstance(cfg, LlmConfig):
+                                    model_name = cfg.model
+                                elif isinstance(cfg, str):
+                                    model_name = cfg
+                                else:
+                                    model_name = None
                                 logger.error(f"Error running sample {s.id} with model {model_name}: {e}")
                                 if self.progress_callback:
                                     await self.progress_callback.sample_error(s.id, str(e), model_name=model_name)
@@ -419,7 +455,7 @@ class Runner:
             accuracy = (passed_attempts / attempted) * 100.0 if attempted > 0 else 0.0
 
         per_model = None
-        if self.suite.target.model_configs:
+        if self.suite.target.model_configs or self.suite.target.model_handles:
             model_results = defaultdict(list)
             for result in self.results:
                 model_results[result.model_name].append(result)

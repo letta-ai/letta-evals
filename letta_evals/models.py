@@ -41,6 +41,11 @@ class TargetSpec(BaseModel):
         default=None, description="List of model config names from llm_model_configs directory"
     )
 
+    # model handles to test (cloud-compatible model identifiers)
+    model_handles: Optional[List[str]] = Field(
+        default=None, description="List of model handles (e.g., 'openai/gpt-4.1') for cloud deployments"
+    )
+
     # internal field for path resolution
     base_dir: Optional[Path] = Field(default=None, exclude=True)
 

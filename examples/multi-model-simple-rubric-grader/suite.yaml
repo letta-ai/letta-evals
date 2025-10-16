@@ -5,9 +5,9 @@ target:
   kind: agent
   agent_file: ascii-art-agent.af
   base_url: http://localhost:8283
-  model_configs:
-    - openai-gpt-4.1
-    - openai-gpt-4.1-mini
+  model_handles:
+    - openai/gpt-4.1
+    - openai/gpt-4.1-mini
 graders:
   quality:
     kind: rubric
