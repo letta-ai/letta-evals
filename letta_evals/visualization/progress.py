@@ -402,22 +402,22 @@ class EvalProgress:
             expand=True,
         )
 
-        table.add_column("#", style="cyan", width=12)
-        table.add_column("Model", style="yellow", width=20)
+        table.add_column("#", style="cyan", width=5)
+        table.add_column("Model", style="yellow", width=27)
         if self.grader_kind == GraderKind.RUBRIC.value and self.rubric_model:
-            table.add_column("Rubric Model", style="magenta", width=15)
+            table.add_column("Rubric Model", style="magenta", width=27)
         table.add_column("Status", width=20)
         # Add per-metric columns (score + rationale) or single score/rationale
         metric_keys = list(self.metric_labels.keys())
         if metric_keys:
             for mk in metric_keys:
                 lbl = self.metric_labels.get(mk, mk)
-                table.add_column(f"{lbl} Score", width=8, justify="right")
-                table.add_column(f"{lbl} Rationale", width=40, justify="left")
+                table.add_column(f"{lbl} Score", width=10, justify="right")
+                table.add_column(f"{lbl} Rationale", width=45, justify="left")
         else:
-            table.add_column("Score", width=8, justify="right")
-            table.add_column("Rationale", width=40, justify="left")
-        table.add_column("Time", width=6, justify="right")
+            table.add_column("Score", width=10, justify="right")
+            table.add_column("Rationale", width=45, justify="left")
+        table.add_column("Time", width=8, justify="right")
         table.add_column("Details", justify="left")
 
         for s in rows:
