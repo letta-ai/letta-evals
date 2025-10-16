@@ -23,6 +23,8 @@ class RubricGrader(Grader):
         model: str = "gpt-4o-mini",
         temperature: float = 0.0,
         provider: LLMProvider = LLMProvider.OPENAI,
+        max_retries: int = 5,
+        timeout: float = 120.0,
         extractor: str = "last_assistant",
         extractor_config: Optional[dict] = None,
     ):
@@ -32,12 +34,18 @@ class RubricGrader(Grader):
         self.provider = provider
         self.extractor = get_extractor(extractor, extractor_config)
 
+        print(f"max_retries: {max_retries}, timeout: {timeout}")
+
         if provider == LLMProvider.OPENAI:
             api_key = os.getenv("OPENAI_API_KEY")
             if not api_key:
                 raise ValueError("OPENAI_API_KEY not found in environment variables")
 
-            client_kwargs = {"api_key": api_key}
+            client_kwargs = {
+                "api_key": api_key,
+                "max_retries": max_retries,
+                "timeout": timeout,
+            }
 
             base_url = os.getenv("OPENAI_BASE_URL")
             if base_url:
