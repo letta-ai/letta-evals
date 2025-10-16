@@ -2,7 +2,7 @@
 Setup script to create agent with core memory populated with facts and then updated with contradicting facts.
 """
 
-from letta_client import AsyncLetta, CreateBlock
+from letta_client import AsyncLetta, CreateBlock, MessageCreate
 
 from letta_evals.decorators import agent_factory
 from letta_evals.models import Sample
@@ -29,6 +29,8 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
 
     if sample.agent_args and "extra" in sample.agent_args and sample.agent_args["extra"]:
         facts = sample.agent_args["extra"].get("facts", [])
+        # Check if there's a contradicting fact to send before the questions
+        contradicting_fact = sample.agent_args["extra"].get("contradicting_fact", None)
 
     if not facts:
         raise ValueError(f"No facts available for sample: {sample.input}")
@@ -53,6 +55,28 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
         )
 
         print(f"✓ Created agent {agent.id} with {len(facts)} initial supporting facts")
+
+        # Send contradicting fact first if available
+        if contradicting_fact:
+            try:
+                stream = client.agents.messages.create_stream(
+                    agent_id=agent.id,
+                    messages=[
+                        MessageCreate(
+                            role="user",
+                            content=f"Please update your knowledge with this new information: {contradicting_fact}",
+                        )
+                    ],
+                    stream_tokens=True,
+                )
+
+                # Process the stream to ensure the message is sent
+                async for chunk in stream:
+                    # Process each chunk as needed - we just need to consume the stream
+                    pass
+            except Exception:
+                # Continue even if there's an exception
+                pass
 
         return agent.id
 
