@@ -62,34 +62,8 @@ class AgentTarget(Target):
         trajectory = []
         usage_stats: list[dict] = []
 
-        contradicting_fact = None
-        if sample.agent_args and "extra" in sample.agent_args and sample.agent_args["extra"]:
-            contradicting_fact = sample.agent_args["extra"].get("contradicting_fact", None)
-
         inputs = sample.input if isinstance(sample.input, list) else [sample.input]
         total_messages = len(inputs)
-
-        # Send contradicting fact first if available
-        if contradicting_fact:
-            try:
-                stream = self.client.agents.messages.create_stream(
-                    agent_id=agent_id,
-                    messages=[
-                        MessageCreate(
-                            role="user",
-                            content=f"Please update your knowledge with this new information: {contradicting_fact}",
-                        )
-                    ],
-                    stream_tokens=True,
-                )
-
-                # Process the stream to ensure the message is sent
-                async for chunk in stream:
-                    # Process each chunk as needed - we just need to consume the stream
-                    pass
-            except Exception:
-                # Continue even if there's an exception
-                pass
 
         for i, input_msg in enumerate(inputs):
             if progress_callback:
