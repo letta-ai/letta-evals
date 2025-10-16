@@ -1,6 +1,7 @@
 import inspect
 import json
 import logging
+import os
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -42,6 +43,9 @@ class Runner:
         progress_callback: Optional[ProgressCallback] = None,
         cached_results: Optional[RunnerResult] = None,
         output_path: Optional[Path] = None,
+        letta_api_key: Optional[str] = None,
+        letta_base_url: Optional[str] = None,
+        letta_project_id: Optional[str] = None,
     ):
         self.suite: SuiteSpec = suite
         # Use a unified multi-grader path; single-metric suites are normalized to one entry
@@ -60,9 +64,22 @@ class Runner:
         self.stream_writer: Optional[StreamingWriter] = None
         self.output_path = output_path
 
-        self.client = AsyncLetta(
-            base_url=self.suite.target.base_url, token=self.suite.target.api_key, timeout=self.suite.target.timeout
-        )
+        env_api_key = os.getenv("LETTA_API_KEY")
+        env_base_url = os.getenv("LETTA_BASE_URL")
+        env_project_id = os.getenv("LETTA_PROJECT_ID")
+
+        # priority: cli arg > yaml suite config > env var
+        token = letta_api_key or self.suite.target.api_key or env_api_key
+        base_url = letta_base_url or self.suite.target.base_url or env_base_url
+        self.project_id = letta_project_id or self.suite.target.project_id or env_project_id
+
+        client_kwargs: dict[str, object] = {"timeout": self.suite.target.timeout}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        if token:
+            client_kwargs["token"] = token
+
+        self.client = AsyncLetta(**client_kwargs)
 
     def _load_model_configs(self) -> List[Optional[LlmConfig]]:
         """Load model configurations if specified."""
@@ -193,7 +210,7 @@ class Runner:
                 )
 
         target = self._create_target(llm_config)
-        target_result = await target.run(sample, progress_callback=self.progress_callback)
+        target_result = await target.run(sample, progress_callback=self.progress_callback, project_id=self.project_id)
         return target_result.trajectory, target_result.agent_id, target_result.model_name, target_result.agent_usage
 
     async def run_sample(self, sample: Sample, llm_config: Optional[LlmConfig] = None) -> SampleResult:
@@ -498,6 +515,9 @@ async def run_suite(
     progress_callback: Optional[ProgressCallback] = None,
     cached_results_path: Optional[Path] = None,
     output_path: Optional[Path] = None,
+    letta_api_key: Optional[str] = None,
+    letta_base_url: Optional[str] = None,
+    letta_project_id: Optional[str] = None,
 ) -> RunnerResult:
     """Load and run a suite from YAML file."""
     with open(suite_path, "r") as f:
@@ -530,5 +550,8 @@ async def run_suite(
         progress_callback=progress_callback,
         cached_results=cached_results,
         output_path=output_path,
+        letta_api_key=letta_api_key,
+        letta_base_url=letta_base_url,
+        letta_project_id=letta_project_id,
     )
     return await runner.run()

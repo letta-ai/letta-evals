@@ -23,7 +23,6 @@ def get_assistant_messages(trajectory: List[List[LettaMessageUnion]]) -> List[As
     """Extract all assistant messages from trajectory."""
     messages = []
     for turn in trajectory:
-        print(f"DEBUG: Turn: {turn}")
         for msg in turn:
             if isinstance(msg, AssistantMessage):
                 messages.append(msg)
