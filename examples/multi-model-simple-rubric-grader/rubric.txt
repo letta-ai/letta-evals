@@ -4,7 +4,7 @@
 
 ## Scoring dimensions (sum → 1.0)
 1. Instruction compliance (0.30)  
-   0.30: Art wrapped in backticks as requested (```art```); exactly one send_message; no extra content outside backticks
+   0.30: Art wrapped in backticks as requested (```art```); no extra content outside backticks
    0.15: Art present but formatting issues (missing/extra backticks, minor extra text)
    0.00: No backticks, extra commentary, multiple tool calls, or mixed content
 
