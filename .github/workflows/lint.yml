@@ -3,8 +3,22 @@ name: Run Lint and Packaging Checks
 on:
   pull_request:
     branches: [ main, master ]
+    paths:
+      - '**.py'
+      - 'pyproject.toml'
+      - 'setup.py'
+      - 'setup.cfg'
+      - 'requirements*.txt'
+      - '.github/workflows/lint.yml'
   push:
     branches: [ main ]
+    paths:
+      - '**.py'
+      - 'pyproject.toml'
+      - 'setup.py'
+      - 'setup.cfg'
+      - 'requirements*.txt'
+      - '.github/workflows/lint.yml'
 
 jobs:
   lint:

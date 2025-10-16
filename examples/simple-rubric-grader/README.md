@@ -1,0 +1,145 @@
+# Simple Rubric Grader Example
+
+This example demonstrates LLM-as-judge evaluation using detailed rubric criteria.
+
+## What This Example Shows
+
+- Using rubric graders for subjective quality evaluation
+- Multi-dimensional scoring criteria (instruction compliance, accuracy, craftsmanship, effort)
+- Running multiple graders in a single suite (`suite.two-metrics.yaml`)
+- Combining rubric grading with tool grading for comprehensive evaluation
+
+## Key Takeaway
+
+Rubric graders use an LLM to evaluate agent responses against detailed criteria, making them ideal for subjective qualities like creativity, quality, or compliance. The rubric in `rubric.txt` defines clear scoring dimensions that sum to 1.0.
+
+## Running This Example
+
+### Local Setup (Default)
+
+Start your local Letta server:
+```bash
+letta server
+```
+
+Set your OpenAI API key (required for rubric grader):
+```bash
+export OPENAI_API_KEY=your-key
+```
+
+Then run the evaluation:
+```bash
+cd examples/simple-rubric-grader
+letta-evals run suite.yaml
+```
+
+### Letta Cloud Setup
+
+Set these environment variables:
+```bash
+export LETTA_API_KEY=your-api-key
+export LETTA_PROJECT_ID=your-project-id
+export OPENAI_API_KEY=your-openai-key
+```
+
+Update `base_url` in `suite.yaml`:
+```yaml
+target:
+  base_url: https://api.letta.com/
+```
+
+Then run the evaluation as above.
+
+## Rubric Structure
+
+The rubric in `rubric.txt` defines multi-dimensional scoring criteria:
+
+```
+# Rubric: ASCII-Art Response Quality & Compliance
+
+## The user asked for: {input}
+
+## Scoring dimensions (sum → 1.0)
+1. Instruction compliance (0.30)
+   0.30: Art wrapped in backticks as requested; exactly one send_message; no extra content
+   0.15: Art present but formatting issues
+   0.00: No backticks, extra commentary, or mixed content
+
+2. Requested item match (0.30)
+   0.30: Depicts the requested animal with unmistakable features
+   0.15: Vaguely animal-like or generic creature
+   0.00: Wrong subject or unrelated shapes
+
+3. Recognizability and silhouette (0.20)
+   0.20: Clear silhouette; core anatomy reads at a glance
+   0.10: Recognizable with effort
+   0.00: Unrecognizable
+
+4. Craftsmanship and layout (0.10)
+   0.10: Good alignment and spacing; holds shape in monospaced render
+   0.05: Minor alignment issues
+   0.00: Misaligned or broken
+
+5. Effort / "best version" signal (0.10)
+   0.10: Shows detail and clear attempt at quality
+   0.05: Minimal but functional
+   0.00: Trivial or careless
+
+IMPORTANT: Make sure to clearly express your rationale and scoring.
+```
+
+**Key points:**
+- Each dimension has multiple scoring tiers with specific criteria
+- Dimensions should sum to 1.0 for normalized scoring
+- Use `{input}` placeholder to inject the sample input into the rubric
+- Clear rationale expectations help produce consistent LLM judgments
+
+## Suite Configuration
+
+### Single Rubric Grader (`suite.yaml`)
+
+```yaml
+graders:
+  quality:
+    kind: rubric
+    prompt_path: rubric.txt
+    model: gpt-4.1
+    temperature: 0.0
+    provider: openai
+    max_retries: 3
+    timeout: 120.0
+    extractor: last_assistant
+```
+
+### Multiple Graders (`suite.two-metrics.yaml`)
+
+Combine rubric and tool graders for comprehensive evaluation:
+
+```yaml
+graders:
+  quality:
+    kind: rubric
+    display_name: "rubric score"
+    prompt_path: rubric.txt
+    model: gpt-4.1
+    temperature: 0.0
+    provider: openai
+    extractor: last_assistant
+  ascii_only:
+    kind: tool
+    display_name: "ascii character check"
+    function: ascii_printable_only
+    extractor: last_assistant
+```
+
+**Key points:**
+- Use `display_name` for prettier output in results
+- `temperature: 0.0` for more consistent grading
+- `max_retries` and `timeout` handle LLM API issues
+- Gate can reference any grader by its `metric_key`
+
+## Variants
+
+- `suite.yaml`: Single rubric grader for quality assessment
+- `suite.two-metrics.yaml`: Combines rubric grader (quality) + tool grader (ASCII character validation)
+- `suite.ascii-only-accuracy.yaml`: Example showing different gate configurations
