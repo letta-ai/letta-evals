@@ -1,5 +1,5 @@
 {
-    "context_window": 8192,
+    "context_window": 32768,
     "model": "Qwen/Qwen2.5-7B-Instruct-Turbo",
     "model_endpoint_type": "together",
     "model_endpoint": "https://api.together.ai/v1"
