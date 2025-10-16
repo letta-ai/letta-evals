@@ -1,0 +1,6 @@
+{
+    "context_window": 131072,
+    "model": "zai-org/GLM-4.5-Air-FP8",
+    "model_endpoint_type": "together",
+    "model_endpoint": "https://api.together.ai/v1"
+}
