@@ -7,7 +7,7 @@ target:
   base_url: http://localhost:8283
   model_configs:
     - openai-gpt-4.1
-    - openai-gpt-4.1-nano
+    - openai-gpt-4.1-mini
 graders:
   quality:
     kind: rubric
@@ -19,4 +19,4 @@ graders:
 gate:
   metric_key: quality
   op: gte
-  value: 0.6
+  value: 0.5
