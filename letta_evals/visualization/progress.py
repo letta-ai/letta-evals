@@ -528,7 +528,7 @@ class EvalProgress:
     async def update_sample_state(self, sample_id: int, state: SampleState, model_name: Optional[str] = None, **kwargs):
         """Update state of a sample"""
         key = (sample_id, model_name)
-        
+
         # If we have a model_name and there's an existing entry with None, migrate it
         if model_name is not None:
             old_key = (sample_id, None)
@@ -537,13 +537,13 @@ class EvalProgress:
                 self.samples[key] = self.samples[old_key]
                 self.samples[key].model_name = model_name
                 del self.samples[old_key]
-        
+
         if key not in self.samples:
             self.samples[key] = SampleProgress(sample_id, model_name=model_name)
 
         sample = self.samples[key]
         sample.state = state
-        
+
         # Update model_name if it's provided and different
         if model_name is not None and sample.model_name != model_name:
             sample.model_name = model_name
@@ -616,7 +616,7 @@ class EvalProgress:
             existing_from_cache = self.samples[key].from_cache
         elif model_name is not None and (sample_id, None) in self.samples:
             existing_from_cache = self.samples[(sample_id, None)].from_cache
-        
+
         await self.update_sample_state(
             sample_id, SampleState.GRADING, model_name=model_name, from_cache=existing_from_cache
         )
@@ -640,7 +640,7 @@ class EvalProgress:
             existing_from_cache = self.samples[key].from_cache
         elif model_name is not None and (sample_id, None) in self.samples:
             existing_from_cache = self.samples[(sample_id, None)].from_cache
-            
+
         await self.update_sample_state(
             sample_id,
             SampleState.COMPLETED,
