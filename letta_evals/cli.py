@@ -66,7 +66,12 @@ def run(
         num_samples = len(samples)
 
         # calculate total evaluations (samples × models)
-        num_models = len(suite.target.model_configs) if suite.target.model_configs else 1
+        if suite.target.model_configs:
+            num_models = len(suite.target.model_configs)
+        elif suite.target.model_handles:
+            num_models = len(suite.target.model_handles)
+        else:
+            num_models = 1
         total_evaluations = num_samples * num_models
     except Exception as e:
         console.print(f"[red]Error loading suite: {e}[/red]")

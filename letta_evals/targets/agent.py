@@ -20,6 +20,7 @@ class AgentTarget(Target):
         agent_script: str = None,
         base_dir: Path = None,
         llm_config: Optional[LlmConfig] = None,
+        model_handle: Optional[str] = None,
     ):
         self.client = client
         self.agent_id = agent_id
@@ -27,6 +28,7 @@ class AgentTarget(Target):
         self.agent_script = agent_script
         self.base_dir = base_dir or Path.cwd()
         self.llm_config = llm_config
+        self.model_handle = model_handle
 
     async def run(
         self, sample: Sample, progress_callback: Optional[ProgressCallback] = None, project_id: Optional[str] = None
@@ -52,9 +54,16 @@ class AgentTarget(Target):
 
         if self.llm_config and agent_id:
             await self.client.agents.modify(agent_id=agent_id, llm_config=self.llm_config)
+        elif self.model_handle and agent_id:
+            await self.client.agents.modify(agent_id=agent_id, model=self.model_handle)
 
         agent = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=[])
-        model_name = self.llm_config.model if self.llm_config else agent.llm_config.model
+        if self.llm_config:
+            model_name = self.llm_config.model
+        elif self.model_handle:
+            model_name = self.model_handle
+        else:
+            model_name = agent.llm_config.model
 
         if progress_callback and (self.agent_file or self.agent_script):
             await progress_callback.agent_loading(sample.id, model_name=model_name)

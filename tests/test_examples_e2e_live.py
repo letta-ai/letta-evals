@@ -158,7 +158,7 @@ async def test_single_suite(request, tmp_path: Path, caplog) -> None:
     # run suite live against letta cloud
     result = await run_suite(
         suite_path=suite_path,
-        max_concurrent=2,
+        max_concurrent=10,
         progress_callback=progress_callback,
         cached_results_path=None,
         output_path=output_path,
