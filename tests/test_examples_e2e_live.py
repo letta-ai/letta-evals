@@ -104,7 +104,7 @@ async def test_examples_run_live_and_pass_gate(suite_path: Path, tmp_path: Path,
     caplog.set_level(logging.INFO)
     progress_callback = SimpleTestProgressCallback()
 
-    logger.info(f"\n{'='*60}\nRunning suite: {suite_path.name}\n{'='*60}")
+    logger.info(f"\n{'=' * 60}\nRunning suite: {suite_path.name}\n{'=' * 60}")
 
     # run suite live against letta cloud
     result = await run_suite(
@@ -117,7 +117,7 @@ async def test_examples_run_live_and_pass_gate(suite_path: Path, tmp_path: Path,
         letta_base_url="https://api.letta.com/",
     )
 
-    logger.info(f"\n{'='*60}\nResults: {result.metrics.passed_attempts}/{result.metrics.total} passed\n{'='*60}")
+    logger.info(f"\n{'=' * 60}\nResults: {result.metrics.passed_attempts}/{result.metrics.total} passed\n{'=' * 60}")
 
     assert result.gates_passed, f"Gate failed for example suite: {suite_path}"
     assert result.metrics.total > 0
@@ -153,7 +153,7 @@ async def test_single_suite(request, tmp_path: Path, caplog) -> None:
     caplog.set_level(logging.INFO)
     progress_callback = SimpleTestProgressCallback()
 
-    logger.info(f"\n{'='*60}\nRunning suite: {suite_path.name}\n{'='*60}")
+    logger.info(f"\n{'=' * 60}\nRunning suite: {suite_path.name}\n{'=' * 60}")
 
     # run suite live against letta cloud
     result = await run_suite(
@@ -166,7 +166,7 @@ async def test_single_suite(request, tmp_path: Path, caplog) -> None:
         letta_base_url="https://api.letta.com/",
     )
 
-    logger.info(f"\n{'='*60}\nResults: {result.metrics.passed_attempts}/{result.metrics.total} passed\n{'='*60}")
+    logger.info(f"\n{'=' * 60}\nResults: {result.metrics.passed_attempts}/{result.metrics.total} passed\n{'=' * 60}")
 
     assert result.gates_passed, f"Gate failed for suite: {suite_path}"
     assert result.metrics.total > 0
