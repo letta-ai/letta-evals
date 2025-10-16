@@ -1,0 +1,69 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [ main, master ]
+  push:
+    branches: [ main ]
+
+jobs:
+  discover-suites:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Discover suite files
+        id: set-matrix
+        run: |
+          suites=$(find examples -name "suite*.yaml" -o -name "suite.yaml" | jq -R -s -c 'split("\n")[:-1]')
+          echo "matrix=${suites}" >> $GITHUB_OUTPUT
+
+  test-suites:
+    needs: discover-suites
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite-path: ${{ fromJson(needs.discover-suites.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          uv sync --extra dev
+
+      - name: Run e2e test for ${{ matrix.suite-path }}
+        env:
+          LETTA_API_KEY: ${{ secrets.LETTA_API_KEY }}
+          LETTA_PROJECT_ID: ${{ secrets.LETTA_PROJECT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          .venv/bin/pytest tests/test_examples_e2e_live.py::test_single_suite \
+            --suite-path=${{ github.workspace }}/${{ matrix.suite-path }} \
+            -vv -rs --log-cli-level=INFO
+
+  all-tests-passed:
+    needs: test-suites
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check if all tests passed
+        run: |
+          if [ "${{ needs.test-suites.result }}" != "success" ]; then
+            echo "Some e2e tests failed"
+            exit 1
+          fi
+          echo "All e2e tests passed!"

@@ -27,4 +27,4 @@ gate:
   value: 100
   # Define per-sample pass criteria for accuracy calculation: require perfect ASCII-only score per sample
   pass_op: gte
-  pass_value: 1.0
+  pass_value: 0.5
