@@ -402,22 +402,22 @@ class EvalProgress:
             expand=True,
         )
 
-        table.add_column("#", style="cyan", width=12)
-        table.add_column("Model", style="yellow", width=20)
+        table.add_column("#", style="cyan", width=5)
+        table.add_column("Model", style="yellow", width=27)
         if self.grader_kind == GraderKind.RUBRIC.value and self.rubric_model:
-            table.add_column("Rubric Model", style="magenta", width=15)
+            table.add_column("Rubric Model", style="magenta", width=27)
         table.add_column("Status", width=20)
         # Add per-metric columns (score + rationale) or single score/rationale
         metric_keys = list(self.metric_labels.keys())
         if metric_keys:
             for mk in metric_keys:
                 lbl = self.metric_labels.get(mk, mk)
-                table.add_column(f"{lbl} score", width=8, justify="right")
-                table.add_column(f"{lbl} rationale", width=40, justify="left")
+                table.add_column(f"{lbl} Score", width=10, justify="right")
+                table.add_column(f"{lbl} Rationale", width=45, justify="left")
         else:
-            table.add_column("score", width=8, justify="right")
-            table.add_column("rationale", width=40, justify="left")
-        table.add_column("Time", width=6, justify="right")
+            table.add_column("Score", width=10, justify="right")
+            table.add_column("Rationale", width=45, justify="left")
+        table.add_column("Time", width=8, justify="right")
         table.add_column("Details", justify="left")
 
         for s in rows:
@@ -528,11 +528,25 @@ class EvalProgress:
     async def update_sample_state(self, sample_id: int, state: SampleState, model_name: Optional[str] = None, **kwargs):
         """Update state of a sample"""
         key = (sample_id, model_name)
+
+        # If we have a model_name and there's an existing entry with None, migrate it
+        if model_name is not None:
+            old_key = (sample_id, None)
+            if old_key in self.samples and key not in self.samples:
+                # Migrate the old entry to the new key
+                self.samples[key] = self.samples[old_key]
+                self.samples[key].model_name = model_name
+                del self.samples[old_key]
+
         if key not in self.samples:
             self.samples[key] = SampleProgress(sample_id, model_name=model_name)
 
         sample = self.samples[key]
         sample.state = state
+
+        # Update model_name if it's provided and different
+        if model_name is not None and sample.model_name != model_name:
+            sample.model_name = model_name
 
         if state == SampleState.LOADING_AGENT and sample.start_time is None:
             sample.start_time = time.time()
@@ -596,7 +610,13 @@ class EvalProgress:
     async def grading_started(self, sample_id: int, model_name: Optional[str] = None):
         """Mark sample as being graded"""
         key = (sample_id, model_name)
-        existing_from_cache = self.samples[key].from_cache if key in self.samples else False
+        # Check both the current key and the None key for from_cache flag
+        existing_from_cache = False
+        if key in self.samples:
+            existing_from_cache = self.samples[key].from_cache
+        elif model_name is not None and (sample_id, None) in self.samples:
+            existing_from_cache = self.samples[(sample_id, None)].from_cache
+
         await self.update_sample_state(
             sample_id, SampleState.GRADING, model_name=model_name, from_cache=existing_from_cache
         )
@@ -615,7 +635,12 @@ class EvalProgress:
         """Mark sample as completed"""
         # preserve from_cache flag if it was set
         key = (sample_id, model_name)
-        existing_from_cache = self.samples[key].from_cache if key in self.samples else False
+        existing_from_cache = False
+        if key in self.samples:
+            existing_from_cache = self.samples[key].from_cache
+        elif model_name is not None and (sample_id, None) in self.samples:
+            existing_from_cache = self.samples[(sample_id, None)].from_cache
+
         await self.update_sample_state(
             sample_id,
             SampleState.COMPLETED,
