@@ -27,6 +27,16 @@ def run(
     cached: Optional[Path] = typer.Option(
         None, "--cached", "-c", help="Path to cached results (JSONL) for re-grading trajectories"
     ),
+    api_key: Optional[str] = typer.Option(
+        None,
+        "--api-key",
+        help="Letta API key override. If not provided, uses LETTA_API_KEY from environment",
+    ),
+    base_url: Optional[str] = typer.Option(
+        None,
+        "--base-url",
+        help="Letta base URL override. If omitted and an API key is set, defaults to Letta Cloud",
+    ),
 ):
     """Run an evaluation suite."""
 
@@ -86,6 +96,8 @@ def run(
                 max_concurrent=max_concurrent,
                 cached_results_path=cached,
                 output_path=output,
+                letta_api_key=api_key,
+                letta_base_url=base_url,
             )
         else:
             rubric_model = None
@@ -129,6 +141,8 @@ def run(
                     progress_callback=progress,
                     cached_results_path=cached,
                     output_path=output,
+                    letta_api_key=api_key,
+                    letta_base_url=base_url,
                 )
                 return result
             finally:
