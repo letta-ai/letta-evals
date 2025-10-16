@@ -67,14 +67,8 @@ class Runner:
         env_base_url = os.getenv("LETTA_BASE_URL")
         env_project_id = os.getenv("LETTA_PROJECT_ID")
 
-        token = letta_api_key or env_api_key or self.suite.target.api_key
-        base_url = None
-        if letta_base_url is not None:
-            base_url = letta_base_url
-        elif env_base_url:
-            base_url = env_base_url
-
-        # resolve project_id: spec takes precedence over env var
+        token = self.suite.target.api_key or letta_api_key or env_api_key
+        base_url = self.suite.target.base_url or letta_base_url or env_base_url
         self.project_id = self.suite.target.project_id or env_project_id
 
         client_kwargs: dict[str, object] = {"timeout": self.suite.target.timeout}
