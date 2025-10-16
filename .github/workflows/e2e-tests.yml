@@ -48,6 +48,7 @@ jobs:
       - name: Run e2e test for ${{ matrix.suite-path }}
         env:
           LETTA_API_KEY: ${{ secrets.LETTA_API_KEY }}
+          LETTA_PROJECT_ID: ${{ secrets.LETTA_PROJECT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           .venv/bin/pytest tests/test_examples_e2e_live.py::test_single_suite \
