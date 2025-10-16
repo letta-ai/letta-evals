@@ -412,11 +412,11 @@ class EvalProgress:
         if metric_keys:
             for mk in metric_keys:
                 lbl = self.metric_labels.get(mk, mk)
-                table.add_column(f"{lbl} score", width=8, justify="right")
-                table.add_column(f"{lbl} rationale", width=40, justify="left")
+                table.add_column(f"{lbl} Score", width=8, justify="right")
+                table.add_column(f"{lbl} Rationale", width=40, justify="left")
         else:
-            table.add_column("score", width=8, justify="right")
-            table.add_column("rationale", width=40, justify="left")
+            table.add_column("Score", width=8, justify="right")
+            table.add_column("Rationale", width=40, justify="left")
         table.add_column("Time", width=6, justify="right")
         table.add_column("Details", justify="left")
 
