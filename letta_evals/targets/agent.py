@@ -28,14 +28,16 @@ class AgentTarget(Target):
         self.base_dir = base_dir or Path.cwd()
         self.llm_config = llm_config
 
-    async def run(self, sample: Sample, progress_callback: Optional[ProgressCallback] = None) -> TargetResult:
+    async def run(
+        self, sample: Sample, progress_callback: Optional[ProgressCallback] = None, project_id: Optional[str] = None
+    ) -> TargetResult:
         """Run the agent on a sample."""
         agent_id = self.agent_id
 
         if self.agent_file:
             with open(self.agent_file, "rb") as f:
                 resp = await self.client.agents.import_file(
-                    file=f, append_copy_suffix=False, override_existing_tools=False
+                    file=f, append_copy_suffix=False, override_existing_tools=False, project_id=project_id
                 )
                 if len(resp.agent_ids) > 1:
                     raise RuntimeError(
@@ -54,7 +56,6 @@ class AgentTarget(Target):
         agent = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=[])
         model_name = self.llm_config.model if self.llm_config else agent.llm_config.model
 
-        # notify progress callback with model name
         if progress_callback and (self.agent_file or self.agent_script):
             await progress_callback.agent_loading(sample.id, model_name=model_name)
 
@@ -76,6 +77,12 @@ class AgentTarget(Target):
             messages = []
 
             prev_message_type = None
+            stream = self.client.agents.messages.create_stream(
+                agent_id=agent_id,
+                messages=[MessageCreate(role="user", content=str(input_msg))],
+                stream_tokens=True,
+            )
+
             async for chunk in stream:
                 # handle usage statistics and skip other non-message types
                 if hasattr(chunk, "message_type"):
