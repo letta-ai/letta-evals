@@ -37,6 +37,11 @@ def run(
         "--base-url",
         help="Letta base URL override. If omitted and an API key is set, defaults to Letta Cloud",
     ),
+    project_id: Optional[str] = typer.Option(
+        None,
+        "--project-id",
+        help="Letta project ID override. If not provided, uses LETTA_PROJECT_ID from environment or suite config",
+    ),
 ):
     """Run an evaluation suite."""
 
@@ -98,6 +103,7 @@ def run(
                 output_path=output,
                 letta_api_key=api_key,
                 letta_base_url=base_url,
+                letta_project_id=project_id,
             )
         else:
             rubric_model = None
@@ -143,6 +149,7 @@ def run(
                     output_path=output,
                     letta_api_key=api_key,
                     letta_base_url=base_url,
+                    letta_project_id=project_id,
                 )
                 return result
             finally:

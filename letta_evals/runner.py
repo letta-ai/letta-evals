@@ -45,6 +45,7 @@ class Runner:
         output_path: Optional[Path] = None,
         letta_api_key: Optional[str] = None,
         letta_base_url: Optional[str] = None,
+        letta_project_id: Optional[str] = None,
     ):
         self.suite: SuiteSpec = suite
         # Use a unified multi-grader path; single-metric suites are normalized to one entry
@@ -67,9 +68,10 @@ class Runner:
         env_base_url = os.getenv("LETTA_BASE_URL")
         env_project_id = os.getenv("LETTA_PROJECT_ID")
 
-        token = self.suite.target.api_key or letta_api_key or env_api_key
-        base_url = self.suite.target.base_url or letta_base_url or env_base_url
-        self.project_id = self.suite.target.project_id or env_project_id
+        # priority: cli arg > yaml suite config > env var
+        token = letta_api_key or self.suite.target.api_key or env_api_key
+        base_url = letta_base_url or self.suite.target.base_url or env_base_url
+        self.project_id = letta_project_id or self.suite.target.project_id or env_project_id
 
         client_kwargs: dict[str, object] = {"timeout": self.suite.target.timeout}
         if base_url:
@@ -515,6 +517,7 @@ async def run_suite(
     output_path: Optional[Path] = None,
     letta_api_key: Optional[str] = None,
     letta_base_url: Optional[str] = None,
+    letta_project_id: Optional[str] = None,
 ) -> RunnerResult:
     """Load and run a suite from YAML file."""
     with open(suite_path, "r") as f:
@@ -549,5 +552,6 @@ async def run_suite(
         output_path=output_path,
         letta_api_key=letta_api_key,
         letta_base_url=letta_base_url,
+        letta_project_id=letta_project_id,
     )
     return await runner.run()
