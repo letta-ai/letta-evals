@@ -21,7 +21,9 @@ console = Console()
 @app.command()
 def run(
     suite_path: Path = typer.Argument(..., help="Path to suite YAML file"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Stream header, summary, and per-instance results to directory"),
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o", help="Stream header, summary, and per-instance results to directory"
+    ),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
     max_concurrent: int = typer.Option(15, "--max-concurrent", help="Maximum concurrent evaluations"),
     cached: Optional[Path] = typer.Option(
