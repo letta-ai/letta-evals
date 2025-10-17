@@ -350,11 +350,11 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
         MAX_SAMPLES_DISPLAY = 50
         total_samples = len(result.results)
         samples_to_display = result.results[:MAX_SAMPLES_DISPLAY]
-        
+
         console.print("\n[bold]Sample Results:[/bold]")
         if total_samples > MAX_SAMPLES_DISPLAY:
             console.print(f"[dim]Showing first {MAX_SAMPLES_DISPLAY} of {total_samples} samples[/dim]")
-        
+
         table = Table()
         table.add_column("Sample", style="cyan")
         table.add_column("Model", style="yellow")
@@ -408,9 +408,11 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
             table.add_row(f"Sample {sample_result.sample.id + 1}", sample_result.model_name or "-", passed, *cells)
 
         console.print(table)
-        
+
         if total_samples > MAX_SAMPLES_DISPLAY:
-            console.print(f"[dim]... and {total_samples - MAX_SAMPLES_DISPLAY} more samples (see output file for complete results)[/dim]")
+            console.print(
+                f"[dim]... and {total_samples - MAX_SAMPLES_DISPLAY} more samples (see output file for complete results)[/dim]"
+            )
 
 
 def save_results(result: RunnerResult, output_path: Path):
