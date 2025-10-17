@@ -98,8 +98,9 @@ Pass/fail thresholds for your evaluation:
 # run an evaluation suite (shows progress by default)
 letta-evals run suite.yaml
 
-# save results to file
-letta-evals run suite.yaml --output results.json
+# save outputs to directory
+# header.json for headers, summary.json for results summary, results.jsonl for per-instance results
+letta-evals run suite.yaml --output results
 
 # quiet mode (only show pass/fail)
 letta-evals run suite.yaml --quiet
