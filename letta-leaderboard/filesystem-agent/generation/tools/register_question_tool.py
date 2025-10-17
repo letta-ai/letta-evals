@@ -10,6 +10,65 @@ from typing import Dict, Any, List
 from datetime import datetime
 
 
+REGISTER_QUESTION_TOOL_DICT = {
+    "name": "register_question",
+    "description": "Register a natural, investigative question that someone might genuinely ask about this population. Use multiple SQL queries to gather evidence and synthesize a comprehensive answer.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "question": {
+                "type": "string",
+                "description": "A natural, conversational question someone might ask. Should feel investigative and genuine, not like a database query. Good questions often: compare groups, find outliers, investigate patterns, or express curiosity about relationships."
+            },
+            "sql_queries": {
+                "type": "array",
+                "description": "Array of SQL queries that together help answer the question. Each query should explore a different aspect.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "description": {
+                            "type": "string",
+                            "description": "What this query investigates (e.g., 'Find all people with 5+ credit cards', 'Check their insurance coverage')"
+                        },
+                        "query": {
+                            "type": "string",
+                            "description": "The SQL query"
+                        }
+                    },
+                    "required": ["description", "query"]
+                }
+            },
+            "answer": {
+                "type": "string",
+                "description": "Natural language answer synthesized from all query results. The answer MUST be a simple value: a number, a name, a date, etc. (e.g., 'John Smith', '5 pets', 'The rabbit is named Charlie')."
+            },
+            "answer_reasoning": {
+                "type": "string",
+                "description": "The reasoning process that led to the answer. This should be a thorough justification/explanation of the steps taken to arrive at the answer."
+            },
+            "difficulty": {
+                "type": "string",
+                "description": "The difficulty of the question from the following options: easy, medium, hard"
+            },
+            # question types generated using GPT-5
+            "question_type": {
+                "type": "string",
+                "description": "The type of question from the following options: factual (direct retrieval), compositional (multi-hop), comparision (relative evaluation), logical (counting, math, filtering), explanatory (why/how)"
+            },
+            "required_files": {
+                "type": "array",
+                "description": "The files that are required to answer the question from the list of available files.",
+                "items": {
+                    "type": "string",
+                    "description": "The name of the file"
+                }
+            }
+        },
+        "required": ["question", "sql_queries", "answer", "answer_reasoning", "difficulty", "question_type", "required_files"]
+    }
+}
+
+
 class RegisterQuestionTool:
     """Tool for registering validated questions."""
     

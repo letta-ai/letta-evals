@@ -7,6 +7,10 @@ This script runs an AI agent that generates difficult questions by:
 3. Creating questions that require multiple file lookups
 4. Verifying answers through SQL execution
 """
+
+from dotenv import load_dotenv
+load_dotenv()
+
 import argparse
 import json
 import os
@@ -18,8 +22,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 from anthropic import Anthropic
 from jinja2 import Template
-from leaderboard.letta_file_bench.tools.sql_execute_tool import SQLExecuteTool
-from leaderboard.letta_file_bench.tools.register_question_tool import RegisterQuestionTool
+from leaderboard.letta_file_bench.tools.sql_execute_tool import SQLExecuteTool, EXECUTE_SQL_TOOL_DICT
+from leaderboard.letta_file_bench.tools.register_question_tool import RegisterQuestionTool, REGISTER_QUESTION_TOOL_DICT
 
 
 # ANSI color codes
@@ -384,56 +388,8 @@ Keep it brief but informative. This summary will help continue the conversation.
                 max_tokens=self.config.get('max_tokens_per_response', 4096),
                 tool_choice={"type": "any"},
                 tools=[
-                    {
-                        "name": "execute_sql",
-                        "description": "Execute a SQL query against the database",
-                        "input_schema": {
-                            "type": "object",
-                            "properties": {
-                                "query": {
-                                    "type": "string",
-                                    "description": "The SQL query to execute"
-                                }
-                            },
-                            "required": ["query"]
-                        }
-                    },
-                    {
-                        "name": "register_question",
-                        "description": "Register a natural, investigative question that someone might genuinely ask about this population. Use multiple SQL queries to gather evidence and synthesize a comprehensive answer.",
-                        "input_schema": {
-                            "type": "object",
-                            "properties": {
-                                "question": {
-                                    "type": "string",
-                                    "description": "A natural, conversational question someone might ask. Should feel investigative and genuine, not like a database query. Good questions often: compare groups, find outliers, investigate patterns, or express curiosity about relationships."
-                                },
-                                "sql_queries": {
-                                    "type": "array",
-                                    "description": "Array of SQL queries that together help answer the question. Each query should explore a different aspect.",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "description": {
-                                                "type": "string",
-                                                "description": "What this query investigates (e.g., 'Find all people with 5+ credit cards', 'Check their insurance coverage')"
-                                            },
-                                            "query": {
-                                                "type": "string",
-                                                "description": "The SQL query"
-                                            }
-                                        },
-                                        "required": ["description", "query"]
-                                    }
-                                },
-                                "answer": {
-                                    "type": "string",
-                                    "description": "Natural language answer synthesized from all query results. MUST start with the direct answer in the first sentence (e.g., 'John Smith', '5 pets', 'The rabbit is named Charlie'), then provide thorough justification/explanation in subsequent sentences."
-                                }
-                            },
-                            "required": ["question", "sql_queries", "answer"]
-                        }
-                    }
+                    EXECUTE_SQL_TOOL_DICT,
+                    REGISTER_QUESTION_TOOL_DICT
                 ]
             )
             
@@ -566,7 +522,11 @@ Keep it brief but informative. This summary will help continue the conversation.
                         result = self.register_tool.register(
                             tool_input["question"],
                             tool_input["sql_queries"],
-                            tool_input["answer"]
+                            tool_input["answer"],
+                            tool_input["answer_reasoning"],
+                            tool_input["difficulty"],
+                            tool_input["question_type"],
+                            tool_input["required_files"]
                         )
                         if result["success"]:
                             question_registered = True
@@ -634,44 +594,7 @@ Keep it brief but informative. This summary will help continue the conversation.
                     system=self.system_prompt,
                     max_tokens=self.config.get('max_tokens_per_response', 4096),
                     tool_choice={"type": "tool", "name": "register_question"},
-                    tools=[
-                        {
-                            "name": "register_question",
-                            "description": "Register a natural, investigative question that someone might genuinely ask about this population. Use multiple SQL queries to gather evidence and synthesize a comprehensive answer.",
-                            "input_schema": {
-                                "type": "object",
-                                "properties": {
-                                    "question": {
-                                        "type": "string",
-                                        "description": "A natural, conversational question someone might ask. Should feel investigative and genuine, not like a database query."
-                                    },
-                                    "sql_queries": {
-                                        "type": "array",
-                                        "description": "Array of SQL queries that together help answer the question.",
-                                        "items": {
-                                            "type": "object",
-                                            "properties": {
-                                                "description": {
-                                                    "type": "string",
-                                                    "description": "What this query investigates"
-                                                },
-                                                "query": {
-                                                    "type": "string",
-                                                    "description": "The SQL query"
-                                                }
-                                            },
-                                            "required": ["description", "query"]
-                                        }
-                                    },
-                                    "answer": {
-                                        "type": "string",
-                                        "description": "Natural language answer synthesized from all query results. MUST start with the direct answer in the first sentence, then provide thorough justification/explanation."
-                                    }
-                                },
-                                "required": ["question", "sql_queries", "answer"]
-                            }
-                        }
-                    ]
+                    tools=[REGISTER_QUESTION_TOOL_DICT]
                 )
                 
                 # Print token usage
@@ -701,7 +624,11 @@ Keep it brief but informative. This summary will help continue the conversation.
                         result = self.register_tool.register(
                             tool_input["question"],
                             tool_input["sql_queries"],
-                            tool_input["answer"]
+                            tool_input["answer"],
+                            tool_input["answer_reasoning"],
+                            tool_input["difficulty"],
+                            tool_input["question_type"],
+                            tool_input["required_files"]
                         )
                         
                         if result["success"]:

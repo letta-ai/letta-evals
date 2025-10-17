@@ -7,7 +7,23 @@ to explore data, verify uniqueness, and get answers.
 import sqlite3
 import time
 from pathlib import Path
-from typing import Dict, Any, List, Union
+from typing import Dict, Any
+
+
+EXECUTE_SQL_TOOL_DICT = {
+    "name": "execute_sql",
+    "description": "Execute a SQL query against the database",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "The SQL query to execute"
+            }
+        },
+        "required": ["query"]
+    }
+}
 
 
 class SQLExecuteTool:
