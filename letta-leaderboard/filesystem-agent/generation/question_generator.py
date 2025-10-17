@@ -19,8 +19,8 @@ from typing import Any, Dict, List, Tuple
 import yaml
 from anthropic import Anthropic
 from jinja2 import Template
-from leaderboard.letta_file_bench.tools.register_question_tool import REGISTER_QUESTION_TOOL_DICT, RegisterQuestionTool
-from leaderboard.letta_file_bench.tools.sql_execute_tool import EXECUTE_SQL_TOOL_DICT, SQLExecuteTool
+from generation.tools.register_question_tool import REGISTER_QUESTION_TOOL_DICT, RegisterQuestionTool
+from generation.tools.sql_execute_tool import EXECUTE_SQL_TOOL_DICT, SQLExecuteTool
 
 
 # ANSI color codes
