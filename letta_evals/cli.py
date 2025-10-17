@@ -21,7 +21,9 @@ console = Console()
 @app.command()
 def run(
     suite_path: Path = typer.Argument(..., help="Path to suite YAML file"),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Stream results to JSONL file"),
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o", help="Stream header, summary, and per-instance results to directory"
+    ),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
     max_concurrent: int = typer.Option(15, "--max-concurrent", help="Maximum concurrent evaluations"),
     cached: Optional[Path] = typer.Option(
@@ -167,7 +169,9 @@ def run(
             display_results(result, verbose, cached_mode=(cached is not None))
 
         if output and not quiet:
-            console.print(f"[green]Results streamed to {output} (JSONL)[/green]")
+            console.print(f"[green]Results streamed to {output}/results.jsonl (JSONL)[/green]")
+            console.print(f"[green]Summary saved to {output}/summary.json[/green]")
+            console.print(f"[green]Header saved to {output}/header.json[/green]")
 
         if result.gates_passed:
             if not quiet:
@@ -416,13 +420,6 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
             table.add_row(f"Sample {sample_result.sample.id + 1}", sample_result.model_name or "-", passed, *cells)
 
         console.print(table)
-
-
-def save_results(result: RunnerResult, output_path: Path):
-    result_json = result.model_dump_json(indent=2)
-
-    with open(output_path, "w") as f:
-        f.write(result_json)
 
 
 if __name__ == "__main__":
