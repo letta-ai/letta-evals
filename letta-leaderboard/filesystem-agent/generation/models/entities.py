@@ -1,6 +1,7 @@
 """
 Data models for synthetic person entities and related records.
 """
+
 import random
 from dataclasses import asdict, dataclass, field
 from typing import List
@@ -19,18 +20,13 @@ class Address:
     state: str
     postal_code: str
     country: str
-    
+
     @staticmethod
     def fake(fk: Faker):
         return Address(
-            generate_unique_id("addr"), 
-            fk.street_address(), 
-            fk.city(), 
-            fk.state(), 
-            fk.postcode(), 
-            fk.current_country()
+            generate_unique_id("addr"), fk.street_address(), fk.city(), fk.state(), fk.postcode(), fk.current_country()
         )
-    
+
     def flatten(self):
         return asdict(self)
 
@@ -43,20 +39,15 @@ class BankAccount:
     account_no: str
     balance: float
     currency: str
-    
+
     @staticmethod
     def fake(fk: Faker):
         bank_name = ensure_unique_value(lambda: fk.company() + " Bank", "company_names")
         account_no = ensure_unique_value(lambda: fk.bban(), "account_numbers")
         return BankAccount(
-            generate_unique_id("acct"), 
-            bank_name, 
-            fk.aba(), 
-            account_no, 
-            round(random.uniform(100, 50_000), 2), 
-            "USD"
+            generate_unique_id("acct"), bank_name, fk.aba(), account_no, round(random.uniform(100, 50_000), 2), "USD"
         )
-    
+
     def flatten(self):
         d = asdict(self)
         d["balance"] = f"{self.balance:.2f}"
@@ -71,19 +62,19 @@ class Employment:
     start_date: str
     salary: float
     currency: str
-    
+
     @staticmethod
     def fake(fk: Faker):
         employer = ensure_unique_value(lambda: fk.company(), "company_names")
         return Employment(
-            generate_unique_id("emp"), 
-            employer, 
-            fk.job(), 
-            str(fk.date_between(start_date="-10y", end_date="today")), 
-            round(random.uniform(40_000, 250_000), 2), 
-            "USD"
+            generate_unique_id("emp"),
+            employer,
+            fk.job(),
+            str(fk.date_between(start_date="-10y", end_date="today")),
+            round(random.uniform(40_000, 250_000), 2),
+            "USD",
         )
-    
+
     def flatten(self):
         d = asdict(self)
         d["salary"] = f"{self.salary:.2f}"
@@ -97,18 +88,18 @@ class CreditCard:
     number: str
     expire: str
     cvc: str
-    
+
     @staticmethod
     def fake(fk: Faker):
         card_number = ensure_unique_value(lambda: fk.credit_card_number(), "credit_card_numbers")
         return CreditCard(
-            generate_unique_id("card"), 
-            fk.credit_card_provider(), 
-            card_number, 
-            fk.credit_card_expire(), 
-            fk.credit_card_security_code()
+            generate_unique_id("card"),
+            fk.credit_card_provider(),
+            card_number,
+            fk.credit_card_expire(),
+            fk.credit_card_security_code(),
         )
-    
+
     def flatten(self):
         return asdict(self)
 
@@ -120,20 +111,14 @@ class Vehicle:
     model: str
     year: int
     license_plate: str
-    
+
     @staticmethod
     def fake(fk: Faker):
         make = fk.vehicle_make() if hasattr(fk, "vehicle_make") else fk.company()
         model = fk.vehicle_model() if hasattr(fk, "vehicle_model") else fk.color_name()
         license_plate = ensure_unique_value(lambda: fk.license_plate(), "license_plates")
-        return Vehicle(
-            generate_unique_id("veh"), 
-            make, 
-            model, 
-            random.randint(1995, 2025), 
-            license_plate
-        )
-    
+        return Vehicle(generate_unique_id("veh"), make, model, random.randint(1995, 2025), license_plate)
+
     def flatten(self):
         return asdict(self)
 
@@ -144,16 +129,16 @@ class Pet:
     name: str
     species: str
     breed: str
-    
+
     @staticmethod
     def fake(fk: Faker):
         return Pet(
-            generate_unique_id("pet"), 
-            fk.first_name(), 
-            random.choice(["Dog", "Cat", "Bird", "Fish", "Rabbit"]), 
-            random.choice(["Mixed", "Purebred", "Unknown"])
+            generate_unique_id("pet"),
+            fk.first_name(),
+            random.choice(["Dog", "Cat", "Bird", "Fish", "Rabbit"]),
+            random.choice(["Mixed", "Purebred", "Unknown"]),
         )
-    
+
     def flatten(self):
         return asdict(self)
 
@@ -165,19 +150,13 @@ class InternetAccount:
     email: str
     url: str
     password: str
-    
+
     @staticmethod
     def fake(fk: Faker):
         username = ensure_unique_value(lambda: fk.user_name(), "usernames")
         email = ensure_unique_value(lambda: fk.free_email(), "emails")
-        return InternetAccount(
-            generate_unique_id("net"), 
-            username, 
-            email, 
-            fk.url(), 
-            fk.password(length=12)
-        )
-    
+        return InternetAccount(generate_unique_id("net"), username, email, fk.url(), fk.password(length=12))
+
     def flatten(self):
         return asdict(self)
 
@@ -189,19 +168,19 @@ class InsurancePolicy:
     policy_type: str
     policy_number: str
     expires: str
-    
+
     @staticmethod
     def fake(fk: Faker):
         insurer = ensure_unique_value(lambda: fk.company(), "company_names")
         policy_number = ensure_unique_value(lambda: fk.bothify(text="???-########"), "policy_numbers")
         return InsurancePolicy(
-            generate_unique_id("ins"), 
-            insurer, 
-            random.choice(["Home", "Auto", "Health", "Life"]), 
-            policy_number, 
-            str(fk.future_date(end_date="+5y"))
+            generate_unique_id("ins"),
+            insurer,
+            random.choice(["Home", "Auto", "Health", "Life"]),
+            policy_number,
+            str(fk.future_date(end_date="+5y")),
         )
-    
+
     def flatten(self):
         return asdict(self)
 
@@ -212,17 +191,17 @@ class MedicalRecord:
     ssn: str
     blood_type: str
     condition: str
-    
+
     @staticmethod
     def fake(fk: Faker):
         ssn = ensure_unique_value(lambda: fk.ssn(), "ssns")
         return MedicalRecord(
-            generate_unique_id("med"), 
-            ssn, 
-            random.choice(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]), 
-            random.choice(["None", "Diabetes", "Hypertension", "Asthma", "Allergy"])
+            generate_unique_id("med"),
+            ssn,
+            random.choice(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]),
+            random.choice(["None", "Diabetes", "Hypertension", "Asthma", "Allergy"]),
         )
-    
+
     def flatten(self):
         return asdict(self)
 
@@ -264,10 +243,10 @@ class Person:
             first = active_fk.first_name()
             last = active_fk.last_name()
             return f"{first} {last}"
-        
+
         full_name = ensure_unique_value(generate_person_name, "person_names")
         first_name, last_name = full_name.split(" ", 1)
-        
+
         email = ensure_unique_value(lambda: active_fk.email(), "emails")
         phone = ensure_unique_value(lambda: active_fk.phone_number(), "phone_numbers")
 

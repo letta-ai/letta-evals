@@ -1,6 +1,7 @@
 """
 Pydantic models for LLM-generated questions and structured outputs.
 """
+
 from typing import List, Literal
 from pydantic import BaseModel
 
