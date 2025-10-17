@@ -1,6 +1,4 @@
-# Filesystem Benchmark
-
-The filesystem benchmark evaluates the ability of models to answer questions related to multiple files using filesystem tools: `grep` (search text) and `open_files` (read text files).
+# Filesystem Benchmark Generation
 
 We use an AI agent (with `anthropic/claude-sonnet-4-20250514`) to generate difficult questions for this benchmark. The agent: 
 1. Explores a [SQLite database](data/letta_file_bench.db)
@@ -11,7 +9,7 @@ We use an AI agent (with `anthropic/claude-sonnet-4-20250514`) to generate diffi
 ## Generate New Questions
 
 ```bash
-python3 -m question_generator.py \
+python3 question_generator.py \
     --num-questions 25 \
     --model claude-sonnet-4-20250514 \
     --db-path data/letta_file_bench.db \

@@ -19,8 +19,13 @@ from typing import Any, Dict, List, Tuple
 import yaml
 from anthropic import Anthropic
 from jinja2 import Template
-from generation.tools.register_question_tool import REGISTER_QUESTION_TOOL_DICT, RegisterQuestionTool
-from generation.tools.sql_execute_tool import EXECUTE_SQL_TOOL_DICT, SQLExecuteTool
+
+from tools.register_question_tool import REGISTER_QUESTION_TOOL_DICT, RegisterQuestionTool
+from tools.sql_execute_tool import EXECUTE_SQL_TOOL_DICT, SQLExecuteTool
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 # ANSI color codes
