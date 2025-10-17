@@ -2,4 +2,3 @@
 
 # Display settings
 MAX_SAMPLES_DISPLAY = 50
-
