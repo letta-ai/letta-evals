@@ -259,7 +259,9 @@ class ModelMetrics(BaseModel):
     avg_score: float = Field(description="Average score across all results (0.0 to 1.0)")
     passed_samples: int = Field(description="Number of attempted samples that passed the gate")
     failed_samples: int = Field(description="Number of attempted samples that failed the gate")
-    metrics: Dict[str, float] = Field(default_factory=dict, description="Per-metric pass rates (metric_key -> percentage)")
+    metrics: Dict[str, float] = Field(
+        default_factory=dict, description="Per-metric pass rates (metric_key -> percentage)"
+    )
 
 
 class MetricAggregate(BaseModel):
@@ -283,7 +285,9 @@ class Metrics(BaseModel):
         default=None, description="Metrics broken down by model configuration"
     )
     by_metric: Optional[Dict[str, MetricAggregate]] = Field(default=None, description="Aggregates for each metric key")
-    metrics: Dict[str, float] = Field(default_factory=dict, description="Per-metric pass rates (metric_key -> percentage)")
+    metrics: Dict[str, float] = Field(
+        default_factory=dict, description="Per-metric pass rates (metric_key -> percentage)"
+    )
 
 
 class SampleResult(BaseModel):

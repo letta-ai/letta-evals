@@ -333,7 +333,7 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
     op_symbol = op_symbols.get(gate_op, gate_op)
 
     status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
-    
+
     if gate_metric == "avg_score":
         actual = metrics.avg_score
         suffix = ""
@@ -345,7 +345,7 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
         else:
             actual = 0.0
         suffix = "%"
-    
+
     # Prefer display name for gate metric key
     display_label = None
     if gate_metric_key and "graders" in result.config and isinstance(result.config["graders"], dict):
