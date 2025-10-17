@@ -2,9 +2,10 @@
 Pydantic models for agent-generated questions with full trace support.
 """
 
-from typing import List, Literal, Dict, Any, Optional
-from pydantic import BaseModel
 from datetime import datetime
+from typing import Any, Dict, List, Literal, Optional
+
+from pydantic import BaseModel
 
 
 class QueryTrace(BaseModel):

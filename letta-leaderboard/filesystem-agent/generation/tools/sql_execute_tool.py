@@ -8,8 +8,7 @@ to explore data, verify uniqueness, and get answers.
 import sqlite3
 import time
 from pathlib import Path
-from typing import Dict, Any
-
+from typing import Any, Dict
 
 EXECUTE_SQL_TOOL_DICT = {
     "name": "execute_sql",
@@ -57,7 +56,7 @@ class SQLExecuteTool:
             write_operations = ["INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE"]
 
             if any(query_upper.startswith(op) for op in write_operations):
-                raise ValueError(f"Write operations are not allowed. Only SELECT queries are permitted.")
+                raise ValueError("Write operations are not allowed. Only SELECT queries are permitted.")
 
             # Execute query
             cursor.execute(query)

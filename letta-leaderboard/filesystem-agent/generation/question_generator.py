@@ -8,23 +8,19 @@ This script runs an AI agent that generates difficult questions by:
 4. Verifying answers through SQL execution
 """
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
 import argparse
 import json
 import os
-from pathlib import Path
-from datetime import datetime
-from typing import List, Dict, Any, Tuple
-import yaml
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
+import yaml
 from anthropic import Anthropic
 from jinja2 import Template
-from leaderboard.letta_file_bench.tools.sql_execute_tool import SQLExecuteTool, EXECUTE_SQL_TOOL_DICT
-from leaderboard.letta_file_bench.tools.register_question_tool import RegisterQuestionTool, REGISTER_QUESTION_TOOL_DICT
+from leaderboard.letta_file_bench.tools.register_question_tool import REGISTER_QUESTION_TOOL_DICT, RegisterQuestionTool
+from leaderboard.letta_file_bench.tools.sql_execute_tool import EXECUTE_SQL_TOOL_DICT, SQLExecuteTool
 
 
 # ANSI color codes

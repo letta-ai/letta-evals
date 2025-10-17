@@ -7,7 +7,6 @@ from dataclasses import asdict, dataclass, field
 from typing import List
 
 from faker import Faker
-
 from leaderboard.letta_file_bench.utils.id_generator import generate_unique_id
 from leaderboard.letta_file_bench.utils.uniqueness import ensure_unique_value
 

@@ -1,17 +1,17 @@
 """Data models for the letta_file_bench package."""
 
 from .entities import (
-    Person,
+    ENTITY_MAP,
     Address,
     BankAccount,
-    Employment,
     CreditCard,
-    Vehicle,
-    Pet,
-    InternetAccount,
+    Employment,
     InsurancePolicy,
+    InternetAccount,
     MedicalRecord,
-    ENTITY_MAP,
+    Person,
+    Pet,
+    Vehicle,
 )
 from .question_models import QuestionAnswer, QuestionSet
 
