@@ -259,14 +259,16 @@ class ModelMetrics(BaseModel):
     avg_score: float = Field(description="Average score across all results (0.0 to 1.0)")
     passed_samples: int = Field(description="Number of attempted samples that passed the gate")
     failed_samples: int = Field(description="Number of attempted samples that failed the gate")
-    accuracy: float = Field(description="Attempt accuracy percentage (passed / total_attempted)")
+    metrics: Dict[str, float] = Field(
+        default_factory=dict, description="Per-metric pass rates (metric_key -> percentage)"
+    )
 
 
 class MetricAggregate(BaseModel):
     """Aggregate metrics for a single metric key (grader)."""
 
     avg_score: float = Field(description="Average score for this metric")
-    accuracy: float = Field(description="Accuracy for this metric (percent)")
+    pass_rate: float = Field(description="Pass rate for this metric (percent)")
     passed_attempts: int = Field(description="Number of attempted samples that passed for this metric")
     failed_attempts: int = Field(description="Number of attempted samples that failed for this metric")
 
@@ -277,13 +279,15 @@ class Metrics(BaseModel):
     total: int = Field(description="Total results (success + error)")
     total_attempted: int = Field(description="Total successfully attempted (completed without error)")
     avg_score: float = Field(description="Average score across all results (0.0 to 1.0)")
-    accuracy: float = Field(description="Attempt accuracy percentage (passed / total_attempted)")
     passed_attempts: int = Field(default=0, description="Number of attempted samples that passed")
     failed_attempts: int = Field(default=0, description="Number of attempted samples that failed")
     per_model: Optional[List[ModelMetrics]] = Field(
         default=None, description="Metrics broken down by model configuration"
     )
     by_metric: Optional[Dict[str, MetricAggregate]] = Field(default=None, description="Aggregates for each metric key")
+    metrics: Dict[str, float] = Field(
+        default_factory=dict, description="Per-metric pass rates (metric_key -> percentage)"
+    )
 
 
 class SampleResult(BaseModel):
