@@ -8,6 +8,7 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
+from letta_evals.constants import MAX_SAMPLES_DISPLAY
 from letta_evals.datasets.loader import load_jsonl
 from letta_evals.models import RunnerResult, SuiteSpec
 from letta_evals.runner import run_suite
@@ -347,7 +348,6 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
     )
 
     if verbose:
-        MAX_SAMPLES_DISPLAY = 50
         total_samples = len(result.results)
         samples_to_display = result.results[:MAX_SAMPLES_DISPLAY]
 
