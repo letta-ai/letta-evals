@@ -1,4 +1,4 @@
-"""Constants used across the letta_evals CLI."""
+"""Constants used across the letta_evals."""
 
-# Display settings
+# CLI constants
 MAX_SAMPLES_DISPLAY = 50
