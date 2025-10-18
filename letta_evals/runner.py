@@ -405,7 +405,15 @@ class Runner:
         """
         total = len(self.results)
         if total == 0:
-            return Metrics(total=0, total_attempted=0, avg_score_attempted=0.0, avg_score_total=0.0, passed_attempts=0, failed_attempts=0, metrics={})
+            return Metrics(
+                total=0,
+                total_attempted=0,
+                avg_score_attempted=0.0,
+                avg_score_total=0.0,
+                passed_attempts=0,
+                failed_attempts=0,
+                metrics={},
+            )
 
         # success = completed without error; error results have empty trajectory or missing agent_id
         def is_success(r: SampleResult) -> bool:

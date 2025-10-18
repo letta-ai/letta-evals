@@ -268,7 +268,9 @@ class ModelMetrics(BaseModel):
 class MetricAggregate(BaseModel):
     """Aggregate metrics for a single metric key (grader)."""
 
-    avg_score_attempted: float = Field(description="Average score for this metric across attempted results (0.0 to 1.0)")
+    avg_score_attempted: float = Field(
+        description="Average score for this metric across attempted results (0.0 to 1.0)"
+    )
     avg_score_total: float = Field(description="Average score for this metric across all results (0.0 to 1.0)")
     pass_rate: float = Field(description="Pass rate for this metric (percent)")
     passed_attempts: int = Field(description="Number of attempted samples that passed for this metric")
