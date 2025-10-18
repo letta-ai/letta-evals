@@ -8,6 +8,7 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
+from letta_evals.constants import MAX_SAMPLES_DISPLAY
 from letta_evals.datasets.loader import load_jsonl
 from letta_evals.models import RunnerResult, SuiteSpec
 from letta_evals.runner import run_suite
@@ -366,7 +367,13 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
     )
 
     if verbose:
+        total_samples = len(result.results)
+        samples_to_display = result.results[:MAX_SAMPLES_DISPLAY]
+
         console.print("\n[bold]Sample Results:[/bold]")
+        if total_samples > MAX_SAMPLES_DISPLAY:
+            console.print(f"[dim]Showing first {MAX_SAMPLES_DISPLAY} of {total_samples} samples[/dim]")
+
         table = Table()
         table.add_column("Sample", style="cyan")
         table.add_column("Model", style="yellow")
@@ -390,7 +397,7 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
 
         gate_spec = GateSpec(**result.config["gate"])
 
-        for sample_result in result.results:
+        for sample_result in samples_to_display:
             score_val = sample_result.grade.score
             passed = "✓" if gate_spec.check_sample(score_val) else "✗"
 
@@ -420,6 +427,11 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
             table.add_row(f"Sample {sample_result.sample.id + 1}", sample_result.model_name or "-", passed, *cells)
 
         console.print(table)
+
+        if total_samples > MAX_SAMPLES_DISPLAY:
+            console.print(
+                f"[dim]... and {total_samples - MAX_SAMPLES_DISPLAY} more samples (see output file for complete results)[/dim]"
+            )
 
 
 if __name__ == "__main__":
