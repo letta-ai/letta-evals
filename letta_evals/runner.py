@@ -405,7 +405,15 @@ class Runner:
         """
         total = len(self.results)
         if total == 0:
-            return Metrics(total=0, total_attempted=0, avg_score=0.0, passed_attempts=0, failed_attempts=0, metrics={})
+            return Metrics(
+                total=0,
+                total_attempted=0,
+                avg_score_attempted=0.0,
+                avg_score_total=0.0,
+                passed_attempts=0,
+                failed_attempts=0,
+                metrics={},
+            )
 
         # success = completed without error; error results have empty trajectory or missing agent_id
         def is_success(r: SampleResult) -> bool:
@@ -418,7 +426,8 @@ class Runner:
         if self.graders is not None:
             for metric_key in self.graders.keys():
                 m_scores = [r.grades[metric_key].score for r in self.results if r.grades and metric_key in r.grades]
-                m_avg = sum(m_scores) / len(m_scores) if m_scores else 0.0
+                m_avg_attempted = sum(m_scores) / len(m_scores) if m_scores else 0.0
+                m_avg_total = sum(m_scores) / len(self.results) if m_scores else 0.0
                 m_passed = sum(
                     1
                     for r in self.results
@@ -429,7 +438,8 @@ class Runner:
                 )
                 m_pass_rate = (m_passed / attempted) * 100.0 if attempted > 0 else 0.0
                 by_metric[metric_key] = MetricAggregate(
-                    avg_score=m_avg,
+                    avg_score_attempted=m_avg_attempted,
+                    avg_score_total=m_avg_total,
                     pass_rate=m_pass_rate,
                     passed_attempts=m_passed,
                     failed_attempts=(attempted - m_passed),
@@ -446,11 +456,13 @@ class Runner:
                 if gate_key in by_metric
                 else (next(iter(by_metric.values())) if by_metric else None)
             )
-            avg_score = agg.avg_score if agg else 0.0
+            avg_score_attempted = agg.avg_score_attempted if agg else 0.0
+            avg_score_total = agg.avg_score_total if agg else 0.0
             passed_attempts = agg.passed_attempts if agg else 0
         else:
             scores = [r.grade.score for r in self.results]
-            avg_score = sum(scores) / len(scores) if scores else 0.0
+            avg_score_attempted = sum(scores) / len(scores) if scores else 0.0
+            avg_score_total = sum(scores) / len(self.results) if scores else 0.0
             passed_attempts = sum(1 for r in self.results if is_success(r) and self._check_sample_pass(r.grade.score))
             # For single grader case, use a default key
             default_key = "default"
@@ -500,14 +512,16 @@ class Runner:
                         (model_passed / model_attempted) * 100.0 if model_attempted > 0 else 0.0
                     )
 
-                model_avg = sum(model_scores) / len(model_scores) if model_scores else 0.0
+                model_avg_attempted = sum(model_scores) / len(model_scores) if model_scores else 0.0
+                model_avg_total = sum(model_scores) / len(results) if model_scores else 0.0
 
                 per_model.append(
                     ModelMetrics(
                         model_name=model_name,
                         total=len(results),
                         total_attempted=model_attempted,
-                        avg_score=model_avg,
+                        avg_score_attempted=model_avg_attempted,
+                        avg_score_total=model_avg_total,
                         passed_samples=model_passed,
                         failed_samples=(model_attempted - model_passed),
                         metrics=model_metrics_dict,
@@ -517,7 +531,8 @@ class Runner:
         return Metrics(
             total=total,
             total_attempted=attempted,
-            avg_score=avg_score,
+            avg_score_attempted=avg_score_attempted,
+            avg_score_total=avg_score_total,
             passed_attempts=passed_attempts,
             failed_attempts=(attempted - passed_attempts),
             per_model=per_model,

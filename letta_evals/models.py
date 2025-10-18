@@ -256,7 +256,8 @@ class ModelMetrics(BaseModel):
     model_name: str = Field(description="Model configuration name")
     total: int = Field(description="Total results (success + error)")
     total_attempted: int = Field(description="Total successfully attempted (completed without error)")
-    avg_score: float = Field(description="Average score across all results (0.0 to 1.0)")
+    avg_score_attempted: float = Field(description="Average score across attempted results (0.0 to 1.0)")
+    avg_score_total: float = Field(description="Average score across all results (0.0 to 1.0)")
     passed_samples: int = Field(description="Number of attempted samples that passed the gate")
     failed_samples: int = Field(description="Number of attempted samples that failed the gate")
     metrics: Dict[str, float] = Field(
@@ -267,7 +268,10 @@ class ModelMetrics(BaseModel):
 class MetricAggregate(BaseModel):
     """Aggregate metrics for a single metric key (grader)."""
 
-    avg_score: float = Field(description="Average score for this metric")
+    avg_score_attempted: float = Field(
+        description="Average score for this metric across attempted results (0.0 to 1.0)"
+    )
+    avg_score_total: float = Field(description="Average score for this metric across all results (0.0 to 1.0)")
     pass_rate: float = Field(description="Pass rate for this metric (percent)")
     passed_attempts: int = Field(description="Number of attempted samples that passed for this metric")
     failed_attempts: int = Field(description="Number of attempted samples that failed for this metric")
@@ -278,7 +282,8 @@ class Metrics(BaseModel):
 
     total: int = Field(description="Total results (success + error)")
     total_attempted: int = Field(description="Total successfully attempted (completed without error)")
-    avg_score: float = Field(description="Average score across all results (0.0 to 1.0)")
+    avg_score_attempted: float = Field(description="Average score across attempted results (0.0 to 1.0)")
+    avg_score_total: float = Field(description="Average score across all results (0.0 to 1.0)")
     passed_attempts: int = Field(default=0, description="Number of attempted samples that passed")
     failed_attempts: int = Field(default=0, description="Number of attempted samples that failed")
     per_model: Optional[List[ModelMetrics]] = Field(

@@ -283,7 +283,8 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
     errors = metrics.total - metrics.total_attempted
     errors_pct = (errors / metrics.total * 100.0) if metrics.total > 0 else 0.0
     console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{metrics.total})")
-    console.print(f"  Average score (gate metric): {metrics.avg_score:.2f}")
+    console.print(f"  Average score (attempted, gate metric): {metrics.avg_score_attempted:.2f}")
+    console.print(f"  Average score (total, gate metric): {metrics.avg_score_total:.2f}")
     console.print(f"  Passed attempts (gate metric): {metrics.passed_attempts}")
     console.print(f"  Failed attempts (gate metric): {metrics.failed_attempts}")
 
@@ -292,7 +293,8 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
         console.print("\n[bold]Metrics by Metric:[/bold]")
         table = Table()
         table.add_column("Metric", style="cyan")
-        table.add_column("Avg Score", style="white")
+        table.add_column("Avg Score (Attempted)", style="white")
+        table.add_column("Avg Score (Total)", style="white")
         # Build key->label mapping from config
         label_map = {}
         if "graders" in result.config and isinstance(result.config["graders"], dict):
@@ -301,7 +303,7 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
 
         for key, agg in metrics.by_metric.items():
             label = label_map.get(key, key)
-            table.add_row(label, f"{agg.avg_score:.2f}")
+            table.add_row(label, f"{agg.avg_score_attempted:.2f}", f"{agg.avg_score_total:.2f}")
         console.print(table)
 
     # show per-model metrics if available
@@ -311,7 +313,8 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
         model_table.add_column("Model", style="cyan")
         model_table.add_column("Samples", style="white")
         model_table.add_column("Attempted", style="white")
-        model_table.add_column("Avg Score", style="white")
+        model_table.add_column("Avg Score (Attempted)", style="white")
+        model_table.add_column("Avg Score (Total)", style="white")
         model_table.add_column("Passed", style="green")
         model_table.add_column("Failed", style="red")
 
@@ -320,7 +323,8 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
                 model_metrics.model_name,
                 str(model_metrics.total),
                 str(model_metrics.total_attempted),
-                f"{model_metrics.avg_score:.2f}",
+                f"{model_metrics.avg_score_attempted:.2f}",
+                f"{model_metrics.avg_score_total:.2f}",
                 str(model_metrics.passed_samples),
                 str(model_metrics.failed_samples),
             )
@@ -339,7 +343,7 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
     status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
 
     if gate_metric == "avg_score":
-        actual = metrics.avg_score
+        actual = metrics.avg_score_attempted
         suffix = ""
     else:
         if gate_metric_key and gate_metric_key in metrics.metrics:
@@ -358,7 +362,7 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
             display_label = gspec.get("display_name")
     metric_key_suffix = f" on '{display_label or gate_metric_key}'" if gate_metric_key else ""
     console.print(
-        f"\n[bold]Gate:{metric_key_suffix}[/bold] {gate_metric} {op_symbol} {gate_value:.2f}{suffix} → {status} (actual: {actual:.2f}{suffix})"
+        f"\n[bold]Gate:{metric_key_suffix}[/bold] {gate_metric} {op_symbol} {gate_value:.2f}{suffix} → {status} (actual: {actual:.2f}{suffix}, total: {metrics.avg_score_total:.2f})"
     )
 
     if verbose:
