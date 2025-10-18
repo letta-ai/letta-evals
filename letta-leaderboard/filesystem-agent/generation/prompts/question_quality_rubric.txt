@@ -1,0 +1,53 @@
+## QUALITY RUBRIC FOR GREP/OPEN_FILES BENCHMARK
+
+### 1. COMPLEXITY BALANCE
+- **Too Simple (REJECT)**: 
+  - Single file lookups
+  - Questions that can be answered with one grep command
+  - Example: "What is the name of person with ID pers-0001?"
+
+- **Too Complex (REJECT)**: 
+  - Requires counting/aggregating across multiple files
+  - Needs complex filtering that grep cannot handle (e.g., "exactly 4 accounts")
+  - Requires joining data from 3+ different files
+  - Example: "Among people who have both exactly 4 internet accounts and exactly 6 bank accounts..."
+
+- **Just Right (ACCEPT)**: 
+  - Requires searching 2-4 files (mostly 2-3)
+  - Starts with a very specific, unique identifier
+  - Clear path but needs careful execution
+  - Example: "What type of pet does the person with bank account ending in 1234 own?"
+
+### 2. GREP-ABILITY & COUNTING
+- **Not Feasible (REJECT)**: 
+  - Requires counting across hundreds of records
+  - Needs to check every person in the database (1000+ people)
+  - Complex aggregations across multiple large files
+  - Example: "Among all 1000 people, who has exactly 4 internet accounts?"
+
+- **Feasible (ACCEPT)**: 
+  - Counting within a small group (5-15 people) after filtering
+  - Requires 2-3 steps of narrowing down candidates
+  - Clear starting point with specific identifier
+  - Example: "Among the 5 employees at TechStartup Inc, who owns the most pets?"
+
+### 3. CHALLENGING BUT FAIR PATTERNS
+Accept questions that:
+- Require 2-4 file lookups (occasionally up to 4, but mostly 2-3)
+- Have a clear starting point with unique identifier
+- Need careful execution but not excessive complexity
+- Example: "How many credit cards does the owner of vehicle with plate 'XYZ-789' have?"
+
+Reject questions that:
+- Are trivial one-hop lookups
+- Require impossible aggregations across many files
+- Need complex mathematical operations
+- Example: "What is the name of person with ID pers-0001?" (too easy)
+- Example: "Total balance of all accounts owned by dog owners" (too hard)
+
+### 5. EVALUATION APPROACH
+For each question:
+1. Read the question, SQL queries, and answer carefully
+2. Assess against each rubric criterion
+3. Consider if this tests meaningful file-searching abilities
+4. Make a decision and provide clear reasoning

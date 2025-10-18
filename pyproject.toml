@@ -48,6 +48,10 @@ dev = [
     "ruff>=0.6.0",
     "pre-commit>=3.0.0",
 ]
+filesystem = [
+    "anthropic>=0.71.0",
+    "faker>=37.6.0",
+]
 
 [project.scripts]
 letta-evals = "letta_evals.cli:app"
