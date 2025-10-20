@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.3.0...letta-evals-v0.3.1) (2025-10-20)
+
+
+### Bug Fixes
+
+* Package python files in build ([#53](https://github.com/letta-ai/letta-evals/issues/53)) ([d5e2682](https://github.com/letta-ai/letta-evals/commit/d5e26824e49a8783f4357117a1d646244fcdd911))
+
 ## [0.3.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.2.0...letta-evals-v0.3.0) (2025-10-20)
 
 
