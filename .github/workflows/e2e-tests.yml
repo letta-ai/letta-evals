@@ -77,7 +77,7 @@ jobs:
         run: |
           .venv/bin/pytest tests/test_examples_e2e_live.py::test_single_suite \
             --suite-path=${{ github.workspace }}/${{ matrix.suite-path }} \
-            -vv -rs --log-cli-level=INFO
+            -vv -rs -s
 
   all-tests-passed:
     needs: test-suites

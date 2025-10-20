@@ -24,6 +24,7 @@ from rich.table import Table
 from rich.text import Text
 
 from letta_evals.types import GraderKind
+from letta_evals.visualization.base import ProgressCallback
 
 
 class SampleState(Enum):
@@ -68,7 +69,7 @@ class DisplayMode(Enum):
     DETAILED = "detailed"
 
 
-class EvalProgress:
+class EvalProgress(ProgressCallback):
     """Beautiful progress visualization for evaluation runs"""
 
     def __init__(

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from letta_evals.models import Sample, TargetResult
-from letta_evals.types import ProgressCallback
+from letta_evals.visualization.base import ProgressCallback
 
 
 class Target(ABC):
