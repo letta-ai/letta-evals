@@ -66,12 +66,18 @@ def extractor(func: Callable = None, *, name: str = None):
     """
     Decorator for extractor functions.
 
-    Validates that the function has signature: (trajectory: List[List[LettaMessageUnion]], config: dict) -> str
+    Validates that the function has signature:
+      - (trajectory: List[List[LettaMessageUnion]], config: dict) -> str, OR
+      - (trajectory: List[List[LettaMessageUnion]], config: dict, agent_state: Optional[AgentState]) -> str
     Auto-registers the function to the extractor registry.
 
     Usage:
         @extractor
         def my_extractor(trajectory: List[List[LettaMessageUnion]], config: dict) -> str:
+            ...
+
+        @extractor
+        def memory_extractor(trajectory: List[List[LettaMessageUnion]], config: dict, agent_state: Optional[AgentState]) -> str:
             ...
 
         @extractor(name="custom_name")
@@ -83,16 +89,22 @@ def extractor(func: Callable = None, *, name: str = None):
         sig = inspect.signature(f)
         params = list(sig.parameters.values())
 
-        if len(params) != 2:
+        if len(params) not in (2, 3):
             raise TypeError(
-                f"Extractor {f.__name__} must have exactly 2 parameters (trajectory, config), got {len(params)}"
+                f"Extractor {f.__name__} must have 2 or 3 parameters (trajectory, config) or (trajectory, config, agent_state), got {len(params)}"
             )
 
         param_names = [p.name for p in params]
-        if param_names != ["trajectory", "config"]:
-            raise TypeError(
-                f"Extractor {f.__name__} must have parameters named 'trajectory' and 'config', got {param_names}"
-            )
+        if len(params) == 2:
+            if param_names != ["trajectory", "config"]:
+                raise TypeError(
+                    f"Extractor {f.__name__} must have parameters named 'trajectory' and 'config', got {param_names}"
+                )
+        elif len(params) == 3:
+            if param_names != ["trajectory", "config", "agent_state"]:
+                raise TypeError(
+                    f"Extractor {f.__name__} must have parameters named 'trajectory', 'config', and 'agent_state', got {param_names}"
+                )
 
         if sig.return_annotation != inspect.Signature.empty:
             if sig.return_annotation is not str:
@@ -102,6 +114,7 @@ def extractor(func: Callable = None, *, name: str = None):
         EXTRACTOR_REGISTRY[registry_name] = f
 
         f._is_extractor = True
+        f._extractor_param_count = len(params)
 
         @wraps(f)
         def wrapper(*args, **kwargs):

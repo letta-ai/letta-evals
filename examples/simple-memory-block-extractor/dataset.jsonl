@@ -1,0 +1,5 @@
+{"input": "Please remember that I like bananas.", "ground_truth": "bananas"}
+{"input": "Please remember that I like apples.", "ground_truth": "apples"}
+{"input": "Please remember that I like strawberries.", "ground_truth": "strawberries"}
+{"input": "Please remember that I like mangoes.", "ground_truth": "mangoes"}
+{"input": "Please remember that I like pineapples.", "ground_truth": "pineapples"}

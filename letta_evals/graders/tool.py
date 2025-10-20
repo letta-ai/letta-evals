@@ -1,10 +1,10 @@
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from letta_client import LettaMessageUnion
+from letta_client import AgentState, LettaMessageUnion
 
 from letta_evals.decorators import GRADER_REGISTRY
-from letta_evals.extractors import get_extractor
+from letta_evals.extractors import extractor_requires_agent_state, get_extractor
 from letta_evals.graders.base import Grader
 from letta_evals.models import GradeResult, Sample
 from letta_evals.utils import load_object
@@ -21,7 +21,10 @@ class ToolGrader(Grader):
         base_dir: Optional[Path] = None,
     ):
         self.function_name = function
+        self.extractor_name = extractor
+        self.base_dir = base_dir
         self.extractor = get_extractor(extractor, extractor_config, base_dir=base_dir)
+        self._requires_agent_state = extractor_requires_agent_state(extractor, base_dir=base_dir)
 
         if function in GRADER_REGISTRY:
             self.func = GRADER_REGISTRY[function]
@@ -37,7 +40,14 @@ class ToolGrader(Grader):
         else:
             raise ValueError(f"Grader function '{function}' not found in registry")
 
-    async def grade(self, sample: Sample, trajectory: List[List[LettaMessageUnion]]) -> Tuple[GradeResult, str]:
+    @property
+    def requires_agent_state(self) -> bool:
+        """Whether this grader's extractor requires agent_state."""
+        return self._requires_agent_state
+
+    async def grade(
+        self, sample: Sample, trajectory: List[List[LettaMessageUnion]], agent_state: Optional[AgentState] = None
+    ) -> Tuple[GradeResult, str]:
         """Grade using the tool function."""
-        submission = self.extractor(trajectory)
+        submission = self.extractor(trajectory, agent_state=agent_state)
         return self.func(sample, submission), submission
