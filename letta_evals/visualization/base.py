@@ -19,6 +19,10 @@ class ProgressCallback(ABC):
         """Optional lifecycle: stop the progress UI (if any)."""
         pass
 
+    def reset(self) -> None:
+        """Optional lifecycle: reset state for a new run (for multi-run scenarios)."""
+        pass
+
     @abstractmethod
     async def sample_started(self, sample_id: int, model_name: Optional[str] = None) -> None:
         """Called when a sample evaluation starts."""

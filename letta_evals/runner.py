@@ -771,8 +771,11 @@ async def run_suite(
                 letta_project_id=letta_project_id,
             )
 
-            if progress_cb is not None and run_idx == 0:
-                await progress_cb.start()
+            if progress_cb is not None:
+                if run_idx == 0:
+                    await progress_cb.start()
+                else:
+                    progress_cb.reset()
 
             try:
                 result = await runner.run()
