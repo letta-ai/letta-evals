@@ -1,6 +1,6 @@
 [project]
 name = "letta-evals"
-version = "0.4.0"
+version = "0.3.2"
 description = "Evaluation framework for Letta AI agents"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = "<3.14,>=3.11"
