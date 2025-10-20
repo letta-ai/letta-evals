@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.3.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.2.0...letta-evals-v0.3.0) (2025-10-20)
+
+
+### Features
+
+* Add filesystem benchmark generator ([#48](https://github.com/letta-ai/letta-evals/issues/48)) ([c2be72a](https://github.com/letta-ai/letta-evals/commit/c2be72ae2704c9e42eeeeaf5e319287a79d405ce))
+* Add max samples to display ([#47](https://github.com/letta-ai/letta-evals/issues/47)) ([c821171](https://github.com/letta-ai/letta-evals/commit/c821171b539233119c28a095e951a82990442b4c))
+* Add memory block built-in extractor  ([#51](https://github.com/letta-ai/letta-evals/issues/51)) ([d171a10](https://github.com/letta-ai/letta-evals/commit/d171a10b662461ac8c07dd39f01d2ae40b7ffda4))
+* Remove hardcoding metric to accuracy ([#45](https://github.com/letta-ai/letta-evals/issues/45)) ([62f41c4](https://github.com/letta-ai/letta-evals/commit/62f41c4847fa8c3ee4a5294776e81cd13748923c))
+* Support passing in handles instead of just model configs ([#41](https://github.com/letta-ai/letta-evals/issues/41)) ([927e70a](https://github.com/letta-ai/letta-evals/commit/927e70ae3a163094cf73c2aee48ec2e691bdd3a6))
+* Use `gpt-5-mini` as rubric grader model ([#46](https://github.com/letta-ai/letta-evals/issues/46)) ([4a4a0ff](https://github.com/letta-ai/letta-evals/commit/4a4a0ff8b4cd4e689775fe8fd59f2d459d976723))
+
+
+### Bug Fixes
+
+* Cannot access local variable 'stream' error  ([#33](https://github.com/letta-ai/letta-evals/issues/33)) ([a989a16](https://github.com/letta-ai/letta-evals/commit/a989a16e09675a850474b7e9c6e3f042e5822835))
+* Expunge send_message and disable tool rules ([7775596](https://github.com/letta-ai/letta-evals/commit/77755964f3c01578bfe52dfe5600d30534ef86d8))
+* Fix streaming bug returns partial results ([8d3e3d8](https://github.com/letta-ai/letta-evals/commit/8d3e3d8abec16aebb9867605b778a4ffa9ce3145))
+* Model, status and metric columns after evaluation completes ([#34](https://github.com/letta-ai/letta-evals/issues/34)) ([b47c508](https://github.com/letta-ai/letta-evals/commit/b47c508ead27a98aceb349470e644f80387defeb))
+* Update leaderboard task suites ([#35](https://github.com/letta-ai/letta-evals/issues/35)) ([436ce6f](https://github.com/letta-ai/letta-evals/commit/436ce6fd8628de37da1815f4a63928f23d2037a2))
+
+
+### Refactors
+
+* Support passing in token, base_url, and project_id programmatically ([#36](https://github.com/letta-ai/letta-evals/issues/36)) ([1e3780a](https://github.com/letta-ai/letta-evals/commit/1e3780af91b3f02dd5b2930d1b2c7480375eccaa))
+
+
+### Documentation
+
+* Add README for memory block extraction ([#52](https://github.com/letta-ai/letta-evals/issues/52)) ([49ccf25](https://github.com/letta-ai/letta-evals/commit/49ccf25c006eace82872e1e5c0e16739bd676be2))
+
+
+### Chores
+
+* Configurable retries and timeout ([9ee97b6](https://github.com/letta-ai/letta-evals/commit/9ee97b6c5e7399b37321829685a37730670bed5f))
+* Report average metrics across attempted and total samples ([#50](https://github.com/letta-ai/letta-evals/issues/50)) ([f2b4f7a](https://github.com/letta-ai/letta-evals/commit/f2b4f7ad1f3bbe8fd266d3b08e9501783f80bb75))
+* Separate files for headers and summary ([#49](https://github.com/letta-ai/letta-evals/issues/49)) ([9f3dbcc](https://github.com/letta-ai/letta-evals/commit/9f3dbccc2516a6730ef64a511f7ac54656c46e60))
+* Update examples to use `letta_v1_agent` ([#31](https://github.com/letta-ai/letta-evals/issues/31)) ([62a6ab6](https://github.com/letta-ai/letta-evals/commit/62a6ab626816d28220c474c00c634b1cfc9e66dc))
+* Update model configs ([91afcb8](https://github.com/letta-ai/letta-evals/commit/91afcb81e48537ad07bbb4dff11af2648ccae6e2))
+
 ## [0.2.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.1.0...letta-evals-v0.2.0) (2025-10-15)
 
 
