@@ -133,7 +133,7 @@ def run(
 
         if not quiet:
             display_results(result, verbose, cached_mode=(cached is not None))
-            
+
             # Display aggregate statistics if multiple runs
             if result.run_statistics is not None:
                 display_aggregate_statistics(result.run_statistics)
@@ -142,7 +142,9 @@ def run(
             if result.run_statistics is not None:
                 # Multiple runs - output to subdirectories
                 num_runs_actual = result.run_statistics.num_runs
-                console.print(f"[green]Individual run results saved to {output}/run_1/ through {output}/run_{num_runs_actual}/[/green]")
+                console.print(
+                    f"[green]Individual run results saved to {output}/run_1/ through {output}/run_{num_runs_actual}/[/green]"
+                )
                 console.print(f"[green]Aggregate statistics saved to {output}/aggregate_stats.json[/green]")
             else:
                 # Single run - output to main directory

@@ -773,7 +773,7 @@ async def run_suite(
 
             if progress_cb is not None and run_idx == 0:
                 await progress_cb.start()
-            
+
             try:
                 result = await runner.run()
                 all_run_results.append(result)
