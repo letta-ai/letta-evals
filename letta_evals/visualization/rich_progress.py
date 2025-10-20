@@ -498,6 +498,21 @@ class EvalProgress(ProgressCallback):
 
         return layout
 
+    def reset(self):
+        """Reset counters and state for a new run"""
+        self.passed_count = 0
+        self.failed_count = 0
+        self.error_count = 0
+        self.total_score = 0.0
+        self.score_count = 0
+        self.samples.clear()
+        self.metric_totals.clear()
+        self.metric_counts.clear()
+        self.metric_passed.clear()
+        self.metric_failed.clear()
+        if self.main_task_id is not None:
+            self.main_progress.update(self.main_task_id, completed=0)
+
     async def start(self):
         """Start the progress display"""
         self.start_time = time.time()
@@ -543,9 +558,9 @@ class EvalProgress(ProgressCallback):
             self.samples[key] = SampleProgress(sample_id, model_name=model_name)
 
         sample = self.samples[key]
+        previous_state = sample.state
         sample.state = state
 
-        # Update model_name if it's provided and different
         if model_name is not None and sample.model_name != model_name:
             sample.model_name = model_name
 
@@ -557,10 +572,12 @@ class EvalProgress(ProgressCallback):
         for key, value in kwargs.items():
             if hasattr(sample, key):
                 setattr(sample, key, value)
-        # update last update timestamp for smart viewport
         sample.last_update_ts = time.time()
 
-        if state == SampleState.COMPLETED:
+        terminal_states = {SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR}
+        is_new_completion = previous_state not in terminal_states and state in terminal_states
+
+        if state == SampleState.COMPLETED and is_new_completion:
             if sample.passed is True:
                 self.passed_count += 1
             elif sample.passed is False:
@@ -573,7 +590,7 @@ class EvalProgress(ProgressCallback):
             completed = self.passed_count + self.failed_count + self.error_count
             self.main_progress.update(self.main_task_id, completed=completed)
 
-        elif state == SampleState.ERROR:
+        elif state == SampleState.ERROR and is_new_completion:
             self.error_count += 1
             completed = self.passed_count + self.failed_count + self.error_count
             self.main_progress.update(self.main_task_id, completed=completed)

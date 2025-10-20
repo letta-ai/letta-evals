@@ -21,6 +21,7 @@ from letta_evals.models import (
     Metrics,
     ModelMetrics,
     RunnerResult,
+    RunStatistics,
     Sample,
     SampleResult,
     SuiteSpec,
@@ -638,6 +639,60 @@ class Runner:
         return "default"
 
 
+def _calculate_run_statistics(all_metrics: List[Metrics], runs_passed: int, suite: SuiteSpec) -> RunStatistics:
+    """Calculate aggregate statistics across multiple runs."""
+    import statistics
+
+    num_runs = len(all_metrics)
+
+    avg_scores_attempted = [m.avg_score_attempted for m in all_metrics]
+    avg_scores_total = [m.avg_score_total for m in all_metrics]
+
+    mean_avg_score_attempted = statistics.mean(avg_scores_attempted)
+    std_avg_score_attempted = statistics.stdev(avg_scores_attempted) if num_runs > 1 else 0.0
+
+    mean_avg_score_total = statistics.mean(avg_scores_total)
+    std_avg_score_total = statistics.stdev(avg_scores_total) if num_runs > 1 else 0.0
+
+    mean_scores: Dict[str, float] = {}
+    std_scores: Dict[str, float] = {}
+
+    if suite.graders:
+        for metric_key in suite.graders.keys():
+            metric_values = []
+            for m in all_metrics:
+                if m.by_metric and metric_key in m.by_metric:
+                    metric_values.append(m.by_metric[metric_key].avg_score_attempted)
+
+            if metric_values:
+                mean_scores[metric_key] = statistics.mean(metric_values)
+                std_scores[metric_key] = statistics.stdev(metric_values) if len(metric_values) > 1 else 0.0
+
+    return RunStatistics(
+        num_runs=num_runs,
+        runs_passed=runs_passed,
+        mean_avg_score_attempted=mean_avg_score_attempted,
+        std_avg_score_attempted=std_avg_score_attempted,
+        mean_avg_score_total=mean_avg_score_total,
+        std_avg_score_total=std_avg_score_total,
+        mean_scores=mean_scores,
+        std_scores=std_scores,
+        individual_run_metrics=all_metrics,
+    )
+
+
+async def _write_aggregate_statistics(output_path: Path, run_statistics: RunStatistics) -> None:
+    """Write aggregate statistics to a JSON file."""
+    stats_file = output_path / "aggregate_stats.json"
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    def _write() -> None:
+        with open(stats_file, "w", encoding="utf-8") as f:
+            json.dump(json.loads(run_statistics.model_dump_json()), f, indent=2)
+
+    await anyio.to_thread.run_sync(_write)
+
+
 async def run_suite(
     suite_path: Path,
     max_concurrent: int,
@@ -649,6 +704,7 @@ async def run_suite(
     letta_api_key: Optional[str] = None,
     letta_base_url: Optional[str] = None,
     letta_project_id: Optional[str] = None,
+    num_runs: Optional[int] = None,
 ) -> RunnerResult:
     """Load and run a suite from YAML file."""
     if custom_progress_callback is not None:
@@ -663,6 +719,12 @@ async def run_suite(
         yaml_data = yaml.safe_load(f)
 
     suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent)
+
+    actual_num_runs = num_runs if num_runs is not None else (suite.num_runs or 1)
+
+    # Multiple runs don't make sense with cached results (trajectories would be identical)
+    if actual_num_runs > 1 and cached_results_path:
+        raise ValueError("Cannot use --num-runs > 1 with --cached (results would be identical)")
 
     cached_results = None
     if cached_results_path:
@@ -715,21 +777,68 @@ async def run_suite(
             metric_labels=metric_labels,
         )
 
-    runner = Runner(
-        suite,
-        max_concurrent=max_concurrent,
-        progress_callback=progress_cb,
-        cached_results=cached_results,
-        output_path=output_path,
-        letta_api_key=letta_api_key,
-        letta_base_url=letta_base_url,
-        letta_project_id=letta_project_id,
-    )
+    if actual_num_runs > 1:
+        all_run_results: List[RunnerResult] = []
+        all_metrics: List[Metrics] = []
+        runs_passed = 0
 
-    if progress_cb is not None:
-        await progress_cb.start()
-    try:
-        return await runner.run()
-    finally:
+        for run_idx in range(actual_num_runs):
+            run_output_path = None
+            if output_path:
+                run_output_path = output_path / f"run_{run_idx + 1}"
+
+            runner = Runner(
+                suite,
+                max_concurrent=max_concurrent,
+                progress_callback=progress_cb,
+                cached_results=cached_results,
+                output_path=run_output_path,
+                letta_api_key=letta_api_key,
+                letta_base_url=letta_base_url,
+                letta_project_id=letta_project_id,
+            )
+
+            if progress_cb is not None:
+                if run_idx == 0:
+                    await progress_cb.start()
+                else:
+                    progress_cb.reset()
+
+            try:
+                result = await runner.run()
+                all_run_results.append(result)
+                all_metrics.append(result.metrics)
+                if result.gates_passed:
+                    runs_passed += 1
+            finally:
+                if progress_cb is not None and run_idx == actual_num_runs - 1:
+                    progress_cb.stop()
+
+        run_statistics = _calculate_run_statistics(all_metrics, runs_passed, suite)
+
+        if output_path:
+            await _write_aggregate_statistics(output_path, run_statistics)
+
+        final_result = all_run_results[-1]
+        final_result.run_statistics = run_statistics
+        final_result.gates_passed = runs_passed > 0
+        return final_result
+    else:
+        runner = Runner(
+            suite,
+            max_concurrent=max_concurrent,
+            progress_callback=progress_cb,
+            cached_results=cached_results,
+            output_path=output_path,
+            letta_api_key=letta_api_key,
+            letta_base_url=letta_base_url,
+            letta_project_id=letta_project_id,
+        )
+
         if progress_cb is not None:
-            progress_cb.stop()
+            await progress_cb.start()
+        try:
+            return await runner.run()
+        finally:
+            if progress_cb is not None:
+                progress_cb.stop()

@@ -33,6 +33,10 @@ class SimpleProgress(ProgressCallback):
         self.console.print("[bold cyan]Suite completed[/]")
         self.console.print("━" * 60)
 
+    def reset(self) -> None:
+        """Reset state for a new run"""
+        self._current_sample = None
+
     async def sample_started(self, sample_id: int, model_name: Optional[str] = None) -> None:
         # track current sample to avoid printing header multiple times
         self._current_sample = (sample_id, model_name)
