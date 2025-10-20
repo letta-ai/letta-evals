@@ -421,18 +421,18 @@ def display_aggregate_statistics(run_statistics):
     console.print(f"\n[bold]Aggregate Statistics (across {stats.num_runs} runs):[/bold]")
     console.print("=" * 50)
 
-    console.print(f"\n[bold]Run Summary:[/bold]")
+    console.print("\n[bold]Run Summary:[/bold]")
     console.print(f"  Total runs: {stats.num_runs}")
     console.print(f"  Runs passed: {stats.runs_passed}")
     console.print(f"  Runs failed: {stats.num_runs - stats.runs_passed}")
     pass_rate = (stats.runs_passed / stats.num_runs * 100.0) if stats.num_runs > 0 else 0.0
     console.print(f"  Pass rate: {pass_rate:.1f}%")
 
-    console.print(f"\n[bold]Average Score (Attempted):[/bold]")
+    console.print("\n[bold]Average Score (Attempted):[/bold]")
     console.print(f"  Mean: {stats.mean_avg_score_attempted:.4f}")
     console.print(f"  Std Dev: {stats.std_avg_score_attempted:.4f}")
 
-    console.print(f"\n[bold]Average Score (Total):[/bold]")
+    console.print("\n[bold]Average Score (Total):[/bold]")
     console.print(f"  Mean: {stats.mean_avg_score_total:.4f}")
     console.print(f"  Std Dev: {stats.std_avg_score_total:.4f}")
 
