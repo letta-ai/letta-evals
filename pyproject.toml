@@ -73,6 +73,7 @@ ignore = [
 
 [tool.hatch.build]
 include = [
+    "letta_evals/**/*.py",
     "letta_evals/**/*.json",
     "letta_evals/py.typed",
 ]
