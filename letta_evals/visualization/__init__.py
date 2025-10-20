@@ -1,3 +1,3 @@
-from .progress import EvalProgress
+from .rich_progress import EvalProgress
 
 __all__ = ["EvalProgress"]

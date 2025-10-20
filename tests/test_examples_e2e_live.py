@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Iterable, Optional
+from typing import Iterable
 
 import pytest
 import yaml
@@ -11,50 +11,9 @@ import yaml
 from letta_evals.models import SuiteSpec
 from letta_evals.runner import run_suite
 from letta_evals.types import GraderKind
+from letta_evals.visualization.factory import ProgressStyle
 
 logger = logging.getLogger(__name__)
-
-
-class SimpleTestProgressCallback:
-    """simple logging-based progress callback for tests"""
-
-    def __init__(self):
-        self.current_sample = None
-
-    async def sample_started(self, sample_id: int, model_name: Optional[str] = None) -> None:
-        self.current_sample = sample_id
-        model_info = f" [{model_name}]" if model_name else ""
-        logger.info(f"▶ sample {sample_id}{model_info} started")
-
-    async def agent_loading(self, sample_id: int, model_name: Optional[str] = None, from_cache: bool = False) -> None:
-        cache_info = " (cached)" if from_cache else ""
-        logger.info(f"  ↳ loading agent{cache_info}")
-
-    async def message_sending(
-        self, sample_id: int, message_num: int, total_messages: int, model_name: Optional[str] = None
-    ) -> None:
-        logger.info(f"  ↳ sending message {message_num}/{total_messages}")
-
-    async def grading_started(self, sample_id: int, model_name: Optional[str] = None) -> None:
-        logger.info("  ↳ grading")
-
-    async def sample_completed(
-        self,
-        sample_id: int,
-        passed: bool,
-        score: Optional[float] = None,
-        model_name: Optional[str] = None,
-        metric_scores: Optional[Dict[str, float]] = None,
-        metric_pass: Optional[Dict[str, bool]] = None,
-        rationale: Optional[str] = None,
-        metric_rationales: Optional[Dict[str, str]] = None,
-    ) -> None:
-        status = "✓ passed" if passed else "✗ failed"
-        score_info = f" (score: {score:.2f})" if score is not None else ""
-        logger.info(f"  {status}{score_info}")
-
-    async def sample_error(self, sample_id: int, error: str, model_name: Optional[str] = None) -> None:
-        logger.error(f"  ✗ error: {error}")
 
 
 def _find_example_suites(base: Path) -> list[Path]:
@@ -100,17 +59,13 @@ async def test_examples_run_live_and_pass_gate(suite_path: Path, tmp_path: Path,
 
     output_path = tmp_path / "stream.jsonl"
 
-    # enable logging for progress callback
-    caplog.set_level(logging.INFO)
-    progress_callback = SimpleTestProgressCallback()
-
     logger.info(f"\n{'=' * 60}\nRunning suite: {suite_path.name}\n{'=' * 60}")
 
     # run suite live against letta cloud
     result = await run_suite(
         suite_path=suite_path,
         max_concurrent=2,
-        progress_callback=progress_callback,
+        progress_style=ProgressStyle.SIMPLE,
         cached_results_path=None,
         output_path=output_path,
         letta_api_key=os.getenv("LETTA_API_KEY"),
@@ -149,17 +104,13 @@ async def test_single_suite(request, tmp_path: Path, caplog) -> None:
 
     output_path = tmp_path / "stream.jsonl"
 
-    # enable logging for progress callback
-    caplog.set_level(logging.INFO)
-    progress_callback = SimpleTestProgressCallback()
-
     logger.info(f"\n{'=' * 60}\nRunning suite: {suite_path.name}\n{'=' * 60}")
 
     # run suite live against letta cloud
     result = await run_suite(
         suite_path=suite_path,
         max_concurrent=10,
-        progress_callback=progress_callback,
+        progress_style=ProgressStyle.SIMPLE,
         cached_results_path=None,
         output_path=output_path,
         letta_api_key=os.getenv("LETTA_API_KEY"),

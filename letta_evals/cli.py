@@ -12,8 +12,7 @@ from letta_evals.constants import MAX_SAMPLES_DISPLAY
 from letta_evals.datasets.loader import load_jsonl
 from letta_evals.models import RunnerResult, SuiteSpec
 from letta_evals.runner import run_suite
-from letta_evals.types import GraderKind
-from letta_evals.visualization.progress import DisplayMode, EvalProgress
+from letta_evals.visualization.factory import ProgressStyle
 
 app = typer.Typer(help="Letta Evals - Evaluation framework for Letta AI agents")
 console = Console()
@@ -97,71 +96,31 @@ def run(
             )
 
     async def run_with_progress():
-        if no_fancy or quiet:
-            if not quiet:
-                console.print(f"Running evaluation suite: {suite.name}")
-                if cached:
-                    console.print(f"[yellow]Re-grading {total_evaluations} cached trajectories...[/yellow]")
-                else:
-                    console.print(f"Evaluating {total_evaluations} samples...")
-            return await run_suite(
-                suite_path,
-                max_concurrent=max_concurrent,
-                cached_results_path=cached,
-                output_path=output,
-                letta_api_key=api_key,
-                letta_base_url=base_url,
-                letta_project_id=project_id,
-            )
+        # Choose built-in progress style for CLI
+        if quiet:
+            style = ProgressStyle.NONE
+        elif no_fancy:
+            style = ProgressStyle.SIMPLE
         else:
-            rubric_model = None
-            if suite.graders:
-                # choose a rubric model if any grader is rubric
-                for key, gspec in suite.graders.items():
-                    if gspec.kind == GraderKind.RUBRIC and hasattr(gspec, "model"):
-                        rubric_model = gspec.model
-                        break
+            style = ProgressStyle.RICH
 
-            # Build metric labels mapping for live progress (key -> display)
-            metric_labels = None
-            if suite.graders:
-                metric_labels = {key: (gspec.display_name or key) for key, gspec in suite.graders.items()}
-            # Determine grader kind label for progress
-            if suite.graders and len(suite.graders) == 1:
-                only_kind = next(iter(suite.graders.values())).kind.value
-                grader_kind_label = only_kind
+        if not quiet:
+            console.print(f"Running evaluation suite: {suite.name}")
+            if cached:
+                console.print(f"[yellow]Re-grading {total_evaluations} cached trajectories...[/yellow]")
             else:
-                grader_kind_label = "multi"
+                console.print(f"Evaluating {total_evaluations} samples...")
 
-            progress = EvalProgress(
-                suite_name=suite.name,
-                total_samples=total_evaluations,
-                target_kind=suite.target.kind.value,
-                grader_kind=grader_kind_label,
-                rubric_model=rubric_model,
-                max_concurrent=max_concurrent,
-                display_mode=DisplayMode.DETAILED,
-                console=console,
-                show_samples=True,
-                cached_mode=(cached is not None),
-                metric_labels=metric_labels,
-            )
-
-            await progress.start()
-            try:
-                result = await run_suite(
-                    suite_path,
-                    max_concurrent=max_concurrent,
-                    progress_callback=progress,
-                    cached_results_path=cached,
-                    output_path=output,
-                    letta_api_key=api_key,
-                    letta_base_url=base_url,
-                    letta_project_id=project_id,
-                )
-                return result
-            finally:
-                progress.stop()
+        return await run_suite(
+            suite_path,
+            max_concurrent=max_concurrent,
+            progress_style=style,
+            cached_results_path=cached,
+            output_path=output,
+            letta_api_key=api_key,
+            letta_base_url=base_url,
+            letta_project_id=project_id,
+        )
 
     try:
         result = anyio.run(run_with_progress)  # type: ignore[arg-type]

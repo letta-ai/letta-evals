@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 import anyio
 import yaml
 from letta_client import AgentState, AsyncLetta, LettaMessageUnion, LlmConfig
+from rich.console import Console
 
 from letta_evals.datasets.loader import load_jsonl
 from letta_evals.graders.base import Grader
@@ -27,8 +28,10 @@ from letta_evals.models import (
 from letta_evals.streaming import StreamingReader, StreamingWriter
 from letta_evals.targets.agent import AgentTarget
 from letta_evals.targets.base import Target
-from letta_evals.types import GateMetric, GraderKind, ProgressCallback, TargetKind
+from letta_evals.types import GateMetric, GraderKind, TargetKind
 from letta_evals.utils import load_object
+from letta_evals.visualization.base import ProgressCallback
+from letta_evals.visualization.factory import ProgressStyle, create_progress_callback
 
 logger = logging.getLogger(__name__)
 
@@ -611,7 +614,9 @@ class Runner:
 async def run_suite(
     suite_path: Path,
     max_concurrent: int,
-    progress_callback: Optional[ProgressCallback] = None,
+    *,
+    custom_progress_callback: Optional[ProgressCallback] = None,
+    progress_style: ProgressStyle | str = ProgressStyle.NONE,
     cached_results_path: Optional[Path] = None,
     output_path: Optional[Path] = None,
     letta_api_key: Optional[str] = None,
@@ -619,6 +624,14 @@ async def run_suite(
     letta_project_id: Optional[str] = None,
 ) -> RunnerResult:
     """Load and run a suite from YAML file."""
+    if custom_progress_callback is not None:
+        style_val = progress_style if isinstance(progress_style, ProgressStyle) else ProgressStyle(progress_style)
+        if style_val != ProgressStyle.NONE:
+            raise ValueError(
+                "Cannot specify both 'custom_progress_callback' and 'progress_style'. "
+                "Use custom_progress_callback for custom implementations, or progress_style for built-in styles."
+            )
+
     with open(suite_path, "r") as f:
         yaml_data = yaml.safe_load(f)
 
@@ -629,7 +642,6 @@ async def run_suite(
         if not cached_results_path.exists():
             raise ValueError(f"Cached results file not found: {cached_results_path}")
 
-        # cached files are now in JSONL streaming format
         cached_results = await StreamingReader.to_runner_result(cached_results_path)
 
         cached_sample_map = {result.sample.id: result.sample for result in cached_results.results}
@@ -643,14 +655,54 @@ async def run_suite(
                         f"Sample ID {sample.id} input mismatch: dataset has '{sample.input}' but cache has '{cached_sample.input}'"
                     )
 
+    samples = list(load_jsonl(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
+    if suite.target.model_configs:
+        num_models = len(suite.target.model_configs)
+    elif suite.target.model_handles:
+        num_models = len(suite.target.model_handles)
+    else:
+        num_models = 1
+    total_evaluations = len(samples) * num_models
+
+    metric_labels = None
+    if suite.graders:
+        metric_labels = {key: (gspec.display_name or key) for key, gspec in suite.graders.items()}
+
+    if custom_progress_callback is not None:
+        progress_cb = custom_progress_callback
+    else:
+        # Accept string value for style for external callers
+        style_val = progress_style
+        if isinstance(style_val, str):
+            try:
+                style_val = ProgressStyle(style_val)
+            except ValueError:
+                style_val = ProgressStyle.NONE
+        progress_cb = create_progress_callback(
+            style=style_val,  # type: ignore[arg-type]
+            suite=suite,
+            total_evaluations=total_evaluations,
+            console=Console() if style_val == ProgressStyle.RICH else None,
+            max_concurrent=max_concurrent,
+            cached_mode=(cached_results_path is not None),
+            metric_labels=metric_labels,
+        )
+
     runner = Runner(
         suite,
         max_concurrent=max_concurrent,
-        progress_callback=progress_callback,
+        progress_callback=progress_cb,
         cached_results=cached_results,
         output_path=output_path,
         letta_api_key=letta_api_key,
         letta_base_url=letta_base_url,
         letta_project_id=letta_project_id,
     )
-    return await runner.run()
+
+    if progress_cb is not None:
+        await progress_cb.start()
+    try:
+        return await runner.run()
+    finally:
+        if progress_cb is not None:
+            progress_cb.stop()
