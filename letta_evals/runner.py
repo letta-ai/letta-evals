@@ -159,6 +159,7 @@ class Runner:
                         extractor=gspec.extractor,
                         extractor_config=gspec.extractor_config,
                         base_dir=gspec.base_dir,
+                        rubric_vars=gspec.rubric_vars,
                     )
                 else:
                     raise ValueError(f"Unknown grader kind: {gspec.kind}")
@@ -338,6 +339,29 @@ class Runner:
                     await self.progress_callback.sample_error(sample_id, str(e), model_name=model_name)
                 raise
 
+    def _validate_rubric_vars(self, samples: List[Sample]) -> None:
+        """Validate that all samples have required rubric_vars for configured graders."""
+        if not self.suite.graders:
+            return
+
+        for grader_key, grader_spec in self.suite.graders.items():
+            if grader_spec.kind != GraderKind.RUBRIC or not grader_spec.rubric_vars:
+                continue
+
+            for sample in samples:
+                if not sample.rubric_vars:
+                    raise ValueError(
+                        f"Sample {sample.id} is missing rubric_vars field. "
+                        f"Grader '{grader_key}' requires variables: {', '.join(grader_spec.rubric_vars)}"
+                    )
+
+                missing_vars = [var for var in grader_spec.rubric_vars if var not in sample.rubric_vars]
+                if missing_vars:
+                    raise ValueError(
+                        f"Sample {sample.id} is missing required rubric variables for grader '{grader_key}': "
+                        f"{', '.join(missing_vars)}"
+                    )
+
     async def run(self) -> RunnerResult:
         """Run evaluation on all samples."""
         await self._run_setup()
@@ -345,6 +369,9 @@ class Runner:
         samples = list(
             load_jsonl(self.suite.dataset, max_samples=self.suite.max_samples, sample_tags=self.suite.sample_tags)
         )
+
+        # validate rubric variables before running any samples
+        self._validate_rubric_vars(samples)
 
         self.results = []
         # prepare config for both streaming and final result
