@@ -1,12 +1,13 @@
 import json
 import os
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 from dotenv import load_dotenv
-from letta_client import LettaMessageUnion
+from letta_client import AgentState, LettaMessageUnion
 from openai import AsyncOpenAI
 
-from letta_evals.extractors import get_extractor
+from letta_evals.extractors import extractor_requires_agent_state, get_extractor
 from letta_evals.graders.base import Grader
 from letta_evals.models import GradeResult, Sample
 from letta_evals.types import LLMProvider
@@ -27,12 +28,16 @@ class RubricGrader(Grader):
         timeout: float = 120.0,
         extractor: str = "last_assistant",
         extractor_config: Optional[dict] = None,
+        base_dir: Optional[Path] = None,
     ):
         self.prompt = prompt
         self.model = model
         self.temperature = temperature
         self.provider = provider
-        self.extractor = get_extractor(extractor, extractor_config)
+        self.extractor_name = extractor
+        self.base_dir = base_dir
+        self.extractor = get_extractor(extractor, extractor_config, base_dir=base_dir)
+        self._requires_agent_state = extractor_requires_agent_state(extractor, base_dir=base_dir)
 
         if provider == LLMProvider.OPENAI:
             api_key = os.getenv("OPENAI_API_KEY")
@@ -53,9 +58,16 @@ class RubricGrader(Grader):
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
-    async def grade(self, sample: Sample, trajectory: List[List[LettaMessageUnion]]) -> Tuple[GradeResult, str]:
+    @property
+    def requires_agent_state(self) -> bool:
+        """Whether this grader's extractor requires agent_state."""
+        return self._requires_agent_state
+
+    async def grade(
+        self, sample: Sample, trajectory: List[List[LettaMessageUnion]], agent_state: Optional[AgentState] = None
+    ) -> Tuple[GradeResult, str]:
         """Grade using LLM judge with rubric."""
-        submission = self.extractor(trajectory)
+        submission = self.extractor(trajectory, agent_state=agent_state)
 
         judge_prompt = self._build_judge_prompt(sample, submission)
 

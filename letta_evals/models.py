@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from letta_client import LettaMessageUnion
+from letta_client import AgentState, LettaMessageUnion
 from pydantic import BaseModel, Field, field_validator
 
 from letta_evals.types import GateMetric, GraderKind, LLMProvider, MetricOp, TargetKind
@@ -230,6 +230,9 @@ class TargetResult(BaseModel):
     model_name: str = Field(description="Model configuration name used for this target")
     agent_usage: Optional[List[dict]] = Field(
         default=None, description="Usage statistics emitted by the agent during the run"
+    )
+    agent_state: Optional[AgentState] = Field(
+        default=None, description="Agent state after running the target (includes memory blocks)"
     )
 
 

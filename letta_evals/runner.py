@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 import anyio
 import yaml
-from letta_client import AsyncLetta, LettaMessageUnion, LlmConfig
+from letta_client import AgentState, AsyncLetta, LettaMessageUnion, LlmConfig
 
 from letta_evals.datasets.loader import load_jsonl
 from letta_evals.graders.base import Grader
@@ -155,11 +155,18 @@ class Runner:
                         timeout=gspec.timeout,
                         extractor=gspec.extractor,
                         extractor_config=gspec.extractor_config,
+                        base_dir=gspec.base_dir,
                     )
                 else:
                     raise ValueError(f"Unknown grader kind: {gspec.kind}")
         else:
             raise ValueError("Suite must define 'graders'")
+
+    def _requires_agent_state(self) -> bool:
+        """Check if any grader requires agent_state for extraction."""
+        if self.graders:
+            return any(grader.requires_agent_state for grader in self.graders.values())
+        return False
 
     async def _run_setup(self) -> None:
         """Execute the setup function if specified."""
@@ -198,9 +205,9 @@ class Runner:
         return cache
 
     async def _get_or_run_trajectory(
-        self, sample: Sample, llm_config: Optional[LlmConfig | str]
-    ) -> tuple[List[List[LettaMessageUnion]], str, str, Optional[list[dict]]]:
-        """Return (trajectory, agent_id, model_name, agent_usage) using cache or by running the target.
+        self, sample: Sample, llm_config: Optional[LlmConfig | str], retrieve_agent_state: bool = False
+    ) -> tuple[List[List[LettaMessageUnion]], str, str, Optional[list[dict]], Optional[AgentState]]:
+        """Return (trajectory, agent_id, model_name, agent_usage, agent_state) using cache or by running the target.
 
         If cache is enabled and contains an exact match, use it; otherwise run the target.
         """
@@ -233,11 +240,23 @@ class Runner:
                     cached_result.agent_id,
                     model_name,
                     getattr(cached_result, "agent_usage", None),
+                    getattr(cached_result, "agent_state", None),
                 )
 
         target = self._create_target(llm_config)
-        target_result = await target.run(sample, progress_callback=self.progress_callback, project_id=self.project_id)
-        return target_result.trajectory, target_result.agent_id, target_result.model_name, target_result.agent_usage
+        target_result = await target.run(
+            sample,
+            progress_callback=self.progress_callback,
+            project_id=self.project_id,
+            retrieve_agent_state=retrieve_agent_state,
+        )
+        return (
+            target_result.trajectory,
+            target_result.agent_id,
+            target_result.model_name,
+            target_result.agent_usage,
+            target_result.agent_state,
+        )
 
     async def run_sample(self, sample: Sample, llm_config: Optional[LlmConfig | str] = None) -> SampleResult:
         """Run a single sample through target and grader."""
@@ -254,7 +273,12 @@ class Runner:
             try:
                 if self.progress_callback:
                     await self.progress_callback.sample_started(sample_id, model_name=model_name)
-                trajectory, agent_id, model_name, agent_usage = await self._get_or_run_trajectory(sample, llm_config)
+
+                # check if any grader needs agent_state
+                retrieve_agent_state = self._requires_agent_state()
+                trajectory, agent_id, model_name, agent_usage, agent_state = await self._get_or_run_trajectory(
+                    sample, llm_config, retrieve_agent_state=retrieve_agent_state
+                )
 
                 if self.progress_callback:
                     await self.progress_callback.grading_started(sample_id, model_name=model_name)
@@ -262,7 +286,7 @@ class Runner:
                 grades_dict: Optional[Dict[str, GradeResult]] = {}
                 submissions_dict: Optional[Dict[str, str]] = {}
                 for key, grader in self.graders.items():  # type: ignore[union-attr]
-                    gr, sub = await grader.grade(sample, trajectory)
+                    gr, sub = await grader.grade(sample, trajectory, agent_state=agent_state)
                     grades_dict[key] = gr
                     submissions_dict[key] = sub
                 # Determine gating metric key

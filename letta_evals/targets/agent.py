@@ -31,7 +31,11 @@ class AgentTarget(Target):
         self.model_handle = model_handle
 
     async def run(
-        self, sample: Sample, progress_callback: Optional[ProgressCallback] = None, project_id: Optional[str] = None
+        self,
+        sample: Sample,
+        progress_callback: Optional[ProgressCallback] = None,
+        project_id: Optional[str] = None,
+        retrieve_agent_state: bool = False,
     ) -> TargetResult:
         """Run the agent on a sample."""
         agent_id = self.agent_id
@@ -123,4 +127,15 @@ class AgentTarget(Target):
             messages = await self.client.runs.messages.list(run_id=run_id)
             trajectory.append(messages)
 
-        return TargetResult(trajectory=trajectory, agent_id=agent_id, model_name=model_name, agent_usage=usage_stats)
+        # conditionally retrieve final agent state if needed (includes memory blocks)
+        final_agent_state = None
+        if retrieve_agent_state:
+            final_agent_state = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=[])
+
+        return TargetResult(
+            trajectory=trajectory,
+            agent_id=agent_id,
+            model_name=model_name,
+            agent_usage=usage_stats,
+            agent_state=final_agent_state,
+        )
