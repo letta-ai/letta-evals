@@ -171,6 +171,7 @@ class SuiteSpec(BaseModel):
 
     max_samples: Optional[int] = Field(default=None, description="Maximum number of samples to evaluate")
     sample_tags: Optional[List[str]] = Field(default=None, description="Only evaluate samples with these tags")
+    num_runs: Optional[int] = Field(default=1, description="Number of times to run the evaluation suite")
 
     setup_script: Optional[str] = Field(
         default=None, description="Path to Python script with setup function (e.g., setup.py:prepare_evaluation)"
@@ -298,6 +299,24 @@ class Metrics(BaseModel):
     )
 
 
+class RunStatistics(BaseModel):
+    """Aggregate statistics across multiple evaluation runs."""
+
+    num_runs: int = Field(description="Total number of runs executed")
+    runs_passed: int = Field(description="Number of runs that passed the gate")
+    mean_avg_score_attempted: float = Field(description="Mean of avg_score_attempted across all runs")
+    std_avg_score_attempted: float = Field(description="Standard deviation of avg_score_attempted across all runs")
+    mean_avg_score_total: float = Field(description="Mean of avg_score_total across all runs")
+    std_avg_score_total: float = Field(description="Standard deviation of avg_score_total across all runs")
+    mean_scores: Dict[str, float] = Field(
+        default_factory=dict, description="Mean score for each metric across all runs"
+    )
+    std_scores: Dict[str, float] = Field(
+        default_factory=dict, description="Standard deviation for each metric across all runs"
+    )
+    individual_run_metrics: List[Metrics] = Field(description="Metrics from each individual run")
+
+
 class SampleResult(BaseModel):
     """Result for a single sample evaluation."""
 
@@ -322,3 +341,6 @@ class RunnerResult(BaseModel):
     results: List[SampleResult] = Field(description="Results for each evaluated sample")
     metrics: Metrics = Field(description="Aggregate metrics across all samples")
     gates_passed: bool = Field(description="Whether all gate criteria were satisfied")
+    run_statistics: Optional[RunStatistics] = Field(
+        default=None, description="Aggregate statistics across multiple runs (if num_runs > 1)"
+    )

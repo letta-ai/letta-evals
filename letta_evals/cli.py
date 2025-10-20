@@ -44,6 +44,11 @@ def run(
         "--project-id",
         help="Letta project ID override. If not provided, uses LETTA_PROJECT_ID from environment or suite config",
     ),
+    num_runs: Optional[int] = typer.Option(
+        None,
+        "--num-runs",
+        help="Number of times to run the evaluation suite. Overrides suite config if provided.",
+    ),
 ):
     """Run an evaluation suite."""
 
@@ -120,6 +125,7 @@ def run(
             letta_api_key=api_key,
             letta_base_url=base_url,
             letta_project_id=project_id,
+            num_runs=num_runs,
         )
 
     try:
@@ -127,11 +133,22 @@ def run(
 
         if not quiet:
             display_results(result, verbose, cached_mode=(cached is not None))
+            
+            # Display aggregate statistics if multiple runs
+            if result.run_statistics is not None:
+                display_aggregate_statistics(result.run_statistics)
 
         if output and not quiet:
-            console.print(f"[green]Results streamed to {output}/results.jsonl (JSONL)[/green]")
-            console.print(f"[green]Summary saved to {output}/summary.json[/green]")
-            console.print(f"[green]Header saved to {output}/header.json[/green]")
+            if result.run_statistics is not None:
+                # Multiple runs - output to subdirectories
+                num_runs_actual = result.run_statistics.num_runs
+                console.print(f"[green]Individual run results saved to {output}/run_1/ through {output}/run_{num_runs_actual}/[/green]")
+                console.print(f"[green]Aggregate statistics saved to {output}/aggregate_stats.json[/green]")
+            else:
+                # Single run - output to main directory
+                console.print(f"[green]Results streamed to {output}/results.jsonl (JSONL)[/green]")
+                console.print(f"[green]Summary saved to {output}/summary.json[/green]")
+                console.print(f"[green]Header saved to {output}/header.json[/green]")
 
         if result.gates_passed:
             if not quiet:
@@ -391,6 +408,45 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
             console.print(
                 f"[dim]... and {total_samples - MAX_SAMPLES_DISPLAY} more samples (see output file for complete results)[/dim]"
             )
+
+
+def display_aggregate_statistics(run_statistics):
+    """Display aggregate statistics across multiple runs."""
+    from letta_evals.models import RunStatistics
+
+    stats: RunStatistics = run_statistics
+
+    console.print(f"\n[bold]Aggregate Statistics (across {stats.num_runs} runs):[/bold]")
+    console.print("=" * 50)
+
+    console.print(f"\n[bold]Run Summary:[/bold]")
+    console.print(f"  Total runs: {stats.num_runs}")
+    console.print(f"  Runs passed: {stats.runs_passed}")
+    console.print(f"  Runs failed: {stats.num_runs - stats.runs_passed}")
+    pass_rate = (stats.runs_passed / stats.num_runs * 100.0) if stats.num_runs > 0 else 0.0
+    console.print(f"  Pass rate: {pass_rate:.1f}%")
+
+    console.print(f"\n[bold]Average Score (Attempted):[/bold]")
+    console.print(f"  Mean: {stats.mean_avg_score_attempted:.4f}")
+    console.print(f"  Std Dev: {stats.std_avg_score_attempted:.4f}")
+
+    console.print(f"\n[bold]Average Score (Total):[/bold]")
+    console.print(f"  Mean: {stats.mean_avg_score_total:.4f}")
+    console.print(f"  Std Dev: {stats.std_avg_score_total:.4f}")
+
+    if stats.mean_scores:
+        console.print("\n[bold]Per-Metric Statistics:[/bold]")
+        table = Table()
+        table.add_column("Metric", style="cyan")
+        table.add_column("Mean Score", style="white")
+        table.add_column("Std Dev", style="white")
+
+        for metric_key in stats.mean_scores.keys():
+            mean = stats.mean_scores[metric_key]
+            std = stats.std_scores.get(metric_key, 0.0)
+            table.add_row(metric_key, f"{mean:.4f}", f"{std:.4f}")
+
+        console.print(table)
 
 
 if __name__ == "__main__":
