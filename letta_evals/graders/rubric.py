@@ -29,6 +29,7 @@ class RubricGrader(Grader):
         extractor: str = "last_assistant",
         extractor_config: Optional[dict] = None,
         base_dir: Optional[Path] = None,
+        rubric_vars: Optional[List[str]] = None,
     ):
         self.prompt = prompt
         self.model = model
@@ -36,6 +37,7 @@ class RubricGrader(Grader):
         self.provider = provider
         self.extractor_name = extractor
         self.base_dir = base_dir
+        self.rubric_vars = rubric_vars or []
         self.extractor = get_extractor(extractor, extractor_config, base_dir=base_dir)
         self._requires_agent_state = extractor_requires_agent_state(extractor, base_dir=base_dir)
 
@@ -131,11 +133,11 @@ IMPORTANT:
         """Build the prompt for the judge."""
         prompt = self.prompt
 
-        prompt = prompt.replace("{input}", str(sample.input))
-        prompt = prompt.replace("{submission}", submission)
-
-        if sample.ground_truth:
-            prompt = prompt.replace("{ground_truth}", sample.ground_truth)
+        # substitute custom rubric variables
+        if self.rubric_vars and sample.rubric_vars:
+            for var_name in self.rubric_vars:
+                var_value = str(sample.rubric_vars[var_name])
+                prompt = prompt.replace(f"{{{var_name}}}", var_value)
 
         parts = [
             "## Rubric",

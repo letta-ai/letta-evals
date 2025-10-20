@@ -50,14 +50,44 @@ target:
 
 Then run the evaluation as above.
 
+## Custom Rubric Variables
+
+This example demonstrates using **custom rubric variables** to pass per-sample context into the rubric. Each sample in `dataset.jsonl` includes a `rubric_vars` field with a `reference_ascii` containing high-quality reference ASCII art:
+
+```json
+{
+  "input": "Send me your best version of ASCII art representing cat...",
+  "rubric_vars": {
+    "reference_ascii": " /\\_/\\\n( o.o )\n > ^ <"
+  }
+}
+```
+
+The suite configuration declares which variables are required:
+
+```yaml
+graders:
+  quality:
+    kind: rubric
+    prompt_path: rubric.txt
+    rubric_vars:
+      - reference_ascii
+```
+
+These variables are then substituted into the rubric template using `{variable_name}` syntax, allowing the LLM judge to compare submissions against reference examples.
+
 ## Rubric Structure
 
-The rubric in `rubric.txt` defines multi-dimensional scoring criteria:
+The rubric in `rubric.txt` defines multi-dimensional scoring criteria with a reference example section:
 
 ```
-# Rubric: ASCII-Art Response Quality & Compliance
+Here is an example of a high-quality ASCII art for this task:
 
-## The user asked for: {input}
+{reference_ascii}
+
+Use this as a reference for quality, detail level, and craftsmanship when evaluating the submission.
+
+---
 
 ## Scoring dimensions (sum → 1.0)
 1. Instruction compliance (0.30)
@@ -91,7 +121,7 @@ IMPORTANT: Make sure to clearly express your rationale and scoring.
 **Key points:**
 - Each dimension has multiple scoring tiers with specific criteria
 - Dimensions should sum to 1.0 for normalized scoring
-- Use `{input}` placeholder to inject the sample input into the rubric
+- Use `{variable_name}` placeholders for custom rubric variables declared in the suite config
 - Clear rationale expectations help produce consistent LLM judgments
 
 ## Suite Configuration
@@ -109,6 +139,8 @@ graders:
     max_retries: 3
     timeout: 120.0
     extractor: last_assistant
+    rubric_vars:
+      - reference_ascii  # declares required custom variables
 ```
 
 ### Multiple Graders (`suite.two-metrics.yaml`)

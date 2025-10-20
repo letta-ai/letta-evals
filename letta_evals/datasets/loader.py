@@ -28,6 +28,7 @@ def load_jsonl(
                 input=data["input"],
                 ground_truth=data.get("ground_truth"),
                 agent_args=data.get("agent_args"),
+                rubric_vars=data.get("rubric_vars"),
             )
 
             line_index += 1

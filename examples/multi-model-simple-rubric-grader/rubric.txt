@@ -1,8 +1,5 @@
-# Rubric: ASCII-Art Response Quality & Compliance
+Scoring dimensions (sum → 1.0):
 
-## The user asked for: {input}
-
-## Scoring dimensions (sum → 1.0)
 1. Instruction compliance (0.30)  
    0.30: Art wrapped in backticks as requested (```art```); no extra content outside backticks
    0.15: Art present but formatting issues (missing/extra backticks, minor extra text)
