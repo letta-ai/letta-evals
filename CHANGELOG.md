@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.3.1...letta-evals-v0.4.0) (2025-10-20)
+
+
+### Features
+
+* Add visualization library and simple visualization configurations ([#55](https://github.com/letta-ai/letta-evals/issues/55)) ([57d483d](https://github.com/letta-ai/letta-evals/commit/57d483d899de6f82e8557b8cefa439750c656bfb))
+
 ## [0.3.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.3.0...letta-evals-v0.3.1) (2025-10-20)
 
 
