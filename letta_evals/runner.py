@@ -618,7 +618,6 @@ def _calculate_run_statistics(all_metrics: List[Metrics], runs_passed: int, suit
 
     num_runs = len(all_metrics)
 
-    # Calculate mean and std for avg_score_attempted and avg_score_total
     avg_scores_attempted = [m.avg_score_attempted for m in all_metrics]
     avg_scores_total = [m.avg_score_total for m in all_metrics]
 
@@ -628,7 +627,6 @@ def _calculate_run_statistics(all_metrics: List[Metrics], runs_passed: int, suit
     mean_avg_score_total = statistics.mean(avg_scores_total)
     std_avg_score_total = statistics.stdev(avg_scores_total) if num_runs > 1 else 0.0
 
-    # Calculate mean and std for each metric (by_metric aggregates)
     mean_scores: Dict[str, float] = {}
     std_scores: Dict[str, float] = {}
 
@@ -695,7 +693,6 @@ async def run_suite(
 
     suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent)
 
-    # CLI num_runs overrides suite config
     actual_num_runs = num_runs if num_runs is not None else (suite.num_runs or 1)
 
     # Multiple runs don't make sense with cached results (trajectories would be identical)
@@ -753,14 +750,12 @@ async def run_suite(
             metric_labels=metric_labels,
         )
 
-    # Handle multiple runs if num_runs > 1
     if actual_num_runs > 1:
         all_run_results: List[RunnerResult] = []
         all_metrics: List[Metrics] = []
         runs_passed = 0
 
         for run_idx in range(actual_num_runs):
-            # Determine output path for this specific run
             run_output_path = None
             if output_path:
                 run_output_path = output_path / f"run_{run_idx + 1}"
@@ -789,21 +784,16 @@ async def run_suite(
                 if progress_cb is not None and run_idx == actual_num_runs - 1:
                     progress_cb.stop()
 
-        # Calculate aggregate statistics
         run_statistics = _calculate_run_statistics(all_metrics, runs_passed, suite)
 
-        # Write aggregate statistics if output path provided
         if output_path:
             await _write_aggregate_statistics(output_path, run_statistics)
 
-        # Return result with aggregate statistics (use metrics from last run)
         final_result = all_run_results[-1]
         final_result.run_statistics = run_statistics
-        # Set gates_passed based on whether any run passed
         final_result.gates_passed = runs_passed > 0
         return final_result
     else:
-        # Single run (original behavior)
         runner = Runner(
             suite,
             max_concurrent=max_concurrent,
