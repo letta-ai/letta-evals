@@ -1,6 +1,7 @@
 name: fetch-webpage-tool-output-test
 description: Test if the tool output from read_webpage_content contains the correct answer
 dataset: tool_output_dataset.csv
+num_runs: 2 # Run this twice
 target:
   kind: agent
   agent_file: test-fetch-webpage-simple-agent.af
