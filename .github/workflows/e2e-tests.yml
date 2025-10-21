@@ -41,7 +41,7 @@ jobs:
       - name: Discover suite files
         id: set-matrix
         run: |
-          suites=$(find examples -name "suite*.yaml" -o -name "suite.yaml" | jq -R -s -c 'split("\n")[:-1]')
+          suites=$(find examples -name "*suite*.yaml" | jq -R -s -c 'split("\n")[:-1]')
           echo "matrix=${suites}" >> $GITHUB_OUTPUT
 
   test-suites:
