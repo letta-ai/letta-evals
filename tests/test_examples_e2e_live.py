@@ -7,6 +7,7 @@ from typing import Iterable
 
 import pytest
 import yaml
+import json
 
 from letta_evals.models import SuiteSpec
 from letta_evals.runner import run_suite
