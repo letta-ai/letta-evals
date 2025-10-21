@@ -180,7 +180,8 @@ Control what part of the agent response gets graded:
 # check for issues
 ruff check .
 
-# auto-format code
+# fix linting issues and auto-format code
+ruff check --fix .
 ruff format .
 ```
 
