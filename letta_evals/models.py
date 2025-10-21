@@ -16,6 +16,9 @@ class Sample(BaseModel):
     input: Union[str, List[str]] = Field(description="Input message(s) to send to the agent")
     ground_truth: Optional[str] = Field(default=None, description="Expected ground_truth response for grading")
     agent_args: Optional[Dict[str, Any]] = Field(default=None, description="Custom arguments for agent creation")
+    rubric_vars: Optional[Dict[str, Any]] = Field(
+        default=None, description="Custom variables to substitute in rubric prompts"
+    )
 
 
 # Config models
@@ -84,6 +87,9 @@ class GraderSpec(BaseModel):
     provider: Optional[LLMProvider] = Field(default=LLMProvider.OPENAI, description="LLM provider for rubric grading")
     max_retries: Optional[int] = Field(default=5, description="Maximum number of retries for rubric grading")
     timeout: Optional[float] = Field(default=120.0, description="Timeout for rubric grading in seconds")
+    rubric_vars: Optional[List[str]] = Field(
+        default=None, description="List of required custom variables for rubric substitution"
+    )
 
     extractor: str = Field(default="last_assistant", description="Strategy for extracting submission from trajectory")
     extractor_config: Optional[Dict[str, Any]] = Field(default=None, description="Configuration for the extractor")
@@ -95,6 +101,8 @@ class GraderSpec(BaseModel):
         if self.kind == GraderKind.TOOL:
             if not self.function:
                 raise ValueError("Tool grader requires function name")
+            if self.rubric_vars:
+                raise ValueError("Tool grader cannot use rubric_vars (only available for rubric graders)")
         elif self.kind == GraderKind.RUBRIC:
             if not self.prompt and not self.prompt_path:
                 raise ValueError("Rubric grader requires either prompt or prompt_path")

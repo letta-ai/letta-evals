@@ -1,6 +1,6 @@
 name: ascii-art-rubric-test
 description: Test if agent can generate ASCII art correctly using rubric grading
-dataset: dataset.jsonl
+dataset: dataset.csv
 max_samples: 3
 target:
   kind: agent
@@ -9,6 +9,7 @@ target:
 graders:
   quality:
     kind: rubric
+    display_name: "rubric score"
     prompt_path: rubric.txt
     model: gpt-5-mini
     temperature: 0.0
@@ -16,6 +17,8 @@ graders:
     max_retries: 3
     timeout: 120.0
     extractor: last_assistant
+    rubric_vars:
+      - reference_ascii
 gate:
   metric_key: quality
   op: gte

@@ -1,6 +1,6 @@
 name: ascii-art-two-metrics
 description: Test ASCII art quality and ASCII-only characters using two graders
-dataset: dataset.jsonl
+dataset: dataset.csv
 target:
   kind: agent
   agent_file: ascii-art-agent.af
@@ -13,7 +13,11 @@ graders:
     model: gpt-5-mini
     temperature: 0.0
     provider: openai
+    max_retries: 3
+    timeout: 120.0
     extractor: last_assistant
+    rubric_vars:
+      - reference_ascii
   ascii_only:
     kind: tool
     display_name: "ascii character check"

@@ -1,8 +1,11 @@
-# Rubric: ASCII-Art Response Quality & Compliance
+Here is an example of a high-quality ASCII art for this task:
 
-## The user asked for: {input}
+```
+{reference_ascii}
+```
 
-## Scoring dimensions (sum → 1.0)
+Use this as a reference for quality, detail level, and craftsmanship when evaluating the submission. Below are the coring dimensions (sum → 1.0):
+
 1. Instruction compliance (0.30)  
    0.30: Art wrapped in backticks as requested (```art```); no extra content outside backticks
    0.15: Art present but formatting issues (missing/extra backticks, minor extra text)

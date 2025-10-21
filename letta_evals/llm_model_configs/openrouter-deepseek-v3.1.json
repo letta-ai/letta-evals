@@ -1,0 +1,7 @@
+{
+    "context_window": 128000,
+    "model": "deepseek/deepseek-chat-v3.1",
+    "model_endpoint_type": "openai",
+    "model_endpoint": "https://openrouter.ai/api/v1",
+    "provider_name": "openrouter"
+}
