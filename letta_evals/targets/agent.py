@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -8,6 +9,8 @@ from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.base import Target
 from letta_evals.utils import load_object
 from letta_evals.visualization.base import ProgressCallback
+
+logger = logging.getLogger(__name__)
 
 
 class AgentTarget(Target):
@@ -133,12 +136,20 @@ class AgentTarget(Target):
                     # success, break out of retry loop
                     break
 
-                except Exception:
+                except Exception as e:
                     attempt += 1
                     if attempt > self.max_retries:
+                        logger.error(
+                            f"Failed to create_stream for sample {sample.id} after {self.max_retries} retries. "
+                            f"Final error: {type(e).__name__}: {str(e)}"
+                        )
                         raise
 
                     backoff_time = 2 ** (attempt - 1)
+                    logger.warning(
+                        f"create_stream failed for sample {sample.id} (attempt {attempt}/{self.max_retries + 1}). "
+                        f"Error: {type(e).__name__}: {str(e)}. Retrying in {backoff_time}s..."
+                    )
                     await anyio.sleep(backoff_time)
 
         final_agent_state = None
