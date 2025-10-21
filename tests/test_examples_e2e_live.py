@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 from pathlib import Path
@@ -7,7 +8,6 @@ from typing import Iterable
 
 import pytest
 import yaml
-import json
 
 from letta_evals.models import SuiteSpec
 from letta_evals.runner import run_suite
