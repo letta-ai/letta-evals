@@ -32,6 +32,7 @@ class TargetSpec(BaseModel):
     api_key: Optional[str] = Field(default=None, description="API key for authentication")
     timeout: float = Field(default=300.0, description="Request timeout in seconds")
     project_id: Optional[str] = Field(default=None, description="Letta project ID")
+    max_retries: int = Field(default=0, description="Maximum number of retries for failed create_stream calls")
 
     agent_id: Optional[str] = Field(default=None, description="ID of existing agent to use")
     agent_file: Optional[Path] = Field(default=None, description="Path to .af agent file to upload")
