@@ -11,8 +11,14 @@ If you are building with agentic systems, creating high quality evals is one of 
 ## Setup
 
 To run evals against Letta agents, you will need a running Letta server. You can either:
-* Follow the [Letta installation guide](https://docs.letta.com/guides/ade/desktop#self-hosted-server-mode-recommended) to get started with self-hosting your server.
-* Use [Letta Cloud](https://app.letta.com) - create an account and configure your suite with the Letta Cloud API endpoint and your API key.
+
+* **Self-hosted**: Follow the [Letta installation guide](https://docs.letta.com/guides/ade/desktop#self-hosted-server-mode-recommended) to get started with self-hosting your server.
+* **Letta Cloud**: Create an account at [app.letta.com](https://app.letta.com) and configure your environment:
+  ```bash
+  export LETTA_API_KEY=your-api-key        # Get from Letta Cloud dashboard
+  export LETTA_PROJECT_ID=your-project-id  # Get from Letta Cloud dashboard
+  ```
+  Then set `base_url: https://api.letta.com/` in your suite YAML.
 
 If you plan to use LLM-based grading (rubric graders), you'll also need to configure API keys for your chosen provider (e.g., `OPENAI_API_KEY`).
 
@@ -126,42 +132,42 @@ See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-a
 
 **Do you have examples of different eval types?**
 
-> Yes! See the [`examples/`](examples/) directory. Each subdirectory contains a complete working example with dataset, suite config, and any custom components.
+* Yes! See the [`examples/`](examples/) directory. Each subdirectory contains a complete working example with dataset, suite config, and any custom components.
 
 **Can I use this without writing any Python code?**
 
-> Absolutely! You can create powerful evals using just YAML configs and JSONL datasets. See [`examples/simple-tool-grader/`](examples/simple-tool-grader/) or [`examples/simple-rubric-grader/`](examples/simple-rubric-grader/) for code-free examples.
+* Absolutely! You can create powerful evals using just YAML configs and JSONL datasets. See [`examples/simple-tool-grader/`](examples/simple-tool-grader/) or [`examples/simple-rubric-grader/`](examples/simple-rubric-grader/) for code-free examples.
 
 **How do I evaluate multi-turn agent interactions?**
 
-> Letta agents inherently support multi-turn conversations. Use extractors like `all_messages` or `tool_calls` to capture the full interaction trajectory, not just the final response.
+* Letta agents inherently support multi-turn conversations. Use extractors like `all_messages` or `tool_calls` to capture the full interaction trajectory, not just the final response.
 
 **Can I test the same agent with different LLM models?**
 
-> Yes! Use the multi-model configuration feature. See [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) for an example that tests one agent with multiple model configurations.
+* Yes! Use the multi-model configuration feature. See [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) for an example that tests one agent with multiple model configurations.
 
 **Can I run evaluations multiple times to measure consistency?**
 
-> Yes! Run evaluations multiple times to measure consistency and variance. See [`examples/simple-tool-grader/multi_run_tool_output_suite.yaml`](examples/simple-tool-grader/multi_run_tool_output_suite.yaml) for an example.
->
-> ```bash
-> # run 5 times and get mean/std dev statistics
-> letta-evals run suite.yaml --num-runs 5 --output results/
-> ```
->
-> Results include aggregate statistics across runs with mean and standard deviation for all metrics.
+* Yes! Run evaluations multiple times to measure consistency and variance. See [`examples/simple-tool-grader/multi_run_tool_output_suite.yaml`](examples/simple-tool-grader/multi_run_tool_output_suite.yaml) for an example.
+
+  ```bash
+  # run 5 times and get mean/std dev statistics
+  letta-evals run suite.yaml --num-runs 5 --output results/
+  ```
+
+  Results include aggregate statistics across runs with mean and standard deviation for all metrics.
 
 **Can I monitor long-running evaluations in real-time?**
 
-> Yes! Results are written incrementally as JSONL, allowing you to monitor evaluations in real-time and resume interrupted runs.
+* Yes! Results are written incrementally as JSONL, allowing you to monitor evaluations in real-time and resume interrupted runs.
 
 **Can I reuse agent trajectories when testing different graders?**
 
-> Yes! Use `--cached-results` to reuse agent trajectories across evaluations, avoiding redundant agent runs when testing different graders.
+* Yes! Use `--cached-results` to reuse agent trajectories across evaluations, avoiding redundant agent runs when testing different graders.
 
 **Can I use this in CI/CD pipelines?**
 
-> Absolutely! Letta Evals is designed to integrate seamlessly into continuous integration workflows. Check out our [`.github/workflows/e2e-tests.yml`](.github/workflows/e2e-tests.yml) for an example of running evaluations in GitHub Actions. The workflow automatically discovers and runs all suite files, making it easy to gate releases or validate changes to your agents.
+* Absolutely! Letta Evals is designed to integrate seamlessly into continuous integration workflows. Check out our [`.github/workflows/e2e-tests.yml`](.github/workflows/e2e-tests.yml) for an example of running evaluations in GitHub Actions. The workflow automatically discovers and runs all suite files, making it easy to gate releases or validate changes to your agents.
 
 ## Contributing
 
