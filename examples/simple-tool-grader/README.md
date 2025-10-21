@@ -1,17 +1,27 @@
 # Simple Tool Grader Example
 
-This example demonstrates basic tool-based grading using the built-in `contains` function.
+This example demonstrates basic tool-based grading using the built-in `contains` function with two different extractors.
 
 ## What This Example Shows
 
 - Using tool graders for deterministic, fast evaluation
 - Testing agent web-fetching capabilities
 - Setting pass/fail gates with threshold values
-- Using the `last_assistant` extractor to evaluate final responses
+- Comparing different extractors: `last_assistant` vs `tool_output`
+
+## Two Suites, Two Evaluation Strategies
+
+This example includes two separate suites that evaluate the same agent differently:
+
+### 1. `last_assistant_suite.yaml` - Evaluating Agent Responses
+Uses the `last_assistant` extractor to check if the agent's final response contains the correct answer. This tests whether the agent can successfully fetch webpage content AND communicate the answer properly to the user.
+
+### 2. `tool_output_suite.yaml` - Evaluating Tool Outputs
+Uses the `tool_output` extractor to check if the raw output from the `read_webpage_content` tool contains the correct answer. This tests whether the tool is successfully fetching and returning webpage content, independent of what the agent says.
 
 ## Key Takeaway
 
-Tool graders like `contains` are ideal when you have clear ground truth answers and need fast, deterministic evaluation. The `contains` function checks if the ground truth appears anywhere in the agent's response.
+Tool graders like `contains` are ideal when you have clear ground truth answers and need fast, deterministic evaluation. Different extractors let you evaluate different parts of the agent's behavior - you can test tool functionality separately from the agent's ability to process and communicate results.
 
 ## Running This Example
 
@@ -22,10 +32,15 @@ Start your local Letta server:
 letta server
 ```
 
-Then run the evaluation:
+Then run either or both evaluations:
 ```bash
 cd examples/simple-tool-grader
-letta-evals run suite.yaml
+
+# evaluate agent's final responses
+letta-evals run last_assistant_suite.yaml
+
+# evaluate tool outputs directly
+letta-evals run tool_output_suite.yaml
 ```
 
 ### Letta Cloud Setup
@@ -48,13 +63,11 @@ Then run the evaluation as above.
 
 ### Dataset Format
 
-Each sample in `dataset.jsonl` has an `input` and `ground_truth`:
+Each sample in `dataset.csv` has an `input` and `ground_truth`:
 
-```json
-{
-  "input": "Read `https://www.york.ac.uk/teaching/cws/wws/webpage1.html`. What program is mentioned for writing HTML code? Respond with the program name ONLY in brackets, e.g. {Word}.",
-  "ground_truth": "{Notepad}"
-}
+```csv
+input,ground_truth
+"Read `https://www.york.ac.uk/teaching/cws/wws/webpage1.html`. What program is mentioned for writing HTML code? Respond with the program name ONLY in brackets, e.g. {Word}.",{Notepad}
 ```
 
 **Key points:**
@@ -62,14 +75,14 @@ Each sample in `dataset.jsonl` has an `input` and `ground_truth`:
 - `ground_truth`: The expected answer to check for in the response
 - Instructing the agent to format consistently (e.g., `{Notepad}`) makes grading more reliable
 
-### Suite Configuration
+### Suite Configurations
 
-The `suite.yaml` file configures the entire evaluation:
+#### `last_assistant_suite.yaml` - Agent Response Evaluation
 
 ```yaml
-name: fetch-webpage-test
-description: Test if agent can fetch webpage content and extract information
-dataset: dataset.jsonl
+name: fetch-webpage-last-assistant-test
+description: Test if agent's final response contains the correct answer from fetched webpage
+dataset: dataset.csv
 target:
   kind: agent
   agent_file: test-fetch-webpage-simple-agent.af
@@ -86,7 +99,35 @@ gate:
 ```
 
 **Key points:**
-- `target.kind: agent` with `agent_file` loads a pre-saved agent
-- `graders.contains_check` uses the built-in `contains` function
 - `extractor: last_assistant` evaluates the final agent message
+- Tests end-to-end behavior: tool calling + response generation
 - `gate` requires ≥75% pass rate (3+ out of 5 samples must pass)
+
+#### `tool_output_suite.yaml` - Tool Output Evaluation
+
+```yaml
+name: fetch-webpage-tool-output-test
+description: Test if the tool output from read_webpage_content contains the correct answer
+dataset: dataset.csv
+target:
+  kind: agent
+  agent_file: test-fetch-webpage-simple-agent.af
+  base_url: http://localhost:8283
+graders:
+  tool_output_check:
+    kind: tool
+    function: contains
+    extractor: tool_output
+    extractor_config:
+      tool_name: read_webpage_content
+gate:
+  metric_key: tool_output_check
+  op: gte
+  value: 0.75
+```
+
+**Key points:**
+- `extractor: tool_output` with `tool_name: read_webpage_content` evaluates raw tool output
+- `extractor_config` specifies which tool's output to extract
+- Tests tool functionality independently of agent's response formatting
+- Useful for debugging: isolates whether issues are with the tool or the agent's processing

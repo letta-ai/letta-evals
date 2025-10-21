@@ -1,0 +1,18 @@
+name: fetch-webpage-tool-output-test
+description: Test if the tool output from read_webpage_content contains the correct answer
+dataset: tool_output_dataset.csv
+target:
+  kind: agent
+  agent_file: test-fetch-webpage-simple-agent.af
+  base_url: http://localhost:8283
+graders:
+  tool_output_check:
+    kind: tool
+    function: contains
+    extractor: tool_output
+    extractor_config:
+      tool_name: fetch_webpage
+gate:
+  metric_key: tool_output_check
+  op: gte
+  value: 0.75
