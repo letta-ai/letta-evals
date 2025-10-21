@@ -85,7 +85,6 @@ class AgentTarget(Target):
             if progress_callback:
                 await progress_callback.message_sending(sample.id, i + 1, total_messages, model_name=model_name)
 
-            # retry logic with exponential backoff
             attempt = 0
             while attempt <= self.max_retries:
                 try:
@@ -101,10 +100,8 @@ class AgentTarget(Target):
                         if not run_id:
                             run_id = chunk.run_id
 
-                        # handle usage statistics in a streaming fashion
                         if hasattr(chunk, "message_type"):
                             if chunk.message_type == "usage_statistics":
-                                # best-effort convert to JSON-serializable dict
                                 usage_rec = None
                                 if hasattr(chunk, "model_dump") and callable(getattr(chunk, "model_dump")):
                                     try:
@@ -122,7 +119,6 @@ class AgentTarget(Target):
                                     except Exception:
                                         usage_rec = None
                                 if usage_rec is None:
-                                    # final fallback to string
                                     usage_rec = {"raw": str(chunk)}
                                 usage_stats.append(usage_rec)
                                 continue
@@ -145,7 +141,6 @@ class AgentTarget(Target):
                     backoff_time = 2 ** (attempt - 1)
                     await anyio.sleep(backoff_time)
 
-        # conditionally retrieve final agent state if needed (includes memory blocks)
         final_agent_state = None
         if retrieve_agent_state:
             final_agent_state = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=[])
