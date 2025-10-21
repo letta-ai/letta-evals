@@ -1,36 +1,40 @@
-# Letta Evals Kit
+# Letta Evals
 
-Evaluation framework for testing Letta AI agents.
+Letta Evals provides a framework for evaluating AI agents built with [Letta](https://github.com/letta-ai/letta). We offer a flexible evaluation system to test different dimensions of agent behavior and the ability to write your own custom evals for use cases you care about. You can use your own datasets to build private evals that represent common patterns in your agentic workflows.
 
-<p align="center">
-  <img src="docs/assets/evaluation-progress.png" alt="Letta Evals Kit running an evaluation suite with real-time progress tracking" width="800">
-</p>
+<img width="596" src="docs/assets/evaluation-progress.png" alt="Letta Evals running an evaluation suite with real-time progress tracking" width="800">
 
-## Project Structure
+If you are building with agentic systems, creating high quality evals is one of the most impactful things you can do. Without evals, it can be very difficult and time intensive to understand how agent configurations, model versions, or prompt changes might affect your use case. In the words of [OpenAI's President Greg Brockman](https://twitter.com/gdb/status/1733553161884127435):
 
-```
-letta_evals/
-├── cli.py              # CLI entry point
-├── runner/             # Evaluation engine
-├── graders/            # Grading implementations
-├── datasets/           # Dataset loaders
-├── targets/            # Evaluation targets
-├── models.py           # Data models
-└── visualization/      # Progress display
+<img width="596" alt="https://x.com/gdb/status/1733553161884127435?s=20" src="https://github.com/openai/evals/assets/35577566/ce7840ff-43a8-4d88-bb2f-6b207410333b">
 
-examples/               # Example suites and datasets
-```
+## Setup
 
-## Installation
+To run evals against Letta agents, you will need a running Letta server. You can either:
+* Follow the [Letta installation guide](https://docs.letta.com/guides/ade/desktop#self-hosted-server-mode-recommended) to get started with self-hosting your server.
+* Use [Letta Cloud](https://app.letta.com) - create an account and configure your suite with the Letta Cloud API endpoint and your API key.
 
-### Recommended: Using UV
+If you plan to use LLM-based grading (rubric graders), you'll also need to configure API keys for your chosen provider (e.g., `OPENAI_API_KEY`).
+
+**Minimum Required Version: Python 3.9**
+
+### Installing Letta Evals
+
+If you are going to be creating custom evals or contributing to this repository, clone the repo directly from GitHub and install using:
 
 ```bash
-# install uv if you haven't already
-pip install uv
-
-# sync dependencies (run inside your virtual environment)
+# we recommend uv
 uv sync --extra dev
+```
+
+Using the editable install, changes you make to your evals will be reflected immediately without having to reinstall.
+
+### Running Evals Only
+
+If you simply want to run existing evals locally, you can install the package via pip:
+
+```bash
+pip install letta-evals
 ```
 
 ## Quick Start
@@ -65,47 +69,23 @@ gate:
 letta-evals run suite.yaml
 ```
 
-## Core Concepts
+## Running Evals
 
-### Suites
-YAML configuration files that define your evaluation parameters. Each suite specifies the dataset, target agent, grading method, and pass/fail criteria.
+You can find the full evaluation flow documentation in [`CLAUDE.md`](CLAUDE.md). The core evaluation flow is:
 
-### Datasets
-JSONL files where each line contains a test sample with:
-- `input`: The prompt to send to the agent
-- `ground_truth`: The expected response (for tool graders)
-- `metadata`: Optional additional context
-
-### Targets
-What you're evaluating. Currently supports:
-- **Letta agents**: Via `agent_file` (.af files) or existing `agent_id`
-
-### Graders
-How responses are scored (define one or many under `graders`):
-- Tool graders: built-ins (`exact_match`, `contains`, etc.) or custom Python functions
-- Rubric graders: LLM judges with custom prompts (`prompt_path`, `model`, `provider`)
-
-### Gates
-Pass/fail thresholds for your evaluation:
-- `metric_key`: Which grader to gate on (key in `graders`)
-- `metric`: Aggregate to compare (`avg_score` or `accuracy`)
-- `op`: Comparison operator (`gte`, `gt`, `lte`, `lt`, `eq`)
-- `value`: Threshold value (decimal for `avg_score`, percent for `accuracy`)
-
-## CLI Commands
+**Dataset → Target (Agent) → Extractor → Grader → Gate → Result**
 
 ```bash
-# run an evaluation suite (shows progress by default)
+# run an evaluation suite with real-time progress
 letta-evals run suite.yaml
 
-# save outputs to directory
-# header.json for headers, summary.json for results summary, results.jsonl for per-instance results
+# save results to a directory (header.json, summary.json, results.jsonl)
 letta-evals run suite.yaml --output results
 
-# quiet mode (only show pass/fail)
-letta-evals run suite.yaml --quiet
+# run multiple times for statistical analysis
+letta-evals run suite.yaml --num-runs 5
 
-# validate suite configuration
+# validate suite configuration before running
 letta-evals validate suite.yaml
 
 # list available components
@@ -113,140 +93,80 @@ letta-evals list-extractors
 letta-evals list-graders
 ```
 
-## Multiple Runs with Statistics
+See the [`examples/`](examples/) directory for complete working examples of different eval types.
 
-Run your evaluation suite multiple times to measure consistency and get aggregate statistics eg. mean  and standard deviation. Specify `num_runs` in either yaml or CLI.
+## Writing Evals
 
-YAML
-```yaml
-name: my-eval-suite
-dataset: dataset.jsonl
-num_runs: 5  # Run the evaluation 5 times
-target:
-  kind: agent
-  agent_file: my_agent.af
-graders:
-  accuracy:
-    kind: tool
-    function: exact_match
-gate:
-  metric_key: accuracy
-  op: gte
-  value: 0.8
-```
+Letta Evals supports multiple approaches for creating evaluations, from simple YAML-based configs to fully custom Python implementations.
 
-CLI
-```bash
-# Override suite config with CLI flag
-letta-evals run suite.yaml --num-runs 10
+### Getting Started
 
-# Save individual run results to separate directories
-letta-evals run suite.yaml --num-runs 5 --output results/
-```
+We suggest getting started with these examples:
 
-### Output Structure
+- **Basic tool grading**: [`examples/simple-tool-grader/`](examples/simple-tool-grader/) - Simple string matching with `exact_match` and `contains` functions
+- **LLM-as-judge grading**: [`examples/simple-rubric-grader/`](examples/simple-rubric-grader/) - Using rubric graders with custom prompts for nuanced evaluation
+- **Multi-metric evaluation**: [`examples/simple-rubric-grader/suite.two-metrics.yaml`](examples/simple-rubric-grader/suite.two-metrics.yaml) - Combining multiple graders (rubric + tool) in one suite
+- **Custom extractors**: [`examples/simple-memory-block-extractor/`](examples/simple-memory-block-extractor/) - Extracting specific content from agent memory blocks
+- **Multi-model evaluation**: [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) - Testing across multiple LLM configurations
+- **Programmatic agent creation**: [`examples/programmatic-agent-creation/`](examples/programmatic-agent-creation/) - Using agent factories to create agents dynamically per sample
+- **Custom graders and extractors**: [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-and-extractor/) - Implementing custom evaluation logic with Python decorators
 
-When using `--output` with multiple runs:
+### Writing Custom Components
 
-```
-results/
-├── run_1/
-│   ├── header.json
-│   ├── results.jsonl
-│   └── summary.json
-├── run_2/
-│   ├── header.json
-│   ├── results.jsonl
-│   └── summary.json
-├── run_3/
-│   └── ...
-└── aggregate_stats.json  # Statistics across all runs
-```
+Letta Evals provides Python decorators for extending the framework:
 
-### Statistics
-The `aggregate_stats.json` file includes:
-- Run summary: Total runs, runs passed/failed, pass rate
-- Average scores: Mean and standard deviation for `avg_score_attempted` and `avg_score_total`
-- Per-metric statistics: Mean and standard deviation for each grader
+- **@grader**: Register custom scoring functions for domain-specific evaluation logic
+- **@extractor**: Create custom extractors to parse agent responses in specialized ways
+- **@agent_factory**: Define programmatic agent creation for dynamic instantiation per sample
+- **@suite_setup**: Run initialization code before evaluation starts
 
-## Example: Multi-Metric Suite
+See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-and-extractor/) for implementation examples.
 
-- Path: `examples/simple-rubric-grader/suite.two-metrics.yaml`
-- Two graders: `quality` (rubric using `rubric.txt`) and `ascii_only` (tool `ascii_printable_only`)
-- Gate: `metric_key: quality`, `metric: avg_score`, `op: gte`, `value: 0.6`
+## FAQ
 
-Run:
+**Do you have examples of different eval types?**
 
-```
-letta-evals run examples/simple-rubric-grader/suite.two-metrics.yaml
-```
+> Yes! See the [`examples/`](examples/) directory. Each subdirectory contains a complete working example with dataset, suite config, and any custom components.
 
-## Configuration
+**Can I use this without writing any Python code?**
 
-### Suite YAML Structure
+> Absolutely! You can create powerful evals using just YAML configs and JSONL datasets. See [`examples/simple-tool-grader/`](examples/simple-tool-grader/) or [`examples/simple-rubric-grader/`](examples/simple-rubric-grader/) for code-free examples.
 
-```yaml
-name: suite-name
-description: Optional description
-dataset: path/to/dataset.jsonl
-max_samples: 100  # optional: limit samples
-sample_tags: [tag1, tag2]  # optional: filter by tags
+**How do I evaluate multi-turn agent interactions?**
 
-target:
-  kind: agent
-  agent_file: path/to/agent.af  # or agent_id: existing-id
-  base_url: http://localhost:8283
+> Letta agents inherently support multi-turn conversations. Use extractors like `all_messages` or `tool_calls` to capture the full interaction trajectory, not just the final response.
 
-graders:
-  my_metric:
-    kind: tool  # or rubric
-    function: contains  # for tool graders
-    extractor: last_assistant  # what to extract from response
-    # for rubric graders:
-    # prompt_path: path/to/rubric.txt
-    # model: gpt-4.1
-    # provider: openai
+**Can I test the same agent with different LLM models?**
 
-gate:
-  metric_key: my_metric
-  op: gte  # gte, gt, lte, lt, eq
-  value: 0.8
-```
+> Yes! Use the multi-model configuration feature. See [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) for an example that tests one agent with multiple model configurations.
 
-### Extractors
+**Can I run evaluations multiple times to measure consistency?**
 
-Control what part of the agent response gets graded:
-- `last_assistant`: Final assistant message
-- `all_messages`: All assistant messages
-- `tool_calls`: Tool invocations
-- `first_assistant`: First assistant message
-- Custom JSONPath expressions
+> Yes! Run evaluations multiple times to measure consistency and variance. See [`examples/simple-tool-grader/multi_run_tool_output_suite.yaml`](examples/simple-tool-grader/multi_run_tool_output_suite.yaml) for an example.
+>
+> ```bash
+> # run 5 times and get mean/std dev statistics
+> letta-evals run suite.yaml --num-runs 5 --output results/
+> ```
+>
+> Results include aggregate statistics across runs with mean and standard deviation for all metrics.
 
-### Built-in Grader Functions
+**Can I monitor long-running evaluations in real-time?**
 
-- `exact_match`: Exact string matching
-- `contains`: Check if response contains expected text
-- Custom functions can be registered via Python
+> Yes! Results are written incrementally as JSONL, allowing you to monitor evaluations in real-time and resume interrupted runs.
 
-## Development
+**Can I reuse agent trajectories when testing different graders?**
 
-### Linting
+> Yes! Use `--cached-results` to reuse agent trajectories across evaluations, avoiding redundant agent runs when testing different graders.
 
-```bash
-# check for issues
-ruff check .
+**Can I use this in CI/CD pipelines?**
 
-# fix linting issues and auto-format code
-ruff check --fix .
-ruff format .
-```
+> Absolutely! Letta Evals is designed to integrate seamlessly into continuous integration workflows. Check out our [`.github/workflows/e2e-tests.yml`](.github/workflows/e2e-tests.yml) for an example of running evaluations in GitHub Actions. The workflow automatically discovers and runs all suite files, making it easy to gate releases or validate changes to your agents.
 
-### Testing
+## Contributing
 
-```bash
-# run tests
-pytest
+Contributions are welcome! If you have an interesting eval or feature, please submit an issue or contact us on [Discord](https://discord.gg/letta).
 
-# run specific tests
-pytest -k test_name
-```
+## License
+
+This project is licensed under the MIT License. By contributing to evals, you are agreeing to make your evaluation logic and data under the same MIT license as this repository. You must have adequate rights to upload any data used in an eval. Letta reserves the right to use this data in future service improvements to our product.
