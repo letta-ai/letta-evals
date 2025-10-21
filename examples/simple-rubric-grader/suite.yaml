@@ -1,6 +1,6 @@
 name: ascii-art-rubric-test
 description: Test if agent can generate ASCII art correctly using rubric grading
-dataset: dataset.jsonl
+dataset: dataset.csv
 max_samples: 3
 target:
   kind: agent

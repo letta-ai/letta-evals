@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from letta_evals.constants import MAX_SAMPLES_DISPLAY
-from letta_evals.datasets.loader import load_jsonl
+from letta_evals.datasets.loader import load_dataset
 from letta_evals.models import RunnerResult, SuiteSpec
 from letta_evals.runner import run_suite
 from letta_evals.visualization.factory import ProgressStyle
@@ -69,7 +69,7 @@ def run(
             yaml_data = yaml.safe_load(f)
         suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent)
 
-        samples = list(load_jsonl(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
+        samples = list(load_dataset(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
         num_samples = len(samples)
 
         # calculate total evaluations (samples × models)

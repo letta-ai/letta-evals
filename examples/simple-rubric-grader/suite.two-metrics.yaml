@@ -1,6 +1,6 @@
 name: ascii-art-two-metrics
 description: Test ASCII art quality and ASCII-only characters using two graders
-dataset: dataset.jsonl
+dataset: dataset.csv
 target:
   kind: agent
   agent_file: ascii-art-agent.af
