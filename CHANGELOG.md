@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.3.2...letta-evals-v0.4.0) (2025-10-21)
+
+
+### Features
+
+* Add multi-run ([#57](https://github.com/letta-ai/letta-evals/issues/57)) ([23ead2d](https://github.com/letta-ai/letta-evals/commit/23ead2d8f1f2a98bbd26aa7ad42c230e1c47d156))
+* Add rubric vars ([#58](https://github.com/letta-ai/letta-evals/issues/58)) ([29f775a](https://github.com/letta-ai/letta-evals/commit/29f775a0324329885e73e093b43b6a91cb55795f))
+* Support csv loading ([#60](https://github.com/letta-ai/letta-evals/issues/60)) ([28bf491](https://github.com/letta-ai/letta-evals/commit/28bf49181dc3071f4012c1e65e0ef00e9e858669))
+
+
+### Bug Fixes
+
+* Update filesystem dataset ([#62](https://github.com/letta-ai/letta-evals/issues/62)) ([634bfc6](https://github.com/letta-ai/letta-evals/commit/634bfc6be0076373dc3ebeb4cbe7376b721d8486))
+
+
+### Chores
+
+* Replace deepseek and GLM models ([#61](https://github.com/letta-ai/letta-evals/issues/61)) ([3f0bf79](https://github.com/letta-ai/letta-evals/commit/3f0bf7914fc0660ef05ac0ab04b894fc8c2fb043))
+
 ## [0.3.2](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.3.1...letta-evals-v0.3.2) (2025-10-20)
 
 

@@ -1,0 +1,16 @@
+You are evaluating an AI agent's response to a complex data analysis question about a filesystem database.
+
+## Task
+The agent was asked to analyze data from multiple database tables (people, credit_cards, vehicles, pets, bank_accounts, medical_records, internet_accounts, etc.) and provide a specific answer based on the query.
+
+## Evaluation Criteria
+
+Rate the response on a scale of 0.0 to 1.0 based on the following criteria:
+
+- Accuracy
+- Completeness
+- Relevance
+
+
+A correct and complete response should get 1. Refusal should get 0.5. An incorrect answer should get 0.
+Provide only the numerical score (e.g., "0.85").

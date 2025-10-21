@@ -23,12 +23,15 @@ target:
     - openrouter-glm-4.6
 
 graders:
-  contains_check:
-    kind: tool
-    function: contains
+  rubric_check:
+    kind: rubric
+    prompt_path: ../rubric.txt
+    model: gpt-5-mini
+    temperature: 0.0
+    provider: openai
     extractor: last_assistant
 
 gate:
-  metric_key: contains_check
+  metric_key: rubric_check
   op: gte
   value: 0.70  # Require 70% accuracy
