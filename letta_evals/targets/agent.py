@@ -19,10 +19,10 @@ class AgentTarget(Target):
     def __init__(
         self,
         client: AsyncLetta,
-        agent_id: str = None,
-        agent_file: Path = None,
-        agent_script: str = None,
-        base_dir: Path = None,
+        agent_id: Optional[str] = None,
+        agent_file: Optional[Path] = None,
+        agent_script: Optional[str] = None,
+        base_dir: Optional[Path] = None,
         llm_config: Optional[LlmConfig] = None,
         model_handle: Optional[str] = None,
         max_retries: int = 0,
@@ -44,53 +44,58 @@ class AgentTarget(Target):
         retrieve_agent_state: bool = False,
     ) -> TargetResult:
         """Run the agent on a sample."""
-        agent_id = self.agent_id
+        attempt = 0
+        last_error = None
 
-        if self.agent_file:
-            with open(self.agent_file, "rb") as f:
-                resp = await self.client.agents.import_file(
-                    file=f, append_copy_suffix=False, override_existing_tools=False, project_id=project_id
-                )
-                if len(resp.agent_ids) > 1:
-                    raise RuntimeError(
-                        f"Expected single agent from .af file, got {len(resp.agent_ids)} agents. We don't support multi-agent evals yet."
-                    )
+        while attempt <= self.max_retries:
+            agent_id = self.agent_id
+            agent_id_to_cleanup = None
 
-                agent_id = resp.agent_ids[0]
+            try:
+                if self.agent_file:
+                    with open(self.agent_file, "rb") as f:
+                        resp = await self.client.agents.import_file(
+                            file=f, append_copy_suffix=False, override_existing_tools=False, project_id=project_id
+                        )
+                        if len(resp.agent_ids) > 1:
+                            raise RuntimeError(
+                                f"Expected single agent from .af file, got {len(resp.agent_ids)} agents. We don't support multi-agent evals yet."
+                            )
 
-        elif self.agent_script:
-            agent_factory_func = load_object(self.agent_script, self.base_dir)
-            agent_id = await agent_factory_func(self.client, sample)
+                        agent_id = resp.agent_ids[0]
+                        agent_id_to_cleanup = agent_id
 
-        if self.llm_config and agent_id:
-            await self.client.agents.modify(agent_id=agent_id, llm_config=self.llm_config)
-        elif self.model_handle and agent_id:
-            await self.client.agents.modify(agent_id=agent_id, model=self.model_handle)
+                elif self.agent_script:
+                    agent_factory_func = load_object(self.agent_script, self.base_dir)
+                    agent_id = await agent_factory_func(self.client, sample)
+                    agent_id_to_cleanup = agent_id
 
-        agent = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=[])
-        if self.llm_config:
-            model_name = self.llm_config.model
-        elif self.model_handle:
-            model_name = self.model_handle
-        else:
-            model_name = agent.llm_config.model
+                if self.llm_config and agent_id:
+                    await self.client.agents.modify(agent_id=agent_id, llm_config=self.llm_config)
+                elif self.model_handle and agent_id:
+                    await self.client.agents.modify(agent_id=agent_id, model=self.model_handle)
 
-        if progress_callback and (self.agent_file or self.agent_script):
-            await progress_callback.agent_loading(sample.id, model_name=model_name)
+                agent = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=[])
+                if self.llm_config:
+                    model_name = self.llm_config.model
+                elif self.model_handle:
+                    model_name = self.model_handle
+                else:
+                    model_name = agent.llm_config.model
 
-        trajectory = []
-        usage_stats: list[dict] = []
+                if progress_callback and (self.agent_file or self.agent_script):
+                    await progress_callback.agent_loading(sample.id, model_name=model_name)
 
-        inputs = sample.input if isinstance(sample.input, list) else [sample.input]
-        total_messages = len(inputs)
+                trajectory = []
+                usage_stats: list[dict] = []
 
-        for i, input_msg in enumerate(inputs):
-            if progress_callback:
-                await progress_callback.message_sending(sample.id, i + 1, total_messages, model_name=model_name)
+                inputs = sample.input if isinstance(sample.input, list) else [sample.input]
+                total_messages = len(inputs)
 
-            attempt = 0
-            while attempt <= self.max_retries:
-                try:
+                for i, input_msg in enumerate(inputs):
+                    if progress_callback:
+                        await progress_callback.message_sending(sample.id, i + 1, total_messages, model_name=model_name)
+
                     stream = self.client.agents.messages.create_stream(
                         agent_id=agent_id,
                         messages=[MessageCreate(role="user", content=str(input_msg))],
@@ -133,33 +138,43 @@ class AgentTarget(Target):
                     messages = await self.client.runs.messages.list(run_id=run_id)
                     trajectory.append(messages)
 
-                    # success, break out of retry loop
-                    break
+                final_agent_state = None
+                if retrieve_agent_state:
+                    final_agent_state = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=[])
 
-                except Exception as e:
-                    attempt += 1
-                    if attempt > self.max_retries:
-                        logger.error(
-                            f"Failed to create_stream for sample {sample.id} after {self.max_retries} retries. "
-                            f"Final error: {type(e).__name__}: {str(e)}"
-                        )
-                        raise
+                return TargetResult(
+                    trajectory=trajectory,
+                    agent_id=agent_id,
+                    model_name=model_name,
+                    agent_usage=usage_stats,
+                    agent_state=final_agent_state,
+                )
 
-                    backoff_time = 2 ** (attempt - 1)
-                    logger.warning(
-                        f"create_stream failed for sample {sample.id} (attempt {attempt}/{self.max_retries + 1}). "
-                        f"Error: {type(e).__name__}: {str(e)}. Retrying in {backoff_time}s..."
+            except Exception as e:
+                last_error = e
+                attempt += 1
+
+                if attempt > self.max_retries:
+                    logger.error(
+                        f"Failed to run agent for sample {sample.id} after {self.max_retries} retries. "
+                        f"Final error: {type(e).__name__}: {str(e)}"
                     )
-                    await anyio.sleep(backoff_time)
+                    raise
 
-        final_agent_state = None
-        if retrieve_agent_state:
-            final_agent_state = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=[])
+                if agent_id_to_cleanup:
+                    try:
+                        await self.client.agents.delete(agent_id=agent_id_to_cleanup)
+                        logger.info(f"Cleaned up agent {agent_id_to_cleanup} after failed attempt {attempt}")
+                    except Exception as cleanup_error:
+                        logger.warning(
+                            f"Failed to cleanup agent {agent_id_to_cleanup}: {type(cleanup_error).__name__}: {str(cleanup_error)}"
+                        )
 
-        return TargetResult(
-            trajectory=trajectory,
-            agent_id=agent_id,
-            model_name=model_name,
-            agent_usage=usage_stats,
-            agent_state=final_agent_state,
-        )
+                backoff_time = 2 ** (attempt - 1)
+                logger.warning(
+                    f"Agent run failed for sample {sample.id} (attempt {attempt}/{self.max_retries + 1}). "
+                    f"Error: {type(e).__name__}: {str(e)}. Retrying in {backoff_time}s..."
+                )
+                await anyio.sleep(backoff_time)
+
+        raise last_error or RuntimeError("Unexpected failure in agent run retry loop")
