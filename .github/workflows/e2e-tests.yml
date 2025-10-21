@@ -15,20 +15,6 @@ on:
       - 'setup.cfg'
       - 'requirements*.txt'
       - '.github/workflows/e2e-tests.yml'
-  push:
-    branches: [ main ]
-    paths:
-      - '**.py'
-      - 'examples/**/*.yaml'
-      - 'examples/**/*.yml'
-      - 'examples/**/*.jsonl'
-      - 'examples/**/*.af'
-      - 'examples/**/*.txt'
-      - 'pyproject.toml'
-      - 'setup.py'
-      - 'setup.cfg'
-      - 'requirements*.txt'
-      - '.github/workflows/e2e-tests.yml'
 
 jobs:
   discover-suites:
