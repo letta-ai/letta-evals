@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.5.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.4.0...letta-evals-v0.5.0) (2025-10-21)
+
+
+### Features
+
+* Add `ruff check --fix .` to README ([#65](https://github.com/letta-ai/letta-evals/issues/65)) ([066408b](https://github.com/letta-ai/letta-evals/commit/066408b99151caa8edf684d24540168067b45e2c))
+
+
+### Bug Fixes
+
+* Use rubric grader for file system task ([#63](https://github.com/letta-ai/letta-evals/issues/63)) ([03ef537](https://github.com/letta-ai/letta-evals/commit/03ef5370c9223cfa03377c83e13376d00503f8d8))
+
+
+### Documentation
+
+* Add example for tool output extractor ([#66](https://github.com/letta-ai/letta-evals/issues/66)) ([523d498](https://github.com/letta-ai/letta-evals/commit/523d498ff77c8f4a13239a124d3bf13a3f8b4ebd))
+* Add extra instructions for cloud usage ([#71](https://github.com/letta-ai/letta-evals/issues/71)) ([a8d3e5b](https://github.com/letta-ai/letta-evals/commit/a8d3e5bf674e46296c4ac520405d06fd9f978e07))
+* Write high level README ([#69](https://github.com/letta-ai/letta-evals/issues/69)) ([68be3da](https://github.com/letta-ai/letta-evals/commit/68be3da0fa3c3cf776c716fe48fc9014d5849de8))
+
+
+### Chores
+
+* Update preview image ([#70](https://github.com/letta-ai/letta-evals/issues/70)) ([81d5b41](https://github.com/letta-ai/letta-evals/commit/81d5b418c9d37e061b89e1ac20b1fda1be31aa37))
+
 ## [0.4.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.3.2...letta-evals-v0.4.0) (2025-10-21)
 
 
