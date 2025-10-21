@@ -61,9 +61,13 @@ Then run the evaluation as above.
 
 ## Configuration Details
 
-### Dataset Format
+### Dataset Formats
 
-Each sample in `dataset.csv` has an `input` and `ground_truth`:
+This example uses two different datasets, each tailored to its evaluation strategy:
+
+#### `assistant_dataset.csv` - Agent Response Dataset
+
+Used by `last_assistant_suite.yaml`. Contains specific answers the agent should extract and communicate:
 
 ```csv
 input,ground_truth
@@ -71,9 +75,24 @@ input,ground_truth
 ```
 
 **Key points:**
-- `input`: The prompt sent to the agent
-- `ground_truth`: The expected answer to check for in the response
-- Instructing the agent to format consistently (e.g., `{Notepad}`) makes grading more reliable
+- `ground_truth`: Specific formatted answers (e.g., `{Notepad}`, `{4}`, `{.html}`)
+- Tests if the agent can extract specific information AND format it correctly
+- Evaluates end-to-end behavior: tool usage + response generation
+
+#### `tool_output_dataset.csv` - Tool Output Dataset
+
+Used by `tool_output_suite.yaml`. Contains a sentence that should appear in the raw webpage content:
+
+```csv
+input,ground_truth
+"Read `https://www.york.ac.uk/teaching/cws/wws/webpage1.html`. What program is mentioned for writing HTML code? Respond with the program name ONLY in brackets, e.g. {Word}.","HTML isn't computer code, but is a language that uses US English to enable texts (words, images, sounds) to be inserted and formatting such as colo(u)r and centre/ering to be written in."
+```
+
+**Key points:**
+- `ground_truth`: A full sentence from the webpage that should appear in the tool's raw output
+- All samples use the same ground truth since they fetch the same webpage
+- Tests if the tool successfully fetches webpage content, regardless of what the agent says
+- Useful for isolating tool functionality from agent processing
 
 ### Suite Configurations
 
@@ -82,7 +101,7 @@ input,ground_truth
 ```yaml
 name: fetch-webpage-last-assistant-test
 description: Test if agent's final response contains the correct answer from fetched webpage
-dataset: dataset.csv
+dataset: assistant_dataset.csv
 target:
   kind: agent
   agent_file: test-fetch-webpage-simple-agent.af
@@ -99,6 +118,7 @@ gate:
 ```
 
 **Key points:**
+- Uses `assistant_dataset.csv` with specific formatted answers as ground truth
 - `extractor: last_assistant` evaluates the final agent message
 - Tests end-to-end behavior: tool calling + response generation
 - `gate` requires ≥75% pass rate (3+ out of 5 samples must pass)
@@ -108,7 +128,7 @@ gate:
 ```yaml
 name: fetch-webpage-tool-output-test
 description: Test if the tool output from read_webpage_content contains the correct answer
-dataset: dataset.csv
+dataset: tool_output_dataset.csv
 target:
   kind: agent
   agent_file: test-fetch-webpage-simple-agent.af
@@ -127,6 +147,7 @@ gate:
 ```
 
 **Key points:**
+- Uses `tool_output_dataset.csv` with a sentence from the webpage as ground truth
 - `extractor: tool_output` with `tool_name: read_webpage_content` evaluates raw tool output
 - `extractor_config` specifies which tool's output to extract
 - Tests tool functionality independently of agent's response formatting
