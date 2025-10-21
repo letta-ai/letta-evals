@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Iterable
 
 import pytest
 import yaml
@@ -14,26 +13,6 @@ from letta_evals.types import GraderKind
 from letta_evals.visualization.factory import ProgressStyle
 
 logger = logging.getLogger(__name__)
-
-
-def _find_example_suites(base: Path) -> list[Path]:
-    examples_dir = base / "examples"
-    patterns: Iterable[str] = ("suite.yaml", "suite.*.yaml")
-    suites: list[Path] = []
-    for sub in examples_dir.rglob("*"):
-        if not sub.is_dir():
-            continue
-        for pat in patterns:
-            for p in sub.glob(pat):
-                suites.append(p)
-    # de-duplicate, preserve order
-    seen: set[Path] = set()
-    result: list[Path] = []
-    for s in suites:
-        if s not in seen:
-            result.append(s)
-            seen.add(s)
-    return result
 
 
 def _requires_openai(suite: SuiteSpec) -> bool:
