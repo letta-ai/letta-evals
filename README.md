@@ -2,7 +2,7 @@
 
 Letta Evals provides a framework for evaluating AI agents built with [Letta](https://github.com/letta-ai/letta). We offer a flexible evaluation system to test different dimensions of agent behavior and the ability to write your own custom evals for use cases you care about. You can use your own datasets to build private evals that represent common patterns in your agentic workflows.
 
-<img width="596" src="docs/assets/evaluation-progress.png" alt="Letta Evals running an evaluation suite with real-time progress tracking" width="800">
+<img width="596" src="https://raw.githubusercontent.com/letta-ai/letta-evals/refs/heads/main/docs/assets/evaluation-progress.png?token=GHSAT0AAAAAACYIKB3XHC4RELKFG7VSECAM2HX7NJA" alt="Letta Evals running an evaluation suite with real-time progress tracking" width="800">
 
 If you are building with agentic systems, creating high quality evals is one of the most impactful things you can do. Without evals, it can be very difficult and time intensive to understand how agent configurations, model versions, or prompt changes might affect your use case. In the words of [OpenAI's President Greg Brockman](https://twitter.com/gdb/status/1733553161884127435):
 
