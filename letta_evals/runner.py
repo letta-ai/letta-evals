@@ -11,7 +11,7 @@ import yaml
 from letta_client import AgentState, AsyncLetta, LettaMessageUnion, LlmConfig
 from rich.console import Console
 
-from letta_evals.datasets.loader import load_jsonl
+from letta_evals.datasets.loader import load_dataset
 from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
@@ -368,7 +368,7 @@ class Runner:
         await self._run_setup()
 
         samples = list(
-            load_jsonl(self.suite.dataset, max_samples=self.suite.max_samples, sample_tags=self.suite.sample_tags)
+            load_dataset(self.suite.dataset, max_samples=self.suite.max_samples, sample_tags=self.suite.sample_tags)
         )
 
         # validate rubric variables before running any samples
@@ -734,7 +734,7 @@ async def run_suite(
         cached_results = await StreamingReader.to_runner_result(cached_results_path)
 
         cached_sample_map = {result.sample.id: result.sample for result in cached_results.results}
-        samples = list(load_jsonl(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
+        samples = list(load_dataset(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
 
         for sample in samples:
             if sample.id in cached_sample_map:
@@ -744,7 +744,7 @@ async def run_suite(
                         f"Sample ID {sample.id} input mismatch: dataset has '{sample.input}' but cache has '{cached_sample.input}'"
                     )
 
-    samples = list(load_jsonl(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
+    samples = list(load_dataset(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
     if suite.target.model_configs:
         num_models = len(suite.target.model_configs)
     elif suite.target.model_handles:
