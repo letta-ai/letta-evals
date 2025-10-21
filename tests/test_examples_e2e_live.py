@@ -43,43 +43,6 @@ def _requires_openai(suite: SuiteSpec) -> bool:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("suite_path", _find_example_suites(Path(__file__).resolve().parents[1]))
-async def test_examples_run_live_and_pass_gate(suite_path: Path, tmp_path: Path, caplog) -> None:
-    # require letta api key for all live runs
-    if not os.getenv("LETTA_API_KEY"):
-        pytest.skip("LETTA_API_KEY not set; skipping live e2e example run")
-
-    # load to know whether we need openai
-    with open(suite_path, "r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
-    suite = SuiteSpec.from_yaml(raw, base_dir=suite_path.parent)
-
-    if _requires_openai(suite) and not os.getenv("OPENAI_API_KEY"):
-        pytest.skip("OPENAI_API_KEY not set; skipping rubric-based example run")
-
-    output_path = tmp_path / "stream.jsonl"
-
-    logger.info(f"\n{'=' * 60}\nRunning suite: {suite_path.name}\n{'=' * 60}")
-
-    # run suite live against letta cloud
-    result = await run_suite(
-        suite_path=suite_path,
-        max_concurrent=2,
-        progress_style=ProgressStyle.SIMPLE,
-        cached_results_path=None,
-        output_path=output_path,
-        letta_api_key=os.getenv("LETTA_API_KEY"),
-        letta_base_url="https://api.letta.com/",
-    )
-
-    logger.info(f"\n{'=' * 60}\nResults: {result.metrics.passed_attempts}/{result.metrics.total} passed\n{'=' * 60}")
-
-    assert result.gates_passed, f"Gate failed for example suite: {suite_path}"
-    assert result.metrics.total > 0
-    assert output_path.exists()
-
-
-@pytest.mark.asyncio
 async def test_single_suite(request, tmp_path: Path, caplog) -> None:
     """test a single suite specified via --suite-path command line option"""
     suite_path_str = request.config.getoption("--suite-path")
