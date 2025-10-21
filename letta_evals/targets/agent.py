@@ -1,12 +1,16 @@
+import logging
 from pathlib import Path
 from typing import Optional
 
+import anyio
 from letta_client import AsyncLetta, LlmConfig, MessageCreate
 
 from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.base import Target
 from letta_evals.utils import load_object
 from letta_evals.visualization.base import ProgressCallback
+
+logger = logging.getLogger(__name__)
 
 
 class AgentTarget(Target):
@@ -21,6 +25,7 @@ class AgentTarget(Target):
         base_dir: Path = None,
         llm_config: Optional[LlmConfig] = None,
         model_handle: Optional[str] = None,
+        max_retries: int = 0,
     ):
         self.client = client
         self.agent_id = agent_id
@@ -29,6 +34,7 @@ class AgentTarget(Target):
         self.base_dir = base_dir or Path.cwd()
         self.llm_config = llm_config
         self.model_handle = model_handle
+        self.max_retries = max_retries
 
     async def run(
         self,
@@ -82,52 +88,70 @@ class AgentTarget(Target):
             if progress_callback:
                 await progress_callback.message_sending(sample.id, i + 1, total_messages, model_name=model_name)
 
-            stream = self.client.agents.messages.create_stream(
-                agent_id=agent_id,
-                messages=[MessageCreate(role="user", content=str(input_msg))],
-                stream_tokens=True,
-            )
+            attempt = 0
+            while attempt <= self.max_retries:
+                try:
+                    stream = self.client.agents.messages.create_stream(
+                        agent_id=agent_id,
+                        messages=[MessageCreate(role="user", content=str(input_msg))],
+                        stream_tokens=True,
+                    )
 
-            run_id = None
-            async for chunk in stream:
-                # derive run_id from very first chunk, all should have the same
-                if not run_id:
-                    run_id = chunk.run_id
+                    run_id = None
+                    async for chunk in stream:
+                        # derive run_id from very first chunk, all should have the same
+                        if not run_id:
+                            run_id = chunk.run_id
 
-                # handle usage statistics in a streaming fashion
-                if hasattr(chunk, "message_type"):
-                    if chunk.message_type == "usage_statistics":
-                        # best-effort convert to JSON-serializable dict
-                        usage_rec = None
-                        if hasattr(chunk, "model_dump") and callable(getattr(chunk, "model_dump")):
-                            try:
-                                usage_rec = chunk.model_dump()
-                            except Exception:
+                        if hasattr(chunk, "message_type"):
+                            if chunk.message_type == "usage_statistics":
                                 usage_rec = None
-                        if usage_rec is None and hasattr(chunk, "dict") and callable(getattr(chunk, "dict")):
-                            try:
-                                usage_rec = chunk.dict()  # type: ignore[attr-defined]
-                            except Exception:
-                                usage_rec = None
-                        if usage_rec is None and hasattr(chunk, "__dict__"):
-                            try:
-                                usage_rec = dict(chunk.__dict__)
-                            except Exception:
-                                usage_rec = None
-                        if usage_rec is None:
-                            # final fallback to string
-                            usage_rec = {"raw": str(chunk)}
-                        usage_stats.append(usage_rec)
-                        continue
+                                if hasattr(chunk, "model_dump") and callable(getattr(chunk, "model_dump")):
+                                    try:
+                                        usage_rec = chunk.model_dump()
+                                    except Exception:
+                                        usage_rec = None
+                                if usage_rec is None and hasattr(chunk, "dict") and callable(getattr(chunk, "dict")):
+                                    try:
+                                        usage_rec = chunk.dict()  # type: ignore[attr-defined]
+                                    except Exception:
+                                        usage_rec = None
+                                if usage_rec is None and hasattr(chunk, "__dict__"):
+                                    try:
+                                        usage_rec = dict(chunk.__dict__)
+                                    except Exception:
+                                        usage_rec = None
+                                if usage_rec is None:
+                                    usage_rec = {"raw": str(chunk)}
+                                usage_stats.append(usage_rec)
+                                continue
 
-            if not run_id:
-                raise RuntimeError("Unexpected error: no run ID was returned from streaming chunks.")
+                    if not run_id:
+                        raise RuntimeError("Unexpected error: no run ID was returned from streaming chunks.")
 
-            # TODO: Set limit here potentially, this is capped to 100
-            messages = await self.client.runs.messages.list(run_id=run_id)
-            trajectory.append(messages)
+                    # TODO: Set limit here potentially, this is capped to 100
+                    messages = await self.client.runs.messages.list(run_id=run_id)
+                    trajectory.append(messages)
 
-        # conditionally retrieve final agent state if needed (includes memory blocks)
+                    # success, break out of retry loop
+                    break
+
+                except Exception as e:
+                    attempt += 1
+                    if attempt > self.max_retries:
+                        logger.error(
+                            f"Failed to create_stream for sample {sample.id} after {self.max_retries} retries. "
+                            f"Final error: {type(e).__name__}: {str(e)}"
+                        )
+                        raise
+
+                    backoff_time = 2 ** (attempt - 1)
+                    logger.warning(
+                        f"create_stream failed for sample {sample.id} (attempt {attempt}/{self.max_retries + 1}). "
+                        f"Error: {type(e).__name__}: {str(e)}. Retrying in {backoff_time}s..."
+                    )
+                    await anyio.sleep(backoff_time)
+
         final_agent_state = None
         if retrieve_agent_state:
             final_agent_state = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=[])

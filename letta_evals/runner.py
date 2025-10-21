@@ -133,6 +133,7 @@ class Runner:
                 base_dir=self.suite.target.base_dir,
                 llm_config=actual_llm_config,
                 model_handle=model_handle,
+                max_retries=self.suite.target.max_retries,
             )
         else:
             raise ValueError(f"Unknown target kind: {self.suite.target.kind}")
