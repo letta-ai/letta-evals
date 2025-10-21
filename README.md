@@ -113,6 +113,62 @@ letta-evals list-extractors
 letta-evals list-graders
 ```
 
+## Multiple Runs with Statistics
+
+Run your evaluation suite multiple times to measure consistency and get aggregate statistics eg. mean  and standard deviation. Specify `num_runs` in either yaml or CLI.
+
+YAML
+```yaml
+name: my-eval-suite
+dataset: dataset.jsonl
+num_runs: 5  # Run the evaluation 5 times
+target:
+  kind: agent
+  agent_file: my_agent.af
+graders:
+  accuracy:
+    kind: tool
+    function: exact_match
+gate:
+  metric_key: accuracy
+  op: gte
+  value: 0.8
+```
+
+CLI
+```bash
+# Override suite config with CLI flag
+letta-evals run suite.yaml --num-runs 10
+
+# Save individual run results to separate directories
+letta-evals run suite.yaml --num-runs 5 --output results/
+```
+
+### Output Structure
+
+When using `--output` with multiple runs:
+
+```
+results/
+├── run_1/
+│   ├── header.json
+│   ├── results.jsonl
+│   └── summary.json
+├── run_2/
+│   ├── header.json
+│   ├── results.jsonl
+│   └── summary.json
+├── run_3/
+│   └── ...
+└── aggregate_stats.json  # Statistics across all runs
+```
+
+### Statistics
+The `aggregate_stats.json` file includes:
+- Run summary: Total runs, runs passed/failed, pass rate
+- Average scores: Mean and standard deviation for `avg_score_attempted` and `avg_score_total`
+- Per-metric statistics: Mean and standard deviation for each grader
+
 ## Example: Multi-Metric Suite
 
 - Path: `examples/simple-rubric-grader/suite.two-metrics.yaml`
