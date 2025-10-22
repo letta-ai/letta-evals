@@ -92,13 +92,14 @@ class RubricGrader(Grader):
         judge_prompt = build_judge_prompt(self.prompt, sample, submission, self.rubric_vars)
 
         temperature = self.temperature
-        if (
-            self.model.startswith("o1") or self.model.startswith("o3") or "gpt-5" in self.model.lower()
-        ) and temperature == 0.0:
-            temperature = 1.0
 
         try:
             if self.provider == LLMProvider.OPENAI:
+                if (
+                    self.model.startswith("o1") or self.model.startswith("o3") or "gpt-5" in self.model.lower()
+                ) and temperature == 0.0:
+                    temperature = 1.0
+
                 response = await self.client.chat.completions.create(
                     model=self.model,
                     messages=[
