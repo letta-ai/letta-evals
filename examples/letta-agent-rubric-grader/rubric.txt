@@ -1,0 +1,16 @@
+Evaluate the agent's response based on the following criteria:
+
+1. **Correctness (0.6 weight)**: Does the response contain accurate information from the webpage? Check if the answer matches what was requested in the input.
+
+2. **Format (0.2 weight)**: Is the response formatted correctly? The input often requests answers in a specific format (e.g., in brackets like {Answer}).
+
+3. **Completeness (0.2 weight)**: Does the response fully address the question without unnecessary information?
+
+Scoring Guidelines:
+- 1.0: Perfect response - correct, properly formatted, and complete
+- 0.75-0.99: Good response - minor formatting or completeness issues
+- 0.5-0.74: Adequate response - correct information but format/completeness problems
+- 0.25-0.49: Poor response - partially correct or missing key information
+- 0.0-0.24: Failed response - incorrect or no relevant information
+
+Use the submit_grade tool to submit your evaluation with a score between 0.0 and 1.0. You will need to use your fetch_webpage tool to fetch the desired webpage and confirm the answer is correct.

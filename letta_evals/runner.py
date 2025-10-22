@@ -12,6 +12,7 @@ from letta_client import AgentState, AsyncLetta, LettaMessageUnion, LlmConfig
 from rich.console import Console
 
 from letta_evals.datasets.loader import load_dataset
+from letta_evals.graders.agent_judge import AgentJudgeGrader
 from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
@@ -52,21 +53,6 @@ class Runner:
         letta_project_id: Optional[str] = None,
     ):
         self.suite: SuiteSpec = suite
-        # Use a unified multi-grader path; single-metric suites are normalized to one entry
-        self.graders: Optional[Dict[str, Grader]] = None
-        self._init_graders()
-        self.results: List[SampleResult] = []
-        self.max_concurrent = max_concurrent
-        self.semaphore = anyio.Semaphore(max_concurrent)
-        self.progress_callback = progress_callback
-        self.model_configs = self._load_model_configs()
-        self.cached_results = cached_results
-        self._cached_trajectories: Dict[int, Dict[str, SampleResult]] = (
-            self._build_trajectory_cache() if cached_results else {}
-        )
-        self._setup_executed = False
-        self.stream_writer: Optional[StreamingWriter] = None
-        self.output_path = output_path
 
         env_api_key = os.getenv("LETTA_API_KEY")
         env_base_url = os.getenv("LETTA_BASE_URL")
@@ -84,6 +70,22 @@ class Runner:
             client_kwargs["token"] = token
 
         self.client = AsyncLetta(**client_kwargs)
+
+        self.graders: Optional[Dict[str, Grader]] = None
+        self._init_graders()
+
+        self.results: List[SampleResult] = []
+        self.max_concurrent = max_concurrent
+        self.semaphore = anyio.Semaphore(max_concurrent)
+        self.progress_callback = progress_callback
+        self.model_configs = self._load_model_configs()
+        self.cached_results = cached_results
+        self._cached_trajectories: Dict[int, Dict[str, SampleResult]] = (
+            self._build_trajectory_cache() if cached_results else {}
+        )
+        self._setup_executed = False
+        self.stream_writer: Optional[StreamingWriter] = None
+        self.output_path = output_path
 
     def _load_model_configs(self) -> List[Optional[LlmConfig | str]]:
         """Load model configurations and handles if specified."""
@@ -151,18 +153,32 @@ class Runner:
                         base_dir=gspec.base_dir,
                     )
                 elif gspec.kind == GraderKind.RUBRIC:
-                    self.graders[key] = RubricGrader(
-                        prompt=gspec.prompt,
-                        model=gspec.model,
-                        temperature=gspec.temperature,
-                        provider=gspec.provider,
-                        max_retries=gspec.max_retries,
-                        timeout=gspec.timeout,
-                        extractor=gspec.extractor,
-                        extractor_config=gspec.extractor_config,
-                        base_dir=gspec.base_dir,
-                        rubric_vars=gspec.rubric_vars,
-                    )
+                    # check if agent-based or LLM-based judge
+                    if gspec.agent_file:
+                        self.graders[key] = AgentJudgeGrader(
+                            agent_file=gspec.agent_file,
+                            prompt=gspec.prompt,
+                            client=self.client,
+                            project_id=self.project_id,
+                            judge_tool_name=gspec.judge_tool_name,
+                            extractor=gspec.extractor,
+                            extractor_config=gspec.extractor_config,
+                            base_dir=gspec.base_dir,
+                            rubric_vars=gspec.rubric_vars,
+                        )
+                    else:
+                        self.graders[key] = RubricGrader(
+                            prompt=gspec.prompt,
+                            model=gspec.model,
+                            temperature=gspec.temperature,
+                            provider=gspec.provider,
+                            max_retries=gspec.max_retries,
+                            timeout=gspec.timeout,
+                            extractor=gspec.extractor,
+                            extractor_config=gspec.extractor_config,
+                            base_dir=gspec.base_dir,
+                            rubric_vars=gspec.rubric_vars,
+                        )
                 else:
                     raise ValueError(f"Unknown grader kind: {gspec.kind}")
         else:
