@@ -25,7 +25,7 @@ target:
 
 graders:
   rubric_check:
-    kind: rubric
+    kind: model_judge
     prompt_path: ../rubric.txt
     model: gpt-5-mini
     temperature: 0.0

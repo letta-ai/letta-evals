@@ -50,11 +50,11 @@ def create_progress_callback(
     else:
         grader_kind_label = "multi"
 
-    # Choose rubric model if any grader is rubric
+    # Choose model if any grader is model_judge
     rubric_model = None
     if suite.graders:
         for _, gspec in suite.graders.items():
-            if hasattr(gspec, "kind") and getattr(gspec, "kind").value == "rubric" and hasattr(gspec, "model"):
+            if hasattr(gspec, "kind") and getattr(gspec, "kind").value == "model_judge" and hasattr(gspec, "model"):
                 rubric_model = gspec.model
                 break
 

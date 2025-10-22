@@ -246,7 +246,7 @@ def list_graders():
         table.add_row(name, "tool")
 
     console.print(table)
-    console.print("\n[dim]You can also use 'rubric' graders with custom prompts[/dim]")
+    console.print("\n[dim]You can also use 'model_judge' or 'letta_judge' graders with custom prompts[/dim]")
 
 
 def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bool = False):

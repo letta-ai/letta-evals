@@ -74,22 +74,22 @@ class TargetSpec(BaseModel):
 class GraderSpec(BaseModel):
     """Grader configuration for evaluation."""
 
-    kind: GraderKind = Field(description="Type of grader (tool or rubric)")
+    kind: GraderKind = Field(description="Type of grader (tool, model_judge, or letta_judge)")
 
     # Optional display name for UI/CLI output
     display_name: Optional[str] = Field(default=None, description="Human-friendly name for this metric")
 
     function: Optional[str] = Field(default=None, description="Name of grading function for tool grader")
 
-    prompt: Optional[str] = Field(default=None, description="Rubric prompt for LLM judge")
-    prompt_path: Optional[Path] = Field(default=None, description="Path to file containing rubric prompt")
-    model: Optional[str] = Field(default="gpt-4o-mini", description="LLM model to use for rubric grading")
-    temperature: Optional[float] = Field(default=0.0, description="Temperature for LLM judge")
-    provider: Optional[LLMProvider] = Field(default=LLMProvider.OPENAI, description="LLM provider for rubric grading")
-    max_retries: Optional[int] = Field(default=5, description="Maximum number of retries for rubric grading")
-    timeout: Optional[float] = Field(default=120.0, description="Timeout for rubric grading in seconds")
+    prompt: Optional[str] = Field(default=None, description="Prompt for model judge or letta judge")
+    prompt_path: Optional[Path] = Field(default=None, description="Path to file containing prompt")
+    model: Optional[str] = Field(default="gpt-4o-mini", description="LLM model to use for model judge")
+    temperature: Optional[float] = Field(default=0.0, description="Temperature for model judge")
+    provider: Optional[LLMProvider] = Field(default=LLMProvider.OPENAI, description="LLM provider for model judge")
+    max_retries: Optional[int] = Field(default=5, description="Maximum number of retries for model judge")
+    timeout: Optional[float] = Field(default=120.0, description="Timeout for model judge in seconds")
     rubric_vars: Optional[List[str]] = Field(
-        default=None, description="List of required custom variables for rubric substitution"
+        default=None, description="List of required custom variables for prompt substitution"
     )
 
     # Agent-based judge fields
@@ -115,25 +115,13 @@ class GraderSpec(BaseModel):
             if not self.function:
                 raise ValueError("Tool grader requires function name")
             if self.rubric_vars:
-                raise ValueError("Tool grader cannot use rubric_vars (only available for rubric graders)")
-        elif self.kind == GraderKind.RUBRIC:
-            # check if agent-based or LLM-based judge
-            if self.agent_file:
-                # agent-based judge validation
-                if not self.prompt and not self.prompt_path:
-                    raise ValueError("Agent judge requires either prompt or prompt_path for rubric text")
-                if self.prompt and self.prompt_path:
-                    raise ValueError("Agent judge cannot have both prompt and prompt_path")
-                if self.model != "gpt-4o-mini" or self.temperature != 0.0 or self.provider != LLMProvider.OPENAI:
-                    raise ValueError(
-                        "Agent judge should not specify model/temperature/provider (those are only for LLM judges)"
-                    )
-            else:
-                # LLM-based judge validation
-                if not self.prompt and not self.prompt_path:
-                    raise ValueError("Rubric grader requires either prompt or prompt_path")
-                if self.prompt and self.prompt_path:
-                    raise ValueError("Rubric grader cannot have both prompt and prompt_path")
+                raise ValueError("Tool grader cannot use rubric_vars (only available for model_judge and letta_judge)")
+        elif self.kind == GraderKind.MODEL_JUDGE:
+            # model judge validation
+            if not self.prompt and not self.prompt_path:
+                raise ValueError("Model judge requires either prompt or prompt_path")
+            if self.prompt and self.prompt_path:
+                raise ValueError("Model judge cannot have both prompt and prompt_path")
 
             # load prompt from file if needed
             if self.prompt_path:
@@ -142,7 +130,7 @@ class GraderSpec(BaseModel):
         elif self.kind == GraderKind.LETTA_JUDGE:
             # letta judge validation
             if not self.prompt and not self.prompt_path:
-                raise ValueError("Letta judge requires either prompt or prompt_path for rubric text")
+                raise ValueError("Letta judge requires either prompt or prompt_path")
             if self.prompt and self.prompt_path:
                 raise ValueError("Letta judge cannot have both prompt and prompt_path")
 
@@ -153,10 +141,10 @@ class GraderSpec(BaseModel):
                     "To use a custom judge_tool_name, provide a custom agent_file."
                 )
 
-            # disallow LLM-specific fields for letta judge
+            # disallow model-specific fields for letta judge
             if self.model != "gpt-4o-mini" or self.temperature != 0.0 or self.provider != LLMProvider.OPENAI:
                 raise ValueError(
-                    "Letta judge should not specify model/temperature/provider (those are only for LLM judges)"
+                    "Letta judge should not specify model/temperature/provider (those are only for model judges)"
                 )
 
             # load prompt from file if needed

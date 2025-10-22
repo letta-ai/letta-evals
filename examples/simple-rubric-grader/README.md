@@ -75,7 +75,7 @@ The suite configuration declares which variables are required:
 ```yaml
 graders:
   quality:
-    kind: rubric
+    kind: model_judge
     prompt_path: rubric.txt
     rubric_vars:
       - reference_ascii
@@ -138,7 +138,7 @@ IMPORTANT: Make sure to clearly express your rationale and scoring.
 ```yaml
 graders:
   quality:
-    kind: rubric
+    kind: model_judge
     prompt_path: rubric.txt
     model: claude-haiku-4-5-20251001
     temperature: 0.0
@@ -157,7 +157,7 @@ Combine rubric and tool graders for comprehensive evaluation:
 ```yaml
 graders:
   quality:
-    kind: rubric
+    kind: model_judge
     display_name: "rubric score"
     prompt_path: rubric.txt
     model: gpt-5-mini

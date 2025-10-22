@@ -7,7 +7,7 @@ target:
   base_url: http://localhost:8283
 graders:
   quality:
-    kind: rubric
+    kind: model_judge
     display_name: "rubric score"
     prompt_path: rubric.txt
     model: gpt-5-mini
