@@ -11,9 +11,9 @@ graders:
     kind: rubric
     display_name: "rubric score"
     prompt_path: rubric.txt
-    model: gpt-5-mini
+    model: claude-haiku-4-5-20251001
     temperature: 0.0
-    provider: openai
+    provider: anthropic
     max_retries: 3
     timeout: 120.0
     extractor: last_assistant

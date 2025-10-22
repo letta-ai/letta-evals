@@ -22,8 +22,12 @@ Start your local Letta server:
 letta server
 ```
 
-Set your OpenAI API key (required for rubric grader):
+Set your API keys (required for rubric grader):
 ```bash
+# For suite.yaml (uses Anthropic Claude)
+export ANTHROPIC_API_KEY=your-key
+
+# For suite.two-metrics.yaml and suite.ascii-only-accuracy.yaml (use OpenAI GPT)
 export OPENAI_API_KEY=your-key
 ```
 
@@ -39,7 +43,10 @@ Set these environment variables:
 ```bash
 export LETTA_API_KEY=your-api-key
 export LETTA_PROJECT_ID=your-project-id
-export OPENAI_API_KEY=your-openai-key
+
+# Depending on which suite you're running:
+export ANTHROPIC_API_KEY=your-anthropic-key  # for suite.yaml
+export OPENAI_API_KEY=your-openai-key  # for suite.two-metrics.yaml and suite.ascii-only-accuracy.yaml
 ```
 
 Update `base_url` in `suite.yaml`:
@@ -133,9 +140,9 @@ graders:
   quality:
     kind: rubric
     prompt_path: rubric.txt
-    model: gpt-4.1
+    model: claude-haiku-4-5-20251001
     temperature: 0.0
-    provider: openai
+    provider: anthropic
     max_retries: 3
     timeout: 120.0
     extractor: last_assistant
@@ -153,7 +160,7 @@ graders:
     kind: rubric
     display_name: "rubric score"
     prompt_path: rubric.txt
-    model: gpt-4.1
+    model: gpt-5-mini
     temperature: 0.0
     provider: openai
     extractor: last_assistant
@@ -172,6 +179,6 @@ graders:
 
 ## Variants
 
-- `suite.yaml`: Single rubric grader for quality assessment
-- `suite.two-metrics.yaml`: Combines rubric grader (quality) + tool grader (ASCII character validation)
-- `suite.ascii-only-accuracy.yaml`: Example showing different gate configurations
+- `suite.yaml`: Single rubric grader for quality assessment (uses Claude Haiku via Anthropic)
+- `suite.two-metrics.yaml`: Combines rubric grader (quality) + tool grader (ASCII character validation) (uses GPT-5-mini via OpenAI)
+- `suite.ascii-only-accuracy.yaml`: Example showing different gate configurations (uses GPT-5-mini via OpenAI)
