@@ -1,0 +1,16 @@
+name: fetch-webpage-default-judge-test
+description: Test agent responses using the default Letta judge with rubric grading
+dataset: dataset.csv
+target:
+  kind: agent
+  agent_file: test-fetch-webpage-simple-agent.af
+  base_url: http://localhost:8283
+graders:
+  agent_judge:
+    kind: letta_judge
+    prompt_path: default_judge_rubric.txt
+    extractor: last_assistant
+gate:
+  metric_key: agent_judge
+  op: gte
+  value: 0.7

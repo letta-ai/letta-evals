@@ -69,36 +69,108 @@ Then run the evaluation as above.
 
 ### Suite Configuration
 
+This example provides two configuration approaches:
+
+#### Option 1: Default Letta Judge (Recommended for Most Use Cases)
+
+**File:** `default_judge_suite.yaml`
+
+The simplest configuration uses the built-in default judge agent with pre-fetched webpage content:
+
 ```yaml
-name: fetch-webpage-agent-judge-test
-description: Test agent responses using a Letta agent as judge with rubric grading
+name: fetch-webpage-default-judge-test
 dataset: dataset.csv
 target:
   kind: agent
   agent_file: test-fetch-webpage-simple-agent.af
-  base_url: http://localhost:8283
 graders:
   agent_judge:
-    kind: rubric
-    agent_file: judge.af              # Judge agent with submit_grade tool
-    prompt_path: rubric.txt           # Rubric criteria for evaluation
-    judge_tool_name: submit_grade     # Tool the judge uses to submit scores
-    extractor: last_assistant         # Extract agent's final response
+    kind: letta_judge                      # Use letta_judge kind
+    prompt_path: default_judge_rubric.txt  # Rubric with hardcoded webpage content
+    extractor: last_assistant
 gate:
   metric_key: agent_judge
   op: gte
-  value: 0.75                         # Pass if avg score ≥ 0.75
+  value: 0.7
 ```
 
+**How it works:**
+- Uses the default Letta judge agent (no custom agent_file needed)
+- Rubric includes the **hardcoded webpage content** for grading
+- Judge reads the content directly from the rubric prompt
+- Simpler, faster, and more reliable (no live web requests)
+
+**When to use:** Most evaluation scenarios where you know the expected content ahead of time.
+
+#### Option 2: Custom Letta Judge with Live Web Search (Advanced)
+
+**File:** `suite.yaml`
+
+For advanced scenarios where the judge needs to dynamically verify information:
+
+```yaml
+name: fetch-webpage-agent-judge-test
+dataset: dataset.csv
+target:
+  kind: agent
+  agent_file: test-fetch-webpage-simple-agent.af
+graders:
+  agent_judge:
+    kind: letta_judge
+    agent_file: custom_web_search_judge.af  # Custom judge with web tools
+    prompt_path: custom_judge_rubric.txt    # Rubric instructs live fetching
+    judge_tool_name: submit_grade
+    extractor: last_assistant
+gate:
+  metric_key: agent_judge
+  op: gte
+  value: 0.7
+```
+
+**How it works:**
+- Uses a **custom judge agent** with `fetch_webpage` tool capabilities
+- Rubric instructs the judge to **fetch the webpage live** during grading
+- Judge performs real-time web requests to verify agent answers
+- More dynamic but slower and depends on network availability
+
+**When to use:** When evaluating against dynamic content, testing web-fetching capabilities, or when ground truth can't be pre-determined.
+
+**Key Differences:**
+
+| Aspect | Default Judge | Custom Judge |
+|--------|--------------|--------------|
+| **Agent** | Built-in default | Custom with web tools |
+| **Rubric** | Hardcoded content | Instructions to fetch live |
+| **Speed** | Faster (no web requests) | Slower (live fetching) |
+| **Reliability** | Higher (offline) | Lower (network dependent) |
+| **Use Case** | Static evaluation | Dynamic verification |
+| **Config Complexity** | Minimal (2 required fields) | Higher (4+ fields) |
+
 **Key Configuration Options:**
-- `agent_file`: Path to `.af` file containing the judge agent
+- `kind`: Must be `letta_judge` for agent-based judges
+- `agent_file`: (Optional) Path to custom `.af` judge agent. If omitted, uses default judge
 - `prompt_path`: Path to file containing rubric text (can also use `prompt` for inline rubric)
-- `judge_tool_name`: Name of the tool the judge calls to submit scores (default: `submit_grade`)
+- `judge_tool_name`: (Optional) Name of the tool the judge calls to submit scores. Only allowed with custom `agent_file`
 - `extractor`: How to extract the submission from agent trajectory
 
 ### Judge Agent Requirements & Gotchas
 
-#### ✅ Checklist: Will Your Judge Agent Work?
+**Recommendation: Use the Default Judge**
+
+We **highly recommend** using the default Letta judge (Option 1) for most use cases. Configuring a custom judge agent is complex and error-prone, with several potential footguns:
+- Tool schema must exactly match expected parameters
+- Tool name must be correctly specified
+- Agent must not have conflicting tools that confuse evaluation
+- Additional complexity in debugging when things go wrong
+
+**Only create a custom judge if you have a specific need**, such as:
+- Judge needs to fetch live web content for verification
+- Judge requires access to custom tools (databases, APIs, etc.)
+- Special evaluation logic that can't be expressed in the rubric alone
+
+If you do need a custom judge, use this checklist:
+
+#### Checklist: Will Your Judge Agent Work?
 
 Use this checklist to verify your judge agent is properly configured:
 

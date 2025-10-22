@@ -8,6 +8,7 @@ class TargetKind(str, Enum):
 class GraderKind(str, Enum):
     TOOL = "tool"
     RUBRIC = "rubric"
+    LETTA_JUDGE = "letta_judge"
 
 
 class MetricOp(str, Enum):

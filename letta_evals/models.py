@@ -139,6 +139,30 @@ class GraderSpec(BaseModel):
             if self.prompt_path:
                 with open(self.prompt_path, "r") as f:
                     self.prompt = f.read()
+        elif self.kind == GraderKind.LETTA_JUDGE:
+            # letta judge validation
+            if not self.prompt and not self.prompt_path:
+                raise ValueError("Letta judge requires either prompt or prompt_path for rubric text")
+            if self.prompt and self.prompt_path:
+                raise ValueError("Letta judge cannot have both prompt and prompt_path")
+
+            # if using default agent (agent_file is None), cannot specify judge_tool_name
+            if self.agent_file is None and self.judge_tool_name != "submit_grade":
+                raise ValueError(
+                    "Cannot specify judge_tool_name when using default Letta judge (agent_file is None). "
+                    "To use a custom judge_tool_name, provide a custom agent_file."
+                )
+
+            # disallow LLM-specific fields for letta judge
+            if self.model != "gpt-4o-mini" or self.temperature != 0.0 or self.provider != LLMProvider.OPENAI:
+                raise ValueError(
+                    "Letta judge should not specify model/temperature/provider (those are only for LLM judges)"
+                )
+
+            # load prompt from file if needed
+            if self.prompt_path:
+                with open(self.prompt_path, "r") as f:
+                    self.prompt = f.read()
 
 
 class GateSpec(BaseModel):

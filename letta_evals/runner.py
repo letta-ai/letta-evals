@@ -179,6 +179,25 @@ class Runner:
                             base_dir=gspec.base_dir,
                             rubric_vars=gspec.rubric_vars,
                         )
+                elif gspec.kind == GraderKind.LETTA_JUDGE:
+                    # use default agent file if not provided
+                    agent_file = gspec.agent_file
+                    judge_tool_name = gspec.judge_tool_name
+                    if agent_file is None:
+                        agent_file = Path(__file__).parent / "graders/letta-evals-judge-agent.af"
+                        judge_tool_name = "submit_grade"
+
+                    self.graders[key] = AgentJudgeGrader(
+                        agent_file=agent_file,
+                        prompt=gspec.prompt,
+                        client=self.client,
+                        project_id=self.project_id,
+                        judge_tool_name=judge_tool_name,
+                        extractor=gspec.extractor,
+                        extractor_config=gspec.extractor_config,
+                        base_dir=gspec.base_dir,
+                        rubric_vars=gspec.rubric_vars,
+                    )
                 else:
                     raise ValueError(f"Unknown grader kind: {gspec.kind}")
         else:
