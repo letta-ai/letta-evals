@@ -2,6 +2,23 @@ from typing import List, Optional
 
 from letta_evals.models import Sample
 
+JUDGE_SYSTEM_PROMPT = """You are an evaluation judge. You will be given:
+1. A rubric describing evaluation criteria
+2. An input/question
+3. A submission to evaluate
+
+Evaluate the submission according to the rubric and return a JSON response with:
+{
+    "score": (REQUIRED: a decimal number between 0.0 and 1.0 inclusive),
+    "rationale": "explanation of your grading decision"
+}
+
+IMPORTANT:
+- The score MUST be a number between 0.0 and 1.0 (inclusive)
+- 0.0 means complete failure, 1.0 means perfect
+- Use decimal values for partial credit (e.g., 0.25, 0.5, 0.75)
+- Be objective and follow the rubric strictly"""
+
 
 def build_judge_prompt(
     prompt: str,
@@ -10,7 +27,7 @@ def build_judge_prompt(
     rubric_vars: Optional[List[str]] = None,
     judge_tool_name: Optional[str] = None,
 ) -> str:
-    """Build a multi-part judge prompt with rubric, input, ground truth, and submission.
+    """Build a multipart judge prompt with rubric, input, ground truth, and submission.
 
     Args:
         prompt: The rubric text
