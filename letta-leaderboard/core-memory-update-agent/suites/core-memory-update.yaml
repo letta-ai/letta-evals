@@ -17,7 +17,7 @@ target:
     - claude-4-1-opus
     - together-gpt-oss-120b
     - together-gpt-oss-20b
-    - together-kimi-k2
+    - openrouter-kimi-k2-0905
     - openrouter-deepseek-v3.1
     - openrouter-glm-4.6
 
