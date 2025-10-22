@@ -107,7 +107,7 @@ class AgentTarget(Target):
                     async for chunk in stream:
                         # derive run_id from very first chunk, all should have the same
                         # defensive for now, letta server needs fix to standardize run_id
-                        chunks.append(chunks)
+                        chunks.append(chunk)
 
                         if not run_id and hasattr(chunk, "run_id"):
                             run_id = chunk.run_id
