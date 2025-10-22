@@ -5,20 +5,11 @@ import os
 from pathlib import Path
 
 import pytest
-import yaml
 
-from letta_evals.models import SuiteSpec
 from letta_evals.runner import run_suite
-from letta_evals.types import GraderKind
 from letta_evals.visualization.factory import ProgressStyle
 
 logger = logging.getLogger(__name__)
-
-
-def _requires_openai(suite: SuiteSpec) -> bool:
-    if not suite.graders:
-        return False
-    return any(g.kind == GraderKind.MODEL_JUDGE for g in suite.graders.values())
 
 
 @pytest.mark.asyncio
@@ -35,14 +26,6 @@ async def test_single_suite(request, tmp_path: Path, caplog) -> None:
     # require letta api key for all live runs
     if not os.getenv("LETTA_API_KEY"):
         pytest.skip("LETTA_API_KEY not set; skipping live e2e example run")
-
-    # load to know whether we need openai
-    with open(suite_path, "r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
-    suite = SuiteSpec.from_yaml(raw, base_dir=suite_path.parent)
-
-    if _requires_openai(suite) and not os.getenv("OPENAI_API_KEY"):
-        pytest.skip("OPENAI_API_KEY not set; skipping rubric-based example run")
 
     output_path = tmp_path / "stream.jsonl"
 

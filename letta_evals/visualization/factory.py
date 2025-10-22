@@ -5,7 +5,7 @@ from typing import Dict, Optional
 
 from rich.console import Console
 
-from letta_evals.models import SuiteSpec
+from letta_evals.models import ModelJudgeGraderSpec, SuiteSpec
 from letta_evals.visualization.base import ProgressCallback
 from letta_evals.visualization.noop_progress import NoOpProgress
 from letta_evals.visualization.rich_progress import DisplayMode, EvalProgress
@@ -50,11 +50,11 @@ def create_progress_callback(
     else:
         grader_kind_label = "multi"
 
-    # Choose model if any grader is model_judge
+    # choose model if any grader is model_judge
     rubric_model = None
     if suite.graders:
         for _, gspec in suite.graders.items():
-            if hasattr(gspec, "kind") and getattr(gspec, "kind").value == "model_judge" and hasattr(gspec, "model"):
+            if isinstance(gspec, ModelJudgeGraderSpec):
                 rubric_model = gspec.model
                 break
 

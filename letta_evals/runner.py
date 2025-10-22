@@ -18,19 +18,22 @@ from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
 from letta_evals.models import (
     GradeResult,
+    LettaJudgeGraderSpec,
     MetricAggregate,
     Metrics,
+    ModelJudgeGraderSpec,
     ModelMetrics,
     RunnerResult,
     RunStatistics,
     Sample,
     SampleResult,
     SuiteSpec,
+    ToolGraderSpec,
 )
 from letta_evals.streaming import StreamingReader, StreamingWriter
 from letta_evals.targets.agent import AgentTarget
 from letta_evals.targets.base import Target
-from letta_evals.types import GateMetric, GraderKind, TargetKind
+from letta_evals.types import GateMetric, TargetKind
 from letta_evals.utils import load_object
 from letta_evals.visualization.base import ProgressCallback
 from letta_evals.visualization.factory import ProgressStyle, create_progress_callback
@@ -145,14 +148,14 @@ class Runner:
         if self.suite.graders:
             self.graders = {}
             for key, gspec in self.suite.graders.items():
-                if gspec.kind == GraderKind.TOOL:
+                if isinstance(gspec, ToolGraderSpec):
                     self.graders[key] = ToolGrader(
                         function=gspec.function,
                         extractor=gspec.extractor,
                         extractor_config=gspec.extractor_config,
                         base_dir=gspec.base_dir,
                     )
-                elif gspec.kind == GraderKind.MODEL_JUDGE:
+                elif isinstance(gspec, ModelJudgeGraderSpec):
                     self.graders[key] = RubricGrader(
                         prompt=gspec.prompt,
                         model=gspec.model,
@@ -165,7 +168,7 @@ class Runner:
                         base_dir=gspec.base_dir,
                         rubric_vars=gspec.rubric_vars,
                     )
-                elif gspec.kind == GraderKind.LETTA_JUDGE:
+                elif isinstance(gspec, LettaJudgeGraderSpec):
                     # use default agent file if not provided
                     agent_file = gspec.agent_file
                     judge_tool_name = gspec.judge_tool_name
@@ -185,7 +188,7 @@ class Runner:
                         rubric_vars=gspec.rubric_vars,
                     )
                 else:
-                    raise ValueError(f"Unknown grader kind: {gspec.kind}")
+                    raise ValueError(f"Unknown grader spec type: {type(gspec)}")
         else:
             raise ValueError("Suite must define 'graders'")
 
@@ -368,7 +371,8 @@ class Runner:
             return
 
         for grader_key, grader_spec in self.suite.graders.items():
-            if grader_spec.kind != GraderKind.MODEL_JUDGE or not grader_spec.rubric_vars:
+            # check if grader uses rubric_vars (model_judge or letta_judge)
+            if not isinstance(grader_spec, (ModelJudgeGraderSpec, LettaJudgeGraderSpec)) or not grader_spec.rubric_vars:
                 continue
 
             for sample in samples:

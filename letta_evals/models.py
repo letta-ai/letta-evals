@@ -1,8 +1,8 @@
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
 from letta_client import AgentState, LettaMessageUnion
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from letta_evals.types import GateMetric, GraderKind, LLMProvider, MetricOp, TargetKind
 
@@ -71,86 +71,100 @@ class TargetSpec(BaseModel):
                 raise ValueError("Agent target can only have one of: agent_id, agent_file, or agent_script")
 
 
-class GraderSpec(BaseModel):
-    """Grader configuration for evaluation."""
+class BaseGraderSpec(BaseModel):
+    """Base grader configuration with common fields."""
 
     kind: GraderKind = Field(description="Type of grader (tool, model_judge, or letta_judge)")
-
-    # Optional display name for UI/CLI output
     display_name: Optional[str] = Field(default=None, description="Human-friendly name for this metric")
+    extractor: str = Field(default="last_assistant", description="Strategy for extracting submission from trajectory")
+    extractor_config: Optional[Dict[str, Any]] = Field(default=None, description="Configuration for the extractor")
+    base_dir: Optional[Path] = Field(default=None, exclude=True)
 
-    function: Optional[str] = Field(default=None, description="Name of grading function for tool grader")
 
-    prompt: Optional[str] = Field(default=None, description="Prompt for model judge or letta judge")
+class ToolGraderSpec(BaseGraderSpec):
+    """Tool grader configuration."""
+
+    kind: Literal[GraderKind.TOOL] = GraderKind.TOOL
+    function: str = Field(description="Name of grading function for tool grader")
+
+
+class ModelJudgeGraderSpec(BaseGraderSpec):
+    """Model judge grader configuration."""
+
+    kind: Literal[GraderKind.MODEL_JUDGE] = GraderKind.MODEL_JUDGE
+    prompt: Optional[str] = Field(default=None, description="Prompt for model judge")
     prompt_path: Optional[Path] = Field(default=None, description="Path to file containing prompt")
-    model: Optional[str] = Field(default="gpt-4o-mini", description="LLM model to use for model judge")
-    temperature: Optional[float] = Field(default=0.0, description="Temperature for model judge")
-    provider: Optional[LLMProvider] = Field(default=LLMProvider.OPENAI, description="LLM provider for model judge")
-    max_retries: Optional[int] = Field(default=5, description="Maximum number of retries for model judge")
-    timeout: Optional[float] = Field(default=120.0, description="Timeout for model judge in seconds")
+    model: str = Field(default="gpt-4o-mini", description="LLM model to use for model judge")
+    temperature: float = Field(default=0.0, description="Temperature for model judge")
+    provider: LLMProvider = Field(default=LLMProvider.OPENAI, description="LLM provider for model judge")
+    max_retries: int = Field(default=5, description="Maximum number of retries for model judge")
+    timeout: float = Field(default=120.0, description="Timeout for model judge in seconds")
     rubric_vars: Optional[List[str]] = Field(
         default=None, description="List of required custom variables for prompt substitution"
     )
 
-    # Agent-based judge fields
+    @model_validator(mode="after")
+    def validate_prompt_config(self):
+        if not self.prompt and not self.prompt_path:
+            raise ValueError("Model judge requires either prompt or prompt_path")
+        if self.prompt and self.prompt_path:
+            raise ValueError("Model judge cannot have both prompt and prompt_path")
+
+        # load prompt from file if needed
+        if self.prompt_path:
+            with open(self.prompt_path, "r") as f:
+                self.prompt = f.read()
+
+        return self
+
+
+class LettaJudgeGraderSpec(BaseGraderSpec):
+    """Letta judge grader configuration."""
+
+    kind: Literal[GraderKind.LETTA_JUDGE] = GraderKind.LETTA_JUDGE
+    prompt: Optional[str] = Field(default=None, description="Prompt for letta judge")
+    prompt_path: Optional[Path] = Field(default=None, description="Path to file containing prompt")
     agent_file: Optional[Path] = Field(default=None, description="Path to .af agent file to use as judge")
-    judge_tool_name: Optional[str] = Field(
+    judge_tool_name: str = Field(
         default="submit_grade", description="Name of tool that agent uses to submit score/rationale"
     )
-
-    extractor: str = Field(default="last_assistant", description="Strategy for extracting submission from trajectory")
-    extractor_config: Optional[Dict[str, Any]] = Field(default=None, description="Configuration for the extractor")
-
-    base_dir: Optional[Path] = Field(default=None, exclude=True)
+    rubric_vars: Optional[List[str]] = Field(
+        default=None, description="List of required custom variables for prompt substitution"
+    )
 
     @field_validator("agent_file")
+    @classmethod
     def validate_agent_file(cls, v: Optional[Path]) -> Optional[Path]:
         if v and not str(v).endswith(".af"):
             raise ValueError("Agent file must have .af extension")
         return v
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        if self.kind == GraderKind.TOOL:
-            if not self.function:
-                raise ValueError("Tool grader requires function name")
-            if self.rubric_vars:
-                raise ValueError("Tool grader cannot use rubric_vars (only available for model_judge and letta_judge)")
-        elif self.kind == GraderKind.MODEL_JUDGE:
-            # model judge validation
-            if not self.prompt and not self.prompt_path:
-                raise ValueError("Model judge requires either prompt or prompt_path")
-            if self.prompt and self.prompt_path:
-                raise ValueError("Model judge cannot have both prompt and prompt_path")
+    @model_validator(mode="after")
+    def validate_letta_judge_config(self):
+        if not self.prompt and not self.prompt_path:
+            raise ValueError("Letta judge requires either prompt or prompt_path")
+        if self.prompt and self.prompt_path:
+            raise ValueError("Letta judge cannot have both prompt and prompt_path")
 
-            # load prompt from file if needed
-            if self.prompt_path:
-                with open(self.prompt_path, "r") as f:
-                    self.prompt = f.read()
-        elif self.kind == GraderKind.LETTA_JUDGE:
-            # letta judge validation
-            if not self.prompt and not self.prompt_path:
-                raise ValueError("Letta judge requires either prompt or prompt_path")
-            if self.prompt and self.prompt_path:
-                raise ValueError("Letta judge cannot have both prompt and prompt_path")
+        # if using default agent (agent_file is None), cannot specify judge_tool_name
+        if self.agent_file is None and self.judge_tool_name != "submit_grade":
+            raise ValueError(
+                "Cannot specify judge_tool_name when using default Letta judge (agent_file is None). "
+                "To use a custom judge_tool_name, provide a custom agent_file."
+            )
 
-            # if using default agent (agent_file is None), cannot specify judge_tool_name
-            if self.agent_file is None and self.judge_tool_name != "submit_grade":
-                raise ValueError(
-                    "Cannot specify judge_tool_name when using default Letta judge (agent_file is None). "
-                    "To use a custom judge_tool_name, provide a custom agent_file."
-                )
+        # load prompt from file if needed
+        if self.prompt_path:
+            with open(self.prompt_path, "r") as f:
+                self.prompt = f.read()
 
-            # disallow model-specific fields for letta judge
-            if self.model != "gpt-4o-mini" or self.temperature != 0.0 or self.provider != LLMProvider.OPENAI:
-                raise ValueError(
-                    "Letta judge should not specify model/temperature/provider (those are only for model judges)"
-                )
+        return self
 
-            # load prompt from file if needed
-            if self.prompt_path:
-                with open(self.prompt_path, "r") as f:
-                    self.prompt = f.read()
+
+GraderSpec = Annotated[
+    Union[ToolGraderSpec, ModelJudgeGraderSpec, LettaJudgeGraderSpec],
+    Field(discriminator="kind"),
+]
 
 
 class GateSpec(BaseModel):
