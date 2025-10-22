@@ -121,11 +121,12 @@ class RubricGrader(Grader):
                     system=[{"type": "text", "text": JUDGE_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
                     messages=[
                         {"role": "user", "content": judge_prompt},
+                        {"role": "assistant", "content": "{"},  # prefill trick
                     ],
                 )
 
                 # extract text from response
-                response_text = ""
+                response_text = "{"
                 for block in response.content:
                     if hasattr(block, "text"):
                         response_text += block.text
