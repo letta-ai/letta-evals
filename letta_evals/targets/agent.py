@@ -105,7 +105,8 @@ class AgentTarget(Target):
                     run_id = None
                     async for chunk in stream:
                         # derive run_id from very first chunk, all should have the same
-                        if not run_id:
+                        # defensive for now, letta server needs fix to standardize run_id
+                        if not run_id and hasattr(chunk, "run_id"):
                             run_id = chunk.run_id
 
                         if hasattr(chunk, "message_type"):
