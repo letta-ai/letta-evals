@@ -7,9 +7,9 @@ target:
   base_url: http://localhost:8283
 graders:
   agent_judge:
-    kind: rubric
-    agent_file: judge.af
-    prompt_path: rubric.txt
+    kind: letta_judge
+    agent_file: custom_web_search_judge.af
+    prompt_path: custom_judge_rubric.txt
     judge_tool_name: submit_grade
     extractor: last_assistant
 gate:
