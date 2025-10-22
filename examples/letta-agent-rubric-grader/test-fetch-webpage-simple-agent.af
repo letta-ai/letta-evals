@@ -1,0 +1,157 @@
+{
+  "agents": [
+    {
+      "name": "test-fetch-webpage-simple-agent",
+      "memory_blocks": [],
+      "tools": [],
+      "tool_ids": [
+        "tool-0"
+      ],
+      "source_ids": [],
+      "block_ids": [],
+      "tool_rules": [],
+      "tags": [],
+      "system": "<base_instructions>\nYou are a helpful self-improving agent with advanced memory and file system capabilities.\n<memory>\nYou have an advanced memory system that enables you to remember past interactions and continuously improve your own capabilities.\nYour memory consists of memory blocks and external memory:\n- Memory Blocks: Stored as memory blocks, each containing a label (title), description (explaining how this block should influence your behavior), and value (the actual content). Memory blocks have size limits. Memory blocks are embedded within your system instructions and remain constantly available in-context.\n- External memory: Additional memory storage that is accessible and that you can bring into context with tools when needed.\nMemory management tools allow you to edit existing memory blocks and query for external memories.\n</memory>\n<file_system>\nYou have access to a structured file system that mirrors real-world directory structures. Each directory can contain multiple files.\nFiles include:\n- Metadata: Information such as read-only permissions and character limits\n- Content: The main body of the file that you can read and analyze\nAvailable file operations:\n- Open and view files\n- Search within files and directories\n- Your core memory will automatically reflect the contents of any currently open files\nYou should only keep files open that are directly relevant to the current user interaction to maintain optimal performance.\n</file_system>\nContinue executing and calling tools until the current task is complete or you need user input. To continue: call another tool. To yield control: end your response without calling a tool.\nBase instructions complete.\n</base_instructions>",
+      "agent_type": "letta_v1_agent",
+      "llm_config": {
+        "model": "gpt-4.1-mini",
+        "model_endpoint_type": "openai",
+        "model_endpoint": "https://api.openai.com/v1",
+        "provider_name": "openai",
+        "provider_category": "base",
+        "model_wrapper": null,
+        "context_window": 30000,
+        "put_inner_thoughts_in_kwargs": true,
+        "handle": "openai/gpt-4.1-mini",
+        "temperature": 0.7,
+        "max_tokens": null,
+        "enable_reasoner": true,
+        "reasoning_effort": null,
+        "max_reasoning_tokens": 0,
+        "frequency_penalty": 1.0,
+        "compatibility_type": null,
+        "verbosity": null,
+        "tier": "free"
+      },
+      "embedding_config": {
+        "embedding_endpoint_type": "openai",
+        "embedding_endpoint": "https://api.openai.com/v1",
+        "embedding_model": "text-embedding-3-small",
+        "embedding_dim": 2000,
+        "embedding_chunk_size": 300,
+        "handle": "openai/text-embedding-3-small",
+        "batch_size": 1024,
+        "azure_endpoint": null,
+        "azure_version": null,
+        "azure_deployment": null
+      },
+      "initial_message_sequence": null,
+      "include_base_tools": false,
+      "include_multi_agent_tools": false,
+      "include_base_tool_rules": false,
+      "include_default_source": false,
+      "description": "A blank slate for you to create your own agent from scratch.",
+      "metadata": null,
+      "model": null,
+      "embedding": null,
+      "context_window_limit": null,
+      "embedding_chunk_size": null,
+      "max_tokens": null,
+      "max_reasoning_tokens": null,
+      "enable_reasoner": false,
+      "reasoning": null,
+      "from_template": null,
+      "template": false,
+      "project": null,
+      "tool_exec_environment_variables": {},
+      "memory_variables": null,
+      "project_id": null,
+      "template_id": null,
+      "base_template_id": null,
+      "identity_ids": null,
+      "message_buffer_autoclear": false,
+      "enable_sleeptime": false,
+      "response_format": null,
+      "timezone": "UTC",
+      "max_files_open": 5,
+      "per_file_view_window_char_limit": 15000,
+      "hidden": null,
+      "id": "agent-0",
+      "in_context_message_ids": [
+        "message-0"
+      ],
+      "messages": [
+        {
+          "type": "message",
+          "role": "system",
+          "content": [
+            {
+              "type": "text",
+              "text": "<base_instructions>\nYou are a helpful self-improving agent with advanced memory and file system capabilities.\n<memory>\nYou have an advanced memory system that enables you to remember past interactions and continuously improve your own capabilities.\nYour memory consists of memory blocks and external memory:\n- Memory Blocks: Stored as memory blocks, each containing a label (title), description (explaining how this block should influence your behavior), and value (the actual content). Memory blocks have size limits. Memory blocks are embedded within your system instructions and remain constantly available in-context.\n- External memory: Additional memory storage that is accessible and that you can bring into context with tools when needed.\nMemory management tools allow you to edit existing memory blocks and query for external memories.\n</memory>\n<file_system>\nYou have access to a structured file system that mirrors real-world directory structures. Each directory can contain multiple files.\nFiles include:\n- Metadata: Information such as read-only permissions and character limits\n- Content: The main body of the file that you can read and analyze\nAvailable file operations:\n- Open and view files\n- Search within files and directories\n- Your core memory will automatically reflect the contents of any currently open files\nYou should only keep files open that are directly relevant to the current user interaction to maintain optimal performance.\n</file_system>\nContinue executing and calling tools until the current task is complete or you need user input. To continue: call another tool. To yield control: end your response without calling a tool.\nBase instructions complete.\n</base_instructions>\n\n<memory_blocks>\nThe following memory blocks are currently engaged in your core memory unit:\n\n\n</memory_blocks>\n\n<memory_metadata>\n- The current system date is: September 10, 2025\n- Memory blocks were last modified: 2025-09-10 08:06:42 PM UTC+0000\n- -4 previous messages between you and the user are stored in recall memory (use tools to access them)\n</memory_metadata>"
+            }
+          ],
+          "name": null,
+          "otid": null,
+          "sender_id": null,
+          "batch_item_id": null,
+          "group_id": null,
+          "id": "message-0",
+          "model": "gpt-4o-mini",
+          "agent_id": "agent-0",
+          "tool_calls": null,
+          "tool_call_id": null,
+          "tool_returns": [],
+          "created_at": "2025-09-10T19:57:16.825563+00:00"
+        }
+      ],
+      "files_agents": [],
+      "group_ids": []
+    }
+  ],
+  "groups": [],
+  "blocks": [],
+  "files": [],
+  "sources": [],
+  "tools": [
+    {
+      "id": "tool-0",
+      "tool_type": "letta_builtin",
+      "description": "Fetch a webpage and convert it to markdown/text format using Jina AI reader.",
+      "source_type": "python",
+      "name": "fetch_webpage",
+      "tags": [
+        "letta_builtin"
+      ],
+      "source_code": null,
+      "json_schema": {
+        "name": "fetch_webpage",
+        "description": "Fetch a webpage and convert it to markdown/text format using Jina AI reader.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "The URL of the webpage to fetch and convert"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      },
+      "args_json_schema": null,
+      "return_char_limit": 50000,
+      "pip_requirements": null,
+      "npm_requirements": null,
+      "default_requires_approval": null,
+      "created_by_id": "user-f9ba1dbe-4bda-492a-8333-dc647f3566c6",
+      "last_updated_by_id": "user-474c06ef-e1ed-4131-922a-1d99fb3063f2",
+      "metadata_": {}
+    }
+  ],
+  "mcp_servers": [],
+  "metadata": {
+    "revision_id": "b888f21b151f"
+  },
+  "created_at": "2025-09-10T20:07:53.350864+00:00"
+}

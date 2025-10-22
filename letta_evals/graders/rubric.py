@@ -9,6 +9,7 @@ from openai import AsyncOpenAI
 
 from letta_evals.extractors import extractor_requires_agent_state, get_extractor
 from letta_evals.graders.base import Grader
+from letta_evals.graders.prompt_utils import build_judge_prompt
 from letta_evals.models import GradeResult, Sample
 from letta_evals.types import LLMProvider
 
@@ -71,7 +72,7 @@ class RubricGrader(Grader):
         """Grade using LLM judge with rubric."""
         submission = self.extractor(trajectory, agent_state=agent_state)
 
-        judge_prompt = self._build_judge_prompt(sample, submission)
+        judge_prompt = build_judge_prompt(self.prompt, sample, submission, self.rubric_vars)
 
         temperature = self.temperature
         if (
@@ -128,36 +129,3 @@ IMPORTANT:
 - 0.0 means complete failure, 1.0 means perfect
 - Use decimal values for partial credit (e.g., 0.25, 0.5, 0.75)
 - Be objective and follow the rubric strictly"""
-
-    def _build_judge_prompt(self, sample: Sample, submission: str) -> str:
-        """Build the prompt for the judge."""
-        prompt = self.prompt
-
-        # substitute custom rubric variables
-        if self.rubric_vars and sample.rubric_vars:
-            for var_name in self.rubric_vars:
-                var_value = str(sample.rubric_vars[var_name])
-                prompt = prompt.replace(f"{{{var_name}}}", var_value)
-
-        parts = [
-            "## Rubric",
-            prompt,
-            "",
-            "## Input",
-            str(sample.input),
-        ]
-
-        if sample.ground_truth:
-            parts.extend(["", "## Ground Truth Answer", sample.ground_truth])
-
-        parts.extend(
-            [
-                "",
-                "## Submission to Evaluate",
-                submission,
-                "",
-                "Please evaluate the submission according to the rubric and return your judgment in JSON format.",
-            ]
-        )
-
-        return "\n".join(parts)

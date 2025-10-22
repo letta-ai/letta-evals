@@ -353,9 +353,9 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
             console.print(f"[dim]Showing first {MAX_SAMPLES_DISPLAY} of {total_samples} samples[/dim]")
 
         table = Table()
-        table.add_column("Sample", style="cyan")
-        table.add_column("Model", style="yellow")
-        table.add_column("Passed", style="white")
+        table.add_column("Sample", style="cyan", no_wrap=True)
+        table.add_column("Model", style="yellow", no_wrap=True)
+        table.add_column("Passed", style="white", no_wrap=True)
 
         # Determine available metrics and display labels
         metric_keys = []
@@ -368,8 +368,8 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
         # Add two sub-columns per metric: score + rationale
         for mk in metric_keys:
             lbl = metric_labels.get(mk, mk)
-            table.add_column(f"{lbl} score", style="white")
-            table.add_column(f"{lbl} rationale", style="dim")
+            table.add_column(f"{lbl} score", style="white", no_wrap=True)
+            table.add_column(f"{lbl} rationale", style="dim", no_wrap=False)
 
         from letta_evals.models import GateSpec
 
@@ -398,8 +398,6 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
                             s_val = None
                             r_text = ""
                     score_cell = f"{s_val:.2f}" if s_val is not None else "-"
-                    if r_text and len(r_text) > 50:
-                        r_text = r_text[:47] + "..."
                     cells.extend([score_cell, r_text])
 
             table.add_row(f"Sample {sample_result.sample.id + 1}", sample_result.model_name or "-", passed, *cells)

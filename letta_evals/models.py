@@ -92,10 +92,22 @@ class GraderSpec(BaseModel):
         default=None, description="List of required custom variables for rubric substitution"
     )
 
+    # Agent-based judge fields
+    agent_file: Optional[Path] = Field(default=None, description="Path to .af agent file to use as judge")
+    judge_tool_name: Optional[str] = Field(
+        default="submit_grade", description="Name of tool that agent uses to submit score/rationale"
+    )
+
     extractor: str = Field(default="last_assistant", description="Strategy for extracting submission from trajectory")
     extractor_config: Optional[Dict[str, Any]] = Field(default=None, description="Configuration for the extractor")
 
     base_dir: Optional[Path] = Field(default=None, exclude=True)
+
+    @field_validator("agent_file")
+    def validate_agent_file(cls, v: Optional[Path]) -> Optional[Path]:
+        if v and not str(v).endswith(".af"):
+            raise ValueError("Agent file must have .af extension")
+        return v
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -105,10 +117,25 @@ class GraderSpec(BaseModel):
             if self.rubric_vars:
                 raise ValueError("Tool grader cannot use rubric_vars (only available for rubric graders)")
         elif self.kind == GraderKind.RUBRIC:
-            if not self.prompt and not self.prompt_path:
-                raise ValueError("Rubric grader requires either prompt or prompt_path")
-            if self.prompt and self.prompt_path:
-                raise ValueError("Rubric grader cannot have both prompt and prompt_path")
+            # check if agent-based or LLM-based judge
+            if self.agent_file:
+                # agent-based judge validation
+                if not self.prompt and not self.prompt_path:
+                    raise ValueError("Agent judge requires either prompt or prompt_path for rubric text")
+                if self.prompt and self.prompt_path:
+                    raise ValueError("Agent judge cannot have both prompt and prompt_path")
+                if self.model != "gpt-4o-mini" or self.temperature != 0.0 or self.provider != LLMProvider.OPENAI:
+                    raise ValueError(
+                        "Agent judge should not specify model/temperature/provider (those are only for LLM judges)"
+                    )
+            else:
+                # LLM-based judge validation
+                if not self.prompt and not self.prompt_path:
+                    raise ValueError("Rubric grader requires either prompt or prompt_path")
+                if self.prompt and self.prompt_path:
+                    raise ValueError("Rubric grader cannot have both prompt and prompt_path")
+
+            # load prompt from file if needed
             if self.prompt_path:
                 with open(self.prompt_path, "r") as f:
                     self.prompt = f.read()
@@ -215,6 +242,9 @@ class SuiteSpec(BaseModel):
                     if "prompt_path" in gspec and gspec["prompt_path"]:
                         if not Path(gspec["prompt_path"]).is_absolute():
                             gspec["prompt_path"] = str((base_dir / gspec["prompt_path"]).resolve())
+                    if "agent_file" in gspec and gspec["agent_file"]:
+                        if not Path(gspec["agent_file"]).is_absolute():
+                            gspec["agent_file"] = str((base_dir / gspec["agent_file"]).resolve())
                     gspec["base_dir"] = base_dir
                     resolved_graders[key] = gspec
                 yaml_data["graders"] = resolved_graders
