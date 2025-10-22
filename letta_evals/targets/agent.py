@@ -103,9 +103,12 @@ class AgentTarget(Target):
                     )
 
                     run_id = None
+                    chunks = []
                     async for chunk in stream:
                         # derive run_id from very first chunk, all should have the same
                         # defensive for now, letta server needs fix to standardize run_id
+                        chunks.append(chunks)
+
                         if not run_id and hasattr(chunk, "run_id"):
                             run_id = chunk.run_id
 
@@ -133,7 +136,7 @@ class AgentTarget(Target):
                                 continue
 
                     if not run_id:
-                        raise RuntimeError("Unexpected error: no run ID was returned from streaming chunks.")
+                        raise RuntimeError(f"Unexpected error: no run ID was found from streaming chunks: {chunks}")
 
                     # TODO: Set limit here potentially, this is capped to 100
                     messages = await self.client.runs.messages.list(run_id=run_id)
