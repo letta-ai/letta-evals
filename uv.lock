@@ -466,6 +466,7 @@ name = "letta-evals"
 version = "0.4.1"
 source = { editable = "." }
 dependencies = [
+    { name = "anthropic" },
     { name = "anyio" },
     { name = "jinja2" },
     { name = "jsonpath-ng" },
@@ -488,13 +489,12 @@ dev = [
     { name = "ruff" },
 ]
 filesystem = [
-    { name = "anthropic" },
     { name = "faker" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", marker = "extra == 'filesystem'", specifier = ">=0.71.0" },
+    { name = "anthropic", specifier = ">=0.71.0" },
     { name = "anyio", specifier = "==4.10.0" },
     { name = "faker", marker = "extra == 'filesystem'", specifier = ">=37.6.0" },
     { name = "jinja2", specifier = ">=3.1.0" },

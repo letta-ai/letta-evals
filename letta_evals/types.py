@@ -27,3 +27,4 @@ class GateMetric(str, Enum):
 
 class LLMProvider(str, Enum):
     OPENAI = "openai"
+    ANTHROPIC = "anthropic"

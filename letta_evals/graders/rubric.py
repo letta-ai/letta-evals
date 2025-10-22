@@ -3,13 +3,14 @@ import os
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
 from letta_client import AgentState, LettaMessageUnion
 from openai import AsyncOpenAI
 
 from letta_evals.extractors import extractor_requires_agent_state, get_extractor
 from letta_evals.graders.base import Grader
-from letta_evals.graders.prompt_utils import build_judge_prompt
+from letta_evals.graders.prompt_utils import JUDGE_SYSTEM_PROMPT, build_judge_prompt
 from letta_evals.models import GradeResult, Sample
 from letta_evals.types import LLMProvider
 
@@ -58,6 +59,22 @@ class RubricGrader(Grader):
                 client_kwargs["base_url"] = base_url
 
             self.client = AsyncOpenAI(**client_kwargs)
+        elif provider == LLMProvider.ANTHROPIC:
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
+
+            client_kwargs = {
+                "api_key": api_key,
+                "max_retries": max_retries,
+                "timeout": timeout,
+            }
+
+            base_url = os.getenv("ANTHROPIC_BASE_URL")
+            if base_url:
+                client_kwargs["base_url"] = base_url
+
+            self.client = AsyncAnthropic(**client_kwargs)
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
@@ -75,23 +92,53 @@ class RubricGrader(Grader):
         judge_prompt = build_judge_prompt(self.prompt, sample, submission, self.rubric_vars)
 
         temperature = self.temperature
-        if (
-            self.model.startswith("o1") or self.model.startswith("o3") or "gpt-5" in self.model.lower()
-        ) and temperature == 0.0:
-            temperature = 1.0
 
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": self._get_system_prompt()},
-                    {"role": "user", "content": judge_prompt},
-                ],
-                temperature=temperature,
-                response_format={"type": "json_object"},
-            )
+            if self.provider == LLMProvider.OPENAI:
+                if (
+                    self.model.startswith("o1") or self.model.startswith("o3") or "gpt-5" in self.model.lower()
+                ) and temperature == 0.0:
+                    temperature = 1.0
 
-            result_json = json.loads(response.choices[0].message.content)
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
+                        {"role": "user", "content": judge_prompt},
+                    ],
+                    temperature=temperature,
+                    response_format={"type": "json_object"},
+                )
+
+                result_json = json.loads(response.choices[0].message.content)
+                usage = response.usage.model_dump() if response.usage else None
+
+            elif self.provider == LLMProvider.ANTHROPIC:
+                response = await self.client.messages.create(
+                    model=self.model,
+                    max_tokens=4096,
+                    temperature=temperature,
+                    system=[{"type": "text", "text": JUDGE_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+                    messages=[
+                        {"role": "user", "content": judge_prompt},
+                    ],
+                )
+
+                # extract text from response
+                response_text = ""
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        response_text += block.text
+
+                result_json = json.loads(response_text)
+                usage = {
+                    "input_tokens": response.usage.input_tokens,
+                    "output_tokens": response.usage.output_tokens,
+                    "cache_creation_input_tokens": getattr(response.usage, "cache_creation_input_tokens", 0),
+                    "cache_read_input_tokens": getattr(response.usage, "cache_read_input_tokens", 0),
+                }
+            else:
+                raise ValueError(f"Unsupported provider: {self.provider}")
 
             score = result_json.get("score")
             if score is None:
@@ -103,29 +150,10 @@ class RubricGrader(Grader):
             return GradeResult(
                 score=score,
                 rationale=result_json.get("rationale", ""),
-                metadata={"model": self.model, "usage": response.usage.model_dump() if response.usage else None},
+                metadata={"model": self.model, "usage": usage},
             ), submission
 
         except Exception as e:
             return GradeResult(
                 score=0.0, rationale=f"Error during grading: {str(e)}", metadata={"error": str(e)}
             ), submission
-
-    def _get_system_prompt(self) -> str:
-        """Get the system prompt for the judge."""
-        return """You are an evaluation judge. You will be given:
-1. A rubric describing evaluation criteria
-2. An input/question
-3. A submission to evaluate
-
-Evaluate the submission according to the rubric and return a JSON response with:
-{
-    "score": (REQUIRED: a decimal number between 0.0 and 1.0 inclusive),
-    "rationale": "explanation of your grading decision"
-}
-
-IMPORTANT:
-- The score MUST be a number between 0.0 and 1.0 (inclusive)
-- 0.0 means complete failure, 1.0 means perfect
-- Use decimal values for partial credit (e.g., 0.25, 0.5, 0.75)
-- Be objective and follow the rubric strictly"""
