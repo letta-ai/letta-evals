@@ -7,7 +7,7 @@ Letta Evals provides a framework for evaluating AI agents built with [Letta](htt
 If you are building with agentic systems, creating high quality evals is one of the most impactful things you can do. Without evals, it can be very difficult and time intensive to understand how agent configurations, model versions, or prompt changes might affect your use case. In the words of [OpenAI's President Greg Brockman](https://twitter.com/gdb/status/1733553161884127435):
 
 <img width="596" alt="https://x.com/gdb/status/1733553161884127435?s=20" src="https://github.com/openai/evals/assets/35577566/ce7840ff-43a8-4d88-bb2f-6b207410333b">
-````
+
 ## Setup
 
 To run evals against Letta agents, you will need a running Letta server. You can either:
@@ -17,7 +17,7 @@ To run evals against Letta agents, you will need a running Letta server. You can
   ```bash
   export LETTA_API_KEY=your-api-key        # Get from Letta Cloud dashboard
   export LETTA_PROJECT_ID=your-project-id  # Get from Letta Cloud dashboard
-  ```
+
   Then set `base_url: https://api.letta.com/` in your suite YAML.
 
 If you plan to use LLM-based grading (rubric graders), you'll also need to configure API keys for your chosen provider (e.g., `OPENAI_API_KEY`).
