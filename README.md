@@ -111,6 +111,7 @@ We suggest getting started with these examples:
 
 - **Basic tool grading**: [`examples/simple-tool-grader/`](examples/simple-tool-grader/) - Simple string matching with `exact_match` and `contains` functions
 - **LLM-as-judge grading**: [`examples/simple-rubric-grader/`](examples/simple-rubric-grader/) - Using rubric graders with custom prompts for nuanced evaluation
+- **Agent-as-judge grading**: [`examples/letta-agent-rubric-grader/`](examples/letta-agent-rubric-grader/) - Using a Letta agent as an LLM judge (no API keys required!)
 - **Multi-metric evaluation**: [`examples/simple-rubric-grader/suite.two-metrics.yaml`](examples/simple-rubric-grader/suite.two-metrics.yaml) - Combining multiple graders (rubric + tool) in one suite
 - **Custom extractors**: [`examples/simple-memory-block-extractor/`](examples/simple-memory-block-extractor/) - Extracting specific content from agent memory blocks
 - **Multi-model evaluation**: [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) - Testing across multiple LLM configurations
@@ -168,6 +169,15 @@ See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-a
 **Can I use this in CI/CD pipelines?**
 
 * Absolutely! Letta Evals is designed to integrate seamlessly into continuous integration workflows. Check out our [`.github/workflows/e2e-tests.yml`](.github/workflows/e2e-tests.yml) for an example of running evaluations in GitHub Actions. The workflow automatically discovers and runs all suite files, making it easy to gate releases or validate changes to your agents.
+
+**I don't have access to LLM provider API keys - can I still use LLM-as-judge / rubric grading?**
+
+* Yes! Use the **agent-as-judge** feature instead of the standard rubric grader. With agent-as-judge, you configure a Letta agent (with its own LLM access) to act as the evaluator. This is perfect for:
+  - Teams without direct LLM API access (using Letta Cloud or managed instances)
+  - Scenarios where you want the judge to use tools (e.g., web search, database queries) during evaluation
+  - Organizations with centralized LLM access through Letta
+
+  See [`examples/letta-agent-rubric-grader/`](examples/letta-agent-rubric-grader/) for a complete working example. The judge agent just needs a `submit_grade(score: float, rationale: str)` tool, and the framework handles the rest!
 
 ## Contributing
 

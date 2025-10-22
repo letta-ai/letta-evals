@@ -96,18 +96,53 @@ gate:
 - `judge_tool_name`: Name of the tool the judge calls to submit scores (default: `submit_grade`)
 - `extractor`: How to extract the submission from agent trajectory
 
-### Judge Tool Requirements
+### Judge Agent Requirements & Gotchas
 
-The judge agent must have a tool with this signature:
+#### ✅ Checklist: Will Your Judge Agent Work?
+
+Use this checklist to verify your judge agent is properly configured:
+
+- [ ] **Tool exists**: Agent has a tool with the name specified in `judge_tool_name` (default: `submit_grade`)
+- [ ] **Tool parameters**: The tool has BOTH `score: float` and `rationale: str` parameters
+- [ ] **Tool is callable**: The tool is not disabled or requires-approval-only
+- [ ] **Agent system prompt**: Agent understands it's an evaluator (optional but recommended)
+- [ ] **No conflicting tools**: Agent doesn't have other tools that might confuse it into answering questions instead of judging
+
+#### Required Tool Signature
+
+The judge agent **must** have a tool with this exact parameter signature:
+
 ```python
 def submit_grade(score: float, rationale: str) -> dict:
-    """Submit evaluation with score (0.0-1.0) and rationale."""
-    pass
+    """
+    Submit an evaluation grade for an agent's response.
+
+    Args:
+        score: A float between 0.0 (complete failure) and 1.0 (perfect)
+        rationale: Explanation of why this score was given
+
+    Returns:
+        dict: Confirmation of grade submission
+    """
+    return {
+        "status": "success",
+        "grade": {"score": score, "rationale": rationale}
+    }
 ```
 
-The framework validates this on initialization and will fail fast if:
-- The specified tool doesn't exist in the agent file
-- The tool is missing `score` or `rationale` parameters
+**Important**: The parameter names must be exactly `score` and `rationale`. The framework validates this on initialization.
+
+
+### Validation on Initialization
+
+The framework validates your judge agent **before** running any evaluations. If validation fails, you'll get a clear error message:
+
+```bash
+ValueError: Judge tool 'submit_grade' not found in agent file judge.af.
+Available tools: ['fetch_webpage', 'search_documents']
+```
+
+This fail-fast approach saves time by catching configuration errors immediately.
 
 ### Dataset Format
 
