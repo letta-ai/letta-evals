@@ -152,33 +152,19 @@ class Runner:
                         extractor_config=gspec.extractor_config,
                         base_dir=gspec.base_dir,
                     )
-                elif gspec.kind == GraderKind.RUBRIC:
-                    # check if agent-based or LLM-based judge
-                    if gspec.agent_file:
-                        self.graders[key] = AgentJudgeGrader(
-                            agent_file=gspec.agent_file,
-                            prompt=gspec.prompt,
-                            client=self.client,
-                            project_id=self.project_id,
-                            judge_tool_name=gspec.judge_tool_name,
-                            extractor=gspec.extractor,
-                            extractor_config=gspec.extractor_config,
-                            base_dir=gspec.base_dir,
-                            rubric_vars=gspec.rubric_vars,
-                        )
-                    else:
-                        self.graders[key] = RubricGrader(
-                            prompt=gspec.prompt,
-                            model=gspec.model,
-                            temperature=gspec.temperature,
-                            provider=gspec.provider,
-                            max_retries=gspec.max_retries,
-                            timeout=gspec.timeout,
-                            extractor=gspec.extractor,
-                            extractor_config=gspec.extractor_config,
-                            base_dir=gspec.base_dir,
-                            rubric_vars=gspec.rubric_vars,
-                        )
+                elif gspec.kind == GraderKind.MODEL_JUDGE:
+                    self.graders[key] = RubricGrader(
+                        prompt=gspec.prompt,
+                        model=gspec.model,
+                        temperature=gspec.temperature,
+                        provider=gspec.provider,
+                        max_retries=gspec.max_retries,
+                        timeout=gspec.timeout,
+                        extractor=gspec.extractor,
+                        extractor_config=gspec.extractor_config,
+                        base_dir=gspec.base_dir,
+                        rubric_vars=gspec.rubric_vars,
+                    )
                 elif gspec.kind == GraderKind.LETTA_JUDGE:
                     # use default agent file if not provided
                     agent_file = gspec.agent_file
@@ -382,7 +368,7 @@ class Runner:
             return
 
         for grader_key, grader_spec in self.suite.graders.items():
-            if grader_spec.kind != GraderKind.RUBRIC or not grader_spec.rubric_vars:
+            if grader_spec.kind != GraderKind.MODEL_JUDGE or not grader_spec.rubric_vars:
                 continue
 
             for sample in samples:

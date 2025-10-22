@@ -8,7 +8,7 @@ target:
   base_url: http://localhost:8283
 graders:
   quality:
-    kind: rubric
+    kind: model_judge
     display_name: "rubric score"
     prompt_path: rubric.txt
     model: claude-haiku-4-5-20251001

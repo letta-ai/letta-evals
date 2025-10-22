@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def _requires_openai(suite: SuiteSpec) -> bool:
     if not suite.graders:
         return False
-    return any(g.kind == GraderKind.RUBRIC for g in suite.graders.values())
+    return any(g.kind == GraderKind.MODEL_JUDGE for g in suite.graders.values())
 
 
 @pytest.mark.asyncio

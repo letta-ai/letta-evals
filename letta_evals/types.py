@@ -7,7 +7,7 @@ class TargetKind(str, Enum):
 
 class GraderKind(str, Enum):
     TOOL = "tool"
-    RUBRIC = "rubric"
+    MODEL_JUDGE = "model_judge"
     LETTA_JUDGE = "letta_judge"
 
 

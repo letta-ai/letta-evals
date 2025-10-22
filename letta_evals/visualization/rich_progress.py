@@ -405,7 +405,7 @@ class EvalProgress(ProgressCallback):
 
         table.add_column("#", style="cyan", width=5)
         table.add_column("Model", style="yellow", width=27)
-        if self.grader_kind == GraderKind.RUBRIC.value and self.rubric_model:
+        if self.grader_kind == GraderKind.MODEL_JUDGE.value and self.rubric_model:
             table.add_column("Rubric Model", style="magenta", width=27)
         table.add_column("Status", width=20)
         # Add per-metric columns (score + rationale) or single score/rationale
@@ -479,7 +479,7 @@ class EvalProgress(ProgressCallback):
                 sample_num,
                 s.model_name or "-",
             ]
-            if self.grader_kind == GraderKind.RUBRIC.value and self.rubric_model:
+            if self.grader_kind == GraderKind.MODEL_JUDGE.value and self.rubric_model:
                 row_data.append(self.rubric_model)
             row_data.extend([self._get_state_text(s), *cells, time_text, details])
             table.add_row(*row_data)
