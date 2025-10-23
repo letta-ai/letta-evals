@@ -1,0 +1,5 @@
+{"input": ["Please remember that I like bananas.", "Actually, sorry, I meant I like apples."], "ground_truth": "apples"}
+{"input": ["Please remember that I like strawberries.", "Actually, sorry, I meant I like mangoes."], "ground_truth": "mangoes"}
+{"input": ["Please remember that I like pineapples.", "Actually, sorry, I meant I like oranges."], "ground_truth": "oranges"}
+{"input": ["Please remember that I like grapes.", "Actually, sorry, I meant I like kiwis."], "ground_truth": "kiwis"}
+{"input": ["Please remember that I like watermelon.", "Actually, sorry, I meant I like cherries."], "ground_truth": "cherries"}
