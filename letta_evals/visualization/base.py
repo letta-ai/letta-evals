@@ -15,6 +15,14 @@ class ProgressCallback(ABC):
         """Optional lifecycle: start the progress UI (if any)."""
         pass
 
+    async def suite_completed(self, result) -> None:
+        """Optional lifecycle: called when evaluation completes with final results.
+
+        Args:
+            result: RunnerResult object containing metrics, sample results, and config
+        """
+        pass
+
     def stop(self) -> None:
         """Optional lifecycle: stop the progress UI (if any)."""
         pass
