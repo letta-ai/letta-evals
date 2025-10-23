@@ -113,7 +113,7 @@ We suggest getting started with these examples:
 - **LLM-as-judge grading**: [`examples/simple-rubric-grader/`](examples/simple-rubric-grader/) - Using rubric graders with custom prompts for nuanced evaluation
 - **Agent-as-judge grading**: [`examples/letta-agent-rubric-grader/`](examples/letta-agent-rubric-grader/) - Using a Letta agent as an LLM judge (no API keys required!)
 - **Multi-metric evaluation**: [`examples/simple-rubric-grader/suite.two-metrics.yaml`](examples/simple-rubric-grader/suite.two-metrics.yaml) - Combining multiple graders (rubric + tool) in one suite
-- **Custom extractors**: [`examples/simple-memory-block-extractor/`](examples/simple-memory-block-extractor/) - Extracting specific content from agent memory blocks
+- **Memory block extraction**: [`examples/multiturn-memory-block-extractor/`](examples/multiturn-memory-block-extractor/) - Extracting and evaluating agent memory across multiturn conversations
 - **Multi-model evaluation**: [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) - Testing across multiple LLM configurations
 - **Programmatic agent creation**: [`examples/programmatic-agent-creation/`](examples/programmatic-agent-creation/) - Using agent factories to create agents dynamically per sample
 - **Custom graders and extractors**: [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-and-extractor/) - Implementing custom evaluation logic with Python decorators
@@ -141,7 +141,7 @@ See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-a
 
 **How do I evaluate multi-turn agent interactions?**
 
-* Letta agents inherently support multi-turn conversations. Use extractors like `all_messages` or `tool_calls` to capture the full interaction trajectory, not just the final response.
+* Letta Evals natively supports multiturn conversations! Simply provide `input` as a list of strings in your dataset instead of a single string. The framework will send each message sequentially and capture the full trajectory. Use extractors like `last_turn`, `all_assistant`, or `memory_block` to evaluate different aspects of the multiturn interaction. See [`examples/multiturn-memory-block-extractor/`](examples/multiturn-memory-block-extractor/) for a complete example testing memory updates across conversation turns.
 
 **Can I test the same agent with different LLM models?**
 
