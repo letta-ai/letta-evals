@@ -45,6 +45,7 @@ class SampleProgress:
 
     sample_id: int
     state: SampleState = SampleState.QUEUED
+    agent_id: Optional[str] = None
     model_name: Optional[str] = None
     passed: Optional[bool] = None
     score: Optional[float] = None
@@ -404,6 +405,7 @@ class EvalProgress(ProgressCallback):
         )
 
         table.add_column("#", style="cyan", width=5)
+        table.add_column("Agent ID", style="dim cyan", no_wrap=False)
         table.add_column("Model", style="yellow", width=27)
         if self.grader_kind == GraderKind.MODEL_JUDGE.value and self.rubric_model:
             table.add_column("Rubric Model", style="magenta", width=27)
@@ -477,6 +479,7 @@ class EvalProgress(ProgressCallback):
 
             row_data = [
                 sample_num,
+                s.agent_id or "-",
                 s.model_name or "-",
             ]
             if self.grader_kind == GraderKind.MODEL_JUDGE.value and self.rubric_model:
@@ -541,7 +544,14 @@ class EvalProgress(ProgressCallback):
             self.live.stop()
             self.console.print()
 
-    async def update_sample_state(self, sample_id: int, state: SampleState, model_name: Optional[str] = None, **kwargs):
+    async def update_sample_state(
+        self,
+        sample_id: int,
+        state: SampleState,
+        agent_id: Optional[str] = None,
+        model_name: Optional[str] = None,
+        **kwargs,
+    ):
         """Update state of a sample"""
         key = (sample_id, model_name)
 
@@ -555,11 +565,14 @@ class EvalProgress(ProgressCallback):
                 del self.samples[old_key]
 
         if key not in self.samples:
-            self.samples[key] = SampleProgress(sample_id, model_name=model_name)
+            self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
 
         sample = self.samples[key]
         previous_state = sample.state
         sample.state = state
+
+        if agent_id is not None and sample.agent_id != agent_id:
+            sample.agent_id = agent_id
 
         if model_name is not None and sample.model_name != model_name:
             sample.model_name = model_name
@@ -598,34 +611,44 @@ class EvalProgress(ProgressCallback):
         if self.live:
             self.live.update(self._render())
 
-    async def sample_started(self, sample_id: int, model_name: Optional[str] = None):
+    async def sample_started(self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None):
         """Mark sample as started"""
         key = (sample_id, model_name)
         if key not in self.samples:
-            self.samples[key] = SampleProgress(sample_id, model_name=model_name)
+            self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
         # skip loading state if using cached trajectories
         if not self.cached_mode:
-            await self.update_sample_state(sample_id, SampleState.LOADING_AGENT, model_name=model_name)
+            await self.update_sample_state(
+                sample_id, SampleState.LOADING_AGENT, agent_id=agent_id, model_name=model_name
+            )
 
-    async def agent_loading(self, sample_id: int, model_name: Optional[str] = None, from_cache: bool = False):
+    async def agent_loading(
+        self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None, from_cache: bool = False
+    ):
         """Mark sample as loading agent"""
         await self.update_sample_state(
-            sample_id, SampleState.LOADING_AGENT, model_name=model_name, from_cache=from_cache
+            sample_id, SampleState.LOADING_AGENT, agent_id=agent_id, model_name=model_name, from_cache=from_cache
         )
 
     async def message_sending(
-        self, sample_id: int, message_num: int, total_messages: int, model_name: Optional[str] = None
+        self,
+        sample_id: int,
+        message_num: int,
+        total_messages: int,
+        agent_id: Optional[str] = None,
+        model_name: Optional[str] = None,
     ):
         """Update message sending progress"""
         await self.update_sample_state(
             sample_id,
             SampleState.SENDING_MESSAGES,
+            agent_id=agent_id,
             model_name=model_name,
             messages_sent=message_num,
             total_messages=total_messages,
         )
 
-    async def grading_started(self, sample_id: int, model_name: Optional[str] = None):
+    async def grading_started(self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None):
         """Mark sample as being graded"""
         key = (sample_id, model_name)
         # Check both the current key and the None key for from_cache flag
@@ -636,13 +659,14 @@ class EvalProgress(ProgressCallback):
             existing_from_cache = self.samples[(sample_id, None)].from_cache
 
         await self.update_sample_state(
-            sample_id, SampleState.GRADING, model_name=model_name, from_cache=existing_from_cache
+            sample_id, SampleState.GRADING, agent_id=agent_id, model_name=model_name, from_cache=existing_from_cache
         )
 
     async def sample_completed(
         self,
         sample_id: int,
         passed: bool,
+        agent_id: Optional[str] = None,
         score: Optional[float] = None,
         model_name: Optional[str] = None,
         metric_scores: Optional[Dict[str, float]] = None,
@@ -662,6 +686,7 @@ class EvalProgress(ProgressCallback):
         await self.update_sample_state(
             sample_id,
             SampleState.COMPLETED,
+            agent_id=agent_id,
             model_name=model_name,
             passed=passed,
             score=score,
@@ -681,11 +706,14 @@ class EvalProgress(ProgressCallback):
                     else:
                         self.metric_failed[mkey] = self.metric_failed.get(mkey, 0) + 1
 
-    async def sample_error(self, sample_id: int, error: str, model_name: Optional[str] = None):
+    async def sample_error(
+        self, sample_id: int, error: str, agent_id: Optional[str] = None, model_name: Optional[str] = None
+    ):
         """Mark sample as having an error"""
         await self.update_sample_state(
             sample_id,
             SampleState.ERROR,
+            agent_id=agent_id,
             model_name=model_name,
             error=error,
         )

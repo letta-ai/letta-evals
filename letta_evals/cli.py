@@ -25,6 +25,9 @@ def run(
         None, "--output", "-o", help="Stream header, summary, and per-instance results to directory"
     ),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
+    display: Optional[str] = typer.Option(
+        None, "--display", help="Display style: 'rich' (default), 'simple', or 'none'"
+    ),
     max_concurrent: int = typer.Option(15, "--max-concurrent", help="Maximum concurrent evaluations"),
     cached: Optional[Path] = typer.Option(
         None, "--cached", "-c", help="Path to cached results (JSONL) for re-grading trajectories"
@@ -102,7 +105,18 @@ def run(
 
     async def run_with_progress():
         # Choose built-in progress style for CLI
-        if quiet:
+        if display:
+            display_lower = display.lower()
+            if display_lower == "none":
+                style = ProgressStyle.NONE
+            elif display_lower == "simple":
+                style = ProgressStyle.SIMPLE
+            elif display_lower == "rich":
+                style = ProgressStyle.RICH
+            else:
+                console.print(f"[red]Error: Invalid display style '{display}'. Use 'rich', 'simple', or 'none'.[/red]")
+                raise typer.Exit(1)
+        elif quiet:
             style = ProgressStyle.NONE
         elif no_fancy:
             style = ProgressStyle.SIMPLE
@@ -354,6 +368,7 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
 
         table = Table()
         table.add_column("Sample", style="cyan", no_wrap=True)
+        table.add_column("Agent ID", style="dim cyan", no_wrap=False)
         table.add_column("Model", style="yellow", no_wrap=True)
         table.add_column("Passed", style="white", no_wrap=True)
 
@@ -400,7 +415,13 @@ def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bo
                     score_cell = f"{s_val:.2f}" if s_val is not None else "-"
                     cells.extend([score_cell, r_text])
 
-            table.add_row(f"Sample {sample_result.sample.id + 1}", sample_result.model_name or "-", passed, *cells)
+            table.add_row(
+                f"Sample {sample_result.sample.id + 1}",
+                sample_result.agent_id or "-",
+                sample_result.model_name or "-",
+                passed,
+                *cells,
+            )
 
         console.print(table)
 
