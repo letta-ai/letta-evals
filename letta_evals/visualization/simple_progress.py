@@ -101,6 +101,106 @@ class SimpleProgress(ProgressCallback):
         prefix = self._format_prefix(sample_id, agent_id, model_name)
         self.console.print(f"{prefix} [bold yellow]⚠ ERROR[/]: {error}")
 
+    async def suite_completed(self, result):
+        """Display summary results after evaluation completes"""
+        from rich.table import Table
+
+        from letta_evals.constants import MAX_SAMPLES_DISPLAY
+        from letta_evals.models import GateSpec
+
+        self.console.print()
+        self.console.print("[bold]Evaluation Results:[/bold]")
+        self.console.print("=" * 50)
+
+        # overall metrics
+        metrics = result.metrics
+        self.console.print("\n[bold]Overall Metrics:[/bold]")
+        self.console.print(f"  Total samples: {metrics.total}")
+        self.console.print(f"  Total attempted: {metrics.total_attempted}")
+        errors = metrics.total - metrics.total_attempted
+        errors_pct = (errors / metrics.total * 100.0) if metrics.total > 0 else 0.0
+        self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{metrics.total})")
+        self.console.print(f"  Average score (attempted): {metrics.avg_score_attempted:.2f}")
+        self.console.print(f"  Average score (total): {metrics.avg_score_total:.2f}")
+
+        # gate status
+        gate = result.config["gate"]
+        gate_op = gate["op"]
+        gate_value = gate["value"]
+        gate_metric = gate.get("metric", "avg_score")
+
+        op_symbols = {"gt": ">", "gte": "≥", "lt": "<", "lte": "≤", "eq": "="}
+        op_symbol = op_symbols.get(gate_op, gate_op)
+
+        status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
+        self.console.print(f"\n[bold]Gate:[/bold] {gate_metric} {op_symbol} {gate_value:.2f} → {status}")
+
+        # sample results table
+        self.console.print("\n[bold]Sample Results:[/bold]")
+
+        total_samples = len(result.results)
+        samples_to_display = result.results[:MAX_SAMPLES_DISPLAY]
+
+        if total_samples > MAX_SAMPLES_DISPLAY:
+            self.console.print(f"[dim]Showing first {MAX_SAMPLES_DISPLAY} of {total_samples} samples[/dim]")
+
+        table = Table(show_header=True)
+        table.add_column("Sample", style="cyan")
+        table.add_column("Agent ID", style="dim cyan")
+        table.add_column("Model", style="yellow")
+        table.add_column("Passed", style="white")
+
+        # determine available metrics
+        metric_keys = []
+        metric_labels = {}
+        if "graders" in result.config and isinstance(result.config["graders"], dict):
+            for k, gspec in result.config["graders"].items():
+                metric_keys.append(k)
+                metric_labels[k] = gspec.get("display_name") or k
+
+        # add score columns per metric
+        for mk in metric_keys:
+            lbl = metric_labels.get(mk, mk)
+            table.add_column(f"{lbl} score", style="white")
+
+        gate_spec = GateSpec(**result.config["gate"])
+
+        for sample_result in samples_to_display:
+            score_val = sample_result.grade.score
+            passed = "✓" if gate_spec.check_sample(score_val) else "✗"
+
+            # build per-metric score cells
+            cells = []
+            for mk in metric_keys:
+                g = sample_result.grades.get(mk) if sample_result.grades else None
+                if g is None:
+                    cells.append("-")
+                else:
+                    try:
+                        s_val = float(getattr(g, "score", None))
+                    except Exception:
+                        try:
+                            s_val = float(g.get("score"))
+                        except Exception:
+                            s_val = None
+                    score_cell = f"{s_val:.2f}" if s_val is not None else "-"
+                    cells.append(score_cell)
+
+            table.add_row(
+                f"Sample {sample_result.sample.id + 1}",
+                sample_result.agent_id or "-",
+                sample_result.model_name or "-",
+                passed,
+                *cells,
+            )
+
+        self.console.print(table)
+
+        if total_samples > MAX_SAMPLES_DISPLAY:
+            self.console.print(
+                f"[dim]... and {total_samples - MAX_SAMPLES_DISPLAY} more samples (see output file for complete results)[/dim]"
+            )
+
     def _format_prefix(self, sample_id: int, agent_id: Optional[str], model_name: Optional[str]) -> str:
         """format a compact prefix for substeps to show which sample they belong to."""
         parts = [f"[dim]\\[[/][cyan]{sample_id}[/][dim]][/]"]

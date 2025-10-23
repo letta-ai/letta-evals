@@ -717,3 +717,175 @@ class EvalProgress(ProgressCallback):
             model_name=model_name,
             error=error,
         )
+
+    async def suite_completed(self, result):
+        """Display summary and detailed results after evaluation completes"""
+        from letta_evals.constants import MAX_SAMPLES_DISPLAY
+        from letta_evals.models import GateSpec
+
+        self.console.print()
+        self.console.print(f"[bold]Evaluation Results: {result.suite}[/bold]")
+        if self.cached_mode:
+            self.console.print("[dim]Note: Results re-graded from cached trajectories[/dim]")
+        self.console.print("=" * 50)
+
+        # overall metrics
+        metrics = result.metrics
+        self.console.print("\n[bold]Overall Metrics:[/bold]")
+        self.console.print(f"  Total samples: {metrics.total}")
+        self.console.print(f"  Total attempted: {metrics.total_attempted}")
+        errors = metrics.total - metrics.total_attempted
+        errors_pct = (errors / metrics.total * 100.0) if metrics.total > 0 else 0.0
+        self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{metrics.total})")
+        self.console.print(f"  Average score (attempted, gate metric): {metrics.avg_score_attempted:.2f}")
+        self.console.print(f"  Average score (total, gate metric): {metrics.avg_score_total:.2f}")
+        self.console.print(f"  Passed attempts (gate metric): {metrics.passed_attempts}")
+        self.console.print(f"  Failed attempts (gate metric): {metrics.failed_attempts}")
+
+        # per-metric aggregates
+        if hasattr(metrics, "by_metric") and metrics.by_metric:
+            self.console.print("\n[bold]Metrics by Metric:[/bold]")
+            metrics_table = Table()
+            metrics_table.add_column("Metric", style="cyan")
+            metrics_table.add_column("Avg Score (Attempted)", style="white")
+            metrics_table.add_column("Avg Score (Total)", style="white")
+            # build key->label mapping from config
+            label_map = {}
+            if "graders" in result.config and isinstance(result.config["graders"], dict):
+                for key, gspec in result.config["graders"].items():
+                    label_map[key] = gspec.get("display_name") or key
+
+            for key, agg in metrics.by_metric.items():
+                label = label_map.get(key, key)
+                metrics_table.add_row(label, f"{agg.avg_score_attempted:.2f}", f"{agg.avg_score_total:.2f}")
+            self.console.print(metrics_table)
+
+        # per-model metrics
+        if metrics.per_model:
+            self.console.print("\n[bold]Per-Model Metrics:[/bold]")
+            model_table = Table()
+            model_table.add_column("Model", style="cyan")
+            model_table.add_column("Samples", style="white")
+            model_table.add_column("Attempted", style="white")
+            model_table.add_column("Avg Score (Attempted)", style="white")
+            model_table.add_column("Avg Score (Total)", style="white")
+            model_table.add_column("Passed", style="green")
+            model_table.add_column("Failed", style="red")
+
+            for model_metrics in metrics.per_model:
+                model_table.add_row(
+                    model_metrics.model_name,
+                    str(model_metrics.total),
+                    str(model_metrics.total_attempted),
+                    f"{model_metrics.avg_score_attempted:.2f}",
+                    f"{model_metrics.avg_score_total:.2f}",
+                    str(model_metrics.passed_samples),
+                    str(model_metrics.failed_samples),
+                )
+
+            self.console.print(model_table)
+
+        # gate status
+        gate = result.config["gate"]
+        gate_op = gate["op"]
+        gate_value = gate["value"]
+        gate_metric = gate.get("metric", "avg_score")
+        gate_metric_key = gate.get("metric_key")
+
+        op_symbols = {"gt": ">", "gte": "≥", "lt": "<", "lte": "≤", "eq": "="}
+        op_symbol = op_symbols.get(gate_op, gate_op)
+
+        status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
+
+        if gate_metric == "avg_score":
+            actual = metrics.avg_score_attempted
+            suffix = ""
+        else:
+            if gate_metric_key and gate_metric_key in metrics.metrics:
+                actual = metrics.metrics[gate_metric_key]
+            elif metrics.metrics:
+                actual = next(iter(metrics.metrics.values()))
+            else:
+                actual = 0.0
+            suffix = "%"
+
+        # prefer display name for gate metric key
+        display_label = None
+        if gate_metric_key and "graders" in result.config and isinstance(result.config["graders"], dict):
+            gspec = result.config["graders"].get(gate_metric_key)
+            if gspec:
+                display_label = gspec.get("display_name")
+        metric_key_suffix = f" on '{display_label or gate_metric_key}'" if gate_metric_key else ""
+        self.console.print(
+            f"\n[bold]Gate:{metric_key_suffix}[/bold] {gate_metric} {op_symbol} {gate_value:.2f}{suffix} → {status} (actual: {actual:.2f}{suffix}, total: {metrics.avg_score_total:.2f})"
+        )
+
+        # sample results table
+        self.console.print("\n[bold]Sample Results:[/bold]")
+
+        total_samples = len(result.results)
+        samples_to_display = result.results[:MAX_SAMPLES_DISPLAY]
+
+        if total_samples > MAX_SAMPLES_DISPLAY:
+            self.console.print(f"[dim]Showing first {MAX_SAMPLES_DISPLAY} of {total_samples} samples[/dim]")
+
+        table = Table(show_header=True, header_style="bold cyan", border_style="blue", box=ROUNDED)
+        table.add_column("Sample", style="cyan", no_wrap=True)
+        table.add_column("Agent ID", style="dim cyan", no_wrap=False)
+        table.add_column("Model", style="yellow", no_wrap=True)
+        table.add_column("Passed", style="white", no_wrap=True)
+
+        # determine available metrics and display labels
+        metric_keys = []
+        metric_labels = {}
+        if "graders" in result.config and isinstance(result.config["graders"], dict):
+            for k, gspec in result.config["graders"].items():
+                metric_keys.append(k)
+                metric_labels[k] = gspec.get("display_name") or k
+
+        # add two sub-columns per metric: score + rationale
+        for mk in metric_keys:
+            lbl = metric_labels.get(mk, mk)
+            table.add_column(f"{lbl} score", style="white", no_wrap=True)
+            table.add_column(f"{lbl} rationale", style="dim", no_wrap=False)
+
+        gate_spec = GateSpec(**result.config["gate"])
+
+        for sample_result in samples_to_display:
+            score_val = sample_result.grade.score
+            passed = "✓" if gate_spec.check_sample(score_val) else "✗"
+
+            # build per-metric cells in config order
+            cells = []
+            for mk in metric_keys:
+                g = sample_result.grades.get(mk) if sample_result.grades else None
+                if g is None:
+                    cells.extend(["-", ""])
+                else:
+                    try:
+                        s_val = float(getattr(g, "score", None))
+                        r_text = getattr(g, "rationale", None) or ""
+                    except Exception:
+                        try:
+                            s_val = float(g.get("score"))
+                            r_text = g.get("rationale", "")
+                        except Exception:
+                            s_val = None
+                            r_text = ""
+                    score_cell = f"{s_val:.2f}" if s_val is not None else "-"
+                    cells.extend([score_cell, r_text])
+
+            table.add_row(
+                f"Sample {sample_result.sample.id + 1}",
+                sample_result.agent_id or "-",
+                sample_result.model_name or "-",
+                passed,
+                *cells,
+            )
+
+        self.console.print(table)
+
+        if total_samples > MAX_SAMPLES_DISPLAY:
+            self.console.print(
+                f"[dim]... and {total_samples - MAX_SAMPLES_DISPLAY} more samples (see output file for complete results)[/dim]"
+            )

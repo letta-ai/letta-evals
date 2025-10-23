@@ -8,9 +8,8 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
-from letta_evals.constants import MAX_SAMPLES_DISPLAY
 from letta_evals.datasets.loader import load_dataset
-from letta_evals.models import RunnerResult, SuiteSpec
+from letta_evals.models import SuiteSpec
 from letta_evals.runner import run_suite
 from letta_evals.visualization.factory import ProgressStyle
 
@@ -59,9 +58,6 @@ def run(
     import os
 
     no_fancy = not console.is_terminal or os.getenv("NO_COLOR") is not None
-
-    # verbose is now the default unless --quiet is specified
-    verbose = not quiet
 
     if not suite_path.exists():
         console.print(f"[red]Error: Suite file not found: {suite_path}[/red]")
@@ -146,8 +142,6 @@ def run(
         result = anyio.run(run_with_progress)  # type: ignore[arg-type]
 
         if not quiet:
-            display_results(result, verbose, cached_mode=(cached is not None))
-
             # Display aggregate statistics if multiple runs
             if result.run_statistics is not None:
                 display_aggregate_statistics(result.run_statistics)
@@ -177,7 +171,7 @@ def run(
 
     except Exception as e:
         console.print(f"[red]Error running suite: {e}[/red]")
-        if verbose:
+        if not quiet:
             import traceback
 
             traceback.print_exc()
@@ -261,174 +255,6 @@ def list_graders():
 
     console.print(table)
     console.print("\n[dim]You can also use 'model_judge' or 'letta_judge' graders with custom prompts[/dim]")
-
-
-def display_results(result: RunnerResult, verbose: bool = False, cached_mode: bool = False):
-    console.print(f"\n[bold]Evaluation Results: {result.suite}[/bold]")
-    if cached_mode:
-        console.print("[dim]Note: Results re-graded from cached trajectories[/dim]")
-    console.print("=" * 50)
-
-    metrics = result.metrics
-    console.print("\n[bold]Overall Metrics:[/bold]")
-    console.print(f"  Total samples: {metrics.total}")
-    console.print(f"  Total attempted: {metrics.total_attempted}")
-    errors = metrics.total - metrics.total_attempted
-    errors_pct = (errors / metrics.total * 100.0) if metrics.total > 0 else 0.0
-    console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{metrics.total})")
-    console.print(f"  Average score (attempted, gate metric): {metrics.avg_score_attempted:.2f}")
-    console.print(f"  Average score (total, gate metric): {metrics.avg_score_total:.2f}")
-    console.print(f"  Passed attempts (gate metric): {metrics.passed_attempts}")
-    console.print(f"  Failed attempts (gate metric): {metrics.failed_attempts}")
-
-    # Print per-metric aggregates if available
-    if hasattr(metrics, "by_metric") and metrics.by_metric:
-        console.print("\n[bold]Metrics by Metric:[/bold]")
-        table = Table()
-        table.add_column("Metric", style="cyan")
-        table.add_column("Avg Score (Attempted)", style="white")
-        table.add_column("Avg Score (Total)", style="white")
-        # Build key->label mapping from config
-        label_map = {}
-        if "graders" in result.config and isinstance(result.config["graders"], dict):
-            for key, gspec in result.config["graders"].items():
-                label_map[key] = gspec.get("display_name") or key
-
-        for key, agg in metrics.by_metric.items():
-            label = label_map.get(key, key)
-            table.add_row(label, f"{agg.avg_score_attempted:.2f}", f"{agg.avg_score_total:.2f}")
-        console.print(table)
-
-    # show per-model metrics if available
-    if metrics.per_model:
-        console.print("\n[bold]Per-Model Metrics:[/bold]")
-        model_table = Table()
-        model_table.add_column("Model", style="cyan")
-        model_table.add_column("Samples", style="white")
-        model_table.add_column("Attempted", style="white")
-        model_table.add_column("Avg Score (Attempted)", style="white")
-        model_table.add_column("Avg Score (Total)", style="white")
-        model_table.add_column("Passed", style="green")
-        model_table.add_column("Failed", style="red")
-
-        for model_metrics in metrics.per_model:
-            model_table.add_row(
-                model_metrics.model_name,
-                str(model_metrics.total),
-                str(model_metrics.total_attempted),
-                f"{model_metrics.avg_score_attempted:.2f}",
-                f"{model_metrics.avg_score_total:.2f}",
-                str(model_metrics.passed_samples),
-                str(model_metrics.failed_samples),
-            )
-
-        console.print(model_table)
-
-    gate = result.config["gate"]
-    gate_op = gate["op"]
-    gate_value = gate["value"]
-    gate_metric = gate.get("metric", "avg_score")
-    gate_metric_key = gate.get("metric_key")
-
-    op_symbols = {"gt": ">", "gte": "≥", "lt": "<", "lte": "≤", "eq": "="}
-    op_symbol = op_symbols.get(gate_op, gate_op)
-
-    status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
-
-    if gate_metric == "avg_score":
-        actual = metrics.avg_score_attempted
-        suffix = ""
-    else:
-        if gate_metric_key and gate_metric_key in metrics.metrics:
-            actual = metrics.metrics[gate_metric_key]
-        elif metrics.metrics:
-            actual = next(iter(metrics.metrics.values()))
-        else:
-            actual = 0.0
-        suffix = "%"
-
-    # Prefer display name for gate metric key
-    display_label = None
-    if gate_metric_key and "graders" in result.config and isinstance(result.config["graders"], dict):
-        gspec = result.config["graders"].get(gate_metric_key)
-        if gspec:
-            display_label = gspec.get("display_name")
-    metric_key_suffix = f" on '{display_label or gate_metric_key}'" if gate_metric_key else ""
-    console.print(
-        f"\n[bold]Gate:{metric_key_suffix}[/bold] {gate_metric} {op_symbol} {gate_value:.2f}{suffix} → {status} (actual: {actual:.2f}{suffix}, total: {metrics.avg_score_total:.2f})"
-    )
-
-    if verbose:
-        total_samples = len(result.results)
-        samples_to_display = result.results[:MAX_SAMPLES_DISPLAY]
-
-        console.print("\n[bold]Sample Results:[/bold]")
-        if total_samples > MAX_SAMPLES_DISPLAY:
-            console.print(f"[dim]Showing first {MAX_SAMPLES_DISPLAY} of {total_samples} samples[/dim]")
-
-        table = Table()
-        table.add_column("Sample", style="cyan", no_wrap=True)
-        table.add_column("Agent ID", style="dim cyan", no_wrap=False)
-        table.add_column("Model", style="yellow", no_wrap=True)
-        table.add_column("Passed", style="white", no_wrap=True)
-
-        # Determine available metrics and display labels
-        metric_keys = []
-        metric_labels = {}
-        if "graders" in result.config and isinstance(result.config["graders"], dict):
-            for k, gspec in result.config["graders"].items():
-                metric_keys.append(k)
-                metric_labels[k] = gspec.get("display_name") or k
-
-        # Add two sub-columns per metric: score + rationale
-        for mk in metric_keys:
-            lbl = metric_labels.get(mk, mk)
-            table.add_column(f"{lbl} score", style="white", no_wrap=True)
-            table.add_column(f"{lbl} rationale", style="dim", no_wrap=False)
-
-        from letta_evals.models import GateSpec
-
-        gate_spec = GateSpec(**result.config["gate"])
-
-        for sample_result in samples_to_display:
-            score_val = sample_result.grade.score
-            passed = "✓" if gate_spec.check_sample(score_val) else "✗"
-
-            # Build per-metric cells in config order
-            cells = []
-            for mk in metric_keys:
-                g = sample_result.grades.get(mk) if sample_result.grades else None
-                if g is None:
-                    cells.extend(["-", ""])
-                else:
-                    try:
-                        s_val = float(getattr(g, "score", None))
-                        r_text = getattr(g, "rationale", None) or ""
-                    except Exception:
-                        # dict fallback
-                        try:
-                            s_val = float(g.get("score"))  # type: ignore[attr-defined]
-                            r_text = g.get("rationale", "")  # type: ignore[attr-defined]
-                        except Exception:
-                            s_val = None
-                            r_text = ""
-                    score_cell = f"{s_val:.2f}" if s_val is not None else "-"
-                    cells.extend([score_cell, r_text])
-
-            table.add_row(
-                f"Sample {sample_result.sample.id + 1}",
-                sample_result.agent_id or "-",
-                sample_result.model_name or "-",
-                passed,
-                *cells,
-            )
-
-        console.print(table)
-
-        if total_samples > MAX_SAMPLES_DISPLAY:
-            console.print(
-                f"[dim]... and {total_samples - MAX_SAMPLES_DISPLAY} more samples (see output file for complete results)[/dim]"
-            )
 
 
 def display_aggregate_statistics(run_statistics):

@@ -842,7 +842,13 @@ async def run_suite(
                     runs_passed += 1
             finally:
                 if progress_cb is not None and run_idx == actual_num_runs - 1:
+                    # stop live display first, then show summary
                     progress_cb.stop()
+                    run_statistics = _calculate_run_statistics(all_metrics, runs_passed, suite)
+                    final_result_temp = all_run_results[-1]
+                    final_result_temp.run_statistics = run_statistics
+                    final_result_temp.gates_passed = runs_passed > 0
+                    await progress_cb.suite_completed(final_result_temp)
 
         run_statistics = _calculate_run_statistics(all_metrics, runs_passed, suite)
 
@@ -868,7 +874,10 @@ async def run_suite(
         if progress_cb is not None:
             await progress_cb.start()
         try:
-            return await runner.run()
+            result = await runner.run()
+            return result
         finally:
             if progress_cb is not None:
+                # stop live display first, then show summary
                 progress_cb.stop()
+                await progress_cb.suite_completed(result)
