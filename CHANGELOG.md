@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.5.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.4.1...letta-evals-v0.5.0) (2025-10-23)
+
+
+### Features
+
+* Add agent_id to visualization ([#91](https://github.com/letta-ai/letta-evals/issues/91)) ([2f77348](https://github.com/letta-ai/letta-evals/commit/2f77348458a90141f984b7c15274dc9f6d7ffdaf))
+* Add agent-as-judge support for rubric grading ([#77](https://github.com/letta-ai/letta-evals/issues/77)) ([ae4878e](https://github.com/letta-ai/letta-evals/commit/ae4878e067986b989fce6fd77b281b07345e822e))
+* Add summary tables on suite finish for all display types (rich, simple) ([#92](https://github.com/letta-ai/letta-evals/issues/92)) ([19e1e1c](https://github.com/letta-ai/letta-evals/commit/19e1e1c8be3c8edbc8b16474353f2be5891f2313))
+* Support anthropic models as grader ([#83](https://github.com/letta-ai/letta-evals/issues/83)) ([c38cf1f](https://github.com/letta-ai/letta-evals/commit/c38cf1f4c5ae80fcc4838eb1878d3f735222506d))
+* Support default Letta judge agent with new `letta_judge` grader kind ([#86](https://github.com/letta-ai/letta-evals/issues/86)) ([b4bfd6c](https://github.com/letta-ai/letta-evals/commit/b4bfd6cf26514c9a139a88d632bc35b35b9949b9))
+
+
+### Bug Fixes
+
+* Add defensive check for run_id from streaming chunk ([#75](https://github.com/letta-ai/letta-evals/issues/75)) ([7d34884](https://github.com/letta-ai/letta-evals/commit/7d348843f66f418bafaceb130354af4ec579fff5))
+* Add pre-fill trick for Anthropic json output ([#84](https://github.com/letta-ai/letta-evals/issues/84)) ([2a4fd4a](https://github.com/letta-ai/letta-evals/commit/2a4fd4aadda3fe4f839e70d3393d9da439911ee2))
+* Fix retry logic for failing agent ([#74](https://github.com/letta-ai/letta-evals/issues/74)) ([ecd5d5a](https://github.com/letta-ai/letta-evals/commit/ecd5d5abdbc6b4edea0651e6e4bc2f7ee07218c0))
+* Fix typo in chunks appending ([#82](https://github.com/letta-ai/letta-evals/issues/82)) ([d888474](https://github.com/letta-ai/letta-evals/commit/d8884742477e28bdc4b089295fce22f4f053c19c))
+* OpenRouter for Kimi ([#76](https://github.com/letta-ai/letta-evals/issues/76)) ([2cd6192](https://github.com/letta-ai/letta-evals/commit/2cd6192b326e6c09b7600726dad45d4f5a246d42))
+* Print out chunks on run_id error ([#81](https://github.com/letta-ai/letta-evals/issues/81)) ([8b71a64](https://github.com/letta-ai/letta-evals/commit/8b71a6435adff3e8505780da332553a0dbbf3a4a))
+
+
+### Performance Improvements
+
+* Retry on letta server failures ([#72](https://github.com/letta-ai/letta-evals/issues/72)) ([acaf5a5](https://github.com/letta-ai/letta-evals/commit/acaf5a5f152c48d0902d3c0696f248d5686ad0c0))
+
+
+### Refactors
+
+* Flatten package imports for easier pip usage ([#89](https://github.com/letta-ai/letta-evals/issues/89)) ([24fd61a](https://github.com/letta-ai/letta-evals/commit/24fd61a5c47cb666e886f1e03bf018d072a5f098))
+* Rename `rubric` to `model_judge` ([#87](https://github.com/letta-ai/letta-evals/issues/87)) ([0047d3f](https://github.com/letta-ai/letta-evals/commit/0047d3f8fa1b7c556ffefecfd9123736b703d541))
+* Use Pydantic discriminated union for GraderSpec types ([#88](https://github.com/letta-ai/letta-evals/issues/88)) ([bb21f1b](https://github.com/letta-ai/letta-evals/commit/bb21f1b9469ada4b87779e40ce8fbbbed663a27d))
+
+
+### Documentation
+
+* Add perma-link for UI screenshot ([#79](https://github.com/letta-ai/letta-evals/issues/79)) ([00dfb38](https://github.com/letta-ai/letta-evals/commit/00dfb38eba43d90ef4e3f6aae448e5b5c6501417))
+* Fix typo in README ([#80](https://github.com/letta-ai/letta-evals/issues/80)) ([a5e0497](https://github.com/letta-ai/letta-evals/commit/a5e049767d22c16a64b62dea6a41577c80c690c0))
+* Write multi-turn memory example ([#90](https://github.com/letta-ai/letta-evals/issues/90)) ([a683727](https://github.com/letta-ai/letta-evals/commit/a68372792eef405b1d7fd874c33cb2f3440cc4b0))
+
 ## [0.4.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.4.0...letta-evals-v0.4.1) (2025-10-21)
 
 
