@@ -24,21 +24,32 @@ class ProgressCallback(ABC):
         pass
 
     @abstractmethod
-    async def sample_started(self, sample_id: int, model_name: Optional[str] = None) -> None:
+    async def sample_started(
+        self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None
+    ) -> None:
         """Called when a sample evaluation starts."""
         ...
 
-    async def agent_loading(self, sample_id: int, model_name: Optional[str] = None, from_cache: bool = False) -> None:
+    async def agent_loading(
+        self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None, from_cache: bool = False
+    ) -> None:
         """Called when an agent is being loaded."""
         pass
 
     async def message_sending(
-        self, sample_id: int, message_num: int, total_messages: int, model_name: Optional[str] = None
+        self,
+        sample_id: int,
+        message_num: int,
+        total_messages: int,
+        agent_id: Optional[str] = None,
+        model_name: Optional[str] = None,
     ) -> None:
         """Called when sending messages to the agent."""
         pass
 
-    async def grading_started(self, sample_id: int, model_name: Optional[str] = None) -> None:
+    async def grading_started(
+        self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None
+    ) -> None:
         """Called when grading of a sample begins."""
         pass
 
@@ -47,6 +58,7 @@ class ProgressCallback(ABC):
         self,
         sample_id: int,
         passed: bool,
+        agent_id: Optional[str] = None,
         score: Optional[float] = None,
         model_name: Optional[str] = None,
         metric_scores: Optional[Dict[str, float]] = None,
@@ -58,6 +70,8 @@ class ProgressCallback(ABC):
         ...
 
     @abstractmethod
-    async def sample_error(self, sample_id: int, error: str, model_name: Optional[str] = None) -> None:
+    async def sample_error(
+        self, sample_id: int, error: str, agent_id: Optional[str] = None, model_name: Optional[str] = None
+    ) -> None:
         """Called when a sample evaluation encounters an error."""
         ...

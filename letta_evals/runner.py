@@ -300,6 +300,7 @@ class Runner:
             model_name = None
 
         async with self.semaphore:
+            agent_id = None
             try:
                 if self.progress_callback:
                     await self.progress_callback.sample_started(sample_id, model_name=model_name)
@@ -311,7 +312,7 @@ class Runner:
                 )
 
                 if self.progress_callback:
-                    await self.progress_callback.grading_started(sample_id, model_name=model_name)
+                    await self.progress_callback.grading_started(sample_id, agent_id=agent_id, model_name=model_name)
 
                 grades_dict: Optional[Dict[str, GradeResult]] = {}
                 submissions_dict: Optional[Dict[str, str]] = {}
@@ -341,6 +342,7 @@ class Runner:
                     await self.progress_callback.sample_completed(
                         sample_id,
                         passed=passed,
+                        agent_id=agent_id,
                         score=grade_result.score,
                         model_name=model_name,
                         metric_scores=metric_scores,
@@ -362,7 +364,9 @@ class Runner:
                 )
             except Exception as e:
                 if self.progress_callback:
-                    await self.progress_callback.sample_error(sample_id, str(e), model_name=model_name)
+                    await self.progress_callback.sample_error(
+                        sample_id, str(e), agent_id=agent_id, model_name=model_name
+                    )
                 raise
 
     def _validate_rubric_vars(self, samples: List[Sample]) -> None:
