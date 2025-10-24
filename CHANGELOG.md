@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.5.0...letta-evals-v0.5.1) (2025-10-24)
+
+
+### Bug Fixes
+
+* Remove duplicate gpt 4.1 results ([#95](https://github.com/letta-ai/letta-evals/issues/95)) ([2b9092c](https://github.com/letta-ai/letta-evals/commit/2b9092cd7b4180f493a5acfd0e0c33662ae574c2))
+
+
+### Chores
+
+* Add leaderboard results yaml and script ([#93](https://github.com/letta-ai/letta-evals/issues/93)) ([e24fb74](https://github.com/letta-ai/letta-evals/commit/e24fb74c373b19cf3fc7543d365f07de6b547ce7))
+
 ## [0.5.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.4.1...letta-evals-v0.5.0) (2025-10-23)
 
 
