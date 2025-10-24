@@ -11,8 +11,8 @@ from collections import defaultdict
 from glob import glob
 from pathlib import Path
 from typing import Dict, List, Tuple
-import pandas as pd
 
+import pandas as pd
 import yaml
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
