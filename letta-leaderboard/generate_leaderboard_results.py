@@ -223,12 +223,12 @@ def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
         except IOError as e:
             logger.error(f"Error reading file {file_path} - {e}")
             continue
-    
+
     results_df = pd.DataFrame(results)
     print("=" * 40)
     print("MODEL COUNTS")
     print("=" * 40)
-    print(results_df['model_name'].value_counts())
+    print(results_df["model_name"].value_counts())
     print("=" * 40)
     return results, num_total, num_errors
 
