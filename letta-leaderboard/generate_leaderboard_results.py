@@ -201,10 +201,13 @@ def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
 
                         if model_name is None:
                             continue
-                            
-                        if model_name in ["anthropic/claude-sonnet-4-5-20250929", "anthropic/claude-opus-4-1-20250805"] and "answerable-6" not in str(file_path):
+
+                        if model_name in [
+                            "anthropic/claude-sonnet-4-5-20250929",
+                            "anthropic/claude-opus-4-1-20250805",
+                        ] and "answerable-6" not in str(file_path):
                             continue
-                        
+
                         if has_error:
                             num_errors += 1
 
@@ -219,7 +222,7 @@ def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
         except IOError as e:
             logger.error(f"Error reading file {file_path} - {e}")
             continue
-    
+
     return results, num_total, num_errors
 
 
@@ -321,7 +324,7 @@ def main() -> None:
     model_stats = aggregate_model_stats(results)
     yaml_output = format_leaderboard_output(model_stats)
     write_yaml_output(yaml_output)
-    print_summary(result_files,yaml_output, num_total, num_errors)
+    print_summary(result_files, yaml_output, num_total, num_errors)
 
 
 if __name__ == "__main__":
