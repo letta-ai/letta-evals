@@ -78,7 +78,6 @@ MODEL_COSTS = {
 }
 
 EXCLUDED_MODELS = {"moonshotai/Kimi-K2-Instruct-0905"}
-NUM_RUNS = 3  # Number of runs per model
 
 
 def normalize_model_name(model_name: str) -> str:
@@ -189,17 +188,23 @@ def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
     num_errors = 0
 
     for file_path in result_files:
+        print(f"Processing file: {file_path}")
         try:
             with open(file_path, "r") as f:
                 for line_num, line in enumerate(f, start=1):
                     num_total += 1
                     try:
                         row = json.loads(line)
+                        # print(f"Row: {row['result'].keys()}")
                         model_name, score, cost, has_error = parse_result_entry(row, line_num, file_path)
+                        # print(f"Model name: {model_name}, Score: {score}, Cost: {cost}, Has error: {has_error}")
 
                         if model_name is None:
                             continue
-
+                            
+                        if model_name in ["anthropic/claude-sonnet-4-5-20250929", "anthropic/claude-opus-4-1-20250805"] and "answerable-6" not in str(file_path):
+                            continue
+                        
                         if has_error:
                             num_errors += 1
 
@@ -214,7 +219,7 @@ def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
         except IOError as e:
             logger.error(f"Error reading file {file_path} - {e}")
             continue
-
+    
     return results, num_total, num_errors
 
 
@@ -237,13 +242,12 @@ def aggregate_model_stats(results: Dict[str, List]) -> Dict[str, Dict[str, List]
     return model_stats
 
 
-def format_leaderboard_output(model_stats: Dict[str, Dict[str, List]], num_runs: int = NUM_RUNS) -> List[Dict]:
+def format_leaderboard_output(model_stats: Dict[str, Dict[str, List]]) -> List[Dict]:
     """
     Format aggregated model statistics for YAML output.
 
     Args:
         model_stats: Dictionary of model statistics
-        num_runs: Number of runs per model for averaging
 
     Returns:
         List of dictionaries formatted for YAML output
@@ -254,8 +258,8 @@ def format_leaderboard_output(model_stats: Dict[str, Dict[str, List]], num_runs:
         scores = model_stats[model_name]["scores"]
         costs = model_stats[model_name]["costs"]
 
-        avg_score = sum(scores) / num_runs
-        total_cost = sum(costs) / num_runs
+        avg_score = sum(scores) * 100 / len(scores)
+        total_cost = sum(costs) * 100 / len(costs)
 
         yaml_output.append(
             {
@@ -286,11 +290,12 @@ def write_yaml_output(data: List[Dict], output_path: str = "leaderboard_results.
         raise
 
 
-def print_summary(yaml_output: List[Dict], num_total: int, num_errors: int) -> None:
+def print_summary(result_files: List[Path], yaml_output: List[Dict], num_total: int, num_errors: int) -> None:
     """
     Print a summary of the leaderboard generation.
 
     Args:
+        result_files: List of result files
         yaml_output: Generated leaderboard data
         num_total: Total number of samples processed
         num_errors: Number of errors encountered
@@ -298,6 +303,7 @@ def print_summary(yaml_output: List[Dict], num_total: int, num_errors: int) -> N
     print("\n" + "=" * 40)
     print("LEADERBOARD RESULTS SUMMARY")
     print("=" * 40)
+    print(f"Total files:  {len(result_files)}")
     print(f"Total models:  {len(yaml_output)}")
     print(f"Total samples: {num_total}")
     print(f"Total errors:  {num_errors}")
@@ -315,7 +321,7 @@ def main() -> None:
     model_stats = aggregate_model_stats(results)
     yaml_output = format_leaderboard_output(model_stats)
     write_yaml_output(yaml_output)
-    print_summary(yaml_output, num_total, num_errors)
+    print_summary(result_files,yaml_output, num_total, num_errors)
 
 
 if __name__ == "__main__":
