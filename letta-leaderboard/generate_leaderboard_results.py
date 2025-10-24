@@ -12,6 +12,7 @@ from glob import glob
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+import pandas as pd
 import yaml
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -188,7 +189,7 @@ def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
     num_errors = 0
 
     for file_path in result_files:
-        print(f"Processing file: {file_path}")
+        logger.info(f"Processing file: {file_path}")
         try:
             with open(file_path, "r") as f:
                 for line_num, line in enumerate(f, start=1):
@@ -223,6 +224,12 @@ def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
             logger.error(f"Error reading file {file_path} - {e}")
             continue
 
+    results_df = pd.DataFrame(results)
+    print("=" * 40)
+    print("MODEL COUNTS")
+    print("=" * 40)
+    print(results_df["model_name"].value_counts())
+    print("=" * 40)
     return results, num_total, num_errors
 
 
@@ -303,7 +310,7 @@ def print_summary(result_files: List[Path], yaml_output: List[Dict], num_total: 
         num_total: Total number of samples processed
         num_errors: Number of errors encountered
     """
-    print("\n" + "=" * 40)
+    print("=" * 40)
     print("LEADERBOARD RESULTS SUMMARY")
     print("=" * 40)
     print(f"Total files:  {len(result_files)}")

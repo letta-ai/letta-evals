@@ -19,9 +19,9 @@
   total_cost: 12.08
   leaderboard_filesystem_100: 55.13
 - model: openai/gpt-4.1-2025-04-14
-  average: 35.35
-  total_cost: 36.38
-  leaderboard_filesystem_100: 35.35
+  average: 36.68
+  total_cost: 36.85
+  leaderboard_filesystem_100: 36.68
 - model: openai/gpt-4.1-mini-2025-04-14
   average: 36.3
   total_cost: 13.56
