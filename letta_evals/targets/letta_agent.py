@@ -13,7 +13,7 @@ from letta_evals.visualization.base import ProgressCallback
 logger = logging.getLogger(__name__)
 
 
-class AgentTarget(Target):
+class LettaAgentTarget(Target):
     """Letta agent target for evaluation."""
 
     def __init__(
