@@ -1,154 +1,178 @@
-# Simple Tool Grader Example
+# Letta Code Bug Fixing Example
 
-This example demonstrates basic tool-based grading using the built-in `contains` function with two different extractors.
+This example demonstrates evaluating Letta Code's ability to find and fix bugs in Python files automatically.
 
 ## What This Example Shows
 
-- Using tool graders for deterministic, fast evaluation
-- Testing agent web-fetching capabilities
-- Setting pass/fail gates with threshold values
-- Comparing different extractors: `last_assistant` vs `tool_output`
+- Using the `letta_code` target to test the Letta Code CLI agent
+- Custom async grader that executes Python files and validates output
+- Suite setup scripts that prepare the testing environment
+- Using `extra_vars` in datasets to pass additional context to graders
+- Testing autonomous debugging capabilities
 
-## Two Suites, Two Evaluation Strategies
+## How It Works
 
-This example includes two separate suites that evaluate the same agent differently:
+### 1. Setup Phase (`setup.py:prepare_evaluation`)
 
-### 1. `last_assistant_suite.yaml` - Evaluating Agent Responses
-Uses the `last_assistant` extractor to check if the agent's final response contains the correct answer. This tests whether the agent can successfully fetch webpage content AND communicate the answer properly to the user.
+Before each evaluation run, the setup script resets the sandbox:
 
-### 2. `tool_output_suite.yaml` - Evaluating Tool Outputs
-Uses the `tool_output` extractor to check if the raw output from the `read_webpage_content` tool contains the correct answer. This tests whether the tool is successfully fetching and returning webpage content, independent of what the agent says.
+```python
+@suite_setup
+async def prepare_evaluation() -> None:
+    # removes existing sandbox directory
+    # copies fresh buggy files from init_sandbox/
+```
 
-## Key Takeaway
+This ensures each test starts with the original buggy code.
 
-Tool graders like `contains` are ideal when you have clear ground truth answers and need fast, deterministic evaluation. Different extractors let you evaluate different parts of the agent's behavior - you can test tool functionality separately from the agent's ability to process and communicate results.
+### 2. Evaluation Phase
+
+For each sample, Letta Code:
+1. Receives a prompt: "Find and fix the bug in sandbox/task_X.py"
+2. Reads the file, identifies the bug
+3. Fixes the bug using its Edit tool
+4. Optionally runs the file to verify the fix
+
+### 3. Grading Phase (`custom_python_grader.py`)
+
+The custom async grader:
+1. Retrieves the file path from `sample.extra_vars`
+2. Executes the (hopefully fixed) Python file using `asyncio.create_subprocess_exec`
+3. Captures stdout and compares it to the expected output
+4. Returns score 1.0 if output matches, 0.0 otherwise
+
+## The Buggy Files
+
+### `task_1.py` - Syntax Error
+```python
+def calculate_sum(numbers)  # missing colon
+```
+**Expected output after fix:** `The sum is: 15`
+
+### `task_2.py` - IndexError
+```python
+return arr[len(arr)]  # should be arr[-1] or arr[len(arr)-1]
+```
+**Expected output after fix:** `The last element is: 50`
+
+### `task_3.py` - ZeroDivisionError
+```python
+def calculate_average(numbers):
+    return sum(numbers) / len(numbers)  # crashes on empty list
+
+calculate_average([])  # needs guard clause
+```
+**Expected output after fix:** `Average: 30.0` (only the second test case)
 
 ## Running This Example
 
-### Local Setup (````Default)
+### Prerequisites
 
-Start your local Letta server:
+1. **Install Letta Code CLI:**
 ```bash
-letta server
+npm install -g @letta-ai/letta-code
 ```
 
-Then run either or both evaluations:
-```bash
-cd examples/simple-tool-grader
-
-# evaluate agent's final responses
-letta-evals run last_assistant_suite.yaml
-
-# evaluate tool outputs directly
-letta-evals run tool_output_suite.yaml
-```
-
-### Letta Cloud Setup
-
-Set these environment variables:
+2. **Set up environment variables:**
 ```bash
 export LETTA_API_KEY=your-api-key
 export LETTA_PROJECT_ID=your-project-id
 ```
 
-Update `base_url` in `suite.yaml`:
-```yaml
-target:
-  base_url: https://api.letta.com/
+### Run the evaluation:
+```bash
+cd examples/letta-code-simple-edit
+letta-evals run suite.yaml
 ```
-
-Then run the evaluation as above.
 
 ## Configuration Details
 
-### Dataset Formats
-
-This example uses two different datasets, each tailored to its evaluation strategy:
-
-#### `assistant_dataset.csv` - Agent Response Dataset
-
-Used by `last_assistant_suite.yaml`. Contains specific answers the agent should extract and communicate:
-
-```csv
-input,ground_truth
-"Read `https://www.york.ac.uk/teaching/cws/wws/webpage1.html`. What program is mentioned for writing HTML code? Respond with the program name ONLY in brackets, e.g. {Word}.",{Notepad}
-```
-
-**Key points:**
-- `ground_truth`: Specific formatted answers (e.g., `{Notepad}`, `{4}`, `{.html}`)
-- Tests if the agent can extract specific information AND format it correctly
-- Evaluates end-to-end behavior: tool usage + response generation
-
-#### `tool_output_dataset.csv` - Tool Output Dataset
-
-Used by `tool_output_suite.yaml`. Contains a sentence that should appear in the raw webpage content:
-
-```csv
-input,ground_truth
-"Read `https://www.york.ac.uk/teaching/cws/wws/webpage1.html`. What program is mentioned for writing HTML code? Respond with the program name ONLY in brackets, e.g. {Word}.","HTML isn't computer code, but is a language that uses US English to enable texts (words, images, sounds) to be inserted and formatting such as colo(u)r and centre/ering to be written in."
-```
-
-**Key points:**
-- `ground_truth`: A full sentence from the webpage that should appear in the tool's raw output
-- All samples use the same ground truth since they fetch the same webpage
-- Tests if the tool successfully fetches webpage content, regardless of what the agent says
-- Useful for isolating tool functionality from agent processing
-
-### Suite Configurations
-
-#### `last_assistant_suite.yaml` - Agent Response Evaluation
+### `suite.yaml`
 
 ```yaml
-name: fetch-webpage-last-assistant-test
-description: Test if agent's final response contains the correct answer from fetched webpage
-dataset: assistant_dataset.csv
+name: letta-code-bug-fix-test
+dataset: dataset.jsonl
+setup_script: setup.py:prepare_evaluation
 target:
-  kind: letta_agent
-  agent_file: test-fetch-webpage-simple-agent.af
-  base_url: http://localhost:8283
+  kind: letta_code
+  base_url: https://api.letta.com/
+  working_dir: sandbox
+  timeout: 300
+  max_retries: 3
 graders:
-  contains_check:
+  bug_fix_check:
     kind: tool
-    function: contains
+    function: custom_python_grader.py:python_output_grader
     extractor: last_assistant
-gate:
-  metric_key: contains_check
-  op: gte
-  value: 0.75
+```
+
+**Key fields:**
+- `kind: letta_code` - Uses the Letta Code CLI instead of SDK
+- `working_dir: sandbox` - Sets the working directory for letta CLI execution
+- `timeout: 300` - 5 minute timeout per sample
+- `max_retries: 3` - Retries failed CLI invocations
+- `setup_script` - Runs before evaluation to reset the sandbox
+
+### `dataset.jsonl`
+
+```jsonl
+{"input": "Find and fix the bug in sandbox/task_1.py", "ground_truth": "The sum is: 15", "extra_vars": {"file_path": "sandbox/task_1.py"}}
+{"input": "Find and fix the bug in sandbox/task_2.py", "ground_truth": "The last element is: 50", "extra_vars": {"file_path": "sandbox/task_2.py"}}
+{"input": "Find and fix the bug in sandbox/task_3.py", "ground_truth": "Average: 30.0", "extra_vars": {"file_path": "sandbox/task_3.py"}}
 ```
 
 **Key points:**
-- Uses `assistant_dataset.csv` with specific formatted answers as ground truth
-- `extractor: last_assistant` evaluates the final agent message
-- Tests end-to-end behavior: tool calling + response generation
-- `gate` requires ≥75% pass rate (3+ out of 5 samples must pass)
+- Generic prompts that don't specify the type of bug
+- `extra_vars` passes file path to the custom grader
+- `ground_truth` is the expected output when the file runs correctly
 
-#### `tool_output_suite.yaml` - Tool Output Evaluation
+### `custom_python_grader.py`
 
-```yaml
-name: fetch-webpage-tool-output-test
-description: Test if the tool output from read_webpage_content contains the correct answer
-dataset: tool_output_dataset.csv
-target:
-  kind: letta_agent
-  agent_file: test-fetch-webpage-simple-agent.af
-  base_url: http://localhost:8283
-graders:
-  tool_output_check:
-    kind: tool
-    function: contains
-    extractor: tool_output
-    extractor_config:
-      tool_name: read_webpage_content
-gate:
-  metric_key: tool_output_check
-  op: gte
-  value: 0.75
+```python
+@grader
+async def python_output_grader(sample: Sample, submission: str) -> GradeResult:
+    # get file path from sample.extra_vars
+    file_path = sample.extra_vars["file_path"]
+
+    # run the python file asynchronously
+    process = await asyncio.create_subprocess_exec(
+        "python3", str(full_path),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
+
+    # compare output to ground truth
+    if output == expected:
+        return GradeResult(score=1.0, rationale=f"Output matches expected: {output}")
+    else:
+        return GradeResult(score=0.0, rationale=f"Output mismatch. Expected: '{expected}', Got: '{output}'")
 ```
 
-**Key points:**
-- Uses `tool_output_dataset.csv` with a sentence from the webpage as ground truth
-- `extractor: tool_output` with `tool_name: read_webpage_content` evaluates raw tool output
-- `extractor_config` specifies which tool's output to extract
-- Tests tool functionality independently of agent's response formatting
-- Useful for debugging: isolates whether issues are with the tool or the agent's processing
+**Key features:**
+- Async grader using `asyncio.create_subprocess_exec`
+- Reads file path from `sample.extra_vars`
+- Executes the file and captures stdout/stderr
+- Compares actual output to expected ground truth
+
+## Key Takeaways
+
+1. **`letta_code` target**: Tests the autonomous Letta Code CLI agent instead of SDK-based agents
+2. **Custom async graders**: Can perform complex operations like running subprocesses
+3. **Suite setup scripts**: Prepare the environment before evaluation (resetting files, creating directories, etc.)
+4. **`extra_vars`**: Pass additional context to custom graders beyond input/ground_truth
+5. **Working directory control**: The `working_dir` field sets where letta CLI executes
+
+## Expected Results
+
+All three samples should pass if Letta Code successfully:
+1. Identifies the bug type (syntax, runtime, logic error)
+2. Applies the correct fix
+3. Produces code that runs without errors
+4. Generates the expected output
+
+The evaluation will show:
+- Whether each file was fixed correctly
+- The actual vs expected output for failures
+- Overall pass rate (should be 100% for a successful run)
