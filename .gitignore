@@ -3,6 +3,7 @@ CLAUDE.md
 .env
 .DS_Store
 .idea/
+.letta/
 
 examples/*/results.json
 examples/*/results.jsonl
