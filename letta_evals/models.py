@@ -17,7 +17,10 @@ class Sample(BaseModel):
     ground_truth: Optional[str] = Field(default=None, description="Expected ground_truth response for grading")
     agent_args: Optional[Dict[str, Any]] = Field(default=None, description="Custom arguments for agent creation")
     rubric_vars: Optional[Dict[str, Any]] = Field(
-        default=None, description="Custom variables to substitute in rubric prompts"
+        default=None, description="Variables for prompt substitution in rubric graders"
+    )
+    extra_vars: Optional[Dict[str, Any]] = Field(
+        default=None, description="Custom user-supplied variables. Useful when writing custom extractors, graders, etc."
     )
 
 
