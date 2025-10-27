@@ -199,7 +199,9 @@ def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
                     try:
                         row = json.loads(line)
                         # print(f"Row: {row['result'].keys()}")
-                        model_name, score, cost, prompt_tokens, completion_tokens, has_error = parse_result_entry(row, line_num, file_path)
+                        model_name, score, cost, prompt_tokens, completion_tokens, has_error = parse_result_entry(
+                            row, line_num, file_path
+                        )
                         # print(f"Model name: {model_name}, Score: {score}, Cost: {cost}, Has error: {has_error}")
 
                         if model_name is None:
@@ -229,11 +231,11 @@ def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
             continue
 
     results_df = pd.DataFrame(results)
-    # print("=" * 40)
-    # print("MODEL COUNTS")
-    # print("=" * 40)
-    # print(results_df["model_name"].value_counts())
-    # print("=" * 40)
+    print("=" * 40)
+    print("MODEL COUNTS")
+    print("=" * 40)
+    print(results_df["model_name"].value_counts())
+    print("=" * 40)
     return results, num_total, num_errors
 
 
@@ -250,11 +252,7 @@ def aggregate_model_stats(results: Dict[str, List]) -> Dict[str, Dict[str, List]
     model_stats = defaultdict(lambda: {"scores": [], "costs": [], "prompt_tokens": [], "completion_tokens": []})
 
     for model, score, cost, prompt_tokens, completion_tokens in zip(
-        results["model_name"], 
-        results["score"], 
-        results["cost"],
-        results["prompt_tokens"],
-        results["completion_tokens"]
+        results["model_name"], results["score"], results["cost"], results["prompt_tokens"], results["completion_tokens"]
     ):
         model_stats[model]["scores"].append(score)
         model_stats[model]["costs"].append(cost)
@@ -325,17 +323,17 @@ def print_token_statistics(model_stats: Dict[str, Dict[str, List]]) -> None:
     print("=" * 80)
     print(f"{'Model':<50} {'Prompt Tokens':>15} {'Completion Tokens':>15}")
     print("-" * 80)
-    
+
     for model_name in sorted(model_stats.keys()):
         prompt_tokens = model_stats[model_name]["prompt_tokens"]
         completion_tokens = model_stats[model_name]["completion_tokens"]
-        
+
         # tokens per-run
         total_prompt = int(sum(prompt_tokens) * 100 / len(prompt_tokens))
         total_completion = int(sum(completion_tokens) * 100 / len(completion_tokens))
-        
+
         print(f"{model_name:<50} {total_prompt:>15,} {total_completion:>15,}")
-    
+
     print("=" * 80 + "\n")
 
 
