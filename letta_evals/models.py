@@ -27,8 +27,8 @@ class Sample(BaseModel):
 # Config models
 
 
-class TargetSpec(BaseModel):
-    """Target configuration for evaluation."""
+class BaseTargetSpec(BaseModel):
+    """Base target configuration with common fields."""
 
     kind: TargetKind = Field(description="Type of target (agent)")
     base_url: str = Field(default="http://localhost:8283", description="Letta server URL")
@@ -36,12 +36,6 @@ class TargetSpec(BaseModel):
     timeout: float = Field(default=300.0, description="Request timeout in seconds")
     project_id: Optional[str] = Field(default=None, description="Letta project ID")
     max_retries: int = Field(default=0, description="Maximum number of retries for failed create_stream calls")
-
-    agent_id: Optional[str] = Field(default=None, description="ID of existing agent to use")
-    agent_file: Optional[Path] = Field(default=None, description="Path to .af agent file to upload")
-    agent_script: Optional[str] = Field(
-        default=None, description="Path to Python script with AgentFactory (e.g., script.py:FactoryClass)"
-    )
 
     # model configs to test (names without .json extension)
     model_configs: Optional[List[str]] = Field(
@@ -53,32 +47,57 @@ class TargetSpec(BaseModel):
         default=None, description="List of model handles (e.g., 'openai/gpt-4.1') for cloud deployments"
     )
 
-    # letta_code specific fields
+    # internal field for path resolution
+    base_dir: Optional[Path] = Field(default=None, exclude=True)
+
+
+class LettaAgentTargetSpec(BaseTargetSpec):
+    """Letta agent target configuration."""
+
+    kind: Literal[TargetKind.LETTA_AGENT] = TargetKind.LETTA_AGENT
+
+    agent_id: Optional[str] = Field(default=None, description="ID of existing agent to use")
+    agent_file: Optional[Path] = Field(default=None, description="Path to .af agent file to upload")
+    agent_script: Optional[str] = Field(
+        default=None, description="Path to Python script with AgentFactory (e.g., script.py:FactoryClass)"
+    )
+
+    @field_validator("agent_file")
+    @classmethod
+    def validate_agent_file(cls, v: Optional[Path]) -> Optional[Path]:
+        if v and not str(v).endswith(".af"):
+            raise ValueError("Agent file must have .af extension")
+        return v
+
+    @model_validator(mode="after")
+    def validate_agent_source(self):
+        sources = [self.agent_id, self.agent_file, self.agent_script]
+        provided = sum(1 for s in sources if s is not None)
+
+        if provided == 0:
+            raise ValueError("Agent target requires one of: agent_id, agent_file, or agent_script")
+        if provided > 1:
+            raise ValueError("Agent target can only have one of: agent_id, agent_file, or agent_script")
+
+        return self
+
+
+class LettaCodeTargetSpec(BaseTargetSpec):
+    """Letta code target configuration."""
+
+    kind: Literal[TargetKind.LETTA_CODE] = TargetKind.LETTA_CODE
+
     working_dir: Optional[Path] = Field(default=None, description="Working directory for letta code execution")
     allowed_tools: Optional[List[str]] = Field(
         default=None, description="List of allowed tools for letta code (e.g., ['Bash', 'Read'])"
     )
     disallowed_tools: Optional[List[str]] = Field(default=None, description="List of disallowed tools for letta code")
 
-    # internal field for path resolution
-    base_dir: Optional[Path] = Field(default=None, exclude=True)
 
-    @field_validator("agent_file")
-    def validate_agent_file(cls, v: Optional[Path]) -> Optional[Path]:
-        if v and not str(v).endswith(".af"):
-            raise ValueError("Agent file must have .af extension")
-        return v
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        if self.kind == TargetKind.LETTA_AGENT:
-            sources = [self.agent_id, self.agent_file, self.agent_script]
-            provided = sum(1 for s in sources if s is not None)
-
-            if provided == 0:
-                raise ValueError("Agent target requires one of: agent_id, agent_file, or agent_script")
-            if provided > 1:
-                raise ValueError("Agent target can only have one of: agent_id, agent_file, or agent_script")
+TargetSpec = Annotated[
+    Union[LettaAgentTargetSpec, LettaCodeTargetSpec],
+    Field(discriminator="kind"),
+]
 
 
 class BaseGraderSpec(BaseModel):
