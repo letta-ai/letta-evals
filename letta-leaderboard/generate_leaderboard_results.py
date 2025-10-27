@@ -26,7 +26,7 @@ MODEL_COSTS = {
     },
     "anthropic/claude-sonnet-4-5-20250929": {
         "prompt_tokens": 3,
-        "completion_tokens": 6,
+        "completion_tokens": 15,
     },
     "anthropic/claude-haiku-4-5-20251001": {
         "prompt_tokens": 1,
@@ -134,7 +134,7 @@ def find_result_files(pattern: str = "results/filesystem-*/**/results.jsonl") ->
     return [Path(p) for p in paths]
 
 
-def parse_result_entry(row: Dict, line_num: int, file_path: Path) -> Tuple[str, float, float, bool]:
+def parse_result_entry(row: Dict, line_num: int, file_path: Path) -> Tuple[str, float, float, int, int, bool]:
     """
     Parse a single result entry from a JSONL file.
 
@@ -144,14 +144,14 @@ def parse_result_entry(row: Dict, line_num: int, file_path: Path) -> Tuple[str, 
         file_path: Path to the file being processed
 
     Returns:
-        Tuple of (model_name, score, cost, has_error)
+        Tuple of (model_name, score, cost, prompt_tokens, completion_tokens, has_error)
     """
     try:
         model_name = row["result"]["model_name"]
 
         # Skip excluded models
         if model_name in EXCLUDED_MODELS:
-            return None, None, None, False
+            return None, None, None, None, None, False
 
         model_name = normalize_model_name(model_name)
         score = row["result"]["grade"]["score"]
@@ -165,13 +165,15 @@ def parse_result_entry(row: Dict, line_num: int, file_path: Path) -> Tuple[str, 
         except (KeyError, IndexError, TypeError) as e:
             logger.debug(f"Missing token data in {file_path}:{line_num} - {e}")
             cost = 0.0
+            prompt_tokens = 0
+            completion_tokens = 0
             has_error = True
 
-        return model_name, score, cost, has_error
+        return model_name, score, cost, prompt_tokens, completion_tokens, has_error
 
     except (KeyError, TypeError) as e:
         logger.error(f"Error parsing entry in {file_path}:{line_num} - {e}")
-        return None, None, None, True
+        return None, None, None, None, None, True
 
 
 def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
@@ -197,7 +199,7 @@ def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
                     try:
                         row = json.loads(line)
                         # print(f"Row: {row['result'].keys()}")
-                        model_name, score, cost, has_error = parse_result_entry(row, line_num, file_path)
+                        model_name, score, cost, prompt_tokens, completion_tokens, has_error = parse_result_entry(row, line_num, file_path)
                         # print(f"Model name: {model_name}, Score: {score}, Cost: {cost}, Has error: {has_error}")
 
                         if model_name is None:
@@ -215,6 +217,8 @@ def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
                         results["model_name"].append(model_name)
                         results["score"].append(score)
                         results["cost"].append(cost)
+                        results["prompt_tokens"].append(prompt_tokens)
+                        results["completion_tokens"].append(completion_tokens)
 
                     except json.JSONDecodeError as e:
                         logger.error(f"Invalid JSON in {file_path}:{line_num} - {e}")
@@ -225,11 +229,11 @@ def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
             continue
 
     results_df = pd.DataFrame(results)
-    print("=" * 40)
-    print("MODEL COUNTS")
-    print("=" * 40)
-    print(results_df["model_name"].value_counts())
-    print("=" * 40)
+    # print("=" * 40)
+    # print("MODEL COUNTS")
+    # print("=" * 40)
+    # print(results_df["model_name"].value_counts())
+    # print("=" * 40)
     return results, num_total, num_errors
 
 
@@ -238,16 +242,24 @@ def aggregate_model_stats(results: Dict[str, List]) -> Dict[str, Dict[str, List]
     Aggregate results by model.
 
     Args:
-        results: Dictionary with model_name, score, and cost lists
+        results: Dictionary with model_name, score, cost, prompt_tokens, and completion_tokens lists
 
     Returns:
-        Dictionary mapping model names to their scores and costs
+        Dictionary mapping model names to their scores, costs, and token counts
     """
-    model_stats = defaultdict(lambda: {"scores": [], "costs": []})
+    model_stats = defaultdict(lambda: {"scores": [], "costs": [], "prompt_tokens": [], "completion_tokens": []})
 
-    for model, score, cost in zip(results["model_name"], results["score"], results["cost"]):
+    for model, score, cost, prompt_tokens, completion_tokens in zip(
+        results["model_name"], 
+        results["score"], 
+        results["cost"],
+        results["prompt_tokens"],
+        results["completion_tokens"]
+    ):
         model_stats[model]["scores"].append(score)
         model_stats[model]["costs"].append(cost)
+        model_stats[model]["prompt_tokens"].append(prompt_tokens)
+        model_stats[model]["completion_tokens"].append(completion_tokens)
 
     return model_stats
 
@@ -268,6 +280,7 @@ def format_leaderboard_output(model_stats: Dict[str, Dict[str, List]]) -> List[D
         scores = model_stats[model_name]["scores"]
         costs = model_stats[model_name]["costs"]
 
+        # scores and costs per-run
         avg_score = sum(scores) * 100 / len(scores)
         total_cost = sum(costs) * 100 / len(costs)
 
@@ -298,6 +311,32 @@ def write_yaml_output(data: List[Dict], output_path: str = "leaderboard_results.
     except IOError as e:
         logger.error(f"Error writing to {output_path} - {e}")
         raise
+
+
+def print_token_statistics(model_stats: Dict[str, Dict[str, List]]) -> None:
+    """
+    Print aggregated token usage statistics for each model.
+
+    Args:
+        model_stats: Dictionary of model statistics including token counts
+    """
+    print("\n" + "=" * 80)
+    print("TOKEN USAGE BY MODEL")
+    print("=" * 80)
+    print(f"{'Model':<50} {'Prompt Tokens':>15} {'Completion Tokens':>15}")
+    print("-" * 80)
+    
+    for model_name in sorted(model_stats.keys()):
+        prompt_tokens = model_stats[model_name]["prompt_tokens"]
+        completion_tokens = model_stats[model_name]["completion_tokens"]
+        
+        # tokens per-run
+        total_prompt = int(sum(prompt_tokens) * 100 / len(prompt_tokens))
+        total_completion = int(sum(completion_tokens) * 100 / len(completion_tokens))
+        
+        print(f"{model_name:<50} {total_prompt:>15,} {total_completion:>15,}")
+    
+    print("=" * 80 + "\n")
 
 
 def print_summary(result_files: List[Path], yaml_output: List[Dict], num_total: int, num_errors: int) -> None:
@@ -332,6 +371,7 @@ def main() -> None:
     yaml_output = format_leaderboard_output(model_stats)
     write_yaml_output(yaml_output)
     print_summary(result_files, yaml_output, num_total, num_errors)
+    print_token_statistics(model_stats)
 
 
 if __name__ == "__main__":
