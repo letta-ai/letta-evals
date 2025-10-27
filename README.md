@@ -117,6 +117,7 @@ We suggest getting started with these examples:
 - **Multi-model evaluation**: [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) - Testing across multiple LLM configurations
 - **Programmatic agent creation**: [`examples/programmatic-agent-creation/`](examples/programmatic-agent-creation/) - Using agent factories to create agents dynamically per sample
 - **Custom graders and extractors**: [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-and-extractor/) - Implementing custom evaluation logic with Python decorators
+- **Letta Code CLI evaluation**: [`examples/letta-code-simple-edit/`](examples/letta-code-simple-edit/) - Testing autonomous coding agents with async graders and subprocess execution
 
 ### Writing Custom Components
 
