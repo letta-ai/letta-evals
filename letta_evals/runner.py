@@ -31,8 +31,8 @@ from letta_evals.models import (
     ToolGraderSpec,
 )
 from letta_evals.streaming import StreamingReader, StreamingWriter
-from letta_evals.targets.agent import AgentTarget
 from letta_evals.targets.base import Target
+from letta_evals.targets.letta_agent import LettaAgentTarget
 from letta_evals.types import GateMetric, TargetKind
 from letta_evals.utils import load_object
 from letta_evals.visualization.base import ProgressCallback
@@ -130,7 +130,7 @@ class Runner:
             model_handle = llm_config if isinstance(llm_config, str) else None
             actual_llm_config = llm_config if isinstance(llm_config, LlmConfig) else None
 
-            return AgentTarget(
+            return LettaAgentTarget(
                 client=self.client,
                 agent_id=self.suite.target.agent_id,
                 agent_file=self.suite.target.agent_file,
