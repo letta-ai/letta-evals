@@ -6,14 +6,14 @@ import anyio
 from letta_client import AsyncLetta, LlmConfig, MessageCreate
 
 from letta_evals.models import Sample, TargetResult
-from letta_evals.targets.base import Target
+from letta_evals.targets.base import AbstractAgentTarget
 from letta_evals.utils import load_object
 from letta_evals.visualization.base import ProgressCallback
 
 logger = logging.getLogger(__name__)
 
 
-class LettaAgentTarget(Target):
+class LettaAgentTarget(AbstractAgentTarget):
     """Letta agent target for evaluation."""
 
     def __init__(
