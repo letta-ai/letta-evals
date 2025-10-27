@@ -268,6 +268,12 @@ class SuiteSpec(BaseModel):
                             (base_dir / yaml_data["target"]["agent_file"]).resolve()
                         )
 
+                if "working_dir" in yaml_data["target"] and yaml_data["target"]["working_dir"]:
+                    if not Path(yaml_data["target"]["working_dir"]).is_absolute():
+                        yaml_data["target"]["working_dir"] = str(
+                            (base_dir / yaml_data["target"]["working_dir"]).resolve()
+                        )
+
                 # store base_dir in target for agent_script resolution
                 yaml_data["target"]["base_dir"] = base_dir
 

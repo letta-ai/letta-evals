@@ -1,3 +1,4 @@
+import inspect
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -50,4 +51,11 @@ class ToolGrader(Grader):
     ) -> Tuple[GradeResult, str]:
         """Grade using the tool function."""
         submission = self.extractor(trajectory, agent_state=agent_state)
-        return self.func(sample, submission), submission
+
+        # check if grader function is async
+        if inspect.iscoroutinefunction(self.func):
+            result = await self.func(sample, submission)
+        else:
+            result = self.func(sample, submission)
+
+        return result, submission

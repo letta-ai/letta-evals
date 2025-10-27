@@ -13,11 +13,16 @@ def grader(func: Callable = None, *, name: str = None):
     Decorator for grader functions.
 
     Validates that the function has signature: (Sample, str) -> GradeResult
+    Supports both sync and async functions.
     Auto-registers the function to the grader registry.
 
     Usage:
         @grader
         def my_grader(sample: Sample, submission: str) -> GradeResult:
+            ...
+
+        @grader
+        async def async_grader(sample: Sample, submission: str) -> GradeResult:
             ...
 
         @grader(name="custom_name")
@@ -50,9 +55,16 @@ def grader(func: Callable = None, *, name: str = None):
 
         f._is_grader = True
 
-        @wraps(f)
-        def wrapper(*args, **kwargs):
-            return f(*args, **kwargs)
+        if inspect.iscoroutinefunction(f):
+
+            @wraps(f)
+            async def wrapper(*args, **kwargs):
+                return await f(*args, **kwargs)
+        else:
+
+            @wraps(f)
+            def wrapper(*args, **kwargs):
+                return f(*args, **kwargs)
 
         return wrapper
 
@@ -175,8 +187,10 @@ def suite_setup(func: Callable) -> Callable:
     """
     Decorator for suite setup functions.
 
-    Validates that the function has signature: async (client: AsyncLetta) -> None
-    Also supports sync functions: (client: AsyncLetta) -> None
+    Supports two signatures:
+    - async () -> None (no parameters)
+    - async (client: AsyncLetta) -> None (with client parameter)
+    Also supports sync versions of both.
 
     Usage:
         @suite_setup
@@ -185,26 +199,28 @@ def suite_setup(func: Callable) -> Callable:
             await client.tools.add(tool=MyCustomTool())
 
         @suite_setup
-        def prepare_evaluation_sync(client: AsyncLetta) -> None:
-            # perform sync setup operations
+        async def prepare_evaluation_no_client() -> None:
+            # perform setup operations without client
             pass
     """
     sig = inspect.signature(func)
     params = list(sig.parameters.values())
 
-    if len(params) != 1:
-        raise TypeError(f"Suite setup {func.__name__} must have exactly 1 parameter (client), got {len(params)}")
+    if len(params) not in (0, 1):
+        raise TypeError(f"Suite setup {func.__name__} must have 0 or 1 parameter (client), got {len(params)}")
 
-    param_names = [p.name for p in params]
-    if param_names != ["client"]:
-        raise TypeError(f"Suite setup {func.__name__} must have parameter named 'client', got {param_names}")
+    if len(params) == 1:
+        param_names = [p.name for p in params]
+        if param_names != ["client"]:
+            raise TypeError(f"Suite setup {func.__name__} must have parameter named 'client', got {param_names}")
 
     if sig.return_annotation != inspect.Signature.empty:
         if sig.return_annotation is not None and sig.return_annotation is not None:
             raise TypeError(f"Suite setup {func.__name__} must return None, got {sig.return_annotation}")
 
-    # mark as validated suite setup
+    # mark as validated suite setup and store param count
     func._is_suite_setup = True
+    func._suite_setup_param_count = len(params)
 
     if inspect.iscoroutinefunction(func):
 

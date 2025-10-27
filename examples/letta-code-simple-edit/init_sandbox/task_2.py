@@ -2,7 +2,7 @@ def find_last_element(arr):
     """Return the last element of an array."""
     if len(arr) == 0:
         return None
-    return arr[len(arr) - 1]
+    return arr[len(arr)]
 
 
 def main():

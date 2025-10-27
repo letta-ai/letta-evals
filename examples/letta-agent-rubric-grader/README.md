@@ -25,7 +25,7 @@ A Letta agent configured with:
 - Access to web fetching if needed for verification
 - System instructions for evaluation behavior
 
-### Rubric (`rubric.txt`)
+### Rubric (```rubric.txt`)
 Defines evaluation criteria:
 - Correctness: Does the response contain accurate information?
 - Format: Is the response properly formatted as requested?

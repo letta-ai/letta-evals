@@ -31,6 +31,7 @@ def load_jsonl(
                 ground_truth=data.get("ground_truth"),
                 agent_args=data.get("agent_args"),
                 rubric_vars=data.get("rubric_vars"),
+                extra_vars=data.get("extra_vars"),
             )
 
             line_index += 1
@@ -48,6 +49,7 @@ def load_csv(
     - ground_truth (optional): str
     - agent_args (optional): dict as JSON string
     - rubric_vars (optional): dict as JSON string
+    - extra_vars (optional): dict as JSON string
     """
     try:
         df = pd.read_csv(file_path)
@@ -113,6 +115,17 @@ def load_csv(
             except json.JSONDecodeError as e:
                 raise ValueError(f"Row {idx}: 'rubric_vars' column contains invalid JSON: {e}")
 
+        # parse extra_vars field (expects JSON string)
+        extra_vars = None
+        if "extra_vars" in df.columns and not pd.isna(row.get("extra_vars")):
+            try:
+                extra_vars_str = str(row["extra_vars"]).strip()
+                extra_vars = json.loads(extra_vars_str)
+                if not isinstance(extra_vars, dict):
+                    raise ValueError(f"Row {idx}: 'extra_vars' must be a JSON object/dict, got {type(extra_vars)}")
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Row {idx}: 'extra_vars' column contains invalid JSON: {e}")
+
         # create sample
         try:
             sample = Sample(
@@ -121,6 +134,7 @@ def load_csv(
                 ground_truth=ground_truth,
                 agent_args=agent_args,
                 rubric_vars=rubric_vars,
+                extra_vars=extra_vars,
             )
         except Exception as e:
             raise ValueError(f"Row {idx}: Failed to create Sample: {e}")

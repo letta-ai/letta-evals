@@ -1,4 +1,4 @@
-def calculate_sum(numbers):
+def calculate_sum(numbers)
     """Calculate the sum of a list of numbers."""
     total = 0
     for num in numbers:

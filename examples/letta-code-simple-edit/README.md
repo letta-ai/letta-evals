@@ -25,7 +25,7 @@ Tool graders like `contains` are ideal when you have clear ground truth answers 
 
 ## Running This Example
 
-### Local Setup (Default)
+### Local Setup (````Default)
 
 Start your local Letta server:
 ```bash

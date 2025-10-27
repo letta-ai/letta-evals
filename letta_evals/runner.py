@@ -222,10 +222,19 @@ class Runner:
             if not hasattr(setup_func, "_is_suite_setup"):
                 raise ValueError(f"Setup function must be decorated with @suite_setup: {self.suite.setup_script}")
 
+            # check if setup function expects client parameter
+            param_count = getattr(setup_func, "_suite_setup_param_count", 1)
+
             if inspect.iscoroutinefunction(setup_func):
-                await setup_func(self.client)
+                if param_count == 1:
+                    await setup_func(self.client)
+                else:
+                    await setup_func()
             else:
-                setup_func(self.client)
+                if param_count == 1:
+                    setup_func(self.client)
+                else:
+                    setup_func()
 
             self._setup_executed = True
             logger.info("Setup completed successfully")

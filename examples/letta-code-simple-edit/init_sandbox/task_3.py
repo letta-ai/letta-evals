@@ -1,7 +1,5 @@
 def calculate_average(numbers):
     """Calculate the average of a list of numbers."""
-    if not numbers:
-        return None
     total = sum(numbers)
     count = len(numbers)
     return total / count
