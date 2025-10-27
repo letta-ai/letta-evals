@@ -25,7 +25,7 @@ A Letta agent configured with:
 - Access to web fetching if needed for verification
 - System instructions for evaluation behavior
 
-### Rubric (`rubric.txt`)
+### Rubric (```rubric.txt`)
 Defines evaluation criteria:
 - Correctness: Does the response contain accurate information?
 - Format: Is the response properly formatted as requested?
@@ -81,7 +81,7 @@ The simplest configuration uses the built-in default judge agent with pre-fetche
 name: fetch-webpage-default-judge-test
 dataset: dataset.csv
 target:
-  kind: agent
+  kind: letta_agent
   agent_file: test-fetch-webpage-simple-agent.af
 graders:
   agent_judge:
@@ -112,7 +112,7 @@ For advanced scenarios where the judge needs to dynamically verify information:
 name: fetch-webpage-agent-judge-test
 dataset: dataset.csv
 target:
-  kind: agent
+  kind: letta_agent
   agent_file: test-fetch-webpage-simple-agent.af
 graders:
   agent_judge:

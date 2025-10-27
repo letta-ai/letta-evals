@@ -3,7 +3,7 @@ description: Test inventory agent created programmatically via Python script
 dataset: dataset.jsonl
 setup_script: setup.py:prepare_evaluation
 target:
-  kind: agent
+  kind: letta_agent
   agent_script: create_agent.py:create_inventory_agent
   base_url: http://localhost:8283
 graders:

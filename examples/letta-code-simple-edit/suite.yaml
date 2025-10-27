@@ -1,0 +1,20 @@
+name: letta-code-bug-fix-test
+description: Test if letta-code can find and fix bugs in Python files
+dataset: dataset.jsonl
+num_runs: 1
+setup_script: setup.py:prepare_evaluation
+target:
+  kind: letta_code
+  base_url: https://api.letta.com/
+  working_dir: sandbox
+  timeout: 300
+  max_retries: 3
+graders:
+  bug_fix_check:
+    kind: tool
+    function: custom_python_grader.py:python_output_grader
+    extractor: last_assistant
+gate:
+  metric_key: bug_fix_check
+  op: gte
+  value: 1.0

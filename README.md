@@ -56,7 +56,7 @@ pip install letta-evals
 name: my-eval-suite
 dataset: dataset.jsonl
 target:
-  kind: agent
+  kind: letta_agent
   agent_file: my_agent.af  # or use agent_id for existing agents
   base_url: http://localhost:8283
 graders:

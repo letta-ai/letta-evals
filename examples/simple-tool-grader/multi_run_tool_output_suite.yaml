@@ -3,7 +3,7 @@ description: Test if the tool output from read_webpage_content contains the corr
 dataset: tool_output_dataset.csv
 num_runs: 2 # Run this twice
 target:
-  kind: agent
+  kind: letta_agent
   agent_file: test-fetch-webpage-simple-agent.af
   base_url: http://localhost:8283
 graders:

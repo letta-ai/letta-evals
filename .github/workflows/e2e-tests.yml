@@ -46,6 +46,15 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install letta-code CLI
+        run: |
+          npm install -g @letta-ai/letta-code
+
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh

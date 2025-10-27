@@ -2,7 +2,7 @@ name: core-memory-update-test
 description: Test if agent can correctly update information in core memory when presented with contradictory facts
 dataset: ../datasets/core_memory_update.jsonl
 target:
-  kind: agent
+  kind: letta_agent
   base_url: http://localhost:8283
   agent_script: ../setup_agent.py:setup_agent
   model_configs:

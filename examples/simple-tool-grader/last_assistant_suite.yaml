@@ -2,7 +2,7 @@ name: fetch-webpage-last-assistant-test
 description: Test if agent's final response contains the correct answer from fetched webpage
 dataset: assistant_dataset.csv
 target:
-  kind: agent
+  kind: letta_agent
   agent_file: test-fetch-webpage-simple-agent.af
   base_url: http://localhost:8283
 graders:

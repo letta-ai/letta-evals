@@ -2,7 +2,7 @@ name: ascii-art-rubric-test
 description: Test if agent can generate ASCII art correctly using rubric grading
 dataset: dataset.jsonl
 target:
-  kind: agent
+  kind: letta_agent
   agent_file: ascii-art-agent.af
   base_url: http://localhost:8283
   model_handles:

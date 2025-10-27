@@ -53,6 +53,13 @@ class TargetSpec(BaseModel):
         default=None, description="List of model handles (e.g., 'openai/gpt-4.1') for cloud deployments"
     )
 
+    # letta_code specific fields
+    working_dir: Optional[Path] = Field(default=None, description="Working directory for letta code execution")
+    allowed_tools: Optional[List[str]] = Field(
+        default=None, description="List of allowed tools for letta code (e.g., ['Bash', 'Read'])"
+    )
+    disallowed_tools: Optional[List[str]] = Field(default=None, description="List of disallowed tools for letta code")
+
     # internal field for path resolution
     base_dir: Optional[Path] = Field(default=None, exclude=True)
 
@@ -64,7 +71,7 @@ class TargetSpec(BaseModel):
 
     def __init__(self, **data):
         super().__init__(**data)
-        if self.kind == TargetKind.AGENT:
+        if self.kind == TargetKind.LETTA_AGENT:
             sources = [self.agent_id, self.agent_file, self.agent_script]
             provided = sum(1 for s in sources if s is not None)
 
@@ -259,6 +266,12 @@ class SuiteSpec(BaseModel):
                     if not Path(yaml_data["target"]["agent_file"]).is_absolute():
                         yaml_data["target"]["agent_file"] = str(
                             (base_dir / yaml_data["target"]["agent_file"]).resolve()
+                        )
+
+                if "working_dir" in yaml_data["target"] and yaml_data["target"]["working_dir"]:
+                    if not Path(yaml_data["target"]["working_dir"]).is_absolute():
+                        yaml_data["target"]["working_dir"] = str(
+                            (base_dir / yaml_data["target"]["working_dir"]).resolve()
                         )
 
                 # store base_dir in target for agent_script resolution

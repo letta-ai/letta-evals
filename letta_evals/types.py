@@ -2,7 +2,8 @@ from enum import Enum
 
 
 class TargetKind(str, Enum):
-    AGENT = "agent"
+    LETTA_AGENT = "letta_agent"
+    LETTA_CODE = "letta_code"
 
 
 class GraderKind(str, Enum):

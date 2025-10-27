@@ -2,7 +2,7 @@ name: ascii-art-two-metrics-ascii-gate
 description: Gate on ASCII-only accuracy while still reporting quality
 dataset: dataset.csv
 target:
-  kind: agent
+  kind: letta_agent
   agent_file: ascii-art-agent.af
   base_url: http://localhost:8283
 graders:
