@@ -9,6 +9,6 @@ class Target(ABC):
     """Base interface for evaluation targets."""
 
     @abstractmethod
-    async def run(self, sample: Sample, progress_callback: Optional[ProgressCallback] = None) -> TargetResult:
+    async def run(self, sample: Sample, progress_callback: Optional[ProgressCallback] = None, **kwargs) -> TargetResult:
         """Run the target on a sample and return result."""
         pass
