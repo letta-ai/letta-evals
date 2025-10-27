@@ -1,19 +1,18 @@
-name: fetch-webpage-tool-output-test
-description: Test if the tool output from read_webpage_content contains the correct answer
-dataset: tool_output_dataset.csv
-num_runs: 2 # Run this twice
+name: letta-code-bug-fix-test
+description: Test if letta-code can find and fix bugs in Python files
+dataset: dataset.jsonl
+num_runs: 1
 target:
-  kind: letta_agent
-  agent_file: test-fetch-webpage-simple-agent.af
+  kind: letta_code
   base_url: http://localhost:8283
+  working_dir: sandbox
+  timeout: 300
 graders:
-  tool_output_check:
+  bug_fix_check:
     kind: tool
-    function: contains
-    extractor: tool_output
-    extractor_config:
-      tool_name: fetch_webpage
+    function: custom_python_grader.py:python_output_grader
+    extractor: last_assistant
 gate:
-  metric_key: tool_output_check
+  metric_key: bug_fix_check
   op: gte
-  value: 0.75
+  value: 1.0

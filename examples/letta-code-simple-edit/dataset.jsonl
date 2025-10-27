@@ -1,0 +1,3 @@
+{"input": "Find and fix the bug in sandbox/task_1.py", "ground_truth": "The sum is: 15", "rubric_vars": {"file_path": "sandbox/task_1.py"}}
+{"input": "Find and fix the bug in sandbox/task_2.py", "ground_truth": "The last element is: 50", "rubric_vars": {"file_path": "sandbox/task_2.py"}}
+{"input": "Find and fix the bug in sandbox/task_3.py", "ground_truth": "Average: 30.0", "rubric_vars": {"file_path": "sandbox/task_3.py"}}
