@@ -5,7 +5,7 @@ from letta_evals.models import Sample, TargetResult
 from letta_evals.visualization.base import ProgressCallback
 
 
-class Target(ABC):
+class AbstractAgentTarget(ABC):
     """Base interface for evaluation targets."""
 
     @abstractmethod

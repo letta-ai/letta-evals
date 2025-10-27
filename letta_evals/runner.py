@@ -31,7 +31,7 @@ from letta_evals.models import (
     ToolGraderSpec,
 )
 from letta_evals.streaming import StreamingReader, StreamingWriter
-from letta_evals.targets.base import Target
+from letta_evals.targets.base import AbstractAgentTarget
 from letta_evals.targets.letta_agent import LettaAgentTarget
 from letta_evals.types import GateMetric, TargetKind
 from letta_evals.utils import load_object
@@ -123,7 +123,7 @@ class Runner:
 
         return configs
 
-    def _create_target(self, llm_config: Optional[LlmConfig | str] = None) -> Target:
+    def _create_target(self, llm_config: Optional[LlmConfig | str] = None) -> AbstractAgentTarget:
         """Create target from spec, optionally with model config or handle."""
         if self.suite.target.kind == TargetKind.AGENT:
             # check both before reassigning

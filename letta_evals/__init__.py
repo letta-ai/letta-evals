@@ -21,7 +21,7 @@ from letta_evals.models import (
     TargetSpec,
 )
 from letta_evals.runner import Runner, run_suite
-from letta_evals.targets import LettaAgentTarget, Target
+from letta_evals.targets import AbstractAgentTarget, LettaAgentTarget
 from letta_evals.types import GateMetric, GraderKind, LLMProvider, MetricOp, TargetKind
 from letta_evals.visualization.factory import ProgressStyle, create_progress_callback
 
@@ -38,7 +38,7 @@ __all__ = [
     "GraderSpec",
     "run_suite",
     "Runner",
-    "Target",
+    "AbstractAgentTarget",
     "LettaAgentTarget",
     "Grader",
     "ToolGrader",
