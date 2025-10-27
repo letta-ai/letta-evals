@@ -2,7 +2,7 @@ name: ascii-art-two-metrics
 description: Test ASCII art quality and ASCII-only characters using two graders
 dataset: dataset.csv
 target:
-  kind: agent
+  kind: letta_agent
   agent_file: ascii-art-agent.af
   base_url: http://localhost:8283
 graders:

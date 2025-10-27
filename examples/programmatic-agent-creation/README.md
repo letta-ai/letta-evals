@@ -152,6 +152,6 @@ In `suite.yaml`, specify the setup and factory scripts:
 ```yaml
 setup_script: setup.py:prepare_evaluation
 target:
-  kind: agent
+  kind: letta_agent
   agent_script: create_agent.py:create_inventory_agent
 ```

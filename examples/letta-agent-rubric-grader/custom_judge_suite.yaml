@@ -2,7 +2,7 @@ name: fetch-webpage-agent-judge-test
 description: Test agent responses using a Letta agent as judge with rubric grading
 dataset: dataset.csv
 target:
-  kind: agent
+  kind: letta_agent
   agent_file: test-fetch-webpage-simple-agent.af
   base_url: http://localhost:8283
 graders:

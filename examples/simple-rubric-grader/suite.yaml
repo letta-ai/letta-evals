@@ -3,7 +3,7 @@ description: Test if agent can generate ASCII art correctly using rubric grading
 dataset: dataset.csv
 max_samples: 3
 target:
-  kind: agent
+  kind: letta_agent
   agent_file: ascii-art-agent.af
   base_url: http://localhost:8283
 graders:

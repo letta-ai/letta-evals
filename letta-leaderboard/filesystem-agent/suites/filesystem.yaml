@@ -4,7 +4,7 @@ dataset: ../datasets/filesystem.jsonl
 setup_script: ../setup.py:prepare_evaluation
 num_runs: 3
 target:
-  kind: agent
+  kind: letta_agent
   base_url: http://localhost:8283
   agent_script: ../setup_agent.py:setup_agent
   model_configs:

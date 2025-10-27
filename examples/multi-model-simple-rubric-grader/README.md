@@ -58,7 +58,7 @@ The `model_handles` field in `suite.yaml` specifies which models to test:
 
 ```yaml
 target:
-  kind: agent
+  kind: letta_agent
   agent_file: ascii-art-agent.af
   base_url: http://localhost:8283
   model_handles:

@@ -77,7 +77,7 @@ name: remember-fruit-preferences-test
 description: Test if agent can remember a user's fruit preferences
 dataset: dataset.jsonl
 target:
-  kind: agent
+  kind: letta_agent
   agent_file: test-fruit-pref-agent.af
   base_url: http://localhost:8283
 graders:

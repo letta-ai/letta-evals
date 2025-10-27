@@ -33,6 +33,7 @@ from letta_evals.models import (
 from letta_evals.streaming import StreamingReader, StreamingWriter
 from letta_evals.targets.base import AbstractAgentTarget
 from letta_evals.targets.letta_agent import LettaAgentTarget
+from letta_evals.targets.letta_code_target import LettaCodeTarget
 from letta_evals.types import GateMetric, TargetKind
 from letta_evals.utils import load_object
 from letta_evals.visualization.base import ProgressCallback
@@ -125,7 +126,7 @@ class Runner:
 
     def _create_target(self, llm_config: Optional[LlmConfig | str] = None) -> AbstractAgentTarget:
         """Create target from spec, optionally with model config or handle."""
-        if self.suite.target.kind == TargetKind.AGENT:
+        if self.suite.target.kind == TargetKind.LETTA_AGENT:
             # check both before reassigning
             model_handle = llm_config if isinstance(llm_config, str) else None
             actual_llm_config = llm_config if isinstance(llm_config, LlmConfig) else None
@@ -138,6 +139,15 @@ class Runner:
                 base_dir=self.suite.target.base_dir,
                 llm_config=actual_llm_config,
                 model_handle=model_handle,
+                max_retries=self.suite.target.max_retries,
+            )
+        elif self.suite.target.kind == TargetKind.LETTA_CODE:
+            return LettaCodeTarget(
+                client=self.client,
+                working_dir=self.suite.target.working_dir,
+                allowed_tools=self.suite.target.allowed_tools,
+                disallowed_tools=self.suite.target.disallowed_tools,
+                timeout=int(self.suite.target.timeout),
                 max_retries=self.suite.target.max_retries,
             )
         else:

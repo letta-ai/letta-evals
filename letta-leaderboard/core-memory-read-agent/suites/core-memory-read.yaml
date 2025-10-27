@@ -3,7 +3,7 @@ description: Test if agent can correctly read information from core memory to an
 dataset: ../datasets/core_memory_read.jsonl
 max_samples: 100  # Limit to first 100 samples for faster testing
 target:
-  kind: agent
+  kind: letta_agent
   base_url: http://localhost:8283
   agent_script: ../setup_agent.py:setup_agent
   model_configs:

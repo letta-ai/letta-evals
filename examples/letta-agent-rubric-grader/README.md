@@ -81,7 +81,7 @@ The simplest configuration uses the built-in default judge agent with pre-fetche
 name: fetch-webpage-default-judge-test
 dataset: dataset.csv
 target:
-  kind: agent
+  kind: letta_agent
   agent_file: test-fetch-webpage-simple-agent.af
 graders:
   agent_judge:
@@ -112,7 +112,7 @@ For advanced scenarios where the judge needs to dynamically verify information:
 name: fetch-webpage-agent-judge-test
 dataset: dataset.csv
 target:
-  kind: agent
+  kind: letta_agent
   agent_file: test-fetch-webpage-simple-agent.af
 graders:
   agent_judge:

@@ -2,7 +2,7 @@ name: fruit-preferences-test
 description: Test if agent correctly stores fruit preferences in memory
 dataset: dataset.jsonl
 target:
-  kind: agent
+  kind: letta_agent
   agent_file: fruit-preferences-agent.af
   base_url: http://localhost:8283
 graders:
