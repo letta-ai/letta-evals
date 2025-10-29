@@ -1,0 +1,13 @@
+{
+  "name": "leaderboard-site",
+  "version": "1.0.0",
+  "description": "Letta Leaderboard static site",
+  "scripts": {
+    "build": "eleventy",
+    "serve": "eleventy --serve"
+  },
+  "dependencies": {
+    "@11ty/eleventy": "^2.0.1",
+    "js-yaml": "^4.1.0"
+  }
+}
