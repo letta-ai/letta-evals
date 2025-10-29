@@ -27,20 +27,20 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: site/package-lock.json
+          cache-dependency-path: leaderboard_site/package-lock.json
 
       - name: Install dependencies
-        working-directory: ./site
+        working-directory: ./leaderboard_site
         run: npm ci
 
       - name: Build site
-        working-directory: ./site
+        working-directory: ./leaderboard_site
         run: npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./site/_site
+          path: ./leaderboard_site/_site
 
   deploy:
     environment:
