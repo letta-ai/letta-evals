@@ -16,7 +16,7 @@
     <div class="header">
         <div class="header-start">
             <a href="https://letta.com">
-                <img src="/letta-logo.svg" alt="Letta" class="letta-logo">
+                <img src="./letta-logo.svg" alt="Letta" class="letta-logo">
             </a>
             <div>
                 <h1 class="title">Letta Research</h1>
@@ -31,7 +31,7 @@
         Letta is designed for building stateful agents - agents that are long-running and can automatically manage long-term memory to learn and adapt over time. To implement intelligent memory management, agents in Letta rely heavily on tool (function) calling, so models that excel at tool use tend to do well in Letta. Conversely, models that struggle to call tools properly often perform poorly when used to drive Letta agents.
          </div>
     </div>
-    
+
 
     <div class="chart-container">
         <input type="text" id="searchInput" class="search-bar" placeholder="Search models...">
@@ -48,7 +48,7 @@
             <div class="chart-row" data-model="{{ entry.model }}">
                 <div class="chart-label">
                     {%- assign provider = entry.model | split: "/" | first -%}
-                    <img src="/icons/{{ provider }}.svg" alt="{{ provider }}" class="model-icon">
+                    <img src="./icons/{{ provider }}.svg" alt="{{ provider }}" class="model-icon">
                     <span>{{ entry.model }}</span>
                 </div>
                 <div class="chart-bar-wrapper">
