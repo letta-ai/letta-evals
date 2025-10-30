@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.6.0...letta-evals-v0.6.1) (2025-10-30)
+
+
+### Bug Fixes
+
+* Letta code session_id to agent_id ([#112](https://github.com/letta-ai/letta-evals/issues/112)) ([3ad7c0c](https://github.com/letta-ai/letta-evals/commit/3ad7c0c127c34b8e80fa34ed0df686d1687b94f6))
+* patch site ([24cfa0b](https://github.com/letta-ai/letta-evals/commit/24cfa0bfc6d231cb4fe58b221630782a6b2c00c0))
+
+
+### Chores
+
+* fix lints ([#111](https://github.com/letta-ai/letta-evals/issues/111)) ([e3431b8](https://github.com/letta-ai/letta-evals/commit/e3431b82455345021c5d2ffe6c7f0a38a67f51a9))
+* fix styling ([7dd2818](https://github.com/letta-ai/letta-evals/commit/7dd2818300d20d31b4b1d4ab9810e00b74b20add))
+
 ## [0.6.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.5.0...letta-evals-v0.6.0) (2025-10-29)
 
 
