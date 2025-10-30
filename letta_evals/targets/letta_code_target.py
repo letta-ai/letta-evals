@@ -56,7 +56,7 @@ class LettaCodeTarget(AbstractAgentTarget):
         while attempt <= self.max_retries:
             try:
                 # construct the letta command with json output
-                cmd = ["letta", "-p", "--yolo", "--output-format", "json"]
+                cmd = ["letta", "--new", "--yolo", "--output-format", "json", "-p"]
 
                 # add tool permissions if specified
                 if self.allowed_tools:
