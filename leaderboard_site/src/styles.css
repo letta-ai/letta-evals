@@ -192,6 +192,8 @@ body {
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
   font-weight: 600;
+  width: 60px;
+  text-align: center;
 }
 
 .title {
@@ -211,11 +213,13 @@ body {
   padding: 0.5rem 0;
   line-height: 1.5;
   font-size: 1rem;
+  display: flex;
+  gap: 1.5rem;
+  flex-direction: column;
 }
 
 .caption-inner {
   max-width: 700px;
-  margin-bottom: 1rem;
 }
 
 .caption-inner:last-child {
