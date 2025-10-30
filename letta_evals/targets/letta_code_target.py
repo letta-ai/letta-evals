@@ -111,20 +111,15 @@ class LettaCodeTarget(AbstractAgentTarget):
                     logger.error(f"Failed to parse JSON output: {stdout_text[:500]}")
                     raise RuntimeError(f"Failed to parse JSON output from letta command: {e}")
 
-                # extract session_id and other metadata
-                session_id = result.get("session_id")
-                if not session_id:
-                    raise RuntimeError(f"No session_id found in letta output: {result}")
+                # extract agent_id and other metadata
+                agent_id = result.get("agent_id")
+                if not agent_id:
+                    raise RuntimeError(f"No agent_id found in letta output: {result}")
 
-                # extract agent_id from session_id (format: agent-{uuid})
-                agent_id = session_id
+                # retrieve the full message history using the agent_id
+                logger.info(f"Retrieving messages for agent {agent_id}")
 
-                # retrieve the full message history using the session_id
-                logger.info(f"Retrieving messages for session {session_id}")
-
-                # the session_id is the agent_id, retrieve messages from the agent's last run
-                # we need to get the messages from this specific run
-                # note: the letta client uses agent_id to retrieve messages
+                # retrieve messages from the agent's last run
                 messages = await self.client.agents.messages.list(agent_id=agent_id)
 
                 # wrap messages in a single turn
