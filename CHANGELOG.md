@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.6.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.5.0...letta-evals-v0.6.0) (2025-10-29)
+
+
+### Features
+
+* add eval website ([#104](https://github.com/letta-ai/letta-evals/issues/104)) ([2daaf0c](https://github.com/letta-ai/letta-evals/commit/2daaf0c598780b6fa2edc26de52348de127f88a5))
+* Fix workflow ([#105](https://github.com/letta-ai/letta-evals/issues/105)) ([62207bd](https://github.com/letta-ai/letta-evals/commit/62207bd502fd6e99008ac755e7956bc3cfa42053))
+* Support letta code as builtin target ([#101](https://github.com/letta-ai/letta-evals/issues/101)) ([fe1ae2f](https://github.com/letta-ai/letta-evals/commit/fe1ae2f7a1bc25ead8115459eda148c873c5ef27))
+
+
+### Bug Fixes
+
+* Fix kwargs in run function ([#97](https://github.com/letta-ai/letta-evals/issues/97)) ([c0f64b0](https://github.com/letta-ai/letta-evals/commit/c0f64b0a317f7c70675e10ee02ed47b19efc09a7))
+* Remove duplicate gpt 4.1 results ([#95](https://github.com/letta-ai/letta-evals/issues/95)) ([2b9092c](https://github.com/letta-ai/letta-evals/commit/2b9092cd7b4180f493a5acfd0e0c33662ae574c2))
+* Update Sonnet 4.5 cost ([#96](https://github.com/letta-ai/letta-evals/issues/96)) ([3b7a39d](https://github.com/letta-ai/letta-evals/commit/3b7a39dd85f02412b644c0f65162d6f52a772921))
+
+
+### Refactors
+
+* Add extra vars to Sample ([#100](https://github.com/letta-ai/letta-evals/issues/100)) ([9ce87cd](https://github.com/letta-ai/letta-evals/commit/9ce87cda70e167533b8d27763d53aad844e63313))
+* Make target spec a discriminated union ([#103](https://github.com/letta-ai/letta-evals/issues/103)) ([762b520](https://github.com/letta-ai/letta-evals/commit/762b520313e57107a756744f2990b325a4478d14))
+* Refactor AgentTarget to LettaAgentTarget ([#98](https://github.com/letta-ai/letta-evals/issues/98)) ([952d6f8](https://github.com/letta-ai/letta-evals/commit/952d6f80d50f6547ab557d8f1d6e445dd8364186))
+* Refactor Target to AbstractAgentTarget ([#99](https://github.com/letta-ai/letta-evals/issues/99)) ([bb632e0](https://github.com/letta-ai/letta-evals/commit/bb632e096607ad47f61ef83f9a64a98d966b964e))
+
+
+### Documentation
+
+* Add letta code example to READMEs ([#102](https://github.com/letta-ai/letta-evals/issues/102)) ([2fe0f68](https://github.com/letta-ai/letta-evals/commit/2fe0f680106a7593543f7c283d8cc83671a0af67))
+* adjust ([2b16cd3](https://github.com/letta-ai/letta-evals/commit/2b16cd390378ea473d1f07690d9bd435b603ed04))
+* patch svg, update site ([64c3491](https://github.com/letta-ai/letta-evals/commit/64c34913e056a037af770b1d8ecc8c99ae1512ad))
+
+
+### Chores
+
+* Add leaderboard results yaml and script ([#93](https://github.com/letta-ai/letta-evals/issues/93)) ([e24fb74](https://github.com/letta-ai/letta-evals/commit/e24fb74c373b19cf3fc7543d365f07de6b547ce7))
+* fix style ([#108](https://github.com/letta-ai/letta-evals/issues/108)) ([575be53](https://github.com/letta-ai/letta-evals/commit/575be5373d6362583f2c5c8bfeb5753835ff5a14))
+* relative routes bruh ([#109](https://github.com/letta-ai/letta-evals/issues/109)) ([d68ee95](https://github.com/letta-ai/letta-evals/commit/d68ee95cdde199381148c8e678eca71a8eb1e334))
+* whoops ([#107](https://github.com/letta-ai/letta-evals/issues/107)) ([53fc4eb](https://github.com/letta-ai/letta-evals/commit/53fc4eb4375d91e836b257c92462987b5f0fd07c))
+
 ## [0.5.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.4.1...letta-evals-v0.5.0) (2025-10-23)
 
 
