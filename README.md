@@ -172,7 +172,7 @@ See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-a
 
 **Can I evaluate Letta Code agents across different models?**
 
-* Yes! The Letta Code target now supports multi-model evaluation. In your suite YAML, specify multiple model handles:
+* Yes! The Letta Code target supports evaluating multiple models. In your suite YAML, specify multiple model handles:
   ```yaml
   target:
     kind: letta_code
