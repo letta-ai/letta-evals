@@ -3,12 +3,18 @@ description: Test if letta-code can find and fix bugs in Python files
 dataset: dataset.jsonl
 num_runs: 1
 setup_script: setup.py:prepare_evaluation
+max_samples: 3
+
 target:
   kind: letta_code
   base_url: https://api.letta.com/
   working_dir: sandbox
   timeout: 300
   max_retries: 3
+  model_handles:
+    - anthropic/claude-sonnet-4-5-20250929
+    - gpt-5-low
+
 graders:
   bug_fix_check:
     kind: tool
