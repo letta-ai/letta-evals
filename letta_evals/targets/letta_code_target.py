@@ -64,7 +64,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                 inputs = sample.input if isinstance(sample.input, list) else [sample.input]
 
                 if progress_callback:
-                    await progress_callback.message_sending(sample.id, 1, len(inputs), model_name=f"letta-code")
+                    await progress_callback.message_sending(sample.id, 1, len(inputs), model_name=self.model_handle)
 
                 # for multiple inputs, concatenate with newlines
                 prompt = "\n".join(str(inp) for inp in inputs)
@@ -142,7 +142,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                 return TargetResult(
                     trajectory=trajectory,
                     agent_id=agent_id,
-                    model_name="letta-code",
+                    model_name=self.model_handle,
                     agent_usage=usage_stats if usage_stats else None,
                     agent_state=None,
                 )
