@@ -117,7 +117,7 @@ We suggest getting started with these examples:
 - **Multi-model evaluation**: [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) - Testing across multiple LLM configurations
 - **Programmatic agent creation**: [`examples/programmatic-agent-creation/`](examples/programmatic-agent-creation/) - Using agent factories to create agents dynamically per sample
 - **Custom graders and extractors**: [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-and-extractor/) - Implementing custom evaluation logic with Python decorators
-- **Letta Code CLI evaluation**: [`examples/letta-code-simple-edit/`](examples/letta-code-simple-edit/) - Testing autonomous coding agents with async graders and subprocess execution
+- **Letta Code CLI evaluation**: [`examples/letta-code-simple-edit/`](examples/letta-code-simple-edit/) - Testing autonomous coding agents with async graders and subprocess execution, including multi-model evaluation support
 
 ### Writing Custom Components
 
@@ -129,7 +129,7 @@ Letta Evals provides Python decorators for extending the framework:
 - **@suite_setup**: Run initialization code before evaluation starts. Supports three signatures:
   - `() -> None` - Run once at the start with no parameters
   - `(client: AsyncLetta) -> None` - Run once at the start with client access
-  - `(client: AsyncLetta, model_name: str) -> None` - Run once per model when evaluating multiple models
+  - `(client: AsyncLetta, model_name: str) -> None` - Run once per model when evaluating multiple models (useful for model-specific setup like creating isolated working directories)
 
 See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-and-extractor/) for implementation examples.
 
@@ -169,6 +169,18 @@ See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-a
 **Can I reuse agent trajectories when testing different graders?**
 
 * Yes! Use `--cached-results` to reuse agent trajectories across evaluations, avoiding redundant agent runs when testing different graders.
+
+**Can I evaluate Letta Code agents across different models?**
+
+* Yes! The Letta Code target now supports multi-model evaluation. In your suite YAML, specify multiple model handles:
+  ```yaml
+  target:
+    kind: letta_code
+    model_handles:
+      - anthropic/claude-sonnet-4-5-20250929
+      - gpt-5-low
+  ```
+  The framework automatically creates isolated working directories for each model to prevent interference between concurrent evaluations. When combined with `@suite_setup` functions that accept `model_name`, you can perform model-specific initialization for each evaluation run.
 
 **Can I use this in CI/CD pipelines?**
 
