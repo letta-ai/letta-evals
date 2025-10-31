@@ -187,10 +187,11 @@ def suite_setup(func: Callable) -> Callable:
     """
     Decorator for suite setup functions.
 
-    Supports two signatures:
+    Supports three signatures:
     - async () -> None (no parameters)
     - async (client: AsyncLetta) -> None (with client parameter)
-    Also supports sync versions of both.
+    - async (client: AsyncLetta, model_name: str) -> None (with client and model_name parameters)
+    Also supports sync versions of all three.
 
     Usage:
         @suite_setup
@@ -202,17 +203,26 @@ def suite_setup(func: Callable) -> Callable:
         async def prepare_evaluation_no_client() -> None:
             # perform setup operations without client
             pass
+
+        @suite_setup
+        async def prepare_evaluation_with_model(client: AsyncLetta, model_name: str) -> None:
+            # perform setup operations with client and model_name
+            print(f"Setting up for model: {model_name}")
     """
     sig = inspect.signature(func)
     params = list(sig.parameters.values())
 
-    if len(params) not in (0, 1):
-        raise TypeError(f"Suite setup {func.__name__} must have 0 or 1 parameter (client), got {len(params)}")
+    if len(params) not in (0, 1, 2):
+        raise TypeError(f"Suite setup {func.__name__} must have 0, 1, or 2 parameters (client, model_name), got {len(params)}")
 
     if len(params) == 1:
         param_names = [p.name for p in params]
         if param_names != ["client"]:
             raise TypeError(f"Suite setup {func.__name__} must have parameter named 'client', got {param_names}")
+    elif len(params) == 2:
+        param_names = [p.name for p in params]
+        if param_names != ["client", "model_name"]:
+            raise TypeError(f"Suite setup {func.__name__} must have parameters named 'client' and 'model_name', got {param_names}")
 
     if sig.return_annotation != inspect.Signature.empty:
         if sig.return_annotation is not None and sig.return_annotation is not None:

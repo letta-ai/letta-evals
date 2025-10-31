@@ -25,6 +25,11 @@ async def prepare_evaluation() -> None:
 
 This ensures each test starts with the original buggy code.
 
+**Note:** The `@suite_setup` decorator supports three signatures:
+- `() -> None` - No parameters (shown above)
+- `(client: AsyncLetta) -> None` - With client access
+- `(client: AsyncLetta, model_name: str) -> None` - With client and model name (runs once per model when testing multiple models)
+
 ### 2. Evaluation Phase
 
 For each sample, Letta Code:

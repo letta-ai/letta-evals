@@ -126,7 +126,10 @@ Letta Evals provides Python decorators for extending the framework:
 - **@grader**: Register custom scoring functions for domain-specific evaluation logic
 - **@extractor**: Create custom extractors to parse agent responses in specialized ways
 - **@agent_factory**: Define programmatic agent creation for dynamic instantiation per sample
-- **@suite_setup**: Run initialization code before evaluation starts
+- **@suite_setup**: Run initialization code before evaluation starts. Supports three signatures:
+  - `() -> None` - Run once at the start with no parameters
+  - `(client: AsyncLetta) -> None` - Run once at the start with client access
+  - `(client: AsyncLetta, model_name: str) -> None` - Run once per model when evaluating multiple models
 
 See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-and-extractor/) for implementation examples.
 

@@ -67,6 +67,10 @@ async def prepare_evaluation(client: AsyncLetta) -> None:
 - Receives an `AsyncLetta` client instance
 - Can be used for any pre-evaluation setup (tools, data loading, etc.)
 - Idempotent check prevents duplicate tool creation
+- Supports three signatures:
+  - `() -> None` - No parameters
+  - `(client: AsyncLetta) -> None` - With client (shown above)
+  - `(client: AsyncLetta, model_name: str) -> None` - With client and model name (runs once per model when testing multiple models)
 
 ### Step 2: Agent Factory (`create_agent.py:create_inventory_agent`)
 
