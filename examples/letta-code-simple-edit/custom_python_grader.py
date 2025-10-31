@@ -1,6 +1,6 @@
+import asyncio
 import json
 import re
-import asyncio
 from pathlib import Path
 
 from letta_evals.decorators import grader
@@ -11,19 +11,19 @@ def extract_json_from_submission(submission: str) -> dict:
     """Extract the file path from the submission."""
     try:
         # Try to find JSON within ```json ... ``` or ``` ... ``` code blocks
-        json_match = re.search(r'```(?:json)?\s*\n?(.*?)```', submission, re.DOTALL)
+        json_match = re.search(r"```(?:json)?\s*\n?(.*?)```", submission, re.DOTALL)
         if json_match:
             submission = json_match.group(1).strip()
         else:
             # Try to find a JSON object in the submission (look for { ... })
             # Find the last occurrence of a complete JSON object
-            json_obj_match = re.search(r'\{(?:[^{}]|(?:\{[^{}]*\}))*\}(?:\s*)$', submission, re.DOTALL)
+            json_obj_match = re.search(r"\{(?:[^{}]|(?:\{[^{}]*\}))*\}(?:\s*)$", submission, re.DOTALL)
             if json_obj_match:
                 submission = json_obj_match.group(0).strip()
             else:
                 # If no JSON object pattern found, try to parse the whole submission
                 submission = submission.strip()
-        
+
         submission = json.loads(submission)
         file_path = submission.get("file_path")
         if not file_path:

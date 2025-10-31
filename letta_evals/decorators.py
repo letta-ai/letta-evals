@@ -213,7 +213,9 @@ def suite_setup(func: Callable) -> Callable:
     params = list(sig.parameters.values())
 
     if len(params) not in (0, 1, 2):
-        raise TypeError(f"Suite setup {func.__name__} must have 0, 1, or 2 parameters (client, model_name), got {len(params)}")
+        raise TypeError(
+            f"Suite setup {func.__name__} must have 0, 1, or 2 parameters (client, model_name), got {len(params)}"
+        )
 
     if len(params) == 1:
         param_names = [p.name for p in params]
@@ -222,7 +224,9 @@ def suite_setup(func: Callable) -> Callable:
     elif len(params) == 2:
         param_names = [p.name for p in params]
         if param_names != ["client", "model_name"]:
-            raise TypeError(f"Suite setup {func.__name__} must have parameters named 'client' and 'model_name', got {param_names}")
+            raise TypeError(
+                f"Suite setup {func.__name__} must have parameters named 'client' and 'model_name', got {param_names}"
+            )
 
     if sig.return_annotation != inspect.Signature.empty:
         if sig.return_annotation is not None and sig.return_annotation is not None:

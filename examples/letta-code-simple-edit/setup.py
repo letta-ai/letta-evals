@@ -2,6 +2,7 @@ import shutil
 from pathlib import Path
 
 from letta_client import AsyncLetta
+
 from letta_evals.decorators import suite_setup
 
 

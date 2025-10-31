@@ -68,7 +68,17 @@ class LettaCodeTarget(AbstractAgentTarget):
                 prompt = "\n".join(str(inp) for inp in inputs)
 
                 # construct the letta command with json output
-                cmd = ["letta", "--new", "--yolo", "--output-format", "json", "--model", self.model_handle, "-p", prompt]
+                cmd = [
+                    "letta",
+                    "--new",
+                    "--yolo",
+                    "--output-format",
+                    "json",
+                    "--model",
+                    self.model_handle,
+                    "-p",
+                    prompt,
+                ]
 
                 # add tool permissions if specified
                 if self.allowed_tools:
@@ -88,9 +98,7 @@ class LettaCodeTarget(AbstractAgentTarget):
 
                 # wait for completion
                 try:
-                    stdout, stderr = await asyncio.wait_for(
-                        process.communicate(), timeout=self.timeout
-                    )
+                    stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=self.timeout)
                 except asyncio.TimeoutError:
                     process.kill()
                     await process.wait()

@@ -142,7 +142,7 @@ class Runner:
             )
         elif self.suite.target.kind == TargetKind.LETTA_CODE:
             model_handle = llm_config if isinstance(llm_config, str) else None
-            
+
             # create sandbox working directory for the model
             model_name = model_handle.split("/")[-1]
             working_dir = self.suite.target.working_dir / model_name
