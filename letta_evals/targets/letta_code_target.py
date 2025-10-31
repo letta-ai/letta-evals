@@ -19,6 +19,7 @@ class LettaCodeTarget(AbstractAgentTarget):
     def __init__(
         self,
         client: AsyncLetta,
+        model_handle: str = "anthropic/claude-sonnet-4-5-20250929",
         working_dir: Optional[Path] = None,
         allowed_tools: Optional[list[str]] = None,
         disallowed_tools: Optional[list[str]] = None,
@@ -29,6 +30,7 @@ class LettaCodeTarget(AbstractAgentTarget):
 
         Args:
             client: AsyncLetta client for retrieving messages after CLI execution
+            model_handle: Model handle to use with letta code
             working_dir: Working directory for letta command execution
             allowed_tools: List of allowed tools (e.g., ["Bash", "Read"])
             disallowed_tools: List of disallowed tools
@@ -36,6 +38,7 @@ class LettaCodeTarget(AbstractAgentTarget):
             max_retries: Number of retry attempts on failure
         """
         self.client = client
+        self.model_handle = model_handle
         self.working_dir = working_dir or Path.cwd()
         self.allowed_tools = allowed_tools
         self.disallowed_tools = disallowed_tools
@@ -55,8 +58,19 @@ class LettaCodeTarget(AbstractAgentTarget):
 
         while attempt <= self.max_retries:
             try:
+                print(f"running letta code target for sample {sample.id} with model {self.model_handle}")
+                
+                # handle single or multiple inputs
+                inputs = sample.input if isinstance(sample.input, list) else [sample.input]
+
+                if progress_callback:
+                    await progress_callback.message_sending(sample.id, 1, len(inputs), model_name=f"letta-code")
+
+                # for multiple inputs, concatenate with newlines
+                prompt = "\n".join(str(inp) for inp in inputs)
+
                 # construct the letta command with json output
-                cmd = ["letta", "--new", "--yolo", "--output-format", "json", "-p"]
+                cmd = ["letta", "--new", "--yolo", "--output-format", "json", "--model", self.model_handle, "-p", prompt]
 
                 # add tool permissions if specified
                 if self.allowed_tools:
@@ -64,30 +78,20 @@ class LettaCodeTarget(AbstractAgentTarget):
                 if self.disallowed_tools:
                     cmd.extend(["--disallowedTools", ",".join(self.disallowed_tools)])
 
-                # handle single or multiple inputs
-                inputs = sample.input if isinstance(sample.input, list) else [sample.input]
-
-                if progress_callback:
-                    await progress_callback.message_sending(sample.id, 1, len(inputs), model_name="letta-code")
-
-                # for multiple inputs, concatenate with newlines
-                prompt = "\n".join(str(inp) for inp in inputs)
-
                 logger.info(f"Running letta command for sample {sample.id}")
 
-                # run the letta command with the prompt as stdin
+                # run the letta command
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
-                    stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=str(self.working_dir),
                 )
 
-                # send the prompt to stdin and wait for completion
+                # wait for completion
                 try:
                     stdout, stderr = await asyncio.wait_for(
-                        process.communicate(input=prompt.encode()), timeout=self.timeout
+                        process.communicate(), timeout=self.timeout
                     )
                 except asyncio.TimeoutError:
                     process.kill()

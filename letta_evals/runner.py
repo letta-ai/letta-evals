@@ -142,9 +142,16 @@ class Runner:
                 max_retries=self.suite.target.max_retries,
             )
         elif self.suite.target.kind == TargetKind.LETTA_CODE:
+            model_handle = llm_config if isinstance(llm_config, str) else None
+            model_name = model_handle.split("/")[-1]
+            working_dir = self.suite.target.working_dir / model_name
+            if not working_dir.exists():
+                working_dir.mkdir(parents=True, exist_ok=True)
+
             return LettaCodeTarget(
                 client=self.client,
-                working_dir=self.suite.target.working_dir,
+                model_handle=model_handle,
+                working_dir=working_dir,
                 allowed_tools=self.suite.target.allowed_tools,
                 disallowed_tools=self.suite.target.disallowed_tools,
                 timeout=int(self.suite.target.timeout),
