@@ -19,5 +19,4 @@ async def prepare_evaluation(client: AsyncLetta, model_name: str) -> None:
         print(f"Removed existing sandbox directory: {sandbox}")
 
     shutil.copytree(init_sandbox, sandbox)
-    print(f"Copied {init_sandbox} to {sandbox}")
-    print(f"Sandbox directory reset with buggy files for model {model_name}")
+    print(f"Reset and copied {init_sandbox} to {sandbox}")

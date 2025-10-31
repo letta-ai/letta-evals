@@ -36,8 +36,6 @@ def extract_json_from_submission(submission: str) -> dict:
 @grader
 async def python_output_grader(sample: Sample, submission: str) -> GradeResult:
     """Run the Python file and compare output to ground truth."""
-    print(f"Submission: {submission}")
-
     # extract file path from submission
     file_path = extract_json_from_submission(submission)
     file_path = Path(file_path).resolve()
