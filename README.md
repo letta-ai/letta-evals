@@ -77,7 +77,7 @@ letta-evals run suite.yaml
 
 ## Running Evals
 
-You can find the full evaluation flow documentation in [`CLAUDE.md`](CLAUDE.md). The core evaluation flow is:
+The core evaluation flow is:
 
 **Dataset → Target (Agent) → Extractor → Grader → Gate → Result**
 
