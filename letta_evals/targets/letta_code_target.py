@@ -58,8 +58,6 @@ class LettaCodeTarget(AbstractAgentTarget):
 
         while attempt <= self.max_retries:
             try:
-                print(f"running letta code target for sample {sample.id} with model {self.model_handle}")
-                
                 # handle single or multiple inputs
                 inputs = sample.input if isinstance(sample.input, list) else [sample.input]
 
