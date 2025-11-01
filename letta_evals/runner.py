@@ -87,7 +87,6 @@ class Runner:
         self._cached_trajectories: Dict[int, Dict[str, SampleResult]] = (
             self._build_trajectory_cache() if cached_results else {}
         )
-        self._setup_executed = False
         self.stream_writer: Optional[StreamingWriter] = None
         self.output_path = output_path
 
@@ -142,9 +141,18 @@ class Runner:
                 max_retries=self.suite.target.max_retries,
             )
         elif self.suite.target.kind == TargetKind.LETTA_CODE:
+            model_handle = llm_config if isinstance(llm_config, str) else None
+
+            # create sandbox working directory for the model
+            model_name = model_handle.split("/")[-1]
+            working_dir = self.suite.target.working_dir / model_name
+            if not working_dir.exists():
+                working_dir.mkdir(parents=True, exist_ok=True)
+
             return LettaCodeTarget(
                 client=self.client,
-                working_dir=self.suite.target.working_dir,
+                model_handle=model_handle,
+                working_dir=working_dir,
                 allowed_tools=self.suite.target.allowed_tools,
                 disallowed_tools=self.suite.target.disallowed_tools,
                 timeout=int(self.suite.target.timeout),
@@ -208,35 +216,43 @@ class Runner:
             return any(grader.requires_agent_state for grader in self.graders.values())
         return False
 
-    async def _run_setup(self) -> None:
-        """Execute the setup function if specified."""
-        if self._setup_executed:
-            return
+    async def _run_setup(self, model_name: Optional[str] = None) -> None:
+        """Execute the setup function if specified.
 
+        Args:
+            model_name: Optional model name to pass to setup function if it accepts one.
+        """
         if not self.suite.setup_script:
             return
 
         try:
-            logger.info(f"Running setup script: {self.suite.setup_script}")
             setup_func = load_object(self.suite.setup_script, self.suite.base_dir)
             if not hasattr(setup_func, "_is_suite_setup"):
                 raise ValueError(f"Setup function must be decorated with @suite_setup: {self.suite.setup_script}")
 
-            # check if setup function expects client parameter
+            # check if setup function expects client and/or model_name parameters
             param_count = getattr(setup_func, "_suite_setup_param_count", 1)
 
+            log_msg = f"Running setup script: {self.suite.setup_script}"
+            if model_name and param_count == 2:
+                log_msg += f" for model: {model_name}"
+            logger.info(log_msg)
+
             if inspect.iscoroutinefunction(setup_func):
-                if param_count == 1:
+                if param_count == 2:
+                    await setup_func(self.client, model_name)
+                elif param_count == 1:
                     await setup_func(self.client)
                 else:
                     await setup_func()
             else:
-                if param_count == 1:
+                if param_count == 2:
+                    setup_func(self.client, model_name)
+                elif param_count == 1:
                     setup_func(self.client)
                 else:
                     setup_func()
 
-            self._setup_executed = True
             logger.info("Setup completed successfully")
 
         except Exception as e:
@@ -414,7 +430,16 @@ class Runner:
 
     async def run(self) -> RunnerResult:
         """Run evaluation on all samples."""
-        await self._run_setup()
+        # Check if setup function accepts model_name parameter
+        setup_needs_model = False
+        if self.suite.setup_script:
+            setup_func = load_object(self.suite.setup_script, self.suite.base_dir)
+            param_count = getattr(setup_func, "_suite_setup_param_count", 1)
+            setup_needs_model = param_count == 2
+
+        # If setup doesn't need model name, run it once now
+        if not setup_needs_model:
+            await self._run_setup()
 
         samples = list(
             load_dataset(self.suite.dataset, max_samples=self.suite.max_samples, sample_tags=self.suite.sample_tags)
@@ -440,6 +465,17 @@ class Runner:
         try:
             async with anyio.create_task_group() as tg:
                 for llm_config in self.model_configs:
+                    # If setup needs model name, run it once per model
+                    if setup_needs_model:
+                        # extract model name from either LlmConfig or string handle
+                        if isinstance(llm_config, LlmConfig):
+                            model_name = llm_config.model
+                        elif isinstance(llm_config, str):
+                            model_name = llm_config
+                        else:
+                            model_name = None
+                        await self._run_setup(model_name=model_name)
+
                     for sample in samples:
 
                         async def run_and_append(s, cfg):

@@ -1,3 +1,3 @@
-{"input": "Find and fix the bug in sandbox/task_1.py", "ground_truth": "The sum is: 15", "extra_vars": {"file_path": "sandbox/task_1.py"}}
-{"input": "Find and fix the bug in sandbox/task_2.py", "ground_truth": "The last element is: 50", "extra_vars": {"file_path": "sandbox/task_2.py"}}
-{"input": "Find and fix the bug in sandbox/task_3.py. If the list is empty, it should return None, not 0.", "ground_truth": "Average: None\nAverage: 30.0", "extra_vars": {"file_path": "sandbox/task_3.py"}}
+{"input": "Find and fix the bug in task_1.py. Return the absolute path to the fixed file in JSON format with the key 'file_path'.", "ground_truth": "The sum is: 15", "extra_vars": {"file_path": "sandbox/task_1.py"}}
+{"input": "Find and fix the bug in task_2.py. Return the absolute path to the fixed file in JSON format with the key 'file_path'.", "ground_truth": "The last element is: 50", "extra_vars": {"file_path": "sandbox/task_2.py"}}
+{"input": "Find and fix the bug in task_3.py. Return the absolute path to the fixed file in JSON format with the key 'file_path'.", "ground_truth": "Average: 0\nAverage: 30.0", "extra_vars": {"file_path": "sandbox/task_3.py"}}
