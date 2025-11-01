@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.6.1...letta-evals-v0.7.0) (2025-11-01)
+
+
+### Features
+
+* Evaluate multiple models with letta-code ([#113](https://github.com/letta-ai/letta-evals/issues/113)) ([f98933b](https://github.com/letta-ai/letta-evals/commit/f98933b0c0ac2a6a20db36ecc4c12941ba71f0cd))
+
+
+### Documentation
+
+* Clean up README of Claude references ([#114](https://github.com/letta-ai/letta-evals/issues/114)) ([a41f9d0](https://github.com/letta-ai/letta-evals/commit/a41f9d039b230dd78337ef043650471455ddfbbb))
+
 ## [0.6.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.6.0...letta-evals-v0.6.1) (2025-10-30)
 
 
