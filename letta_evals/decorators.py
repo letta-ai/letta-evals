@@ -170,9 +170,7 @@ def aggregation(func: Callable = None, *, name: str = None):
 
         param_names = [p.name for p in params]
         if param_names != ["metrics"]:
-            raise TypeError(
-                f"Aggregation function {f.__name__} must have parameter named 'metrics', got {param_names}"
-            )
+            raise TypeError(f"Aggregation function {f.__name__} must have parameter named 'metrics', got {param_names}")
 
         if sig.return_annotation != inspect.Signature.empty:
             if sig.return_annotation not in (float, int):

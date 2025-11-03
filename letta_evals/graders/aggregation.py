@@ -106,11 +106,7 @@ class AggregationGrader(Grader):
 
             rationale = f"Aggregated from metrics: {', '.join(f'{k}={v:.3f}' for k, v in metrics.items())} -> {aggregated_score:.3f}"
 
-            return GradeResult(
-                score=aggregated_score,
-                rationale=rationale,
-                metadata={"input_metrics": metrics}
-            ), ""
+            return GradeResult(score=aggregated_score, rationale=rationale, metadata={"input_metrics": metrics}), ""
 
         except Exception as e:
             raise ValueError(f"Error executing aggregate function: {e}")

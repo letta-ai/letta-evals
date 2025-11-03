@@ -194,7 +194,9 @@ class AggregationGraderSpec(BaseGraderSpec):
     """Aggregation grader configuration that combines multiple metrics using custom Python code."""
 
     kind: Literal[GraderKind.AGGREGATION] = GraderKind.AGGREGATION
-    function: str = Field(description="Path to Python file containing aggregation function (e.g., 'aggregation.py:my_aggregate') or inline code")
+    function: str = Field(
+        description="Path to Python file containing aggregation function (e.g., 'aggregation.py:my_aggregate') or inline code"
+    )
     depends_on: List[str] = Field(description="List of metric keys (grader names) that this aggregation depends on")
 
     @field_validator("depends_on")

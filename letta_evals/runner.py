@@ -372,10 +372,12 @@ class Runner:
 
                 # Now grade aggregation graders with dependent grades
                 for key, grader in aggregation_graders.items():
-                    gr, sub = await grader.grade(sample, trajectory, agent_state=agent_state, dependent_grades=grades_dict)
+                    gr, sub = await grader.grade(
+                        sample, trajectory, agent_state=agent_state, dependent_grades=grades_dict
+                    )
                     grades_dict[key] = gr
                     submissions_dict[key] = sub
-                
+
                 # Determine gating metric key
                 gate_key = self._gate_metric_key()
                 gate_grade = grades_dict.get(gate_key) if gate_key in grades_dict else next(iter(grades_dict.values()))
