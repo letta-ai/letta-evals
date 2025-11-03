@@ -113,6 +113,7 @@ We suggest getting started with these examples:
 - **LLM-as-judge grading**: [`examples/simple-rubric-grader/`](examples/simple-rubric-grader/) - Using rubric graders with custom prompts for nuanced evaluation
 - **Agent-as-judge grading**: [`examples/letta-agent-rubric-grader/`](examples/letta-agent-rubric-grader/) - Using a Letta agent as an LLM judge (no API keys required!)
 - **Multi-metric evaluation**: [`examples/simple-rubric-grader/suite.two-metrics.yaml`](examples/simple-rubric-grader/suite.two-metrics.yaml) - Combining multiple graders (rubric + tool) in one suite
+- **Aggregation grading**: [`examples/aggregation-grader/`](examples/aggregation-grader/) - Combining multiple metrics with custom Python code for flexible aggregation (weighted average, min/max, conditional logic, etc.)
 - **Memory block extraction**: [`examples/multiturn-memory-block-extractor/`](examples/multiturn-memory-block-extractor/) - Extracting and evaluating agent memory across multiturn conversations
 - **Multi-model evaluation**: [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) - Testing across multiple LLM configurations
 - **Programmatic agent creation**: [`examples/programmatic-agent-creation/`](examples/programmatic-agent-creation/) - Using agent factories to create agents dynamically per sample
@@ -181,6 +182,39 @@ See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-a
       - gpt-5-low
   ```
   The framework automatically creates isolated working directories for each model to prevent interference between concurrent evaluations. When combined with `@suite_setup` functions that accept `model_name`, you can perform model-specific initialization for each evaluation run.
+
+**Can I combine multiple metrics into a single score?**
+
+* Yes! Use the **aggregation grader** to combine multiple metrics with custom Python code. This is useful for:
+  - Weighted averages: Give different importance to different metrics (e.g., 70% accuracy + 30% speed)
+  - Minimum/maximum scores: Require all metrics to pass or take the best score
+  - Conditional logic: Complex rules like "all metrics must be above 0.5, then average them"
+  - Custom formulas: Any mathematical combination of your metrics
+
+  ```yaml
+  graders:
+    accuracy:
+      kind: tool
+      function: exact_match
+
+    relevance:
+      kind: model_judge
+      prompt_path: rubric.txt
+
+    combined:
+      kind: aggregation
+      function: aggregation.py:my_aggregate  # Reference to external file
+      depends_on:
+        - accuracy
+        - relevance
+
+  gate:
+    metric_key: combined  # Gate on the aggregated score
+    op: gte
+    value: 0.8
+  ```
+
+  See [`examples/aggregation-grader/`](examples/aggregation-grader/) for complete examples and documentation.
 
 **Can I use this in CI/CD pipelines?**
 
