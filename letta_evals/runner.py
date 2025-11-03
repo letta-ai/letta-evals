@@ -13,10 +13,12 @@ from rich.console import Console
 
 from letta_evals.datasets.loader import load_dataset
 from letta_evals.graders.agent_judge import AgentJudgeGrader
+from letta_evals.graders.aggregation import AggregationGrader
 from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
 from letta_evals.models import (
+    AggregationGraderSpec,
     GradeResult,
     LettaJudgeGraderSpec,
     MetricAggregate,
@@ -205,6 +207,12 @@ class Runner:
                         base_dir=gspec.base_dir,
                         rubric_vars=gspec.rubric_vars,
                     )
+                elif isinstance(gspec, AggregationGraderSpec):
+                    self.graders[key] = AggregationGrader(
+                        function=gspec.function,
+                        depends_on=gspec.depends_on,
+                        base_dir=gspec.base_dir,
+                    )
                 else:
                     raise ValueError(f"Unknown grader spec type: {type(gspec)}")
         else:
@@ -351,10 +359,23 @@ class Runner:
 
                 grades_dict: Optional[Dict[str, GradeResult]] = {}
                 submissions_dict: Optional[Dict[str, str]] = {}
+
+                # Grade non-aggregation graders first
+                aggregation_graders = {}
                 for key, grader in self.graders.items():  # type: ignore[union-attr]
-                    gr, sub = await grader.grade(sample, trajectory, agent_state=agent_state)
+                    if isinstance(grader, AggregationGrader):
+                        aggregation_graders[key] = grader
+                    else:
+                        gr, sub = await grader.grade(sample, trajectory, agent_state=agent_state)
+                        grades_dict[key] = gr
+                        submissions_dict[key] = sub
+
+                # Now grade aggregation graders with dependent grades
+                for key, grader in aggregation_graders.items():
+                    gr, sub = await grader.grade(sample, trajectory, agent_state=agent_state, dependent_grades=grades_dict)
                     grades_dict[key] = gr
                     submissions_dict[key] = sub
+                
                 # Determine gating metric key
                 gate_key = self._gate_metric_key()
                 gate_grade = grades_dict.get(gate_key) if gate_key in grades_dict else next(iter(grades_dict.values()))

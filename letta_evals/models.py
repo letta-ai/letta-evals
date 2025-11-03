@@ -190,8 +190,24 @@ class LettaJudgeGraderSpec(BaseGraderSpec):
         return self
 
 
+class AggregationGraderSpec(BaseGraderSpec):
+    """Aggregation grader configuration that combines multiple metrics using custom Python code."""
+
+    kind: Literal[GraderKind.AGGREGATION] = GraderKind.AGGREGATION
+    function: str = Field(description="Path to Python file containing aggregation function (e.g., 'aggregation.py:my_aggregate') or inline code")
+    depends_on: List[str] = Field(description="List of metric keys (grader names) that this aggregation depends on")
+
+    @field_validator("depends_on")
+    @classmethod
+    def validate_depends_on(cls, v: List[str]) -> List[str]:
+        """Validate that depends_on has at least one metric."""
+        if not v:
+            raise ValueError("Aggregation grader must depend on at least one metric")
+        return v
+
+
 GraderSpec = Annotated[
-    Union[ToolGraderSpec, ModelJudgeGraderSpec, LettaJudgeGraderSpec],
+    Union[ToolGraderSpec, ModelJudgeGraderSpec, LettaJudgeGraderSpec, AggregationGraderSpec],
     Field(discriminator="kind"),
 ]
 

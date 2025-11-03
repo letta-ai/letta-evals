@@ -10,6 +10,7 @@ class GraderKind(str, Enum):
     TOOL = "tool"
     MODEL_JUDGE = "model_judge"
     LETTA_JUDGE = "letta_judge"
+    AGGREGATION = "aggregation"
 
 
 class MetricOp(str, Enum):
