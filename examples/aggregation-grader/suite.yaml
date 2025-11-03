@@ -1,0 +1,36 @@
+name: aggregation-grader-example
+description: Example demonstrating how to aggregate multiple metrics with custom Python code
+dataset: dataset.csv
+max_samples: 3
+target:
+  kind: letta_agent
+  agent_file: test-agent.af
+  base_url: http://localhost:8283
+
+graders:
+  # First grader - checks if answer contains the correct information
+  contains_check:
+    kind: tool
+    function: contains
+    extractor: last_assistant
+
+  # Second grader - checks exact match
+  exact_check:
+    kind: tool
+    function: exact_match
+    extractor: last_assistant
+
+  # Aggregation grader - combines the two metrics
+  # Takes the weighted average: 70% contains_check + 30% exact_check
+  combined_score:
+    kind: aggregation
+    display_name: "Combined Score"
+    function: aggregation.py:weighted_average_aggregate
+    depends_on:
+      - contains_check
+      - exact_check
+
+gate:
+  metric_key: combined_score
+  op: gte
+  value: 0.6
