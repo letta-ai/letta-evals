@@ -1,7 +1,12 @@
 """Custom aggregation function for combining multiple metrics."""
 
+from typing import Dict
 
-def weighted_average_aggregate(metrics):
+from letta_evals.decorators import aggregation
+
+
+@aggregation
+def weighted_average_aggregate(metrics: Dict[str, float]) -> float:
     """
     Aggregate multiple metrics with custom weights.
 

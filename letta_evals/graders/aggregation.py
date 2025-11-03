@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Tuple
 
 from letta_client import AgentState, LettaMessageUnion
 
+from letta_evals.decorators import AGGREGATION_REGISTRY
 from letta_evals.graders.base import Grader
 from letta_evals.models import GradeResult, Sample
 from letta_evals.utils import load_object
@@ -37,19 +38,28 @@ class AggregationGrader(Grader):
         self._load_function()
 
     def _load_function(self):
-        """Load the aggregation function from file path."""
-        if ":" not in self.function_name:
+        """Load the aggregation function from registry or file path."""
+        # First check if it's in the registry (like ToolGrader does)
+        if self.function_name in AGGREGATION_REGISTRY:
+            self._aggregate_func = AGGREGATION_REGISTRY[self.function_name]
+        elif ":" in self.function_name:
+            # Load from file path
+            func = load_object(self.function_name, base_dir=self.base_dir)
+
+            if not callable(func):
+                raise ValueError(f"Loaded object {self.function_name} is not callable")
+
+            # Check if it has the decorator marker (optional but recommended)
+            if not hasattr(func, "_is_aggregation"):
+                # Allow it but maybe warn in the future
+                pass
+
+            self._aggregate_func = func
+        else:
             raise ValueError(
-                f"Aggregation function must be specified as 'file.py:function_name', got '{self.function_name}'"
+                f"Aggregation function '{self.function_name}' not found in registry. "
+                f"Either use @aggregation decorator or specify as 'file.py:function_name'"
             )
-
-        # Load the function using the same utility as ToolGrader
-        func = load_object(self.function_name, base_dir=self.base_dir)
-
-        if not callable(func):
-            raise ValueError(f"Loaded object {self.function_name} is not callable")
-
-        self._aggregate_func = func
 
     @property
     def requires_agent_state(self) -> bool:

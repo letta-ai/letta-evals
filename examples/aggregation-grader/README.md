@@ -32,7 +32,11 @@ combined_score:
 Where `aggregation.py` contains:
 
 ```python
-def weighted_average_aggregate(metrics):
+from typing import Dict
+from letta_evals.decorators import aggregation
+
+@aggregation
+def weighted_average_aggregate(metrics: Dict[str, float]) -> float:
     """
     Aggregate multiple metrics with custom weights.
 
@@ -51,6 +55,8 @@ def weighted_average_aggregate(metrics):
     return weighted_score
 ```
 
+**Note**: The `@aggregation` decorator is recommended as it validates your function signature and provides better error messages.
+
 ### Key Fields
 
 - **kind**: Must be `aggregation`
@@ -63,6 +69,10 @@ def weighted_average_aggregate(metrics):
 The aggregation function receives a dictionary mapping metric keys to their scores:
 
 ```python
+from typing import Dict
+from letta_evals.decorators import aggregation
+
+@aggregation
 def my_aggregate(metrics: Dict[str, float]) -> float:
     # metrics = {'contains_check': 1.0, 'exact_check': 0.5}
     # Return a value between 0.0 and 1.0
@@ -70,6 +80,16 @@ def my_aggregate(metrics: Dict[str, float]) -> float:
 ```
 
 You can name the function anything you want, then reference it in your YAML as `filename.py:function_name`.
+
+### Using the @aggregation Decorator
+
+The `@aggregation` decorator is **recommended** because it:
+- Validates function signature (must have exactly one parameter named `metrics`)
+- Validates return type annotation (must be `float` or `int`)
+- Provides clearer error messages if something is wrong
+- Follows the same pattern as `@grader` and `@extractor` decorators
+
+The decorator is optional - functions without it will still work, but you won't get the validation benefits.
 
 ## Example Aggregation Strategies
 

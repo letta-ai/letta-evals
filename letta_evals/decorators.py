@@ -6,6 +6,7 @@ from letta_evals.models import GradeResult
 
 GRADER_REGISTRY: Dict[str, Callable] = {}
 EXTRACTOR_REGISTRY: Dict[str, Callable] = {}
+AGGREGATION_REGISTRY: Dict[str, Callable] = {}
 
 
 def grader(func: Callable = None, *, name: str = None):
@@ -127,6 +128,60 @@ def extractor(func: Callable = None, *, name: str = None):
 
         f._is_extractor = True
         f._extractor_param_count = len(params)
+
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            return f(*args, **kwargs)
+
+        return wrapper
+
+    if func is None:
+        return decorator
+    else:
+        return decorator(func)
+
+
+def aggregation(func: Callable = None, *, name: str = None):
+    """
+    Decorator for aggregation functions.
+
+    Validates that the function has signature: (metrics: Dict[str, float]) -> float
+    Auto-registers the function to the aggregation registry.
+
+    Usage:
+        @aggregation
+        def my_aggregate(metrics: Dict[str, float]) -> float:
+            return sum(metrics.values()) / len(metrics)
+
+        @aggregation(name="custom_name")
+        def another_aggregate(metrics: Dict[str, float]) -> float:
+            return min(metrics.values())
+    """
+
+    def decorator(f: Callable) -> Callable:
+        sig = inspect.signature(f)
+        params = list(sig.parameters.values())
+
+        if len(params) != 1:
+            raise TypeError(
+                f"Aggregation function {f.__name__} must have exactly 1 parameter (metrics: Dict[str, float]), "
+                f"got {len(params)}"
+            )
+
+        param_names = [p.name for p in params]
+        if param_names != ["metrics"]:
+            raise TypeError(
+                f"Aggregation function {f.__name__} must have parameter named 'metrics', got {param_names}"
+            )
+
+        if sig.return_annotation != inspect.Signature.empty:
+            if sig.return_annotation not in (float, int):
+                raise TypeError(f"Aggregation function {f.__name__} must return float, got {sig.return_annotation}")
+
+        registry_name = name or f.__name__
+        AGGREGATION_REGISTRY[registry_name] = f
+
+        f._is_aggregation = True
 
         @wraps(f)
         def wrapper(*args, **kwargs):
