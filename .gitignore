@@ -4,6 +4,7 @@ CLAUDE.md
 .DS_Store
 .idea/
 .letta/
+results/
 
 examples/*/results.json
 examples/*/results.jsonl
