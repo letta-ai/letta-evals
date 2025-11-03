@@ -1,0 +1,119 @@
+{
+  "agents": [
+    {
+      "name": "test-qa-agent",
+      "memory_blocks": [],
+      "tools": [],
+      "tool_ids": [],
+      "source_ids": [],
+      "block_ids": [],
+      "tool_rules": [],
+      "tags": [],
+      "system": "You are a helpful assistant that answers questions concisely and accurately. Provide direct, short answers without unnecessary explanation.",
+      "agent_type": "letta_v1_agent",
+      "llm_config": {
+        "model": "gpt-4.1",
+        "model_endpoint_type": "openai",
+        "model_endpoint": "https://api.openai.com/v1",
+        "provider_name": "openai",
+        "provider_category": "base",
+        "model_wrapper": null,
+        "context_window": 30000,
+        "put_inner_thoughts_in_kwargs": true,
+        "handle": "openai/gpt-4.1",
+        "temperature": 0.7,
+        "max_tokens": 8192,
+        "enable_reasoner": true,
+        "reasoning_effort": null,
+        "max_reasoning_tokens": 0,
+        "frequency_penalty": null,
+        "compatibility_type": null,
+        "verbosity": null,
+        "tier": "premium"
+      },
+      "embedding_config": {
+        "embedding_endpoint_type": "openai",
+        "embedding_endpoint": "https://api.openai.com/v1",
+        "embedding_model": "text-embedding-3-small",
+        "embedding_dim": 2000,
+        "embedding_chunk_size": 300,
+        "handle": "openai/text-embedding-3-small",
+        "batch_size": 1024,
+        "azure_endpoint": null,
+        "azure_version": null,
+        "azure_deployment": null
+      },
+      "initial_message_sequence": null,
+      "include_base_tools": false,
+      "include_multi_agent_tools": false,
+      "include_base_tool_rules": false,
+      "include_default_source": false,
+      "description": "A simple Q&A agent for testing aggregation graders",
+      "metadata": null,
+      "model": null,
+      "embedding": null,
+      "context_window_limit": null,
+      "embedding_chunk_size": null,
+      "max_tokens": null,
+      "max_reasoning_tokens": null,
+      "enable_reasoner": false,
+      "reasoning": null,
+      "from_template": null,
+      "template": false,
+      "project": null,
+      "tool_exec_environment_variables": {},
+      "memory_variables": null,
+      "project_id": null,
+      "template_id": null,
+      "base_template_id": null,
+      "identity_ids": null,
+      "message_buffer_autoclear": false,
+      "enable_sleeptime": false,
+      "response_format": null,
+      "timezone": "UTC",
+      "max_files_open": 5,
+      "per_file_view_window_char_limit": 15000,
+      "hidden": null,
+      "id": "agent-0",
+      "in_context_message_ids": [
+        "message-0"
+      ],
+      "messages": [
+        {
+          "type": "message",
+          "role": "system",
+          "content": [
+            {
+              "type": "text",
+              "text": "You are a helpful assistant that answers questions concisely and accurately. Provide direct, short answers without unnecessary explanation.\n\n<memory_blocks>\nThe following memory blocks are currently engaged in your core memory unit:\n\n\n</memory_blocks>\n\n<memory_metadata>\n- The current system date is: January 15, 2025\n- Memory blocks were last modified: 2025-01-15 12:00:00 PM UTC+0000\n- 0 previous messages between you and the user are stored in recall memory (use tools to access them)\n</memory_metadata>"
+            }
+          ],
+          "name": null,
+          "otid": null,
+          "sender_id": null,
+          "batch_item_id": null,
+          "group_id": null,
+          "id": "message-0",
+          "model": "gpt-4o-mini",
+          "agent_id": "agent-0",
+          "tool_calls": null,
+          "tool_call_id": null,
+          "tool_returns": [],
+          "created_at": "2025-01-15T12:00:00.000000+00:00"
+        }
+      ],
+      "files_agents": [],
+      "group_ids": []
+    }
+  ],
+  "groups": [],
+  "blocks": [],
+  "files": [],
+  "sources": [],
+  "tools": [],
+  "mcp_servers": [],
+  "metadata": {
+    "revision_id": "aggregation-example-v1"
+  },
+  "created_at": "2025-01-15T12:00:00.000000+00:00"
+}

@@ -4,7 +4,7 @@ dataset: dataset.csv
 max_samples: 3
 target:
   kind: letta_agent
-  agent_file: test-agent.af
+  agent_file: test-aggregation-agent.af
   base_url: http://localhost:8283
 
 graders:
