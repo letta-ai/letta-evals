@@ -24,9 +24,15 @@ graders:
     function: ascii_printable_only
     extractor: last_assistant
 gate:
-  # Gate on quality average score >= 0.6
-  kind: simple
-  metric_key: quality
-  aggregation: avg_score
-  op: gte
-  value: 0.6
+  kind: logical
+  operator: and
+  conditions:
+    - metric_key: quality
+      aggregation: avg_score
+      op: gte
+      value: 0.6
+    - metric_key: ascii_only
+      aggregation: accuracy
+      pass_threshold: 0.8
+      op: gte
+      value: 90
