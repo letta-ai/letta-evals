@@ -65,9 +65,11 @@ graders:
     function: contains  # or exact_match
     extractor: last_assistant
 gate:
+  kind: simple
   metric_key: quality
+  aggregation: avg_score
   op: gte
-  value: 0.75  # require 75% pass threshold
+  value: 0.75  # require average score >= 0.75
 ```
 
 3. **Run the evaluation**:
@@ -112,7 +114,7 @@ We suggest getting started with these examples:
 - **Basic tool grading**: [`examples/simple-tool-grader/`](examples/simple-tool-grader/) - Simple string matching with `exact_match` and `contains` functions
 - **LLM-as-judge grading**: [`examples/simple-rubric-grader/`](examples/simple-rubric-grader/) - Using rubric graders with custom prompts for nuanced evaluation
 - **Agent-as-judge grading**: [`examples/letta-agent-rubric-grader/`](examples/letta-agent-rubric-grader/) - Using a Letta agent as an LLM judge (no API keys required!)
-- **Multi-metric evaluation**: [`examples/simple-rubric-grader/suite.two-metrics.yaml`](examples/simple-rubric-grader/suite.two-metrics.yaml) - Combining multiple graders (rubric + tool) in one suite
+- **Multi-grader gates**: [`examples/multi-grader-gate/`](examples/multi-grader-gate/) - Combining multiple graders with logical AND/OR gates, weighted averages, and advanced aggregation functions
 - **Memory block extraction**: [`examples/multiturn-memory-block-extractor/`](examples/multiturn-memory-block-extractor/) - Extracting and evaluating agent memory across multiturn conversations
 - **Multi-model evaluation**: [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) - Testing across multiple LLM configurations
 - **Programmatic agent creation**: [`examples/programmatic-agent-creation/`](examples/programmatic-agent-creation/) - Using agent factories to create agents dynamically per sample
