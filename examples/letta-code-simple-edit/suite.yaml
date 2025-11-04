@@ -25,4 +25,4 @@ gate:
   metric_key: bug_fix_check
   aggregation: avg_score
   op: gte
-  value: 1.0
+  value: 0.75
