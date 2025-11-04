@@ -46,12 +46,23 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Check if suite uses letta-code
+        id: check-letta-code
+        run: |
+          if grep -q "kind: letta_code" "${{ matrix.suite-path }}"; then
+            echo "needs-letta-code=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs-letta-code=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Set up Node.js
+        if: steps.check-letta-code.outputs.needs-letta-code == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Install letta-code CLI
+        if: steps.check-letta-code.outputs.needs-letta-code == 'true'
         run: |
           npm install -g @letta-ai/letta-code
 
