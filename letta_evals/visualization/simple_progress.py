@@ -83,7 +83,6 @@ class SimpleProgress(ProgressCallback):
         metric_rationales: Optional[Dict[str, str]] = None,
     ) -> None:
         prefix = self._format_prefix(sample_id, agent_id, model_name)
-        # handle None explicitly - per-sample pass/fail not meaningful with multi-grader gates
         if passed is True:
             status = "[bold green]✓ PASS[/]"
         elif passed is False:
