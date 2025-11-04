@@ -664,7 +664,6 @@ class EvalProgress(ProgressCallback):
     async def sample_completed(
         self,
         sample_id: int,
-        passed: bool,
         agent_id: Optional[str] = None,
         score: Optional[float] = None,
         model_name: Optional[str] = None,
@@ -687,7 +686,7 @@ class EvalProgress(ProgressCallback):
             SampleState.COMPLETED,
             agent_id=agent_id,
             model_name=model_name,
-            passed=passed,
+            passed=None,
             score=score,
             rationale=rationale,
             from_cache=existing_from_cache,

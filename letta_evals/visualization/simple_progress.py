@@ -73,7 +73,6 @@ class SimpleProgress(ProgressCallback):
     async def sample_completed(
         self,
         sample_id: int,
-        passed: bool,
         agent_id: Optional[str] = None,
         score: Optional[float] = None,
         model_name: Optional[str] = None,
@@ -83,7 +82,7 @@ class SimpleProgress(ProgressCallback):
         metric_rationales: Optional[Dict[str, str]] = None,
     ) -> None:
         prefix = self._format_prefix(sample_id, agent_id, model_name)
-        status = "[bold green]✓ PASS[/]" if passed else "[bold red]✗ FAIL[/]"
+        status = "[bold cyan]✓ DONE[/]"
         parts = [f"{prefix} {status}"]
 
         if score is not None:

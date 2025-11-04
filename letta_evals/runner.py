@@ -375,7 +375,6 @@ class Runner:
                         metric_rationales = {k: (v.rationale or "") for k, v in grades_dict.items()}
                     await self.progress_callback.sample_completed(
                         sample_id,
-                        passed=None,  # not meaningful with multi-grader gates
                         agent_id=agent_id,
                         score=grade_result.score,
                         model_name=model_name,
