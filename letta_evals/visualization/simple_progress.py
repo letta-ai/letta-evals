@@ -124,15 +124,38 @@ class SimpleProgress(ProgressCallback):
 
         # gate status
         gate = result.config["gate"]
-        gate_op = gate["op"]
-        gate_value = gate["value"]
-        gate_metric = gate.get("metric", "avg_score")
+        gate_kind = gate.get("kind", "simple")
+        status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
 
         op_symbols = {"gt": ">", "gte": "≥", "lt": "<", "lte": "≤", "eq": "="}
-        op_symbol = op_symbols.get(gate_op, gate_op)
 
-        status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
-        self.console.print(f"\n[bold]Gate:[/bold] {gate_metric} {op_symbol} {gate_value:.2f} → {status}")
+        # format gate description based on kind
+        if gate_kind == "simple":
+            gate_op = gate["op"]
+            gate_value = gate["value"]
+            gate_aggregation = gate.get("aggregation", "avg_score")
+            gate_metric_key = gate.get("metric_key", "")
+            op_symbol = op_symbols.get(gate_op, gate_op)
+            gate_desc = f"{gate_metric_key} {gate_aggregation} {op_symbol} {gate_value:.2f}"
+
+        elif gate_kind == "weighted_average":
+            weights = gate.get("weights", {})
+            gate_op = gate["op"]
+            gate_value = gate["value"]
+            gate_aggregation = gate.get("aggregation", "avg_score")
+            op_symbol = op_symbols.get(gate_op, gate_op)
+            weight_strs = [f"{k}({w})" for k, w in weights.items()]
+            gate_desc = f"weighted_average[{', '.join(weight_strs)}] {gate_aggregation} {op_symbol} {gate_value}"
+
+        elif gate_kind == "logical":
+            operator = gate.get("operator", "and").upper()
+            num_conditions = len(gate.get("conditions", []))
+            gate_desc = f"logical {operator} with {num_conditions} conditions"
+
+        else:
+            gate_desc = f"unknown gate kind: {gate_kind}"
+
+        self.console.print(f"\n[bold]Gate:[/bold] {gate_desc} → {status}")
 
         # sample results table
         self.console.print("\n[bold]Sample Results:[/bold]")

@@ -6,9 +6,7 @@ This example demonstrates LLM-as-judge evaluation using detailed rubric criteria
 
 - Using rubric graders for subjective quality evaluation
 - Multi-dimensional scoring criteria (instruction compliance, accuracy, craftsmanship, effort)
-- Running multiple graders in a single suite (`suite.two-metrics.yaml`)
-- Combining rubric grading with tool grading for comprehensive evaluation
-- **Logical gates** that require multiple metrics to pass (`suite.two-metrics.yaml`)
+- Custom rubric variables for passing per-sample context to the LLM judge
 
 ## Key Takeaway
 
@@ -28,7 +26,7 @@ Set your API keys (required for rubric grader):
 # For suite.yaml (uses Anthropic Claude)
 export ANTHROPIC_API_KEY=your-key
 
-# For suite.two-metrics.yaml and suite.ascii-only-accuracy.yaml (use OpenAI GPT)
+# For suite.ascii-only-accuracy.yaml (uses OpenAI GPT)
 export OPENAI_API_KEY=your-key
 ```
 
@@ -47,7 +45,7 @@ export LETTA_PROJECT_ID=your-project-id
 
 # Depending on which suite you're running:
 export ANTHROPIC_API_KEY=your-anthropic-key  # for suite.yaml
-export OPENAI_API_KEY=your-openai-key  # for suite.two-metrics.yaml and suite.ascii-only-accuracy.yaml
+export OPENAI_API_KEY=your-openai-key  # for suite.ascii-only-accuracy.yaml
 ```
 
 Update `base_url` in `suite.yaml`:
@@ -134,8 +132,6 @@ IMPORTANT: Make sure to clearly express your rationale and scoring.
 
 ## Suite Configuration
 
-### Single Rubric Grader (`suite.yaml`)
-
 ```yaml
 graders:
   quality:
@@ -149,63 +145,21 @@ graders:
     extractor: last_assistant
     rubric_vars:
       - reference_ascii  # declares required custom variables
-```
 
-### Multiple Graders (`suite.two-metrics.yaml`)
-
-Combine rubric and tool graders for comprehensive evaluation:
-
-```yaml
-graders:
-  quality:
-    kind: model_judge
-    display_name: "rubric score"
-    prompt_path: rubric.txt
-    model: gpt-5-mini
-    temperature: 0.0
-    provider: openai
-    extractor: last_assistant
-  ascii_only:
-    kind: tool
-    display_name: "ascii character check"
-    function: ascii_printable_only
-    extractor: last_assistant
-```
-
-**Gate configuration - Logical AND:**
-
-`suite.two-metrics.yaml` uses a **logical gate** that requires BOTH graders to pass:
-
-```yaml
 gate:
-  kind: logical
-  operator: and
-  conditions:
-    - metric_key: quality
-      aggregation: avg_score
-      op: gte
-      value: 0.6
-    - metric_key: ascii_only
-      aggregation: accuracy
-      pass_threshold: 0.8  # sample passes if score >= 0.8
-      op: gte
-      value: 90  # at least 90% of samples must pass
+  kind: simple
+  metric_key: quality
+  aggregation: avg_score
+  op: gte
+  value: 0.6
 ```
-
-This gate passes only if:
-1. **Quality (avg_score) >= 0.6**: Average quality score across all samples must be at least 0.6
-2. **ASCII-only (accuracy) >= 90%**: At least 90% of samples must have ASCII scores >= 0.8
 
 **Key points:**
-- Use `display_name` for prettier output in results
-- `temperature: 0.0` for more consistent grading
+- Use `temperature: 0.0` for more consistent grading
 - `max_retries` and `timeout` handle LLM API issues
-- Logical gates support `and` / `or` operators and can be nested
-- Different aggregations can be combined: `avg_score` (average) vs `accuracy` (percentage passing threshold)
-- `pass_threshold` defines what score counts as "passing" for accuracy calculations (defaults to 1.0)
+- Custom rubric variables are declared in `rubric_vars` and substituted in the prompt using `{variable_name}` syntax
 
 ## Variants
 
 - `suite.yaml`: Single rubric grader for quality assessment (uses Claude Haiku via Anthropic)
-- `suite.two-metrics.yaml`: **Multi-grader logical gate** - Combines rubric grader (quality) + tool grader (ASCII validation) with AND logic requiring both to pass (uses GPT-5-mini via OpenAI)
 - `suite.ascii-only-accuracy.yaml`: Demonstrates accuracy aggregation with custom per-sample pass threshold (uses GPT-5-mini via OpenAI)

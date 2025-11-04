@@ -1,5 +1,5 @@
-name: ascii-art-two-metrics
-description: Test ASCII art quality and ASCII-only characters using two graders
+name: ascii-art-logical-and-gate
+description: Logical AND gate requiring both high quality (avg_score >= 0.6) AND valid ASCII (accuracy >= 60%)
 dataset: dataset.csv
 target:
   kind: letta_agent
@@ -33,6 +33,6 @@ gate:
       value: 0.6
     - metric_key: ascii_only
       aggregation: accuracy
-      pass_threshold: 0.8
+      pass_threshold: 1
       op: gte
-      value: 90
+      value: 60
