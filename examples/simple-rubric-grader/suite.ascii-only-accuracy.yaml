@@ -24,11 +24,10 @@ graders:
     function: ascii_printable_only
     extractor: last_assistant
 gate:
-  # Gate on 100% ASCII-only messages (all attempts must be valid ASCII art characters)
+  # Gate on 50% of samples having ASCII-only scores >= 0.5
+  kind: simple
   metric_key: ascii_only
-  metric: accuracy
+  aggregation: accuracy
+  pass_threshold: 0.5  # per-sample pass threshold
   op: gte
-  value: 50
-  # Define per-sample pass criteria for accuracy calculation: require perfect ASCII-only score per sample
-  pass_op: gte
-  pass_value: 0.5
+  value: 50  # 50% of samples must pass

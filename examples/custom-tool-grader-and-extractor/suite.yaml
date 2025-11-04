@@ -11,6 +11,8 @@ graders:
     function: custom_evaluators.py:grade_fruit_preference
     extractor: custom_evaluators.py:memory_insert_extractor
 gate:
+  kind: simple
   metric_key: preference_check
+  aggregation: avg_score
   op: gte
   value: 1

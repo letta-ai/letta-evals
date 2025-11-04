@@ -4,7 +4,7 @@ from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 from letta_client import AgentState, LettaMessageUnion
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from letta_evals.types import GateMetric, GraderKind, LLMProvider, MetricOp, TargetKind
+from letta_evals.types import Aggregation, GateKind, GraderKind, LLMProvider, LogicalOp, MetricOp, TargetKind
 
 # Dataset models
 
@@ -196,58 +196,106 @@ GraderSpec = Annotated[
 ]
 
 
-class GateSpec(BaseModel):
-    """Gate configuration for pass/fail criteria."""
+# gate helper functions
 
-    # Which aggregate metric kind to compare (e.g., avg_score or accuracy)
-    metric: GateMetric = Field(default=GateMetric.AVG_SCORE, description="Aggregate kind to apply gate on")
 
-    # Which metric key (grader name) to evaluate; if None, uses the single configured grader
-    metric_key: Optional[str] = Field(default=None, description="Metric key (grader name) to gate on")
+def _compare(a: float, op: MetricOp, b: float) -> bool:
+    """compare two values using the given operator."""
+    if op == MetricOp.GT:
+        return a > b
+    elif op == MetricOp.GTE:
+        return a >= b
+    elif op == MetricOp.LT:
+        return a < b
+    elif op == MetricOp.LTE:
+        return a <= b
+    elif op == MetricOp.EQ:
+        return a == b
+    return False
 
-    # Gate comparison for the selected aggregate metric
-    op: MetricOp = Field(description="Comparison operator for the selected metric")
-    value: float = Field(description="Threshold value for the selected metric")
 
-    # Optional, separate per-sample pass criteria (used for accuracy computation)
-    pass_op: Optional[MetricOp] = Field(
-        default=None, description="Comparison operator for per-sample pass (defaults to op)"
+def normalize_weights(weights: Dict[str, float]) -> Dict[str, float]:
+    """normalize weights to sum to 1.0."""
+    total = sum(weights.values())
+    if total == 0:
+        raise ValueError("weights must sum to a non-zero value")
+    return {k: v / total for k, v in weights.items()}
+
+
+# gate models
+
+
+class SimpleCondition(BaseModel):
+    """simple condition for logical gates (leaf node)."""
+
+    metric_key: str = Field(description="grader name to evaluate")
+    aggregation: Aggregation = Field(description="aggregation function to apply")
+    op: MetricOp = Field(description="comparison operator")
+    value: float = Field(description="threshold value")
+    pass_threshold: Optional[float] = Field(
+        default=None, description="per-sample pass threshold for accuracy aggregation (defaults to 1.0)"
     )
-    pass_value: Optional[float] = Field(
-        default=None, description="Threshold value for per-sample pass (defaults to value)"
+
+    def __hash__(self):
+        """make simple condition hashable for set operations."""
+        return hash((self.metric_key, self.aggregation, self.op, self.value, self.pass_threshold))
+
+
+class SimpleGateSpec(BaseModel):
+    """single-metric gate."""
+
+    kind: Literal[GateKind.SIMPLE] = Field(description="gate type")
+    metric_key: str = Field(description="grader name to gate on")
+    aggregation: Aggregation = Field(default=Aggregation.AVG_SCORE, description="aggregation function")
+    op: MetricOp = Field(description="comparison operator")
+    value: float = Field(description="threshold value")
+    pass_threshold: Optional[float] = Field(
+        default=None, description="per-sample pass threshold for accuracy aggregation (defaults to 1.0)"
     )
 
-    def _compare(self, a: float, op: MetricOp, b: float) -> bool:
-        if op == MetricOp.GT:
-            return a > b
-        elif op == MetricOp.GTE:
-            return a >= b
-        elif op == MetricOp.LT:
-            return a < b
-        elif op == MetricOp.LTE:
-            return a <= b
-        elif op == MetricOp.EQ:
-            return a == b
-        return False
 
-    def check_sample(self, score: float) -> bool:
-        """Check if an individual sample score passes.
+class WeightedAverageGateSpec(BaseModel):
+    """weighted average of multiple grader metrics."""
 
-        Uses pass_op/pass_value if provided; otherwise falls back to op/value.
-        """
-        # If gate is on accuracy aggregate and no explicit per-sample threshold set,
-        # default per-sample pass to score >= 1.0 (perfect) using GTE.
-        if self.pass_value is None and self.metric == GateMetric.ACCURACY:
-            op = MetricOp.GTE
-            value = 1.0
-        else:
-            op = self.pass_op or self.op
-            value = self.pass_value if self.pass_value is not None else self.value
-        return self._compare(score, op, value)
+    kind: Literal[GateKind.WEIGHTED_AVERAGE] = Field(description="gate type")
+    aggregation: Aggregation = Field(description="aggregation function applied to each metric before weighting")
+    weights: Dict[str, float] = Field(description="weights for each metric_key (grader name)")
+    op: MetricOp = Field(description="comparison operator")
+    value: float = Field(description="threshold value")
 
-    # Back-compat alias
-    def check_score(self, score: float) -> bool:
-        return self.check_sample(score)
+    @field_validator("weights")
+    @classmethod
+    def validate_weights(cls, v: Dict[str, float]) -> Dict[str, float]:
+        if not v:
+            raise ValueError("weights dict cannot be empty")
+        if any(w < 0 for w in v.values()):
+            raise ValueError("weights must be non-negative")
+        if sum(v.values()) == 0:
+            raise ValueError("weights must sum to a non-zero value")
+        return v
+
+
+class LogicalGateSpec(BaseModel):
+    """logical combination of conditions."""
+
+    kind: Literal[GateKind.LOGICAL] = Field(description="gate type")
+    operator: LogicalOp = Field(description="logical operator (and/or)")
+    conditions: List[Union["SimpleCondition", "LogicalGateSpec"]] = Field(
+        description="list of conditions (can be simple or nested logical)"
+    )
+
+    @field_validator("conditions")
+    @classmethod
+    def validate_conditions(cls, v: List) -> List:
+        if not v:
+            raise ValueError("conditions list cannot be empty")
+        return v
+
+
+GateSpec = Annotated[
+    Union[SimpleGateSpec, WeightedAverageGateSpec, LogicalGateSpec],
+    Field(discriminator="kind"),
+]
 
 
 class SuiteSpec(BaseModel):

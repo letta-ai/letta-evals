@@ -22,7 +22,7 @@ from letta_evals.models import (
 )
 from letta_evals.runner import Runner, run_suite
 from letta_evals.targets import AbstractAgentTarget, LettaAgentTarget
-from letta_evals.types import GateMetric, GraderKind, LLMProvider, MetricOp, TargetKind
+from letta_evals.types import Aggregation, GateKind, GraderKind, LLMProvider, LogicalOp, MetricOp, TargetKind
 from letta_evals.visualization.factory import ProgressStyle, create_progress_callback
 
 try:
@@ -55,7 +55,9 @@ __all__ = [
     "GraderKind",
     "TargetKind",
     "MetricOp",
-    "GateMetric",
+    "Aggregation",
+    "GateKind",
+    "LogicalOp",
     "LLMProvider",
     "grader",
     "extractor",

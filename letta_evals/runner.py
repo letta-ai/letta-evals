@@ -19,6 +19,7 @@ from letta_evals.graders.tool import ToolGrader
 from letta_evals.models import (
     GradeResult,
     LettaJudgeGraderSpec,
+    LogicalGateSpec,
     MetricAggregate,
     Metrics,
     ModelJudgeGraderSpec,
@@ -27,14 +28,19 @@ from letta_evals.models import (
     RunStatistics,
     Sample,
     SampleResult,
+    SimpleCondition,
+    SimpleGateSpec,
     SuiteSpec,
     ToolGraderSpec,
+    WeightedAverageGateSpec,
+    _compare,
+    normalize_weights,
 )
 from letta_evals.streaming import StreamingReader, StreamingWriter
 from letta_evals.targets.base import AbstractAgentTarget
 from letta_evals.targets.letta_agent import LettaAgentTarget
 from letta_evals.targets.letta_code_target import LettaCodeTarget
-from letta_evals.types import GateMetric, TargetKind
+from letta_evals.types import Aggregation, LogicalOp, TargetKind
 from letta_evals.utils import load_object
 from letta_evals.visualization.base import ProgressCallback
 from letta_evals.visualization.factory import ProgressStyle, create_progress_callback
@@ -680,48 +686,93 @@ class Runner:
             metrics=metrics_dict,
         )
 
-    def _check_sample_pass(self, score: float) -> bool:
-        """Check if an individual score satisfies the per-sample pass criteria."""
-        return self.suite.gate.check_sample(score)
+    def _compute_aggregation(
+        self, metric_key: str, aggregation: Aggregation, pass_threshold: Optional[float] = None
+    ) -> float:
+        """compute aggregated value for a metric key using the specified aggregation function."""
+        scores = [r.grades[metric_key].score for r in self.results if r.grades and metric_key in r.grades]
+
+        if not scores:
+            return 0.0
+
+        if aggregation == Aggregation.AVG_SCORE:
+            return sum(scores) / len(scores)
+        elif aggregation == Aggregation.MIN:
+            return min(scores)
+        elif aggregation == Aggregation.MAX:
+            return max(scores)
+        elif aggregation in (Aggregation.MEDIAN, Aggregation.P50):
+            import statistics
+
+            return statistics.median(scores)
+        elif aggregation in (Aggregation.P95, Aggregation.P99):
+            import numpy as np
+
+            percentile = 95 if aggregation == Aggregation.P95 else 99
+            return float(np.percentile(scores, percentile))
+        elif aggregation == Aggregation.ACCURACY:
+            # accuracy: percentage of scores that pass the threshold
+            threshold = pass_threshold if pass_threshold is not None else 1.0
+            passed = sum(1 for s in scores if s >= threshold)
+            return (passed / len(scores)) * 100.0
+        else:
+            return 0.0
+
+    def _evaluate_simple_condition(self, condition: SimpleCondition) -> bool:
+        """evaluate a simple condition against current results."""
+        if condition.metric_key not in self.graders:
+            raise ValueError(f"metric_key '{condition.metric_key}' not found in graders")
+        value = self._compute_aggregation(condition.metric_key, condition.aggregation, condition.pass_threshold)
+        return _compare(value, condition.op, condition.value)
+
+    def _evaluate_logical_gate(self, gate: LogicalGateSpec) -> bool:
+        """recursively evaluate logical gate with nested conditions."""
+        results = []
+        for condition in gate.conditions:
+            if isinstance(condition, SimpleCondition):
+                results.append(self._evaluate_simple_condition(condition))
+            elif isinstance(condition, LogicalGateSpec):
+                results.append(self._evaluate_logical_gate(condition))
+            else:
+                raise ValueError(f"unknown condition type: {type(condition)}")
+
+        if gate.operator == LogicalOp.AND:
+            return all(results)
+        elif gate.operator == LogicalOp.OR:
+            return any(results)
+        else:
+            raise ValueError(f"unknown logical operator: {gate.operator}")
 
     def _check_gates(self, metrics: Metrics) -> bool:
-        """Check if the configured gate metric is satisfied."""
-        metric_kind = self.suite.gate.metric
-        gate_key = self._gate_metric_key()
-        # recompute a lightweight aggregate for gate metric from current results
-        if metric_kind == GateMetric.AVG_SCORE:
-            scores = [r.grades[gate_key].score for r in self.results if r.grades and gate_key in r.grades]
-            value = (sum(scores) / len(scores)) if scores else 0.0
-        elif metric_kind == GateMetric.ACCURACY:
-            # accuracy over attempted
-            def is_success(r: SampleResult) -> bool:
-                return (r.agent_id is not None) and bool(r.trajectory)
+        """check if the configured gate passes."""
+        gate = self.suite.gate
 
-            attempted = sum(1 for r in self.results if is_success(r))
-            passed = sum(
-                1
-                for r in self.results
-                if is_success(r)
-                and r.grades
-                and gate_key in r.grades
-                and self._check_sample_pass(r.grades[gate_key].score)
-            )
-            value = (passed / attempted) * 100.0 if attempted > 0 else 0.0
+        if isinstance(gate, SimpleGateSpec):
+            if gate.metric_key not in self.graders:
+                raise ValueError(f"metric_key '{gate.metric_key}' not found in graders")
+            value = self._compute_aggregation(gate.metric_key, gate.aggregation, gate.pass_threshold)
+            return _compare(value, gate.op, gate.value)
+
+        elif isinstance(gate, WeightedAverageGateSpec):
+            # validate all metric keys exist
+            for metric_key in gate.weights.keys():
+                if metric_key not in self.graders:
+                    raise ValueError(f"metric_key '{metric_key}' not found in graders")
+
+            # normalize weights and compute weighted average
+            normalized = normalize_weights(gate.weights)
+            weighted_sum = 0.0
+            for metric_key, weight in normalized.items():
+                agg_value = self._compute_aggregation(metric_key, gate.aggregation)
+                weighted_sum += weight * agg_value
+
+            return _compare(weighted_sum, gate.op, gate.value)
+
+        elif isinstance(gate, LogicalGateSpec):
+            return self._evaluate_logical_gate(gate)
+
         else:
-            value = 0.0
-        return self.suite.gate._compare(value, self.suite.gate.op, self.suite.gate.value)
-
-    def _gate_metric_key(self) -> str:
-        """Return the selected metric key (grader name) for gating.
-
-        If not specified, uses the only grader if single, otherwise the first in order.
-        """
-        if self.suite.gate.metric_key:
-            return self.suite.gate.metric_key
-        if self.graders is not None and len(self.graders) > 0:
-            # return first key (deterministic by insertion order)
-            return next(iter(self.graders.keys()))
-        return "default"
+            raise ValueError(f"unknown gate type: {type(gate)}")
 
 
 def _calculate_run_statistics(all_metrics: List[Metrics], runs_passed: int, suite: SuiteSpec) -> RunStatistics:

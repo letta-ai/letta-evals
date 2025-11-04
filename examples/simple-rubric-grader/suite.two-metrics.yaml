@@ -25,7 +25,8 @@ graders:
     extractor: last_assistant
 gate:
   # Gate on quality average score >= 0.6
+  kind: simple
   metric_key: quality
-  metric: avg_score
+  aggregation: avg_score
   op: gte
   value: 0.6

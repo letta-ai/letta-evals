@@ -13,6 +13,8 @@ graders:
     extractor_config:
       block_label: "fruit_preferences"
 gate:
+  kind: simple
   metric_key: memory_check
+  aggregation: avg_score
   op: gte
   value: 0.33

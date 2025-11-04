@@ -11,6 +11,8 @@ graders:
     prompt_path: default_judge_rubric.txt
     extractor: last_assistant
 gate:
+  kind: simple
   metric_key: agent_judge
+  aggregation: avg_score
   op: gte
   value: 0.7

@@ -20,6 +20,8 @@ graders:
     rubric_vars:
       - reference_ascii
 gate:
+  kind: simple
   metric_key: quality
+  aggregation: avg_score
   op: gte
   value: 0.6
