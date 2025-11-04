@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.7.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.6.1...letta-evals-v0.7.0) (2025-11-04)
+
+
+### Features
+
+* Evaluate multiple models with letta-code ([#113](https://github.com/letta-ai/letta-evals/issues/113)) ([f98933b](https://github.com/letta-ai/letta-evals/commit/f98933b0c0ac2a6a20db36ecc4c12941ba71f0cd))
+* Support multiple graders in gates with weighted average and logical combinations ([#117](https://github.com/letta-ai/letta-evals/issues/117)) ([d0d0add](https://github.com/letta-ai/letta-evals/commit/d0d0add8199220746cf9f678f0f3357c5ae4a90e))
+
+
+### Bug Fixes
+
+* Fix per sample pass is None ([#120](https://github.com/letta-ai/letta-evals/issues/120)) ([f416487](https://github.com/letta-ai/letta-evals/commit/f416487407abfa6a38b62b98a4e6a957654eb018))
+
+
+### Documentation
+
+* Add examples for multiple metric gates ([#118](https://github.com/letta-ai/letta-evals/issues/118)) ([739e4de](https://github.com/letta-ai/letta-evals/commit/739e4de994ebea5551b0dcf6f83da57a151f51ab))
+* Add reference to multi grader gate example in top level README ([#119](https://github.com/letta-ai/letta-evals/issues/119)) ([7ad732d](https://github.com/letta-ai/letta-evals/commit/7ad732dd2db20842fde523ad5fae4b2bb09be8db))
+* Clean up README of Claude references ([#114](https://github.com/letta-ai/letta-evals/issues/114)) ([a41f9d0](https://github.com/letta-ai/letta-evals/commit/a41f9d039b230dd78337ef043650471455ddfbbb))
+
 ## [0.6.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.6.0...letta-evals-v0.6.1) (2025-10-30)
 
 
