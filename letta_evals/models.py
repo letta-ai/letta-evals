@@ -358,11 +358,8 @@ class SuiteSpec(BaseModel):
                     resolved_graders[key] = gspec
                 yaml_data["graders"] = resolved_graders
 
-            # store base_dir in SuiteSpec for setup_script resolution
             yaml_data["base_dir"] = base_dir
 
-        if "gate" in yaml_data and isinstance(yaml_data["gate"], dict):
-            yaml_data["gate"] = GateSpec(**yaml_data["gate"])
         return cls(**yaml_data)
 
 
@@ -403,47 +400,41 @@ class GradeResult(BaseModel):
 
 
 class ModelMetrics(BaseModel):
-    """Metrics for a specific model configuration."""
+    """metrics for a specific model configuration."""
 
-    model_name: str = Field(description="Model configuration name")
-    total: int = Field(description="Total results (success + error)")
-    total_attempted: int = Field(description="Total successfully attempted (completed without error)")
-    avg_score_attempted: float = Field(description="Average score across attempted results (0.0 to 1.0)")
-    avg_score_total: float = Field(description="Average score across all results (0.0 to 1.0)")
-    passed_samples: int = Field(description="Number of attempted samples that passed the gate")
-    failed_samples: int = Field(description="Number of attempted samples that failed the gate")
+    model_name: str = Field(description="model configuration name")
+    total: int = Field(description="total results (success + error)")
+    total_attempted: int = Field(description="total successfully attempted (completed without error)")
+    avg_score_attempted: float = Field(description="average score across attempted results (0.0 to 1.0)")
+    avg_score_total: float = Field(description="average score across all results (0.0 to 1.0)")
     metrics: Dict[str, float] = Field(
-        default_factory=dict, description="Per-metric pass rates (metric_key -> percentage)"
+        default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
     )
 
 
 class MetricAggregate(BaseModel):
-    """Aggregate metrics for a single metric key (grader)."""
+    """aggregate metrics for a single metric key (grader)."""
 
     avg_score_attempted: float = Field(
-        description="Average score for this metric across attempted results (0.0 to 1.0)"
+        description="average score for this metric across attempted results (0.0 to 1.0)"
     )
-    avg_score_total: float = Field(description="Average score for this metric across all results (0.0 to 1.0)")
-    pass_rate: float = Field(description="Pass rate for this metric (percent)")
-    passed_attempts: int = Field(description="Number of attempted samples that passed for this metric")
-    failed_attempts: int = Field(description="Number of attempted samples that failed for this metric")
+    avg_score_total: float = Field(description="average score for this metric across all results (0.0 to 1.0)")
+    pass_rate: float = Field(description="average score as percentage")
 
 
 class Metrics(BaseModel):
-    """Evaluation metrics."""
+    """evaluation metrics."""
 
-    total: int = Field(description="Total results (success + error)")
-    total_attempted: int = Field(description="Total successfully attempted (completed without error)")
-    avg_score_attempted: float = Field(description="Average score across attempted results (0.0 to 1.0)")
-    avg_score_total: float = Field(description="Average score across all results (0.0 to 1.0)")
-    passed_attempts: int = Field(default=0, description="Number of attempted samples that passed")
-    failed_attempts: int = Field(default=0, description="Number of attempted samples that failed")
+    total: int = Field(description="total results (success + error)")
+    total_attempted: int = Field(description="total successfully attempted (completed without error)")
+    avg_score_attempted: float = Field(description="average score across attempted results (0.0 to 1.0)")
+    avg_score_total: float = Field(description="average score across all results (0.0 to 1.0)")
     per_model: Optional[List[ModelMetrics]] = Field(
-        default=None, description="Metrics broken down by model configuration"
+        default=None, description="metrics broken down by model configuration"
     )
-    by_metric: Optional[Dict[str, MetricAggregate]] = Field(default=None, description="Aggregates for each metric key")
+    by_metric: Optional[Dict[str, MetricAggregate]] = Field(default=None, description="aggregates for each metric key")
     metrics: Dict[str, float] = Field(
-        default_factory=dict, description="Per-metric pass rates (metric_key -> percentage)"
+        default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
     )
 
 

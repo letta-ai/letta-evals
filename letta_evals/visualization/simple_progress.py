@@ -106,7 +106,6 @@ class SimpleProgress(ProgressCallback):
         from rich.table import Table
 
         from letta_evals.constants import MAX_SAMPLES_DISPLAY
-        from letta_evals.models import GateSpec
 
         self.console.print()
         self.console.print("[bold]Evaluation Results:[/bold]")
@@ -148,7 +147,6 @@ class SimpleProgress(ProgressCallback):
         table.add_column("Sample", style="cyan")
         table.add_column("Agent ID", style="dim cyan")
         table.add_column("Model", style="yellow")
-        table.add_column("Passed", style="white")
 
         # determine available metrics
         metric_keys = []
@@ -163,12 +161,7 @@ class SimpleProgress(ProgressCallback):
             lbl = metric_labels.get(mk, mk)
             table.add_column(f"{lbl} score", style="white")
 
-        gate_spec = GateSpec(**result.config["gate"])
-
         for sample_result in samples_to_display:
-            score_val = sample_result.grade.score
-            passed = "✓" if gate_spec.check_sample(score_val) else "✗"
-
             # build per-metric score cells
             cells = []
             for mk in metric_keys:
@@ -190,7 +183,6 @@ class SimpleProgress(ProgressCallback):
                 f"Sample {sample_result.sample.id + 1}",
                 sample_result.agent_id or "-",
                 sample_result.model_name or "-",
-                passed,
                 *cells,
             )
 

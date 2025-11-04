@@ -361,33 +361,26 @@ class Runner:
                     gr, sub = await grader.grade(sample, trajectory, agent_state=agent_state)
                     grades_dict[key] = gr
                     submissions_dict[key] = sub
-                # Determine gating metric key
-                gate_key = self._gate_metric_key()
-                gate_grade = grades_dict.get(gate_key) if gate_key in grades_dict else next(iter(grades_dict.values()))
-                gate_submission = (
-                    submissions_dict.get(gate_key)
-                    if gate_key in submissions_dict
-                    else next(iter(submissions_dict.values()))
-                )
-                grade_result, submission = gate_grade, gate_submission
+                # use first grader as primary for legacy grade_result/submission
+                first_key = next(iter(grades_dict.keys()))
+                grade_result = grades_dict[first_key]
+                submission = submissions_dict[first_key]
 
                 if self.progress_callback:
-                    passed = self._check_sample_pass(grade_result.score)
+                    # per-sample pass/fail not meaningful with multi-grader gates
                     metric_scores = None
-                    metric_pass = None
                     metric_rationales = None
                     if self.graders is not None and grades_dict is not None:
                         metric_scores = {k: v.score for k, v in grades_dict.items()}
-                        metric_pass = {k: self._check_sample_pass(v) for k, v in metric_scores.items()}
                         metric_rationales = {k: (v.rationale or "") for k, v in grades_dict.items()}
                     await self.progress_callback.sample_completed(
                         sample_id,
-                        passed=passed,
+                        passed=None,  # not meaningful with multi-grader gates
                         agent_id=agent_id,
                         score=grade_result.score,
                         model_name=model_name,
                         metric_scores=metric_scores,
-                        metric_pass=metric_pass,
+                        metric_pass=None,  # not meaningful with multi-grader gates
                         rationale=grade_result.rationale,
                         metric_rationales=metric_rationales,
                     )
@@ -556,8 +549,6 @@ class Runner:
                 total_attempted=0,
                 avg_score_attempted=0.0,
                 avg_score_total=0.0,
-                passed_attempts=0,
-                failed_attempts=0,
                 metrics={},
             )
 
@@ -567,52 +558,38 @@ class Runner:
 
         attempted = sum(1 for r in self.results if is_success(r))
 
-        # Determine per-metric aggregates if multiple graders
+        # compute per-metric aggregates if multiple graders
         by_metric: Dict[str, MetricAggregate] = {}
         if self.graders is not None:
             for metric_key in self.graders.keys():
                 m_scores = [r.grades[metric_key].score for r in self.results if r.grades and metric_key in r.grades]
                 m_avg_attempted = sum(m_scores) / len(m_scores) if m_scores else 0.0
                 m_avg_total = sum(m_scores) / len(self.results) if m_scores else 0.0
-                m_passed = sum(
-                    1
-                    for r in self.results
-                    if is_success(r)
-                    and r.grades
-                    and metric_key in r.grades
-                    and self._check_sample_pass(r.grades[metric_key].score)
-                )
-                m_pass_rate = (m_passed / attempted) * 100.0 if attempted > 0 else 0.0
+                # pass_rate is just avg score as percentage
+                m_pass_rate = m_avg_attempted * 100.0
                 by_metric[metric_key] = MetricAggregate(
                     avg_score_attempted=m_avg_attempted,
                     avg_score_total=m_avg_total,
                     pass_rate=m_pass_rate,
-                    passed_attempts=m_passed,
-                    failed_attempts=(attempted - m_passed),
                 )
 
         metrics_dict: Dict[str, float] = {}
         if self.graders is not None:
-            gate_key = self._gate_metric_key()
+            # use first grader for overall metrics
+            first_key = next(iter(self.graders.keys()))
             for key, agg in by_metric.items():
                 metrics_dict[key] = agg.pass_rate
 
-            agg = (
-                by_metric.get(gate_key)
-                if gate_key in by_metric
-                else (next(iter(by_metric.values())) if by_metric else None)
-            )
+            agg = by_metric.get(first_key) if first_key in by_metric else None
             avg_score_attempted = agg.avg_score_attempted if agg else 0.0
             avg_score_total = agg.avg_score_total if agg else 0.0
-            passed_attempts = agg.passed_attempts if agg else 0
         else:
             scores = [r.grade.score for r in self.results]
             avg_score_attempted = sum(scores) / len(scores) if scores else 0.0
             avg_score_total = sum(scores) / len(self.results) if scores else 0.0
-            passed_attempts = sum(1 for r in self.results if is_success(r) and self._check_sample_pass(r.grade.score))
-            # For single grader case, use a default key
+            # for single grader case, use a default key
             default_key = "default"
-            metrics_dict[default_key] = (passed_attempts / attempted) * 100.0 if attempted > 0 else 0.0
+            metrics_dict[default_key] = avg_score_attempted * 100.0
 
         per_model = None
         if self.suite.target.model_configs or self.suite.target.model_handles:
@@ -626,36 +603,25 @@ class Runner:
                 model_metrics_dict: Dict[str, float] = {}
 
                 if self.graders is not None:
-                    gate_key = self._gate_metric_key()
-                    # Calculate pass rate for each metric
+                    # use first grader for overall model metrics
+                    first_key = next(iter(self.graders.keys()))
+                    # calculate avg score for each metric
                     for metric_key in self.graders.keys():
-                        metric_passed = sum(
-                            1
+                        metric_scores = [
+                            r.grades[metric_key].score
                             for r in results
-                            if is_success(r)
-                            and r.grades
-                            and metric_key in r.grades
-                            and self._check_sample_pass(r.grades[metric_key].score)
-                        )
+                            if is_success(r) and r.grades and metric_key in r.grades
+                        ]
                         model_metrics_dict[metric_key] = (
-                            (metric_passed / model_attempted) * 100.0 if model_attempted > 0 else 0.0
+                            (sum(metric_scores) / len(metric_scores)) * 100.0 if metric_scores else 0.0
                         )
 
-                    model_scores = [r.grades[gate_key].score for r in results if r.grades and gate_key in r.grades]
-                    model_passed = sum(
-                        1
-                        for r in results
-                        if is_success(r)
-                        and r.grades
-                        and gate_key in r.grades
-                        and self._check_sample_pass(r.grades[gate_key].score)
-                    )
+                    model_scores = [r.grades[first_key].score for r in results if r.grades and first_key in r.grades]
                 else:
                     model_scores = [r.grade.score for r in results]
-                    model_passed = sum(1 for r in results if is_success(r) and self._check_sample_pass(r.grade.score))
                     default_key = "default"
                     model_metrics_dict[default_key] = (
-                        (model_passed / model_attempted) * 100.0 if model_attempted > 0 else 0.0
+                        (sum(model_scores) / len(model_scores)) * 100.0 if model_scores else 0.0
                     )
 
                 model_avg_attempted = sum(model_scores) / len(model_scores) if model_scores else 0.0
@@ -668,8 +634,6 @@ class Runner:
                         total_attempted=model_attempted,
                         avg_score_attempted=model_avg_attempted,
                         avg_score_total=model_avg_total,
-                        passed_samples=model_passed,
-                        failed_samples=(model_attempted - model_passed),
                         metrics=model_metrics_dict,
                     )
                 )
@@ -679,8 +643,6 @@ class Runner:
             total_attempted=attempted,
             avg_score_attempted=avg_score_attempted,
             avg_score_total=avg_score_total,
-            passed_attempts=passed_attempts,
-            failed_attempts=(attempted - passed_attempts),
             per_model=per_model,
             by_metric=by_metric if by_metric else None,
             metrics=metrics_dict,
@@ -979,6 +941,7 @@ async def run_suite(
 
         if progress_cb is not None:
             await progress_cb.start()
+        result = None
         try:
             result = await runner.run()
             return result
@@ -986,4 +949,5 @@ async def run_suite(
             if progress_cb is not None:
                 # stop live display first, then show summary
                 progress_cb.stop()
-                await progress_cb.suite_completed(result)
+                if result is not None:
+                    await progress_cb.suite_completed(result)
