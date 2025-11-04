@@ -152,11 +152,10 @@ class EvalProgress(ProgressCallback):
             text.append(f" sending [{sample.messages_sent}/{sample.total_messages}]")
             return text
         elif sample.state == SampleState.COMPLETED:
-            if sample.passed is not None:
-                icon = Text("✓", style="green") if sample.passed else Text("✗", style="red")
+            icon = Text("✓", style="green")
             text = Text()
             text.append(icon)
-            text.append(f" {'passed' if sample.passed else 'failed'}")
+            text.append(" completed")
             return text
         else:
             text = Text()
@@ -465,7 +464,7 @@ class EvalProgress(ProgressCallback):
             elif s.state == SampleState.GRADING:
                 details = "Grading response…"
             elif s.state == SampleState.COMPLETED:
-                details = "[green]✓ Passed[/green]" if s.passed else "[red]✗ Failed[/red]"
+                details = "[green]✓ Completed[/green]"
             elif s.state == SampleState.ERROR:
                 details = f"[red]Error: {s.error[:25]}…[/red]" if s.error else "[red]Error[/red]"
             elif s.state == SampleState.QUEUED:
@@ -721,7 +720,6 @@ class EvalProgress(ProgressCallback):
     async def suite_completed(self, result):
         """Display summary and detailed results after evaluation completes"""
         from letta_evals.constants import MAX_SAMPLES_DISPLAY
-        from letta_evals.models import GateSpec
 
         self.console.print()
         self.console.print(f"[bold]Evaluation Results: {result.suite}[/bold]")
@@ -737,10 +735,8 @@ class EvalProgress(ProgressCallback):
         errors = metrics.total - metrics.total_attempted
         errors_pct = (errors / metrics.total * 100.0) if metrics.total > 0 else 0.0
         self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{metrics.total})")
-        self.console.print(f"  Average score (attempted, gate metric): {metrics.avg_score_attempted:.2f}")
-        self.console.print(f"  Average score (total, gate metric): {metrics.avg_score_total:.2f}")
-        self.console.print(f"  Passed attempts (gate metric): {metrics.passed_attempts}")
-        self.console.print(f"  Failed attempts (gate metric): {metrics.failed_attempts}")
+        self.console.print(f"  Average score (attempted): {metrics.avg_score_attempted:.2f}")
+        self.console.print(f"  Average score (total): {metrics.avg_score_total:.2f}")
 
         # per-metric aggregates
         if hasattr(metrics, "by_metric") and metrics.by_metric:
@@ -769,8 +765,6 @@ class EvalProgress(ProgressCallback):
             model_table.add_column("Attempted", style="white")
             model_table.add_column("Avg Score (Attempted)", style="white")
             model_table.add_column("Avg Score (Total)", style="white")
-            model_table.add_column("Passed", style="green")
-            model_table.add_column("Failed", style="red")
 
             for model_metrics in metrics.per_model:
                 model_table.add_row(
@@ -779,8 +773,6 @@ class EvalProgress(ProgressCallback):
                     str(model_metrics.total_attempted),
                     f"{model_metrics.avg_score_attempted:.2f}",
                     f"{model_metrics.avg_score_total:.2f}",
-                    str(model_metrics.passed_samples),
-                    str(model_metrics.failed_samples),
                 )
 
             self.console.print(model_table)
@@ -833,7 +825,6 @@ class EvalProgress(ProgressCallback):
         table.add_column("Sample", style="cyan", no_wrap=True)
         table.add_column("Agent ID", style="dim cyan", no_wrap=False)
         table.add_column("Model", style="yellow", no_wrap=True)
-        table.add_column("Passed", style="white", no_wrap=True)
 
         # determine available metrics and display labels
         metric_keys = []
@@ -849,12 +840,7 @@ class EvalProgress(ProgressCallback):
             table.add_column(f"{lbl} score", style="white", no_wrap=True)
             table.add_column(f"{lbl} rationale", style="dim", no_wrap=False)
 
-        gate_spec = GateSpec(**result.config["gate"])
-
         for sample_result in samples_to_display:
-            score_val = sample_result.grade.score
-            passed = "✓" if gate_spec.check_sample(score_val) else "✗"
-
             # build per-metric cells in config order
             cells = []
             for mk in metric_keys:
@@ -879,7 +865,6 @@ class EvalProgress(ProgressCallback):
                 f"Sample {sample_result.sample.id + 1}",
                 sample_result.agent_id or "-",
                 sample_result.model_name or "-",
-                passed,
                 *cells,
             )
 

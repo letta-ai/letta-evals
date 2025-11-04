@@ -4,7 +4,7 @@ from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 from letta_client import AgentState, LettaMessageUnion
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from letta_evals.types import GateMetric, GraderKind, LLMProvider, MetricOp, TargetKind
+from letta_evals.types import Aggregation, GateKind, GraderKind, LLMProvider, LogicalOp, MetricOp, TargetKind
 
 # Dataset models
 
@@ -196,58 +196,106 @@ GraderSpec = Annotated[
 ]
 
 
-class GateSpec(BaseModel):
-    """Gate configuration for pass/fail criteria."""
+# gate helper functions
 
-    # Which aggregate metric kind to compare (e.g., avg_score or accuracy)
-    metric: GateMetric = Field(default=GateMetric.AVG_SCORE, description="Aggregate kind to apply gate on")
 
-    # Which metric key (grader name) to evaluate; if None, uses the single configured grader
-    metric_key: Optional[str] = Field(default=None, description="Metric key (grader name) to gate on")
+def _compare(a: float, op: MetricOp, b: float) -> bool:
+    """compare two values using the given operator."""
+    if op == MetricOp.GT:
+        return a > b
+    elif op == MetricOp.GTE:
+        return a >= b
+    elif op == MetricOp.LT:
+        return a < b
+    elif op == MetricOp.LTE:
+        return a <= b
+    elif op == MetricOp.EQ:
+        return a == b
+    return False
 
-    # Gate comparison for the selected aggregate metric
-    op: MetricOp = Field(description="Comparison operator for the selected metric")
-    value: float = Field(description="Threshold value for the selected metric")
 
-    # Optional, separate per-sample pass criteria (used for accuracy computation)
-    pass_op: Optional[MetricOp] = Field(
-        default=None, description="Comparison operator for per-sample pass (defaults to op)"
+def normalize_weights(weights: Dict[str, float]) -> Dict[str, float]:
+    """normalize weights to sum to 1.0."""
+    total = sum(weights.values())
+    if total == 0:
+        raise ValueError("weights must sum to a non-zero value")
+    return {k: v / total for k, v in weights.items()}
+
+
+# gate models
+
+
+class SimpleCondition(BaseModel):
+    """simple condition for logical gates (leaf node)."""
+
+    metric_key: str = Field(description="grader name to evaluate")
+    aggregation: Aggregation = Field(description="aggregation function to apply")
+    op: MetricOp = Field(description="comparison operator")
+    value: float = Field(description="threshold value")
+    pass_threshold: Optional[float] = Field(
+        default=None, description="per-sample pass threshold for accuracy aggregation (defaults to 1.0)"
     )
-    pass_value: Optional[float] = Field(
-        default=None, description="Threshold value for per-sample pass (defaults to value)"
+
+    def __hash__(self):
+        """make simple condition hashable for set operations."""
+        return hash((self.metric_key, self.aggregation, self.op, self.value, self.pass_threshold))
+
+
+class SimpleGateSpec(BaseModel):
+    """single-metric gate."""
+
+    kind: Literal[GateKind.SIMPLE] = Field(description="gate type")
+    metric_key: str = Field(description="grader name to gate on")
+    aggregation: Aggregation = Field(default=Aggregation.AVG_SCORE, description="aggregation function")
+    op: MetricOp = Field(description="comparison operator")
+    value: float = Field(description="threshold value")
+    pass_threshold: Optional[float] = Field(
+        default=None, description="per-sample pass threshold for accuracy aggregation (defaults to 1.0)"
     )
 
-    def _compare(self, a: float, op: MetricOp, b: float) -> bool:
-        if op == MetricOp.GT:
-            return a > b
-        elif op == MetricOp.GTE:
-            return a >= b
-        elif op == MetricOp.LT:
-            return a < b
-        elif op == MetricOp.LTE:
-            return a <= b
-        elif op == MetricOp.EQ:
-            return a == b
-        return False
 
-    def check_sample(self, score: float) -> bool:
-        """Check if an individual sample score passes.
+class WeightedAverageGateSpec(BaseModel):
+    """weighted average of multiple grader metrics."""
 
-        Uses pass_op/pass_value if provided; otherwise falls back to op/value.
-        """
-        # If gate is on accuracy aggregate and no explicit per-sample threshold set,
-        # default per-sample pass to score >= 1.0 (perfect) using GTE.
-        if self.pass_value is None and self.metric == GateMetric.ACCURACY:
-            op = MetricOp.GTE
-            value = 1.0
-        else:
-            op = self.pass_op or self.op
-            value = self.pass_value if self.pass_value is not None else self.value
-        return self._compare(score, op, value)
+    kind: Literal[GateKind.WEIGHTED_AVERAGE] = Field(description="gate type")
+    aggregation: Aggregation = Field(description="aggregation function applied to each metric before weighting")
+    weights: Dict[str, float] = Field(description="weights for each metric_key (grader name)")
+    op: MetricOp = Field(description="comparison operator")
+    value: float = Field(description="threshold value")
 
-    # Back-compat alias
-    def check_score(self, score: float) -> bool:
-        return self.check_sample(score)
+    @field_validator("weights")
+    @classmethod
+    def validate_weights(cls, v: Dict[str, float]) -> Dict[str, float]:
+        if not v:
+            raise ValueError("weights dict cannot be empty")
+        if any(w < 0 for w in v.values()):
+            raise ValueError("weights must be non-negative")
+        if sum(v.values()) == 0:
+            raise ValueError("weights must sum to a non-zero value")
+        return v
+
+
+class LogicalGateSpec(BaseModel):
+    """logical combination of conditions."""
+
+    kind: Literal[GateKind.LOGICAL] = Field(description="gate type")
+    operator: LogicalOp = Field(description="logical operator (and/or)")
+    conditions: List[Union["SimpleCondition", "LogicalGateSpec"]] = Field(
+        description="list of conditions (can be simple or nested logical)"
+    )
+
+    @field_validator("conditions")
+    @classmethod
+    def validate_conditions(cls, v: List) -> List:
+        if not v:
+            raise ValueError("conditions list cannot be empty")
+        return v
+
+
+GateSpec = Annotated[
+    Union[SimpleGateSpec, WeightedAverageGateSpec, LogicalGateSpec],
+    Field(discriminator="kind"),
+]
 
 
 class SuiteSpec(BaseModel):
@@ -310,11 +358,8 @@ class SuiteSpec(BaseModel):
                     resolved_graders[key] = gspec
                 yaml_data["graders"] = resolved_graders
 
-            # store base_dir in SuiteSpec for setup_script resolution
             yaml_data["base_dir"] = base_dir
 
-        if "gate" in yaml_data and isinstance(yaml_data["gate"], dict):
-            yaml_data["gate"] = GateSpec(**yaml_data["gate"])
         return cls(**yaml_data)
 
 
@@ -355,47 +400,41 @@ class GradeResult(BaseModel):
 
 
 class ModelMetrics(BaseModel):
-    """Metrics for a specific model configuration."""
+    """metrics for a specific model configuration."""
 
-    model_name: str = Field(description="Model configuration name")
-    total: int = Field(description="Total results (success + error)")
-    total_attempted: int = Field(description="Total successfully attempted (completed without error)")
-    avg_score_attempted: float = Field(description="Average score across attempted results (0.0 to 1.0)")
-    avg_score_total: float = Field(description="Average score across all results (0.0 to 1.0)")
-    passed_samples: int = Field(description="Number of attempted samples that passed the gate")
-    failed_samples: int = Field(description="Number of attempted samples that failed the gate")
+    model_name: str = Field(description="model configuration name")
+    total: int = Field(description="total results (success + error)")
+    total_attempted: int = Field(description="total successfully attempted (completed without error)")
+    avg_score_attempted: float = Field(description="average score across attempted results (0.0 to 1.0)")
+    avg_score_total: float = Field(description="average score across all results (0.0 to 1.0)")
     metrics: Dict[str, float] = Field(
-        default_factory=dict, description="Per-metric pass rates (metric_key -> percentage)"
+        default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
     )
 
 
 class MetricAggregate(BaseModel):
-    """Aggregate metrics for a single metric key (grader)."""
+    """aggregate metrics for a single metric key (grader)."""
 
     avg_score_attempted: float = Field(
-        description="Average score for this metric across attempted results (0.0 to 1.0)"
+        description="average score for this metric across attempted results (0.0 to 1.0)"
     )
-    avg_score_total: float = Field(description="Average score for this metric across all results (0.0 to 1.0)")
-    pass_rate: float = Field(description="Pass rate for this metric (percent)")
-    passed_attempts: int = Field(description="Number of attempted samples that passed for this metric")
-    failed_attempts: int = Field(description="Number of attempted samples that failed for this metric")
+    avg_score_total: float = Field(description="average score for this metric across all results (0.0 to 1.0)")
+    pass_rate: float = Field(description="average score as percentage")
 
 
 class Metrics(BaseModel):
-    """Evaluation metrics."""
+    """evaluation metrics."""
 
-    total: int = Field(description="Total results (success + error)")
-    total_attempted: int = Field(description="Total successfully attempted (completed without error)")
-    avg_score_attempted: float = Field(description="Average score across attempted results (0.0 to 1.0)")
-    avg_score_total: float = Field(description="Average score across all results (0.0 to 1.0)")
-    passed_attempts: int = Field(default=0, description="Number of attempted samples that passed")
-    failed_attempts: int = Field(default=0, description="Number of attempted samples that failed")
+    total: int = Field(description="total results (success + error)")
+    total_attempted: int = Field(description="total successfully attempted (completed without error)")
+    avg_score_attempted: float = Field(description="average score across attempted results (0.0 to 1.0)")
+    avg_score_total: float = Field(description="average score across all results (0.0 to 1.0)")
     per_model: Optional[List[ModelMetrics]] = Field(
-        default=None, description="Metrics broken down by model configuration"
+        default=None, description="metrics broken down by model configuration"
     )
-    by_metric: Optional[Dict[str, MetricAggregate]] = Field(default=None, description="Aggregates for each metric key")
+    by_metric: Optional[Dict[str, MetricAggregate]] = Field(default=None, description="aggregates for each metric key")
     metrics: Dict[str, float] = Field(
-        default_factory=dict, description="Per-metric pass rates (metric_key -> percentage)"
+        default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
     )
 
 

@@ -13,6 +13,8 @@ graders:
     judge_tool_name: submit_grade
     extractor: last_assistant
 gate:
+  kind: simple
   metric_key: agent_judge
+  aggregation: avg_score
   op: gte
   value: 0.7

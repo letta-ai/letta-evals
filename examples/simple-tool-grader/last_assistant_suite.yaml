@@ -11,6 +11,8 @@ graders:
     function: contains
     extractor: last_assistant
 gate:
+  kind: simple
   metric_key: contains_check
+  aggregation: avg_score
   op: gte
   value: 0.75
