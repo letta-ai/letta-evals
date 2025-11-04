@@ -42,7 +42,12 @@ async def test_single_suite(request, tmp_path: Path, caplog) -> None:
         letta_base_url="https://api.letta.com/",
     )
 
-    logger.info(f"\n{'=' * 60}\nResults: {result.metrics.passed_attempts}/{result.metrics.total} passed\n{'=' * 60}")
+    logger.info(
+        f"\n{'=' * 60}\n"
+        f"Results: {result.metrics.total_attempted}/{result.metrics.total} attempted, "
+        f"avg score: {result.metrics.avg_score_attempted:.2f}\n"
+        f"{'=' * 60}"
+    )
 
     assert result.gates_passed, f"Gate failed for suite: {suite_path}"
     assert result.metrics.total > 0
