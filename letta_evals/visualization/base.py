@@ -65,7 +65,6 @@ class ProgressCallback(ABC):
     async def sample_completed(
         self,
         sample_id: int,
-        passed: bool,
         agent_id: Optional[str] = None,
         score: Optional[float] = None,
         model_name: Optional[str] = None,
