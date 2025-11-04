@@ -779,38 +779,48 @@ class EvalProgress(ProgressCallback):
 
         # gate status
         gate = result.config["gate"]
-        gate_op = gate["op"]
-        gate_value = gate["value"]
-        gate_metric = gate.get("metric", "avg_score")
-        gate_metric_key = gate.get("metric_key")
-
-        op_symbols = {"gt": ">", "gte": "≥", "lt": "<", "lte": "≤", "eq": "="}
-        op_symbol = op_symbols.get(gate_op, gate_op)
-
+        gate_kind = gate.get("kind", "simple")
         status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
 
-        if gate_metric == "avg_score":
-            actual = metrics.avg_score_attempted
-            suffix = ""
-        else:
-            if gate_metric_key and gate_metric_key in metrics.metrics:
-                actual = metrics.metrics[gate_metric_key]
-            elif metrics.metrics:
-                actual = next(iter(metrics.metrics.values()))
-            else:
-                actual = 0.0
-            suffix = "%"
+        op_symbols = {"gt": ">", "gte": "≥", "lt": "<", "lte": "≤", "eq": "="}
 
-        # prefer display name for gate metric key
-        display_label = None
-        if gate_metric_key and "graders" in result.config and isinstance(result.config["graders"], dict):
-            gspec = result.config["graders"].get(gate_metric_key)
-            if gspec:
-                display_label = gspec.get("display_name")
-        metric_key_suffix = f" on '{display_label or gate_metric_key}'" if gate_metric_key else ""
-        self.console.print(
-            f"\n[bold]Gate:{metric_key_suffix}[/bold] {gate_metric} {op_symbol} {gate_value:.2f}{suffix} → {status} (actual: {actual:.2f}{suffix}, total: {metrics.avg_score_total:.2f})"
-        )
+        # format gate description based on kind
+        if gate_kind == "simple":
+            gate_op = gate["op"]
+            gate_value = gate["value"]
+            gate_aggregation = gate.get("aggregation", "avg_score")
+            gate_metric_key = gate.get("metric_key")
+            op_symbol = op_symbols.get(gate_op, gate_op)
+
+            # get display name
+            display_label = None
+            if gate_metric_key and "graders" in result.config and isinstance(result.config["graders"], dict):
+                gspec = result.config["graders"].get(gate_metric_key)
+                if gspec:
+                    display_label = gspec.get("display_name")
+            metric_label = display_label or gate_metric_key or "metric"
+
+            gate_desc = f"'{metric_label}' {gate_aggregation} {op_symbol} {gate_value}"
+
+        elif gate_kind == "weighted_average":
+            weights = gate.get("weights", {})
+            gate_op = gate["op"]
+            gate_value = gate["value"]
+            gate_aggregation = gate.get("aggregation", "avg_score")
+            op_symbol = op_symbols.get(gate_op, gate_op)
+
+            weight_strs = [f"{k}({w})" for k, w in weights.items()]
+            gate_desc = f"weighted_average[{', '.join(weight_strs)}] {gate_aggregation} {op_symbol} {gate_value}"
+
+        elif gate_kind == "logical":
+            operator = gate.get("operator", "and").upper()
+            num_conditions = len(gate.get("conditions", []))
+            gate_desc = f"logical {operator} with {num_conditions} conditions"
+
+        else:
+            gate_desc = f"unknown gate kind: {gate_kind}"
+
+        self.console.print(f"\n[bold]Gate:[/bold] {gate_desc} → {status}")
 
         # sample results table
         self.console.print("\n[bold]Sample Results:[/bold]")
