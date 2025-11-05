@@ -1,0 +1,32 @@
+{
+  "type": "summary",
+  "metrics": {
+    "total": 100,
+    "total_attempted": 100,
+    "avg_score_attempted": 0.504,
+    "avg_score_total": 0.504,
+    "per_model": [
+      {
+        "model_name": "minimax/minimax-m2",
+        "total": 100,
+        "total_attempted": 100,
+        "avg_score_attempted": 0.504,
+        "avg_score_total": 0.504,
+        "metrics": {
+          "rubric_check": 50.4
+        }
+      }
+    ],
+    "by_metric": {
+      "rubric_check": {
+        "avg_score_attempted": 0.504,
+        "avg_score_total": 0.504,
+        "pass_rate": 50.4
+      }
+    },
+    "metrics": {
+      "rubric_check": 50.4
+    }
+  },
+  "gates_passed": false
+}

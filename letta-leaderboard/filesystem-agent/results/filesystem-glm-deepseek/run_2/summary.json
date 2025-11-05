@@ -1,0 +1,50 @@
+{
+  "type": "summary",
+  "metrics": {
+    "total": 200,
+    "total_attempted": 200,
+    "avg_score_attempted": 0.322,
+    "avg_score_total": 0.322,
+    "passed_attempts": 63,
+    "failed_attempts": 137,
+    "per_model": [
+      {
+        "model_name": "deepseek/deepseek-chat-v3.1",
+        "total": 100,
+        "total_attempted": 100,
+        "avg_score_attempted": 0.099,
+        "avg_score_total": 0.099,
+        "passed_samples": 9,
+        "failed_samples": 91,
+        "metrics": {
+          "rubric_check": 9.0
+        }
+      },
+      {
+        "model_name": "z-ai/glm-4.6",
+        "total": 100,
+        "total_attempted": 100,
+        "avg_score_attempted": 0.545,
+        "avg_score_total": 0.545,
+        "passed_samples": 54,
+        "failed_samples": 46,
+        "metrics": {
+          "rubric_check": 54.0
+        }
+      }
+    ],
+    "by_metric": {
+      "rubric_check": {
+        "avg_score_attempted": 0.322,
+        "avg_score_total": 0.322,
+        "pass_rate": 31.5,
+        "passed_attempts": 63,
+        "failed_attempts": 137
+      }
+    },
+    "metrics": {
+      "rubric_check": 31.5
+    }
+  },
+  "gates_passed": false
+}

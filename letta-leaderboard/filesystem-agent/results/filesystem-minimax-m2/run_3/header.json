@@ -1,0 +1,45 @@
+{
+  "type": "header",
+  "suite": "filesystem-test",
+  "config": {
+    "target": {
+      "kind": "letta_agent",
+      "base_url": "http://localhost:8283",
+      "api_key": null,
+      "timeout": 300.0,
+      "project_id": null,
+      "max_retries": 0,
+      "model_configs": [
+        "openrouter-minimax-m2"
+      ],
+      "model_handles": null,
+      "agent_id": null,
+      "agent_file": null,
+      "agent_script": "setup_agent.py:setup_agent"
+    },
+    "gate": {
+      "kind": "simple",
+      "metric_key": "rubric_check",
+      "aggregation": "avg_score",
+      "op": "gte",
+      "value": 0.7,
+      "pass_threshold": null
+    },
+    "graders": {
+      "rubric_check": {
+        "kind": "model_judge",
+        "display_name": null,
+        "extractor": "last_assistant",
+        "extractor_config": null,
+        "prompt": "You are evaluating an AI agent's response to a complex data analysis question about a filesystem database.\n\n## Task\nThe agent was asked to analyze data from multiple database tables (people, credit_cards, vehicles, pets, bank_accounts, medical_records, internet_accounts, etc.) and provide a specific answer based on the query.\n\n## Evaluation Criteria\n\nRate the response on a scale of 0.0 to 1.0 based on the following criteria:\n\n- Accuracy\n- Completeness\n- Relevance\n\n\nA correct and complete response should get 1. Refusal should get 0.5. An incorrect answer should get 0.\nProvide only the numerical score (e.g., \"0.85\").\n",
+        "prompt_path": "/Users/devanshjain/Desktop/letta-evals/letta-leaderboard/filesystem-agent/rubric.txt",
+        "model": "gpt-5-mini",
+        "temperature": 0.0,
+        "provider": "openai",
+        "max_retries": 5,
+        "timeout": 120.0,
+        "rubric_vars": null
+      }
+    }
+  }
+}

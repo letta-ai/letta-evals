@@ -1,0 +1,38 @@
+{
+  "type": "summary",
+  "metrics": {
+    "total": 100,
+    "total_attempted": 100,
+    "avg_score_attempted": 0.579,
+    "avg_score_total": 0.579,
+    "passed_attempts": 58,
+    "failed_attempts": 42,
+    "per_model": [
+      {
+        "model_name": "moonshotai/kimi-k2-0905",
+        "total": 100,
+        "total_attempted": 100,
+        "avg_score_attempted": 0.579,
+        "avg_score_total": 0.579,
+        "passed_samples": 58,
+        "failed_samples": 42,
+        "metrics": {
+          "rubric_check": 57.99999999999999
+        }
+      }
+    ],
+    "by_metric": {
+      "rubric_check": {
+        "avg_score_attempted": 0.579,
+        "avg_score_total": 0.579,
+        "pass_rate": 57.99999999999999,
+        "passed_attempts": 58,
+        "failed_attempts": 42
+      }
+    },
+    "metrics": {
+      "rubric_check": 57.99999999999999
+    }
+  },
+  "gates_passed": false
+}

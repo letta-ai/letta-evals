@@ -1,0 +1,118 @@
+{
+  "num_runs": 3,
+  "runs_passed": 0,
+  "mean_avg_score_attempted": 0.5513333333333333,
+  "std_avg_score_attempted": 0.02967041174863153,
+  "mean_avg_score_total": 0.5513333333333333,
+  "std_avg_score_total": 0.02967041174863153,
+  "mean_scores": {
+    "rubric_check": 0.5513333333333333
+  },
+  "std_scores": {
+    "rubric_check": 0.02967041174863153
+  },
+  "individual_run_metrics": [
+    {
+      "total": 100,
+      "total_attempted": 100,
+      "avg_score_attempted": 0.579,
+      "avg_score_total": 0.579,
+      "passed_attempts": 58,
+      "failed_attempts": 42,
+      "per_model": [
+        {
+          "model_name": "moonshotai/kimi-k2-0905",
+          "total": 100,
+          "total_attempted": 100,
+          "avg_score_attempted": 0.579,
+          "avg_score_total": 0.579,
+          "passed_samples": 58,
+          "failed_samples": 42,
+          "metrics": {
+            "rubric_check": 57.99999999999999
+          }
+        }
+      ],
+      "by_metric": {
+        "rubric_check": {
+          "avg_score_attempted": 0.579,
+          "avg_score_total": 0.579,
+          "pass_rate": 57.99999999999999,
+          "passed_attempts": 58,
+          "failed_attempts": 42
+        }
+      },
+      "metrics": {
+        "rubric_check": 57.99999999999999
+      }
+    },
+    {
+      "total": 100,
+      "total_attempted": 100,
+      "avg_score_attempted": 0.555,
+      "avg_score_total": 0.555,
+      "passed_attempts": 56,
+      "failed_attempts": 44,
+      "per_model": [
+        {
+          "model_name": "moonshotai/kimi-k2-0905",
+          "total": 100,
+          "total_attempted": 100,
+          "avg_score_attempted": 0.555,
+          "avg_score_total": 0.555,
+          "passed_samples": 56,
+          "failed_samples": 44,
+          "metrics": {
+            "rubric_check": 56.00000000000001
+          }
+        }
+      ],
+      "by_metric": {
+        "rubric_check": {
+          "avg_score_attempted": 0.555,
+          "avg_score_total": 0.555,
+          "pass_rate": 56.00000000000001,
+          "passed_attempts": 56,
+          "failed_attempts": 44
+        }
+      },
+      "metrics": {
+        "rubric_check": 56.00000000000001
+      }
+    },
+    {
+      "total": 100,
+      "total_attempted": 100,
+      "avg_score_attempted": 0.52,
+      "avg_score_total": 0.52,
+      "passed_attempts": 52,
+      "failed_attempts": 48,
+      "per_model": [
+        {
+          "model_name": "moonshotai/kimi-k2-0905",
+          "total": 100,
+          "total_attempted": 100,
+          "avg_score_attempted": 0.52,
+          "avg_score_total": 0.52,
+          "passed_samples": 52,
+          "failed_samples": 48,
+          "metrics": {
+            "rubric_check": 52.0
+          }
+        }
+      ],
+      "by_metric": {
+        "rubric_check": {
+          "avg_score_attempted": 0.52,
+          "avg_score_total": 0.52,
+          "pass_rate": 52.0,
+          "passed_attempts": 52,
+          "failed_attempts": 48
+        }
+      },
+      "metrics": {
+        "rubric_check": 52.0
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "type": "summary",
+  "metrics": {
+    "total": 100,
+    "total_attempted": 100,
+    "avg_score_attempted": 0.218,
+    "avg_score_total": 0.218,
+    "passed_attempts": 20,
+    "failed_attempts": 80,
+    "per_model": [
+      {
+        "model_name": "openai/gpt-oss-120b",
+        "total": 100,
+        "total_attempted": 100,
+        "avg_score_attempted": 0.218,
+        "avg_score_total": 0.218,
+        "passed_samples": 20,
+        "failed_samples": 80,
+        "metrics": {
+          "rubric_check": 20.0
+        }
+      }
+    ],
+    "by_metric": {
+      "rubric_check": {
+        "avg_score_attempted": 0.218,
+        "avg_score_total": 0.218,
+        "pass_rate": 20.0,
+        "passed_attempts": 20,
+        "failed_attempts": 80
+      }
+    },
+    "metrics": {
+      "rubric_check": 20.0
+    }
+  },
+  "gates_passed": false
+}

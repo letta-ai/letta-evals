@@ -1,0 +1,146 @@
+{
+  "type": "summary",
+  "metrics": {
+    "total": 1000,
+    "total_attempted": 970,
+    "avg_score_attempted": 0.47680412371134023,
+    "avg_score_total": 0.4625,
+    "passed_attempts": 437,
+    "failed_attempts": 533,
+    "per_model": [
+      {
+        "model_name": "gpt-4.1-2025-04-14",
+        "total": 100,
+        "total_attempted": 99,
+        "avg_score_attempted": 0.37929292929292924,
+        "avg_score_total": 0.37549999999999994,
+        "passed_samples": 36,
+        "failed_samples": 63,
+        "metrics": {
+          "rubric_check": 36.36363636363637
+        }
+      },
+      {
+        "model_name": "gpt-4.1-mini-2025-04-14",
+        "total": 100,
+        "total_attempted": 100,
+        "avg_score_attempted": 0.315,
+        "avg_score_total": 0.315,
+        "passed_samples": 30,
+        "failed_samples": 70,
+        "metrics": {
+          "rubric_check": 30.0
+        }
+      },
+      {
+        "model_name": "gpt-4.1-nano-2025-04-14",
+        "total": 100,
+        "total_attempted": 98,
+        "avg_score_attempted": 0.1683673469387755,
+        "avg_score_total": 0.165,
+        "passed_samples": 8,
+        "failed_samples": 90,
+        "metrics": {
+          "rubric_check": 8.16326530612245
+        }
+      },
+      {
+        "model_name": "gpt-5-2025-08-07",
+        "total": 100,
+        "total_attempted": 100,
+        "avg_score_attempted": 0.72,
+        "avg_score_total": 0.72,
+        "passed_samples": 62,
+        "failed_samples": 38,
+        "metrics": {
+          "rubric_check": 62.0
+        }
+      },
+      {
+        "model_name": "gpt-5-mini-2025-08-07",
+        "total": 100,
+        "total_attempted": 100,
+        "avg_score_attempted": 0.62,
+        "avg_score_total": 0.62,
+        "passed_samples": 62,
+        "failed_samples": 38,
+        "metrics": {
+          "rubric_check": 62.0
+        }
+      },
+      {
+        "model_name": "gpt-5-nano-2025-08-07",
+        "total": 100,
+        "total_attempted": 100,
+        "avg_score_attempted": 0.45,
+        "avg_score_total": 0.45,
+        "passed_samples": 44,
+        "failed_samples": 56,
+        "metrics": {
+          "rubric_check": 44.0
+        }
+      },
+      {
+        "model_name": "claude-sonnet-4-5-20250929",
+        "total": 100,
+        "total_attempted": 83,
+        "avg_score_attempted": 0.5,
+        "avg_score_total": 0.415,
+        "passed_samples": 40,
+        "failed_samples": 43,
+        "metrics": {
+          "rubric_check": 48.19277108433735
+        }
+      },
+      {
+        "model_name": "claude-haiku-4-5-20251001",
+        "total": 100,
+        "total_attempted": 100,
+        "avg_score_attempted": 0.629,
+        "avg_score_total": 0.629,
+        "passed_samples": 63,
+        "failed_samples": 37,
+        "metrics": {
+          "rubric_check": 63.0
+        }
+      },
+      {
+        "model_name": "claude-opus-4-1-20250805",
+        "total": 100,
+        "total_attempted": 90,
+        "avg_score_attempted": 0.4783333333333333,
+        "avg_score_total": 0.4305,
+        "passed_samples": 42,
+        "failed_samples": 48,
+        "metrics": {
+          "rubric_check": 46.666666666666664
+        }
+      },
+      {
+        "model_name": "moonshotai/Kimi-K2-Instruct-0905",
+        "total": 100,
+        "total_attempted": 100,
+        "avg_score_attempted": 0.505,
+        "avg_score_total": 0.505,
+        "passed_samples": 50,
+        "failed_samples": 50,
+        "metrics": {
+          "rubric_check": 50.0
+        }
+      }
+    ],
+    "by_metric": {
+      "rubric_check": {
+        "avg_score_attempted": 0.47680412371134023,
+        "avg_score_total": 0.4625,
+        "pass_rate": 45.05154639175258,
+        "passed_attempts": 437,
+        "failed_attempts": 533
+      }
+    },
+    "metrics": {
+      "rubric_check": 45.05154639175258
+    }
+  },
+  "gates_passed": false
+}
