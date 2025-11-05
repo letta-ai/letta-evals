@@ -25,6 +25,11 @@ letta-evals run letta-leaderboard/filesystem-agent/filesystem.yaml \
   --output letta-leaderboard/filesystem-agent/results/filesystem-{provider}-{model-name}
 ```
 
+Note: The `filesystem-agent/results/` directory uses Git LFS (Large File Storage) to manage result files. Ensure you have [Git LFS installed](https://git-lfs.com/) and configured before committing results. To pull existing result files, run:
+```bash
+git lfs pull
+```
+
 4. Generate the updated leaderboard:
 ```bash
 python generate_leaderboard_results.py
