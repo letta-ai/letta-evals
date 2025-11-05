@@ -1,8 +1,1 @@
 letta-leaderboard/filesystem-agent/results filter=lfs diff=lfs merge=lfs -text
-letta-leaderboard/filesystem-agent/results/filesystem-gptoss-20b filter=lfs diff=lfs merge=lfs -text
-letta-leaderboard/filesystem-agent/results/filesystem-kimi-k2 filter=lfs diff=lfs merge=lfs -text
-letta-leaderboard/filesystem-agent/results/filesystem-minimax-m2 filter=lfs diff=lfs merge=lfs -text
-letta-leaderboard/filesystem-agent/results/filesystem-results-anthropic filter=lfs diff=lfs merge=lfs -text
-letta-leaderboard/filesystem-agent/results/filesystem-results-oai-anthropic filter=lfs diff=lfs merge=lfs -text
-letta-leaderboard/filesystem-agent/results/filesystem-glm-deepseek filter=lfs diff=lfs merge=lfs -text
-letta-leaderboard/filesystem-agent/results/filesystem-gptoss-120b filter=lfs diff=lfs merge=lfs -text
