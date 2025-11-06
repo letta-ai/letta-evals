@@ -320,7 +320,9 @@ def aggregate_model_stats_by_benchmark(results: Dict[str, List]) -> Dict[str, Di
     return benchmark_stats
 
 
-def format_leaderboard_output(model_stats: Dict[str, Dict[str, List]], benchmark_name: str = "filesystem") -> List[Dict]:
+def format_leaderboard_output(
+    model_stats: Dict[str, Dict[str, List]], benchmark_name: str = "filesystem"
+) -> List[Dict]:
     """
     Format aggregated model statistics for YAML output.
 
@@ -354,7 +356,7 @@ def format_leaderboard_output(model_stats: Dict[str, Dict[str, List]], benchmark
 
 
 def format_leaderboard_output_by_benchmark(
-    benchmark_stats: Dict[str, Dict[str, Dict[str, List]]]
+    benchmark_stats: Dict[str, Dict[str, Dict[str, List]]],
 ) -> Dict[str, List[Dict]]:
     """
     Format aggregated model statistics by benchmark for YAML output.
