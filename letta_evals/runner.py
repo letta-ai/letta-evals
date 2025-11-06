@@ -361,10 +361,30 @@ class Runner:
                     gr, sub = await grader.grade(sample, trajectory, agent_state=agent_state)
                     grades_dict[key] = gr
                     submissions_dict[key] = sub
+
                 # use first grader as primary for legacy grade_result/submission
                 first_key = next(iter(grades_dict.keys()))
                 grade_result = grades_dict[first_key]
                 submission = submissions_dict[first_key]
+
+                # Check if submission is empty and mark as error
+                if not submission or submission.strip() == "":
+                    error_msg = "Empty submission"
+                    if self.progress_callback:
+                        await self.progress_callback.sample_error(
+                            sample_id, error_msg, agent_id=agent_id, model_name=model_name
+                        )
+                    return SampleResult(
+                        sample=sample,
+                        submission="",
+                        submissions=submissions_dict,
+                        trajectory=trajectory,
+                        agent_id=agent_id,
+                        grade=GradeResult(score=0.0, rationale=error_msg),
+                        grades={k: GradeResult(score=0.0, rationale=error_msg) for k in grades_dict.keys()},
+                        model_name=model_name,
+                        agent_usage=agent_usage,
+                    )
 
                 if self.progress_callback:
                     # per-sample pass/fail not meaningful with multi-grader gates
