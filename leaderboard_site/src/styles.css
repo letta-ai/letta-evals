@@ -228,6 +228,7 @@ body {
 
 .tabs-container {
   margin: 1.5rem 0 1rem 0;
+  max-width: 800px;
 }
 
 .tabs {
@@ -256,7 +257,7 @@ body {
 }
 
 .tab-button.active {
-  border-bottom-color: rgb(6, 6, 172);
+  border-bottom-color: var(--text-color);
   font-weight: 600;
 }
 
