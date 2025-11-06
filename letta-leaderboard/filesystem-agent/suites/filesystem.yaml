@@ -22,6 +22,7 @@ target:
     - openrouter-kimi-k2-0905
     - openrouter-deepseek-v3.1
     - openrouter-glm-4.6
+    - openrouter-kimi-k2-thinking
 
 graders:
   rubric_check:
