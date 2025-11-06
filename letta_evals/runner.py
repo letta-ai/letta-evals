@@ -387,7 +387,6 @@ class Runner:
                     )
 
                 if self.progress_callback:
-                    # per-sample pass/fail not meaningful with multi-grader gates
                     metric_scores = None
                     metric_rationales = None
                     if self.graders is not None and grades_dict is not None:
@@ -399,7 +398,6 @@ class Runner:
                         score=grade_result.score,
                         model_name=model_name,
                         metric_scores=metric_scores,
-                        metric_pass=None,  # not meaningful with multi-grader gates
                         rationale=grade_result.rationale,
                         metric_rationales=metric_rationales,
                     )

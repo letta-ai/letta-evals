@@ -73,7 +73,11 @@ class ProgressCallback(ABC):
         rationale: Optional[str] = None,
         metric_rationales: Optional[Dict[str, str]] = None,
     ) -> None:
-        """Called when a sample evaluation completes successfully."""
+        """Called when a sample evaluation completes successfully.
+        
+        Note: metric_pass parameter is deprecated and ignored. Pass/fail is only
+        determined at the dataset level via gates, not at the instance level.
+        """
         ...
 
     @abstractmethod

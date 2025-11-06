@@ -47,7 +47,6 @@ class SampleProgress:
     state: SampleState = SampleState.QUEUED
     agent_id: Optional[str] = None
     model_name: Optional[str] = None
-    passed: Optional[bool] = None
     score: Optional[float] = None
     rationale: Optional[str] = None
     error: Optional[str] = None
@@ -103,8 +102,6 @@ class EvalProgress(ProgressCallback):
         # live aggregates per metric key
         self.metric_totals: Dict[str, float] = {}
         self.metric_counts: Dict[str, int] = {}
-        self.metric_passed: Dict[str, int] = {}
-        self.metric_failed: Dict[str, int] = {}
 
         self.samples: Dict[tuple, SampleProgress] = {}  # key: (sample_id, model_name)
         self.start_time = None
@@ -122,8 +119,7 @@ class EvalProgress(ProgressCallback):
         )
         self.main_task_id = None
 
-        self.passed_count = 0
-        self.failed_count = 0
+        self.completed_count = 0
         self.error_count = 0
         self.total_score = 0.0
         self.score_count = 0
@@ -230,7 +226,7 @@ class EvalProgress(ProgressCallback):
 
     def _create_progress_with_metrics(self) -> Panel:
         """Create progress bar with inline metrics"""
-        completed = self.passed_count + self.failed_count + self.error_count
+        completed = self.completed_count + self.error_count
 
         if completed == 0:
             errors_text = "Errored: N/A"
@@ -253,17 +249,13 @@ class EvalProgress(ProgressCallback):
                 if cnt == 0:
                     continue
                 avg = total / cnt if cnt > 0 else 0.0
-                acc_cnt = self.metric_passed.get(key, 0) + self.metric_failed.get(key, 0)
-                acc = (self.metric_passed.get(key, 0) / acc_cnt * 100.0) if acc_cnt > 0 else 0.0
                 label = self.metric_labels.get(key, key)
                 if not first:
                     chips.append("   ")
-                chips.append(f"{label}: {avg:.2f}, {acc:.0f}%", style="bold white")
+                chips.append(f"{label}: {avg:.2f}", style="bold white")
                 first = False
         chips.append("   ")
-        chips.append(f"✓ {self.passed_count}", style="green")
-        chips.append("   ")
-        chips.append(f"✗ {self.failed_count}", style="red")
+        chips.append(f"✓ {self.completed_count}", style="green")
         if self.error_count:
             chips.append("   ")
             chips.append(f"⚠ {self.error_count}", style="yellow")
@@ -274,7 +266,7 @@ class EvalProgress(ProgressCallback):
 
     def _create_metrics_panel(self) -> Panel:
         """Create panel showing live metrics"""
-        completed = self.passed_count + self.failed_count + self.error_count
+        completed = self.completed_count + self.error_count
 
         if completed == 0:
             errors_text_row = "N/A"
@@ -291,13 +283,6 @@ class EvalProgress(ProgressCallback):
             avg_score = self.total_score / self.score_count
             metrics_table.add_row("📈 Avg Score:", f"{avg_score:.2f}")
 
-        if self.failed_count > 0:
-            failed_samples = [str(key[0] + 1) for key, s in self.samples.items() if s.passed is False][:5]
-            failed_text = ", ".join(failed_samples)
-            if len(failed_samples) < self.failed_count:
-                failed_text += f" ... ({self.failed_count} total)"
-            metrics_table.add_row("❌ Failed:", failed_text)
-
         if self.error_count > 0:
             metrics_table.add_row("⚠️ Errors:", str(self.error_count))
 
@@ -311,10 +296,8 @@ class EvalProgress(ProgressCallback):
                 total = self.metric_totals.get(key, 0.0)
                 cnt = self.metric_counts.get(key, 0)
                 avg = total / cnt if cnt > 0 else 0.0
-                att = self.metric_passed.get(key, 0) + self.metric_failed.get(key, 0)
-                acc = (self.metric_passed.get(key, 0) / att * 100.0) if att > 0 else 0.0
                 label = self.metric_labels.get(key, key)
-                metrics_table.add_row(f"• {label}:", f"avg={avg:.2f}, acc={acc:.1f}%")
+                metrics_table.add_row(f"• {label}:", f"avg={avg:.2f}")
 
         if self.start_time and completed > 0 and completed < self.total_samples:
             elapsed = time.time() - self.start_time
@@ -502,16 +485,13 @@ class EvalProgress(ProgressCallback):
 
     def reset(self):
         """Reset counters and state for a new run"""
-        self.passed_count = 0
-        self.failed_count = 0
+        self.completed_count = 0
         self.error_count = 0
         self.total_score = 0.0
         self.score_count = 0
         self.samples.clear()
         self.metric_totals.clear()
         self.metric_counts.clear()
-        self.metric_passed.clear()
-        self.metric_failed.clear()
         if self.main_task_id is not None:
             self.main_progress.update(self.main_task_id, completed=0)
 
@@ -590,27 +570,18 @@ class EvalProgress(ProgressCallback):
         is_new_completion = previous_state not in terminal_states and state in terminal_states
 
         if state == SampleState.COMPLETED and is_new_completion:
-            # Track pass/fail if provided
-            if sample.passed is True:
-                self.passed_count += 1
-            elif sample.passed is False:
-                self.failed_count += 1
-            # For multi-grader setups where pass/fail isn't meaningful,
-            # we still need to track completion for the progress bar
-            # Count as "passed" if we have a score but no pass/fail status
-            elif sample.passed is None and sample.score is not None:
-                self.passed_count += 1
+            self.completed_count += 1
 
             if sample.score is not None:
                 self.total_score += sample.score
                 self.score_count += 1
 
-            completed = self.passed_count + self.failed_count + self.error_count
+            completed = self.completed_count + self.error_count
             self.main_progress.update(self.main_task_id, completed=completed)
 
         elif state == SampleState.ERROR and is_new_completion:
             self.error_count += 1
-            completed = self.passed_count + self.failed_count + self.error_count
+            completed = self.completed_count + self.error_count
             self.main_progress.update(self.main_task_id, completed=completed)
 
         if self.live:
@@ -674,7 +645,7 @@ class EvalProgress(ProgressCallback):
         score: Optional[float] = None,
         model_name: Optional[str] = None,
         metric_scores: Optional[Dict[str, float]] = None,
-        metric_pass: Optional[Dict[str, bool]] = None,
+        metric_pass: Optional[Dict[str, bool]] = None,  # deprecated, ignored
         rationale: Optional[str] = None,
         metric_rationales: Optional[Dict[str, str]] = None,
     ):
@@ -692,7 +663,6 @@ class EvalProgress(ProgressCallback):
             SampleState.COMPLETED,
             agent_id=agent_id,
             model_name=model_name,
-            passed=None,
             score=score,
             rationale=rationale,
             from_cache=existing_from_cache,
@@ -704,11 +674,6 @@ class EvalProgress(ProgressCallback):
             for mkey, mscore in metric_scores.items():
                 self.metric_totals[mkey] = self.metric_totals.get(mkey, 0.0) + (mscore or 0.0)
                 self.metric_counts[mkey] = self.metric_counts.get(mkey, 0) + 1
-                if metric_pass and mkey in metric_pass:
-                    if metric_pass[mkey]:
-                        self.metric_passed[mkey] = self.metric_passed.get(mkey, 0) + 1
-                    else:
-                        self.metric_failed[mkey] = self.metric_failed.get(mkey, 0) + 1
 
     async def sample_error(
         self, sample_id: int, error: str, agent_id: Optional[str] = None, model_name: Optional[str] = None
