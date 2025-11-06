@@ -76,9 +76,11 @@ MODEL_COSTS = {
         "prompt_tokens": 0.05,
         "completion_tokens": 0.2,
     },
+    "minimax/minimax-m2": {
+        "prompt_tokens": 0.15,
+        "completion_tokens": 0.45,
+    },
 }
-
-EXCLUDED_MODELS = {"moonshotai/Kimi-K2-Instruct-0905"}
 
 
 def normalize_model_name(model_name: str) -> str:
@@ -119,7 +121,7 @@ def calculate_cost(model_name: str, prompt_tokens: int, completion_tokens: int) 
     return prompt_cost + completion_cost
 
 
-def find_result_files(pattern: str = "results/filesystem-*/**/results.jsonl") -> List[Path]:
+def find_result_files(pattern: str = "filesystem-*/**/results.jsonl") -> List[Path]:
     """
     Find all result files matching the given pattern.
 
@@ -147,13 +149,7 @@ def parse_result_entry(row: Dict, line_num: int, file_path: Path) -> Tuple[str, 
         Tuple of (model_name, score, cost, prompt_tokens, completion_tokens, has_error)
     """
     try:
-        model_name = row["result"]["model_name"]
-
-        # Skip excluded models
-        if model_name in EXCLUDED_MODELS:
-            return None, None, None, None, None, False
-
-        model_name = normalize_model_name(model_name)
+        model_name = normalize_model_name(row["result"]["model_name"])
         score = row["result"]["grade"]["score"]
 
         # Extract token usage
@@ -205,12 +201,6 @@ def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
                         # print(f"Model name: {model_name}, Score: {score}, Cost: {cost}, Has error: {has_error}")
 
                         if model_name is None:
-                            continue
-
-                        if model_name in [
-                            "anthropic/claude-sonnet-4-5-20250929",
-                            "anthropic/claude-opus-4-1-20250805",
-                        ] and "answerable-6" not in str(file_path):
                             continue
 
                         if has_error:

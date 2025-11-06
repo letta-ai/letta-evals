@@ -156,6 +156,22 @@ class RegisterQuestionTool:
             with open(self.output_path, "a") as f:
                 f.write(json.dumps(question_data) + "\n")
 
+            # letta-evals format
+            question_data_formatted = {
+                "input": question,
+                "ground_truth": answer,
+                "agent_args": {
+                    "tags": [],
+                    "extra": {
+                        "required_files": required_files,
+                        "question_type": question_type,
+                        "difficulty": difficulty,
+                    },
+                },
+            }
+            with open(self.output_path.parent / "agent_generated_questions_parsed.jsonl", "a") as f:
+                f.write(json.dumps(question_data_formatted) + "\n")
+
             return {
                 "success": True,
                 "message": f"Question registered successfully. Answer: {answer}",
