@@ -134,6 +134,32 @@ def find_result_files(pattern: str = "results/filesystem-*/**/results.jsonl") ->
     return [Path(p) for p in paths]
 
 
+def extract_benchmark_name(file_path: Path) -> str:
+    """
+    Extract the benchmark name from a result file path.
+
+    Args:
+        file_path: Path to a results file
+
+    Returns:
+        Benchmark name (e.g., 'filesystem', 'core-memory-read')
+    """
+    # Extract from path like "results/filesystem-*" or "results/core-memory-read-*"
+    parts = file_path.parts
+    for part in parts:
+        if part.startswith("results/"):
+            continue
+        if any(benchmark in part for benchmark in ["filesystem-", "core-memory-read-", "core-memory-update-"]):
+            # Extract the benchmark prefix
+            if part.startswith("filesystem-"):
+                return "filesystem"
+            elif part.startswith("core-memory-read-"):
+                return "core-memory-read"
+            elif part.startswith("core-memory-update-"):
+                return "core-memory-update"
+    return "unknown"
+
+
 def parse_result_entry(row: Dict, line_num: int, file_path: Path) -> Tuple[str, float, float, int, int, bool]:
     """
     Parse a single result entry from a JSONL file.
@@ -191,7 +217,8 @@ def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
     num_errors = 0
 
     for file_path in result_files:
-        logger.info(f"Processing file: {file_path}")
+        benchmark_name = extract_benchmark_name(file_path)
+        logger.info(f"Processing file: {file_path} (benchmark: {benchmark_name})")
         try:
             with open(file_path, "r") as f:
                 for line_num, line in enumerate(f, start=1):
@@ -221,6 +248,7 @@ def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
                         results["cost"].append(cost)
                         results["prompt_tokens"].append(prompt_tokens)
                         results["completion_tokens"].append(completion_tokens)
+                        results["benchmark"].append(benchmark_name)
 
                     except json.JSONDecodeError as e:
                         logger.error(f"Invalid JSON in {file_path}:{line_num} - {e}")
@@ -262,12 +290,43 @@ def aggregate_model_stats(results: Dict[str, List]) -> Dict[str, Dict[str, List]
     return model_stats
 
 
-def format_leaderboard_output(model_stats: Dict[str, Dict[str, List]]) -> List[Dict]:
+def aggregate_model_stats_by_benchmark(results: Dict[str, List]) -> Dict[str, Dict[str, Dict[str, List]]]:
+    """
+    Aggregate results by model and benchmark.
+
+    Args:
+        results: Dictionary with model_name, score, cost, prompt_tokens, completion_tokens, and benchmark lists
+
+    Returns:
+        Dictionary mapping benchmark names to model stats
+    """
+    benchmark_stats = defaultdict(
+        lambda: defaultdict(lambda: {"scores": [], "costs": [], "prompt_tokens": [], "completion_tokens": []})
+    )
+
+    for model, score, cost, prompt_tokens, completion_tokens, benchmark in zip(
+        results["model_name"],
+        results["score"],
+        results["cost"],
+        results["prompt_tokens"],
+        results["completion_tokens"],
+        results["benchmark"],
+    ):
+        benchmark_stats[benchmark][model]["scores"].append(score)
+        benchmark_stats[benchmark][model]["costs"].append(cost)
+        benchmark_stats[benchmark][model]["prompt_tokens"].append(prompt_tokens)
+        benchmark_stats[benchmark][model]["completion_tokens"].append(completion_tokens)
+
+    return benchmark_stats
+
+
+def format_leaderboard_output(model_stats: Dict[str, Dict[str, List]], benchmark_name: str = "filesystem") -> List[Dict]:
     """
     Format aggregated model statistics for YAML output.
 
     Args:
         model_stats: Dictionary of model statistics
+        benchmark_name: Name of the benchmark
 
     Returns:
         List of dictionaries formatted for YAML output
@@ -287,11 +346,31 @@ def format_leaderboard_output(model_stats: Dict[str, Dict[str, List]]) -> List[D
                 "model": model_name,
                 "average": round(avg_score, 2),
                 "total_cost": round(total_cost, 2),
-                "leaderboard_filesystem_100": round(avg_score, 2),
+                f"leaderboard_{benchmark_name}_100": round(avg_score, 2),
             }
         )
 
     return yaml_output
+
+
+def format_leaderboard_output_by_benchmark(
+    benchmark_stats: Dict[str, Dict[str, Dict[str, List]]]
+) -> Dict[str, List[Dict]]:
+    """
+    Format aggregated model statistics by benchmark for YAML output.
+
+    Args:
+        benchmark_stats: Dictionary mapping benchmark names to model stats
+
+    Returns:
+        Dictionary mapping benchmark names to formatted leaderboard data
+    """
+    all_benchmarks = {}
+
+    for benchmark_name, model_stats in benchmark_stats.items():
+        all_benchmarks[benchmark_name] = format_leaderboard_output(model_stats, benchmark_name)
+
+    return all_benchmarks
 
 
 def write_yaml_output(data: List[Dict], output_path: str = "leaderboard_results.yaml") -> None:
@@ -308,6 +387,28 @@ def write_yaml_output(data: List[Dict], output_path: str = "leaderboard_results.
         logger.info(f"Results written to {output_path}")
     except IOError as e:
         logger.error(f"Error writing to {output_path} - {e}")
+        raise
+
+
+def write_yaml_output_by_benchmark(all_benchmarks: Dict[str, List[Dict]]) -> None:
+    """
+    Write leaderboard data for each benchmark to separate YAML files.
+
+    Args:
+        all_benchmarks: Dictionary mapping benchmark names to leaderboard data
+    """
+    for benchmark_name, data in all_benchmarks.items():
+        output_path = f"leaderboard_{benchmark_name}.yaml"
+        write_yaml_output(data, output_path)
+
+    # Also write a combined file with all benchmarks
+    combined_path = "leaderboard_all.yaml"
+    try:
+        with open(combined_path, "w") as f:
+            yaml.dump(all_benchmarks, f, default_flow_style=False, sort_keys=False)
+        logger.info(f"Combined results written to {combined_path}")
+    except IOError as e:
+        logger.error(f"Error writing to {combined_path} - {e}")
         raise
 
 
@@ -359,17 +460,42 @@ def print_summary(result_files: List[Path], yaml_output: List[Dict], num_total: 
 
 def main() -> None:
     """Main execution function."""
-    result_files = find_result_files()
-    if not result_files:
+    # Find all result files from all benchmarks
+    patterns = [
+        "results/filesystem-*/**/results.jsonl",
+    ]
+
+    all_result_files = []
+    for pattern in patterns:
+        all_result_files.extend(find_result_files(pattern))
+
+    if not all_result_files:
         logger.error("No result files found")
         return
 
-    results, num_total, num_errors = load_results(result_files)
+    # Load and process all results
+    results, num_total, num_errors = load_results(all_result_files)
+
+    # Generate benchmark-specific leaderboards
+    benchmark_stats = aggregate_model_stats_by_benchmark(results)
+    all_benchmarks = format_leaderboard_output_by_benchmark(benchmark_stats)
+    write_yaml_output_by_benchmark(all_benchmarks)
+
+    # Also generate overall leaderboard for backward compatibility
     model_stats = aggregate_model_stats(results)
     yaml_output = format_leaderboard_output(model_stats)
     write_yaml_output(yaml_output)
-    print_summary(result_files, yaml_output, num_total, num_errors)
+
+    print_summary(all_result_files, yaml_output, num_total, num_errors)
     print_token_statistics(model_stats)
+
+    # Print benchmark-specific summaries
+    print("\n" + "=" * 80)
+    print("BENCHMARK-SPECIFIC RESULTS")
+    print("=" * 80)
+    for benchmark_name, data in all_benchmarks.items():
+        print(f"\n{benchmark_name.upper()}: {len(data)} models")
+    print("=" * 80)
 
 
 if __name__ == "__main__":
