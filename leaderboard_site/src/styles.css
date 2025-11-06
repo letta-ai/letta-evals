@@ -226,13 +226,71 @@ body {
   margin-bottom: 0;
 }
 
+.tabs-container {
+  margin: 1.5rem 0 1rem 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.tab-button {
+  background: none;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  color: var(--text-color);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  position: relative;
+  bottom: -2px;
+}
+
+.tab-button:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.tab-button.active {
+  border-bottom-color: rgb(6, 6, 172);
+  font-weight: 600;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: flex;
+}
+
 @media (max-width: 600px) {
   .chart-row {
     grid-template-columns: 1fr;
     gap: 0.5rem;
   }
-  
+
   .chart-bar-wrapper {
     height: 1.5rem;
+  }
+
+  .tabs {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .tab-button {
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .tab-button.active {
+    background: rgba(6, 6, 172, 0.1);
+    border-left: 3px solid rgb(6, 6, 172);
+    border-bottom: 1px solid var(--border-color);
   }
 }
