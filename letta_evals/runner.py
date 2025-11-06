@@ -366,6 +366,25 @@ class Runner:
                 grade_result = grades_dict[first_key]
                 submission = submissions_dict[first_key]
 
+                # Check if submission is empty and mark as error
+                if not submission or submission.strip() == "":
+                    error_msg = "Empty submission"
+                    if self.progress_callback:
+                        await self.progress_callback.sample_error(
+                            sample_id, error_msg, agent_id=agent_id, model_name=model_name
+                        )
+                    return SampleResult(
+                        sample=sample,
+                        submission="",
+                        submissions=submissions_dict,
+                        trajectory=trajectory,
+                        agent_id=None,  # Mark as error by setting agent_id to None
+                        grade=GradeResult(score=0.0, rationale=error_msg),
+                        grades={k: GradeResult(score=0.0, rationale=error_msg) for k in grades_dict.keys()},
+                        model_name=model_name,
+                        agent_usage=agent_usage,
+                    )
+
                 if self.progress_callback:
                     # per-sample pass/fail not meaningful with multi-grader gates
                     metric_scores = None
