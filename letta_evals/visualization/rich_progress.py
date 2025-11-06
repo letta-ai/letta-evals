@@ -83,7 +83,7 @@ class EvalProgress(ProgressCallback):
         max_concurrent: int = 15,
         display_mode: DisplayMode = DisplayMode.STANDARD,
         console: Optional[Console] = None,
-        update_freq: float = 10.0,
+        update_freq: float = 2.0,
         show_samples: bool = True,
         cached_mode: bool = False,
         metric_labels: Optional[Dict[str, str]] = None,
@@ -590,10 +590,16 @@ class EvalProgress(ProgressCallback):
         is_new_completion = previous_state not in terminal_states and state in terminal_states
 
         if state == SampleState.COMPLETED and is_new_completion:
+            # Track pass/fail if provided
             if sample.passed is True:
                 self.passed_count += 1
             elif sample.passed is False:
                 self.failed_count += 1
+            # For multi-grader setups where pass/fail isn't meaningful,
+            # we still need to track completion for the progress bar
+            # Count as "passed" if we have a score but no pass/fail status
+            elif sample.passed is None and sample.score is not None:
+                self.passed_count += 1
 
             if sample.score is not None:
                 self.total_score += sample.score
@@ -607,6 +613,7 @@ class EvalProgress(ProgressCallback):
             completed = self.passed_count + self.failed_count + self.error_count
             self.main_progress.update(self.main_task_id, completed=completed)
 
+        # Update the live display
         if self.live:
             self.live.update(self._render())
 

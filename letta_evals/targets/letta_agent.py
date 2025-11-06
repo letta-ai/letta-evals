@@ -94,7 +94,7 @@ class LettaAgentTarget(AbstractAgentTarget):
 
                 for i, input_msg in enumerate(inputs):
                     if progress_callback:
-                        await progress_callback.message_sending(sample.id, i + 1, total_messages, model_name=model_name)
+                        await progress_callback.message_sending(sample.id, i + 1, total_messages, agent_id=agent_id, model_name=model_name)
 
                     stream = self.client.agents.messages.create_stream(
                         agent_id=agent_id,
