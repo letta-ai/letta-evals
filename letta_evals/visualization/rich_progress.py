@@ -613,7 +613,6 @@ class EvalProgress(ProgressCallback):
             completed = self.passed_count + self.failed_count + self.error_count
             self.main_progress.update(self.main_task_id, completed=completed)
 
-        # Update the live display
         if self.live:
             self.live.update(self._render())
 

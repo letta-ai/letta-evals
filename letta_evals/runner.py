@@ -361,6 +361,7 @@ class Runner:
                     gr, sub = await grader.grade(sample, trajectory, agent_state=agent_state)
                     grades_dict[key] = gr
                     submissions_dict[key] = sub
+
                 # use first grader as primary for legacy grade_result/submission
                 first_key = next(iter(grades_dict.keys()))
                 grade_result = grades_dict[first_key]
@@ -378,7 +379,7 @@ class Runner:
                         submission="",
                         submissions=submissions_dict,
                         trajectory=trajectory,
-                        agent_id=None,  # Mark as error by setting agent_id to None
+                        agent_id=agent_id,
                         grade=GradeResult(score=0.0, rationale=error_msg),
                         grades={k: GradeResult(score=0.0, rationale=error_msg) for k in grades_dict.keys()},
                         model_name=model_name,
