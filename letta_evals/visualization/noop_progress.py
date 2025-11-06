@@ -20,7 +20,6 @@ class NoOpProgress(ProgressCallback):
         score: Optional[float] = None,
         model_name: Optional[str] = None,
         metric_scores: Optional[Dict[str, float]] = None,
-        metric_pass: Optional[Dict[str, bool]] = None,  # deprecated, ignored
         rationale: Optional[str] = None,
         metric_rationales: Optional[Dict[str, str]] = None,
     ) -> None:
