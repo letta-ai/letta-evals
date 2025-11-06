@@ -35,4 +35,6 @@ git lfs pull
 python generate_leaderboard_results.py
 ```
 
+5. In case of a new provider, add their logo to [leaderboard_site/src/icons](leaderboard_site/src/icons).
+
 Results will be added to [leaderboard_results.yaml](leaderboard_results.yaml) and automatically updated.
