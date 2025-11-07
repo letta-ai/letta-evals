@@ -280,7 +280,7 @@ body {
 
 .multi-metric-header {
   display: grid;
-  grid-template-columns: 18rem 1fr;
+  grid-template-columns: 24rem 1fr;
   gap: 1rem;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
@@ -305,7 +305,7 @@ body {
 
 .multi-metric-row {
   display: grid;
-  grid-template-columns: 18rem 1fr;
+  grid-template-columns: 24rem 1fr;
   gap: 1rem;
   margin-bottom: 1rem;
   align-items: center;
