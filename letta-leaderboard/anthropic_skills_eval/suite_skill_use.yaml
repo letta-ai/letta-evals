@@ -1,11 +1,11 @@
-name: skills-eval-oracle
-description: Evaluate if agent can complete tasks using Anthropic's Skills with oracle setting
-dataset: data/dataset_oracle.csv
+name: skills-eval-use
+description: Evaluate if agent can complete tasks by loading the mentioned skill
+dataset: data/dataset_use.csv
 
 target:
   kind: letta_code
   base_url: http://0.0.0.0:8283
-  working_dir: output-oracle
+  working_dir: output-use
   timeout: 300
   max_retries: 1
   model_handles:

@@ -1,11 +1,11 @@
-name: skills-eval-selection
-description: Evaluate if agent can complete tasks using Anthropic's Skills with selection setting
-dataset: data/dataset_selection.csv
+name: skills-eval-select-use
+description: Evaluate if agent can complete tasks by selecting and loading required skills
+dataset: data/dataset_select_use.csv
 
 target:
   kind: letta_code
   base_url: http://0.0.0.0:8283
-  working_dir: output-selection
+  working_dir: output-select-use
   timeout: 300
   max_retries: 1
   model_handles:

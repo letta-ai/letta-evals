@@ -1,6 +1,6 @@
 name: skills-eval-baseline
-description: Evaluate if agent can complete tasks using Anthropic's Skills with baseline setting
-dataset: data/dataset_selection.csv
+description: Evaluate if agent can complete tasks in the baseline setting without access to skills
+dataset: data/dataset_select_use.csv
 
 target:
   kind: letta_code
