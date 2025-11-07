@@ -31,8 +31,8 @@
         {%- assign cost_range = max_cost | minus: min_cost -%}
     {%- endif -%}
 
-    {%- comment -%} Metric headers {%- endcomment -%}
-    <div class="multi-metric-header">
+    {%- comment -%} Metric headers - close inner container and reopen after header {%- endcomment -%}
+    </div><div class="multi-metric-header">
         <div class="model-column-header">Model</div>
         <div class="metrics-columns-header">
             {%- for metric_key in metric_keys -%}
@@ -56,7 +56,7 @@
             </div>
             {%- endfor -%}
         </div>
-    </div>
+    </div><div class="chart-container--inner">
 
     {%- for entry in sorted_by_score -%}
     <div class="multi-metric-row" data-model="{{ entry.model }}">
@@ -102,6 +102,31 @@
         {%- assign max_cost = sorted_by_cost_desc[0].total_cost -%}
         {%- assign cost_range = max_cost | minus: min_cost -%}
     {%- endif -%}
+
+    {%- comment -%} Single metric header - close inner container and reopen after header {%- endcomment -%}
+    {%- assign single_metric_key = metric_keys[0] -%}
+    </div><div class="single-metric-header">
+        <div class="model-column-header">Model</div>
+        <div class="metric-column-header-single">
+            <span class="metric-name">
+                {%- if metricsMetadata[single_metric_key].name -%}
+                    {{ metricsMetadata[single_metric_key].name }}
+                {%- else -%}
+                    {{ single_metric_key | replace: "_", " " | replace: "-", " " | capitalize }}
+                {%- endif -%}
+            </span>
+            {%- if metricsMetadata[single_metric_key] -%}
+            <span class="info-tooltip">
+                <svg class="info-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                    <text x="8" y="12" font-size="11" font-weight="bold" text-anchor="middle" fill="currentColor" font-family="system-ui, sans-serif">i</text>
+                </svg>
+                <span class="tooltip-text">{{ metricsMetadata[single_metric_key].description }}</span>
+            </span>
+            {%- endif -%}
+        </div>
+    </div><div class="chart-container--inner">
+
     {%- for entry in sorted_by_score -%}
     <div class="chart-row" data-model="{{ entry.model }}">
         <div class="chart-label">
