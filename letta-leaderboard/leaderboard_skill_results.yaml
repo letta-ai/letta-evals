@@ -1,0 +1,46 @@
+benchmark_name: Skills Suite
+
+metrics:
+  task_completion:
+    name: Task Completion Rubric
+    description: LLM-as-a-judge rubric to evaluate the agent's ability to complete tasks
+  skill_use:
+    name: Skill Use Rubric
+    description: LLM-as-a-judge rubric to evaluate the agent's ability to select, load and use skills
+  average:
+    name: Average
+    description: Overall average score across all evaluation metrics
+
+results:
+- model: anthropic/claude-haiku-4-5-20251001
+  average: 63.5
+  task_completion: 69.7
+  skill_use: 57.3
+- model: anthropic/claude-opus-4-1-20250805
+  average: 73.1
+  task_completion: 74.4
+  skill_use: 71.8
+- model: anthropic/claude-sonnet-4-5-20250929
+  average: 74.25
+  task_completion: 76.5
+  skill_use: 72.0
+- model: z-ai/glm-4.6
+  average: 57.95
+  task_completion: 65.9
+  skill_use: 50.0
+- model: openai/gpt-4.1-2025-04-14
+  average: 33.71
+  task_completion: 36.1
+  skill_use: 31.3
+- model: openai/gpt-5-2025-08-07
+  average: 60.8
+  task_completion: 70.2
+  skill_use: 51.4
+- model: openai/gpt-5-mini-2025-08-07
+  average: 57.12
+  task_completion: 68.8
+  skill_use: 45.5
+- model: openai/gpt-5-nano-2025-08-07
+  average: 38.39
+  task_completion: 52.8
+  skill_use: 24.0
