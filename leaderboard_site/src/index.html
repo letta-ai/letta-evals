@@ -103,7 +103,7 @@
             const container = document.querySelector(`[data-content="${benchmarkName}"]`);
 
             if (container) {
-                const chartRows = container.querySelectorAll('.chart-row');
+                const chartRows = container.querySelectorAll('.chart-row, .multi-metric-row');
 
                 searchInput.addEventListener('input', (e) => {
                     const searchTerm = e.target.value.toLowerCase();
