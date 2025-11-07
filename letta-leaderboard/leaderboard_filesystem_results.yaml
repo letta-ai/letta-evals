@@ -1,3 +1,14 @@
+benchmark_name: Filesystem Suite
+
+metrics:
+  leaderboard_filesystem_100:
+    name: Filesystem Score
+    description: LLM-as-a-judge rubric to evaluate the agent's ability to correctly retrieve and analyze information from filesystem data files
+  average:
+    name: Average
+    description: Overall average score across all evaluation metrics
+
+results:
 - model: anthropic/claude-haiku-4-5-20251001
   average: 61.02
   total_cost: 10.18

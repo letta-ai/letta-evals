@@ -10,7 +10,9 @@ examples/*/results.jsonl
 examples/*/cache.jsonl
 examples/*/cache.json
 letta-leaderboard/*/results/results.json
-
+letta-leaderboard/skills-suite/task_generator/output/
+letta-leaderboard/filesystem-agent/generation/data/generated_questions/
+package-*.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
