@@ -29,77 +29,98 @@
 
     <div class="caption">
         <div class="caption-inner">
-        Context-Bench (C-Bench) evaluates how well language models can chain file operations, trace entity relationships, and manage multi-step information retrieval.
-        </div>
-        <div class="caption-inner">
-        Read more about Context-Bench on our <a href="https://letta.com/blog/context-bench">blog</a>.
-        </div>
-        <div class="caption-inner">
-        Interested in contributing a task or model? <a href="mailto:research@letta.com">Email us</a> or <a href="https://github.com/letta-ai/letta-evals/issues">open an issue</a> on GitHub.
+            <p>Context-Bench measures an agent's ability to perform context engineering with:</p>
+            <ul>
+                <li><a href="https://letta.com/blog/context-bench">Filesystem Suite</a>: Evaluates how well language models can chain file operations, trace entity relationships, and manage multi-step information retrieval.</li>
+                <li><a href="https://www.letta.com/blog/context-bench-skills">Skills Suite</a>: Evalutes how well language modelsc can discover and load relevant skills from a library to complete tasks.</li>
+            </ul>
+            <p>Interested in contributing a task or model? <a href="mailto:research@letta.com">Email us</a> or <a href="https://github.com/letta-ai/letta-evals/issues">open an issue</a> on GitHub.</p>
         </div>
     </div>
 
+    {%- assign has_multiple_benchmarks = false -%}
+    {%- assign benchmark_count = 0 -%}
+    {%- for benchmark in leaderboards -%}
+        {%- assign benchmark_count = benchmark_count | plus: 1 -%}
+    {%- endfor -%}
+    {%- if benchmark_count > 1 -%}
+        {%- assign has_multiple_benchmarks = true -%}
+    {%- endif -%}
 
-    <div class="chart-container">
-        <input type="text" id="searchInput" class="search-bar" placeholder="Search models...">
-
-        <div class="chart-container--inner">
-            {%- assign sorted_by_score = leaderboard | sort: "average" | reverse -%}
-            {%- assign max_score = sorted_by_score[0].average -%}
-            {%- assign sorted_by_cost = leaderboard | sort: "total_cost" -%}
-            {%- assign min_cost = sorted_by_cost[0].total_cost -%}
-            {%- assign sorted_by_cost_desc = leaderboard | sort: "total_cost" | reverse -%}
-            {%- assign max_cost = sorted_by_cost_desc[0].total_cost -%}
-            {%- assign cost_range = max_cost | minus: min_cost -%}
-            {%- for entry in sorted_by_score -%}
-            <div class="chart-row" data-model="{{ entry.model }}">
-                <div class="chart-label">
-                    {%- assign provider = entry.model | split: "/" | first -%}
-                    <img src="./icons/{{ provider }}.svg" alt="{{ provider }}" class="model-icon">
-                    <span>{{ entry.model }}</span>
-                </div>
-                <div class="chart-bar-wrapper">
-                    <div class="chart-bar" style="width: {{ entry.average }}%"></div>
-                    <div class="chart-value">
-                        <span>{{ entry.average }}%</span>
-                        {%- if entry.total_cost <= 4 -%}
-                        {%- assign cost_normalized = entry.total_cost | divided_by: 4.0 -%}
-                        {%- assign hue = cost_normalized | times: -60 | plus: 120 -%}
-                        {%- else -%}
-                        {%- assign cost_over_threshold = entry.total_cost | minus: 4 -%}
-                        {%- assign remaining_range = max_cost | minus: 4 -%}
-                        {%- assign cost_normalized = cost_over_threshold | divided_by: remaining_range -%}
-                        {%- assign hue = cost_normalized | times: -60 | plus: 60 -%}
-                        {%- endif -%}
-                        <span class="cost-badge" style="background-color: hsl({{ hue }}, 70%, 45%); color: white;">${{ entry.total_cost }}</span>
-                    </div>
-                </div>
-            </div>
+    {%- if has_multiple_benchmarks -%}
+    <div class="tabs-container">
+        <div class="tabs">
+            {%- for benchmark in leaderboards -%}
+            <button class="tab-button{% if forloop.first %} active{% endif %}" data-tab="{{ benchmark[0] }}">
+                {%- if benchmarkNames[benchmark[0]] -%}
+                    {{ benchmarkNames[benchmark[0]] }}
+                {%- else -%}
+                    {{ benchmark[0] | replace: "-", " " | capitalize }}
+                {%- endif -%}
+            </button>
             {%- endfor -%}
         </div>
     </div>
-    
+    {%- endif -%}
+
+    {%- for benchmark in leaderboards -%}
+    <div class="chart-container tab-content{% if forloop.first %} active{% endif %}" data-content="{{ benchmark[0] }}">
+        <input type="text" class="search-bar" placeholder="Search models..." data-search="{{ benchmark[0] }}">
+
+        <div class="chart-container--inner">
+            {%- assign leaderboard_data = benchmark[1] -%}
+            {%- include "leaderboard-chart.liquid", leaderboard_data: leaderboard_data -%}
+        </div>
+    </div>
+    {%- endfor -%}
+
     <script>
         document.documentElement.classList.remove('no-js');
-        
-        const searchInput = document.getElementById('searchInput');
-        const chartRows = document.querySelectorAll('.chart-row');
-        const chartContainer = document.querySelector('.chart-container');
-        
-        const initialHeight = chartContainer.offsetHeight;
-        chartContainer.style.height = initialHeight + 'px';
-        
-        searchInput.addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase();
-            
-            chartRows.forEach(row => {
-                const modelName = row.getAttribute('data-model').toLowerCase();
-                if (modelName.includes(searchTerm)) {
-                    row.style.display = 'grid';
-                } else {
-                    row.style.display = 'none';
+
+        // Tab switching functionality
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const tabName = button.getAttribute('data-tab');
+
+                // Remove active class from all tabs and contents
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabContents.forEach(content => content.classList.remove('active'));
+
+                // Add active class to clicked tab and corresponding content
+                button.classList.add('active');
+                const activeContent = document.querySelector(`[data-content="${tabName}"]`);
+                if (activeContent) {
+                    activeContent.classList.add('active');
                 }
             });
+        });
+
+        // Search functionality for each leaderboard
+        const searchInputs = document.querySelectorAll('.search-bar');
+
+        searchInputs.forEach(searchInput => {
+            const benchmarkName = searchInput.getAttribute('data-search');
+            const container = document.querySelector(`[data-content="${benchmarkName}"]`);
+
+            if (container) {
+                const chartRows = container.querySelectorAll('.chart-row, .multi-metric-row');
+
+                searchInput.addEventListener('input', (e) => {
+                    const searchTerm = e.target.value.toLowerCase();
+
+                    chartRows.forEach(row => {
+                        const modelName = row.getAttribute('data-model').toLowerCase();
+                        if (modelName.includes(searchTerm)) {
+                            row.style.display = 'grid';
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    });
+                });
+            }
         });
     </script>
 </body>
