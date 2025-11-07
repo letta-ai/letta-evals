@@ -417,6 +417,8 @@ class ModelMetrics(BaseModel):
     metrics: Dict[str, float] = Field(
         default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
     )
+    total_cost: Optional[float] = Field(default=None, description="total cost in dollars for this model")
+    avg_cost_per_sample: Optional[float] = Field(default=None, description="average cost in dollars per sample")
 
 
 class MetricAggregate(BaseModel):
@@ -443,6 +445,8 @@ class Metrics(BaseModel):
     metrics: Dict[str, float] = Field(
         default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
     )
+    total_cost: Optional[float] = Field(default=None, description="total cost in dollars across all samples")
+    avg_cost_per_sample: Optional[float] = Field(default=None, description="average cost in dollars per sample")
 
 
 class RunStatistics(BaseModel):
@@ -477,6 +481,7 @@ class SampleResult(BaseModel):
     agent_usage: Optional[List[dict]] = Field(
         default=None, description="Usage statistics emitted by the agent during the run"
     )
+    cost: Optional[float] = Field(default=None, description="Total cost in dollars for this sample run")
 
 
 class RunnerResult(BaseModel):

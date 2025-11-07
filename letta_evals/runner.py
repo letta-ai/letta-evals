@@ -41,7 +41,7 @@ from letta_evals.targets.base import AbstractAgentTarget
 from letta_evals.targets.letta_agent import LettaAgentTarget
 from letta_evals.targets.letta_code_target import LettaCodeTarget
 from letta_evals.types import Aggregation, LogicalOp, TargetKind
-from letta_evals.utils import load_object
+from letta_evals.utils import calculate_cost_from_agent_usage, load_object
 from letta_evals.visualization.base import ProgressCallback
 from letta_evals.visualization.factory import ProgressStyle, create_progress_callback
 
@@ -403,6 +403,9 @@ class Runner:
                         metric_rationales=metric_rationales,
                     )
 
+                # Calculate cost from agent usage
+                cost = calculate_cost_from_agent_usage(model_name, agent_usage) if model_name else None
+
                 return SampleResult(
                     sample=sample,
                     submission=submission,
@@ -413,6 +416,7 @@ class Runner:
                     grades=grades_dict,
                     model_name=model_name,
                     agent_usage=agent_usage,
+                    cost=cost,
                 )
             except Exception as e:
                 if self.progress_callback:
@@ -523,6 +527,7 @@ class Runner:
                                     grades=None,
                                     model_name=model_name,
                                     agent_usage=None,
+                                    cost=None,
                                 )
                                 self.results.append(error_result)
                                 if self.stream_writer:
@@ -609,6 +614,11 @@ class Runner:
             default_key = "default"
             metrics_dict[default_key] = avg_score_attempted * 100.0
 
+        # Calculate overall cost aggregates
+        costs = [r.cost for r in self.results if r.cost is not None]
+        total_cost = sum(costs) if costs else None
+        avg_cost_per_sample = (total_cost / len(self.results)) if total_cost is not None else None
+
         per_model = None
         if self.suite.target.model_configs or self.suite.target.model_handles:
             model_results = defaultdict(list)
@@ -645,6 +655,11 @@ class Runner:
                 model_avg_attempted = sum(model_scores) / len(model_scores) if model_scores else 0.0
                 model_avg_total = sum(model_scores) / len(results) if model_scores else 0.0
 
+                # Calculate cost for this model
+                model_costs = [r.cost for r in results if r.cost is not None]
+                model_total_cost = sum(model_costs) if model_costs else None
+                model_avg_cost = (model_total_cost / len(results)) if model_total_cost is not None else None
+
                 per_model.append(
                     ModelMetrics(
                         model_name=model_name,
@@ -653,6 +668,8 @@ class Runner:
                         avg_score_attempted=model_avg_attempted,
                         avg_score_total=model_avg_total,
                         metrics=model_metrics_dict,
+                        total_cost=model_total_cost,
+                        avg_cost_per_sample=model_avg_cost,
                     )
                 )
 
@@ -664,6 +681,8 @@ class Runner:
             per_model=per_model,
             by_metric=by_metric if by_metric else None,
             metrics=metrics_dict,
+            total_cost=total_cost,
+            avg_cost_per_sample=avg_cost_per_sample,
         )
 
     def _compute_aggregation(
