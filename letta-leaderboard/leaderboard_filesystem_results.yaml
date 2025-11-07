@@ -2,7 +2,7 @@ benchmark_name: Filesystem Suite
 
 metrics:
   leaderboard_filesystem_100:
-    name: Filesystem Score
+    name: Filesystem Rubric
     description: LLM-as-a-judge rubric to evaluate the agent's ability to correctly retrieve and analyze information from filesystem data files
   average:
     name: Average
