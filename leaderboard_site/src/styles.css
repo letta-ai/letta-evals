@@ -269,6 +269,22 @@ body {
   display: flex;
 }
 
+.metric-section {
+  margin-bottom: 2.5rem;
+}
+
+.metric-section:last-child {
+  margin-bottom: 0;
+}
+
+.metric-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--border-color);
+}
+
 @media (max-width: 600px) {
   .chart-row {
     grid-template-columns: 1fr;

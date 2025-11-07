@@ -1,32 +1,105 @@
-{%- assign sorted_by_score = leaderboard_data | sort: "average" | reverse -%}
-{%- assign max_score = sorted_by_score[0].average -%}
-{%- assign sorted_by_cost = leaderboard_data | sort: "total_cost" -%}
-{%- assign min_cost = sorted_by_cost[0].total_cost -%}
-{%- assign sorted_by_cost_desc = leaderboard_data | sort: "total_cost" | reverse -%}
-{%- assign max_cost = sorted_by_cost_desc[0].total_cost -%}
-{%- assign cost_range = max_cost | minus: min_cost -%}
-{%- for entry in sorted_by_score -%}
-<div class="chart-row" data-model="{{ entry.model }}">
-    <div class="chart-label">
-        {%- assign provider = entry.model | split: "/" | first -%}
-        <img src="./icons/{{ provider }}.svg" alt="{{ provider }}" class="model-icon">
-        <span>{{ entry.model }}</span>
-    </div>
-    <div class="chart-bar-wrapper">
-        <div class="chart-bar" style="width: {{ entry.average }}%"></div>
-        <div class="chart-value">
-            <span>{{ entry.average }}%</span>
-            {%- if entry.total_cost <= 4 -%}
-            {%- assign cost_normalized = entry.total_cost | divided_by: 4.0 -%}
-            {%- assign hue = cost_normalized | times: -60 | plus: 120 -%}
-            {%- else -%}
-            {%- assign cost_over_threshold = entry.total_cost | minus: 4 -%}
-            {%- assign remaining_range = max_cost | minus: 4 -%}
-            {%- assign cost_normalized = cost_over_threshold | divided_by: remaining_range -%}
-            {%- assign hue = cost_normalized | times: -60 | plus: 60 -%}
-            {%- endif -%}
-            <span class="cost-badge" style="background-color: hsl({{ hue }}, 70%, 45%); color: white;">${{ entry.total_cost }}</span>
+{%- comment -%} Check if we have multiple metrics by examining the first entry {%- endcomment -%}
+{%- assign first_entry = leaderboard_data[0] -%}
+{%- assign metric_keys = "" | split: "" -%}
+{%- assign has_costs = false -%}
+
+{%- for key_value in first_entry -%}
+    {%- assign key = key_value[0] -%}
+    {%- if key != "model" and key != "average" and key != "total_cost" -%}
+        {%- assign metric_keys = metric_keys | push: key -%}
+    {%- endif -%}
+    {%- if key == "total_cost" -%}
+        {%- assign has_costs = true -%}
+    {%- endif -%}
+{%- endfor -%}
+
+{%- assign has_multiple_metrics = false -%}
+{%- if metric_keys.size > 1 -%}
+    {%- assign has_multiple_metrics = true -%}
+{%- endif -%}
+
+{%- if has_multiple_metrics -%}
+    {%- comment -%} Multiple metrics case: create separate sections for each metric {%- endcomment -%}
+    {%- for metric_key in metric_keys -%}
+        {%- assign sorted_by_metric = leaderboard_data | sort: metric_key | reverse -%}
+        {%- assign max_metric_value = sorted_by_metric[0][metric_key] -%}
+
+        {%- comment -%} Calculate cost range if costs exist {%- endcomment -%}
+        {%- if has_costs -%}
+            {%- assign sorted_by_cost = leaderboard_data | sort: "total_cost" -%}
+            {%- assign min_cost = sorted_by_cost[0].total_cost -%}
+            {%- assign sorted_by_cost_desc = leaderboard_data | sort: "total_cost" | reverse -%}
+            {%- assign max_cost = sorted_by_cost_desc[0].total_cost -%}
+            {%- assign cost_range = max_cost | minus: min_cost -%}
+        {%- endif -%}
+
+        <div class="metric-section">
+            <h3 class="metric-title">{{ metric_key | replace: "_", " " | replace: "-", " " | capitalize }}</h3>
+            {%- for entry in sorted_by_metric -%}
+            <div class="chart-row" data-model="{{ entry.model }}">
+                <div class="chart-label">
+                    {%- assign provider = entry.model | split: "/" | first -%}
+                    <img src="./icons/{{ provider }}.svg" alt="{{ provider }}" class="model-icon">
+                    <span>{{ entry.model }}</span>
+                </div>
+                <div class="chart-bar-wrapper">
+                    <div class="chart-bar" style="width: {{ entry[metric_key] }}%"></div>
+                    <div class="chart-value">
+                        <span>{{ entry[metric_key] }}%</span>
+                        {%- if has_costs -%}
+                            {%- if entry.total_cost <= 4 -%}
+                            {%- assign cost_normalized = entry.total_cost | divided_by: 4.0 -%}
+                            {%- assign hue = cost_normalized | times: -60 | plus: 120 -%}
+                            {%- else -%}
+                            {%- assign cost_over_threshold = entry.total_cost | minus: 4 -%}
+                            {%- assign remaining_range = max_cost | minus: 4 -%}
+                            {%- assign cost_normalized = cost_over_threshold | divided_by: remaining_range -%}
+                            {%- assign hue = cost_normalized | times: -60 | plus: 60 -%}
+                            {%- endif -%}
+                            <span class="cost-badge" style="background-color: hsl({{ hue }}, 70%, 45%); color: white;">${{ entry.total_cost }}</span>
+                        {%- endif -%}
+                    </div>
+                </div>
+            </div>
+            {%- endfor -%}
+        </div>
+    {%- endfor -%}
+{%- else -%}
+    {%- comment -%} Single metric case: use average (original behavior) {%- endcomment -%}
+    {%- assign sorted_by_score = leaderboard_data | sort: "average" | reverse -%}
+    {%- assign max_score = sorted_by_score[0].average -%}
+    {%- if has_costs -%}
+        {%- assign sorted_by_cost = leaderboard_data | sort: "total_cost" -%}
+        {%- assign min_cost = sorted_by_cost[0].total_cost -%}
+        {%- assign sorted_by_cost_desc = leaderboard_data | sort: "total_cost" | reverse -%}
+        {%- assign max_cost = sorted_by_cost_desc[0].total_cost -%}
+        {%- assign cost_range = max_cost | minus: min_cost -%}
+    {%- endif -%}
+    {%- for entry in sorted_by_score -%}
+    <div class="chart-row" data-model="{{ entry.model }}">
+        <div class="chart-label">
+            {%- assign provider = entry.model | split: "/" | first -%}
+            <img src="./icons/{{ provider }}.svg" alt="{{ provider }}" class="model-icon">
+            <span>{{ entry.model }}</span>
+        </div>
+        <div class="chart-bar-wrapper">
+            <div class="chart-bar" style="width: {{ entry.average }}%"></div>
+            <div class="chart-value">
+                <span>{{ entry.average }}%</span>
+                {%- if has_costs -%}
+                    {%- if entry.total_cost <= 4 -%}
+                    {%- assign cost_normalized = entry.total_cost | divided_by: 4.0 -%}
+                    {%- assign hue = cost_normalized | times: -60 | plus: 120 -%}
+                    {%- else -%}
+                    {%- assign cost_over_threshold = entry.total_cost | minus: 4 -%}
+                    {%- assign remaining_range = max_cost | minus: 4 -%}
+                    {%- assign cost_normalized = cost_over_threshold | divided_by: remaining_range -%}
+                    {%- assign hue = cost_normalized | times: -60 | plus: 60 -%}
+                    {%- endif -%}
+                    <span class="cost-badge" style="background-color: hsl({{ hue }}, 70%, 45%); color: white;">${{ entry.total_cost }}</span>
+                {%- endif -%}
+            </div>
         </div>
     </div>
-</div>
-{%- endfor -%}
+    {%- endfor -%}
+{%- endif -%}
