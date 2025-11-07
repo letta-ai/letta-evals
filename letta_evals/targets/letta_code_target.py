@@ -83,12 +83,14 @@ class LettaCodeTarget(AbstractAgentTarget):
                 if self.skills_dir:
                     cmd.extend(["--skills", str(self.skills_dir)])
 
-                cmd.extend([
-                    "--model",
-                    self.model_handle,
-                    "-p",
-                    prompt,
-                ])
+                cmd.extend(
+                    [
+                        "--model",
+                        self.model_handle,
+                        "-p",
+                        prompt,
+                    ]
+                )
 
                 # add tool permissions if specified
                 if self.allowed_tools:

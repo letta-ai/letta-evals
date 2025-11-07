@@ -11,11 +11,12 @@ Usage:
 
 import argparse
 import json
-import os
+from collections import defaultdict
 from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
-from collections import defaultdict
+
 
 def collect_results(results_dir="results_old"):
     """Collect all summary.json files and extract metrics by model."""
@@ -43,7 +44,7 @@ def collect_results(results_dir="results_old"):
             continue
 
         # Load and extract metrics from per_model array
-        with open(summary_file, 'r') as f:
+        with open(summary_file, "r") as f:
             data = json.load(f)
 
         per_model = data.get("metrics", {}).get("per_model", [])
@@ -55,15 +56,13 @@ def collect_results(results_dir="results_old"):
             task_completion = metrics.get("task_completion", 0)
             skill_use = metrics.get("skill_use", 0)
 
-            results[model_name][setting] = {
-                "task_completion": task_completion,
-                "skill_use": skill_use
-            }
+            results[model_name][setting] = {"task_completion": task_completion, "skill_use": skill_use}
 
             print(f"  - {model_name}: task_completion={task_completion:.2f}, skill_use={skill_use:.2f}")
         print()
 
     return results
+
 
 def create_plot(results, metric_name, ylabel, title, filename):
     """Create a grouped bar plot with models on x-axis and settings as bars."""
@@ -98,9 +97,9 @@ def create_plot(results, metric_name, ylabel, title, filename):
 
     # Setting colors
     colors = {
-        "baseline": "#3498db",    # Blue
-        "oracle": "#e74c3c",      # Red
-        "selection": "#2ecc71"    # Green
+        "baseline": "#3498db",  # Blue
+        "oracle": "#e74c3c",  # Red
+        "selection": "#2ecc71",  # Green
     }
 
     # Create figure
@@ -119,44 +118,57 @@ def create_plot(results, metric_name, ylabel, title, filename):
                 values.append(0)
 
         offset = width * multiplier
-        bars = ax.bar(x + offset, values, width,
-                     label=setting.capitalize(),
-                     color=colors.get(setting, "#999999"),
-                     edgecolor='black', linewidth=1, alpha=0.85)
+        bars = ax.bar(
+            x + offset,
+            values,
+            width,
+            label=setting.capitalize(),
+            color=colors.get(setting, "#999999"),
+            edgecolor="black",
+            linewidth=1,
+            alpha=0.85,
+        )
 
         # Add value labels on bars
         for bar, value in zip(bars, values):
             height = bar.get_height()
             if height > 0:
-                ax.text(bar.get_x() + bar.get_width()/2., height,
-                       f'{value:.1f}',
-                       ha='center', va='bottom', fontsize=8, fontweight='bold')
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2.0,
+                    height,
+                    f"{value:.1f}",
+                    ha="center",
+                    va="bottom",
+                    fontsize=8,
+                    fontweight="bold",
+                )
 
         multiplier += 1
 
-    ax.set_xlabel('Model', fontsize=14, fontweight='bold')
-    ax.set_ylabel(ylabel, fontsize=14, fontweight='bold')
-    ax.set_title(title, fontsize=16, fontweight='bold', pad=20)
+    ax.set_xlabel("Model", fontsize=14, fontweight="bold")
+    ax.set_ylabel(ylabel, fontsize=14, fontweight="bold")
+    ax.set_title(title, fontsize=16, fontweight="bold", pad=20)
     ax.set_xticks(x + width)
-    ax.set_xticklabels(model_display_names, fontsize=10, rotation=45, ha='right')
-    ax.legend(loc='upper left', fontsize=12, framealpha=0.9)
-    ax.grid(axis='y', alpha=0.3, linestyle='--')
+    ax.set_xticklabels(model_display_names, fontsize=10, rotation=45, ha="right")
+    ax.legend(loc="upper left", fontsize=12, framealpha=0.9)
+    ax.grid(axis="y", alpha=0.3, linestyle="--")
 
     plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.savefig(filename, dpi=300, bbox_inches="tight")
     print(f"Saved plot to {filename}")
     plt.close()
 
+
 def print_summary_table(results):
     """Print a summary table of all results by model."""
-    print("\n" + "="*110)
+    print("\n" + "=" * 110)
     print("SUMMARY TABLE (by Model)")
-    print("="*110)
+    print("=" * 110)
 
     settings = ["baseline", "oracle", "selection"]
 
     print(f"{'Model':<50} {'Setting':<15} {'Task Completion':<20} {'Skill Use':<15}")
-    print("-"*110)
+    print("-" * 110)
 
     for model in sorted(results.keys()):
         for setting in settings:
@@ -168,7 +180,8 @@ def print_summary_table(results):
                 print(f"{model:<50} {setting:<15} {'N/A':<20} {'N/A':<15}")
         print()
 
-    print("="*110)
+    print("=" * 110)
+
 
 def create_aggregated_plot(results, filename):
     """Create a grouped bar plot with mean of task completion and skill use."""
@@ -203,9 +216,9 @@ def create_aggregated_plot(results, filename):
 
     # Setting colors
     colors = {
-        "baseline": "#3498db",    # Blue
-        "oracle": "#e74c3c",      # Red
-        "selection": "#2ecc71"    # Green
+        "baseline": "#3498db",  # Blue
+        "oracle": "#e74c3c",  # Red
+        "selection": "#2ecc71",  # Green
     }
 
     # Create figure
@@ -228,33 +241,46 @@ def create_aggregated_plot(results, filename):
                 values.append(0)
 
         offset = width * multiplier
-        bars = ax.bar(x + offset, values, width,
-                     label=setting.capitalize(),
-                     color=colors.get(setting, "#999999"),
-                     edgecolor='black', linewidth=1, alpha=0.85)
+        bars = ax.bar(
+            x + offset,
+            values,
+            width,
+            label=setting.capitalize(),
+            color=colors.get(setting, "#999999"),
+            edgecolor="black",
+            linewidth=1,
+            alpha=0.85,
+        )
 
         # Add value labels on bars
         for bar, value in zip(bars, values):
             height = bar.get_height()
             if height > 0:
-                ax.text(bar.get_x() + bar.get_width()/2., height,
-                       f'{value:.1f}',
-                       ha='center', va='bottom', fontsize=8, fontweight='bold')
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2.0,
+                    height,
+                    f"{value:.1f}",
+                    ha="center",
+                    va="bottom",
+                    fontsize=8,
+                    fontweight="bold",
+                )
 
         multiplier += 1
 
-    ax.set_xlabel('Model', fontsize=14, fontweight='bold')
-    ax.set_ylabel('Average Score (%)', fontsize=14, fontweight='bold')
-    ax.set_title('Average Score (Task Completion + Skill Use) Across Settings', fontsize=16, fontweight='bold', pad=20)
+    ax.set_xlabel("Model", fontsize=14, fontweight="bold")
+    ax.set_ylabel("Average Score (%)", fontsize=14, fontweight="bold")
+    ax.set_title("Average Score (Task Completion + Skill Use) Across Settings", fontsize=16, fontweight="bold", pad=20)
     ax.set_xticks(x + width)
-    ax.set_xticklabels(model_display_names, fontsize=10, rotation=45, ha='right')
-    ax.legend(loc='upper left', fontsize=12, framealpha=0.9)
-    ax.grid(axis='y', alpha=0.3, linestyle='--')
+    ax.set_xticklabels(model_display_names, fontsize=10, rotation=45, ha="right")
+    ax.legend(loc="upper left", fontsize=12, framealpha=0.9)
+    ax.grid(axis="y", alpha=0.3, linestyle="--")
 
     plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.savefig(filename, dpi=300, bbox_inches="tight")
     print(f"Saved plot to {filename}")
     plt.close()
+
 
 def create_setting_aggregation_plot(results, filename):
     """Create a bar plot with 3 bars showing average scores across all models for each setting."""
@@ -276,7 +302,7 @@ def create_setting_aggregation_plot(results, filename):
         # Calculate average of both metrics combined
         if task_comp_scores and skill_use_scores:
             avg_task_comp = np.mean(task_comp_scores)
-            avg_skill_use = np.mean(skill_use_scores)
+            # avg_skill_use = np.mean(skill_use_scores)
             # Average of task completion and skill use
             # setting_averages[setting] = (avg_task_comp + avg_skill_use) / 2
             setting_averages[setting] = avg_task_comp
@@ -285,9 +311,9 @@ def create_setting_aggregation_plot(results, filename):
 
     # Setting colors
     colors = {
-        "baseline": "#3498db",    # Blue
-        "oracle": "#e74c3c",      # Red
-        "selection": "#2ecc71"    # Green
+        "baseline": "#3498db",  # Blue
+        "oracle": "#e74c3c",  # Red
+        "selection": "#2ecc71",  # Green
     }
 
     # Create figure
@@ -297,46 +323,45 @@ def create_setting_aggregation_plot(results, filename):
     values = [setting_averages[s] for s in settings]
     bar_colors = [colors[s] for s in settings]
 
-    bars = ax.bar(x, values, width=0.6,
-                  color=bar_colors,
-                  edgecolor='black', linewidth=2, alpha=0.85)
+    bars = ax.bar(x, values, width=0.6, color=bar_colors, edgecolor="black", linewidth=2, alpha=0.85)
 
     # Add value labels on bars
     for bar, value in zip(bars, values):
         height = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2., height,
-               f'{value:.1f}%',
-               ha='center', va='bottom', fontsize=14, fontweight='bold')
+        ax.text(
+            bar.get_x() + bar.get_width() / 2.0,
+            height,
+            f"{value:.1f}%",
+            ha="center",
+            va="bottom",
+            fontsize=14,
+            fontweight="bold",
+        )
 
-    ax.set_xlabel('Setting', fontsize=14, fontweight='bold')
-    ax.set_ylabel('Average Score (%)', fontsize=14, fontweight='bold')
-    ax.set_title('Average Score Across All Models by Setting', fontsize=16, fontweight='bold', pad=20)
+    ax.set_xlabel("Setting", fontsize=14, fontweight="bold")
+    ax.set_ylabel("Average Score (%)", fontsize=14, fontweight="bold")
+    ax.set_title("Average Score Across All Models by Setting", fontsize=16, fontweight="bold", pad=20)
     ax.set_xticks(x)
     ax.set_xticklabels([s.capitalize() for s in settings], fontsize=12)
-    ax.grid(axis='y', alpha=0.3, linestyle='--')
+    ax.grid(axis="y", alpha=0.3, linestyle="--")
     ax.set_ylim(0, max(values) * 1.15)  # Add some space at the top for labels
 
     plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.savefig(filename, dpi=300, bbox_inches="tight")
     print(f"Saved plot to {filename}")
     plt.close()
 
+
 def main():
     # Parse command line arguments
-    parser = argparse.ArgumentParser(
-        description="Analyze results from summary.json files and create plots."
-    )
+    parser = argparse.ArgumentParser(description="Analyze results from summary.json files and create plots.")
     parser.add_argument(
         "results_dir",
         nargs="?",
         default="results_old",
-        help="Directory containing result folders with summary.json files (default: results_old)"
+        help="Directory containing result folders with summary.json files (default: results_old)",
     )
-    parser.add_argument(
-        "--output-dir",
-        default="plots",
-        help="Directory to save plots (default: plots)"
-    )
+    parser.add_argument("--output-dir", default="plots", help="Directory to save plots (default: plots)")
     args = parser.parse_args()
 
     # Create output directory if it doesn't exist
@@ -358,7 +383,7 @@ def main():
         metric_name="task_completion",
         ylabel="Task Completion Score (%)",
         title="Task Completion Scores Across Settings",
-        filename=output_dir / "task_completion_plot.png"
+        filename=output_dir / "task_completion_plot.png",
     )
 
     create_plot(
@@ -366,21 +391,16 @@ def main():
         metric_name="skill_use",
         ylabel="Skill Use Score (%)",
         title="Skill Use Scores Across Settings",
-        filename=output_dir / "skill_use_plot.png"
+        filename=output_dir / "skill_use_plot.png",
     )
 
-    create_aggregated_plot(
-        results,
-        filename=output_dir / "aggregated_score_plot.png"
-    )
+    create_aggregated_plot(results, filename=output_dir / "aggregated_score_plot.png")
 
-    create_setting_aggregation_plot(
-        results,
-        filename=output_dir / "setting_aggregation_plot.png"
-    )
+    create_setting_aggregation_plot(results, filename=output_dir / "setting_aggregation_plot.png")
 
     print("\nAnalysis complete!")
     print(f"All plots saved to: {output_dir.absolute()}")
+
 
 if __name__ == "__main__":
     main()

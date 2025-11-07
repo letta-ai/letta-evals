@@ -341,7 +341,7 @@ class SuiteSpec(BaseModel):
                         yaml_data["target"]["working_dir"] = str(
                             (base_dir / yaml_data["target"]["working_dir"]).resolve()
                         )
-                
+
                 if "skills_dir" in yaml_data["target"] and yaml_data["target"]["skills_dir"]:
                     if not Path(yaml_data["target"]["skills_dir"]).is_absolute():
                         yaml_data["target"]["skills_dir"] = str(
