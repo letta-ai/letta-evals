@@ -53,7 +53,11 @@
         <div class="tabs">
             {%- for benchmark in leaderboards -%}
             <button class="tab-button{% if forloop.first %} active{% endif %}" data-tab="{{ benchmark[0] }}">
-                {{ benchmark[0] | replace: "-", " " | capitalize }}
+                {%- if benchmarkNames[benchmark[0]] -%}
+                    {{ benchmarkNames[benchmark[0]] }}
+                {%- else -%}
+                    {{ benchmark[0] | replace: "-", " " | capitalize }}
+                {%- endif -%}
             </button>
             {%- endfor -%}
         </div>

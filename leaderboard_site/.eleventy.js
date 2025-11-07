@@ -17,18 +17,30 @@ module.exports = function(eleventyConfig) {
         if (filename.startsWith('leaderboard_') && filename.endsWith('.yaml')) {
           const filePath = path.join(leaderboardDir, filename);
 
-          // Extract benchmark name
-          let benchmarkName = filename.replace('leaderboard_', '').replace('.yaml', '');
+          // Extract benchmark key from filename
+          let benchmarkKey = filename.replace('leaderboard_', '').replace('.yaml', '');
           // Remove '_results' suffix if present
-          benchmarkName = benchmarkName.replace('_results', '');
+          benchmarkKey = benchmarkKey.replace('_results', '');
 
           // Skip if it's just "results" (backward compat file)
-          if (benchmarkName === 'results' || benchmarkName === 'all') {
+          if (benchmarkKey === 'results' || benchmarkKey === 'all') {
             return;
           }
 
           const fileContents = fs.readFileSync(filePath, 'utf8');
-          leaderboards[benchmarkName] = yaml.load(fileContents);
+          const data = yaml.load(fileContents);
+
+          // Check if the YAML has the new structure with metrics and results
+          if (data && typeof data === 'object' && data.results && Array.isArray(data.results)) {
+            // New structure: extract results array
+            leaderboards[benchmarkKey] = data.results;
+          } else if (Array.isArray(data)) {
+            // Old structure: data is already an array
+            leaderboards[benchmarkKey] = data;
+          } else {
+            // Fallback
+            leaderboards[benchmarkKey] = data;
+          }
         }
       });
     }
@@ -38,11 +50,86 @@ module.exports = function(eleventyConfig) {
       const fallbackPath = path.join(leaderboardDir, 'leaderboard_results.yaml');
       if (fs.existsSync(fallbackPath)) {
         const fileContents = fs.readFileSync(fallbackPath, 'utf8');
-        leaderboards['filesystem'] = yaml.load(fileContents);
+        const data = yaml.load(fileContents);
+        leaderboards['filesystem'] = Array.isArray(data) ? data : (data.results || data);
       }
     }
 
     return leaderboards;
+  });
+
+  // Load benchmark names from each leaderboard file
+  eleventyConfig.addGlobalData("benchmarkNames", function() {
+    const leaderboardDir = '../letta-leaderboard';
+    const benchmarkNames = {};
+
+    // Find all leaderboard_*.yaml files
+    if (fs.existsSync(leaderboardDir)) {
+      const files = fs.readdirSync(leaderboardDir);
+
+      files.forEach(filename => {
+        if (filename.startsWith('leaderboard_') && filename.endsWith('.yaml')) {
+          const filePath = path.join(leaderboardDir, filename);
+
+          // Extract benchmark key from filename
+          let benchmarkKey = filename.replace('leaderboard_', '').replace('.yaml', '');
+          benchmarkKey = benchmarkKey.replace('_results', '');
+
+          if (benchmarkKey === 'results' || benchmarkKey === 'all') {
+            return;
+          }
+
+          const fileContents = fs.readFileSync(filePath, 'utf8');
+          const data = yaml.load(fileContents);
+
+          // Extract benchmark_name if it exists in the new structure
+          if (data && typeof data === 'object' && data.benchmark_name) {
+            benchmarkNames[benchmarkKey] = data.benchmark_name;
+          } else {
+            // Fallback: use capitalized key
+            benchmarkNames[benchmarkKey] = benchmarkKey.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          }
+        }
+      });
+    }
+
+    return benchmarkNames;
+  });
+
+  // Load metrics metadata from each leaderboard file
+  eleventyConfig.addGlobalData("metricsMetadata", function() {
+    const leaderboardDir = '../letta-leaderboard';
+    const allMetrics = {};
+
+    // Find all leaderboard_*.yaml files
+    if (fs.existsSync(leaderboardDir)) {
+      const files = fs.readdirSync(leaderboardDir);
+
+      files.forEach(filename => {
+        if (filename.startsWith('leaderboard_') && filename.endsWith('.yaml')) {
+          const filePath = path.join(leaderboardDir, filename);
+
+          // Extract benchmark name
+          let benchmarkName = filename.replace('leaderboard_', '').replace('.yaml', '');
+          benchmarkName = benchmarkName.replace('_results', '');
+
+          if (benchmarkName === 'results' || benchmarkName === 'all') {
+            return;
+          }
+
+          const fileContents = fs.readFileSync(filePath, 'utf8');
+          const data = yaml.load(fileContents);
+
+          // Extract metrics if they exist in the new structure
+          if (data && typeof data === 'object' && data.metrics) {
+            // Merge metrics from this file into the global metrics object
+            Object.assign(allMetrics, data.metrics);
+          }
+        }
+      });
+    }
+
+    return allMetrics;
   });
 
   // Keep backward compatibility with single leaderboard
