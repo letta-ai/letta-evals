@@ -88,6 +88,7 @@ class LettaCodeTargetSpec(BaseTargetSpec):
     kind: Literal[TargetKind.LETTA_CODE] = TargetKind.LETTA_CODE
 
     working_dir: Optional[Path] = Field(default=None, description="Working directory for letta code execution")
+    skills_dir: Optional[Path] = Field(default=None, description="Directory containing skills to load")
     allowed_tools: Optional[List[str]] = Field(
         default=None, description="List of allowed tools for letta code (e.g., ['Bash', 'Read'])"
     )
@@ -339,6 +340,12 @@ class SuiteSpec(BaseModel):
                     if not Path(yaml_data["target"]["working_dir"]).is_absolute():
                         yaml_data["target"]["working_dir"] = str(
                             (base_dir / yaml_data["target"]["working_dir"]).resolve()
+                        )
+                
+                if "skills_dir" in yaml_data["target"] and yaml_data["target"]["skills_dir"]:
+                    if not Path(yaml_data["target"]["skills_dir"]).is_absolute():
+                        yaml_data["target"]["skills_dir"] = str(
+                            (base_dir / yaml_data["target"]["skills_dir"]).resolve()
                         )
 
                 # store base_dir in target for agent_script resolution

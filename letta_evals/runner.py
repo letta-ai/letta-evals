@@ -159,6 +159,7 @@ class Runner:
                 client=self.client,
                 model_handle=model_handle,
                 working_dir=working_dir,
+                skills_dir=self.suite.target.skills_dir,
                 allowed_tools=self.suite.target.allowed_tools,
                 disallowed_tools=self.suite.target.disallowed_tools,
                 timeout=int(self.suite.target.timeout),
