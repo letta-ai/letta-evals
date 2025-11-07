@@ -31,8 +31,8 @@
         {%- assign cost_range = max_cost | minus: min_cost -%}
     {%- endif -%}
 
-    {%- comment -%} Metric headers {%- endcomment -%}
-    <div class="multi-metric-header">
+    {%- comment -%} Metric headers - close inner container and reopen after header {%- endcomment -%}
+    </div><div class="multi-metric-header">
         <div class="model-column-header">Model</div>
         <div class="metrics-columns-header">
             {%- for metric_key in metric_keys -%}
@@ -56,7 +56,7 @@
             </div>
             {%- endfor -%}
         </div>
-    </div>
+    </div><div class="chart-container--inner">
 
     {%- for entry in sorted_by_score -%}
     <div class="multi-metric-row" data-model="{{ entry.model }}">
@@ -103,9 +103,9 @@
         {%- assign cost_range = max_cost | minus: min_cost -%}
     {%- endif -%}
 
-    {%- comment -%} Single metric header {%- endcomment -%}
+    {%- comment -%} Single metric header - close inner container and reopen after header {%- endcomment -%}
     {%- assign single_metric_key = metric_keys[0] -%}
-    <div class="single-metric-header">
+    </div><div class="single-metric-header">
         <div class="model-column-header">Model</div>
         <div class="metric-column-header-single">
             <span class="metric-name">
@@ -125,7 +125,7 @@
             </span>
             {%- endif -%}
         </div>
-    </div>
+    </div><div class="chart-container--inner">
 
     {%- for entry in sorted_by_score -%}
     <div class="chart-row" data-model="{{ entry.model }}">
