@@ -21,6 +21,7 @@ class LettaCodeTarget(AbstractAgentTarget):
         client: AsyncLetta,
         model_handle: str = "anthropic/claude-sonnet-4-5-20250929",
         working_dir: Optional[Path] = None,
+        skills_dir: Optional[Path] = None,
         allowed_tools: Optional[list[str]] = None,
         disallowed_tools: Optional[list[str]] = None,
         timeout: int = 300,
@@ -32,6 +33,7 @@ class LettaCodeTarget(AbstractAgentTarget):
             client: AsyncLetta client for retrieving messages after CLI execution
             model_handle: Model handle to use with letta code
             working_dir: Working directory for letta command execution
+            skills_dir: Directory containing skills to load
             allowed_tools: List of allowed tools (e.g., ["Bash", "Read"])
             disallowed_tools: List of disallowed tools
             timeout: Command timeout in seconds (default: 300)
@@ -40,6 +42,7 @@ class LettaCodeTarget(AbstractAgentTarget):
         self.client = client
         self.model_handle = model_handle
         self.working_dir = working_dir or Path.cwd()
+        self.skills_dir = skills_dir
         self.allowed_tools = allowed_tools
         self.disallowed_tools = disallowed_tools
         self.timeout = timeout
@@ -74,11 +77,20 @@ class LettaCodeTarget(AbstractAgentTarget):
                     "--yolo",
                     "--output-format",
                     "json",
-                    "--model",
-                    self.model_handle,
-                    "-p",
-                    prompt,
                 ]
+
+                # add skills directory if specified
+                if self.skills_dir:
+                    cmd.extend(["--skills", str(self.skills_dir)])
+
+                cmd.extend(
+                    [
+                        "--model",
+                        self.model_handle,
+                        "-p",
+                        prompt,
+                    ]
+                )
 
                 # add tool permissions if specified
                 if self.allowed_tools:
