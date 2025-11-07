@@ -1,0 +1,15 @@
+{
+  "skill_name": "slack-gif-creator",
+  "task": "Create an animated GIF suitable for Slack messages (not emoji) that depicts a progress bar filling up from 0% to 100%. The animation should start with an empty progress bar outline at the bottom third of the frame. Above it, show '0%' text. The bar should smoothly fill from left to right with a vibrant color gradient (like blue transitioning to green). As the bar fills, update the percentage text above it to show 25%, 50%, 75%, and finally 100%. When it reaches 100%, add a celebratory effect - make the bar pulse or glow briefly, and have small confetti particles or sparkles burst from the ends of the bar. The animation should be about 3 seconds long, optimized for 480x480 dimensions, and stay well under 2MB. Use smooth easing for the fill animation so it doesn't feel mechanical. After creating the GIF, validate that it meets the file size requirements for Slack message GIFs.",
+  "rubric_task_completion": "1. The GIF shows a progress bar that visually fills from 0% to 100% with smooth animation and color gradient\n2. Percentage text is displayed and updates at key milestones (0%, 25%, 50%, 75%, 100%)\n3. A celebratory effect (pulse/glow and particles/sparkles) appears when the bar reaches 100%\n4. The final GIF file is validated and confirmed to be under 2MB and suitable for Slack messages",
+  "rubric_skill_use": "1. The slack-gif-creator skill is selected for this task\n2. The SKILL.md file from the slack-gif-creator skill is loaded into context\n3. Required core files (gif_builder.py, validators.py, easing.py, frame_composer.py, typography.py) and at least one visual effects file (visual_effects.py or templates for animation) are loaded\n4. The skill components are used appropriately: GIFBuilder is used to assemble frames, easing functions are applied for smooth fill animation, typography is used for percentage text, visual effects or particles are added for celebration, and validators confirm the file meets Slack's message GIF requirements (under 2MB, appropriate dimensions)",
+  "files": [
+    "slack-gif-creator/SKILL.md",
+    "slack-gif-creator/core/gif_builder.py",
+    "slack-gif-creator/core/validators.py",
+    "slack-gif-creator/core/easing.py",
+    "slack-gif-creator/core/frame_composer.py",
+    "slack-gif-creator/core/typography.py",
+    "slack-gif-creator/core/visual_effects.py"
+  ]
+}

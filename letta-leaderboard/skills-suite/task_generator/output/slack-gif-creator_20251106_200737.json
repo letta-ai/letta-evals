@@ -1,0 +1,15 @@
+{
+  "skill_name": "slack-gif-creator",
+  "task": "I need a custom animated emoji for our Slack that shows a thought process happening. Start with a simple lightbulb emoji that's dim/off, then have it flicker a few times (alternating between dim and slightly brighter states), and finally have it fully light up with a bright glow or sparkle effect around it to indicate the 'aha!' moment. The flickering should feel quick and energetic, like synapses firing. Make sure it loops smoothly and stays under 64KB for Slack emoji upload. The final lit-up state should hold for a moment before it loops back to show the idea forming again. Verify the file meets Slack's emoji requirements before finishing.",
+  "rubric_task_completion": "1. The GIF shows a lightbulb that transitions from dim/off through a flickering phase to a fully lit state with visual enhancement (glow or sparkle effect)\n2. The flickering phase is visible and creates an energetic effect with multiple alternations between dim and brighter states\n3. The final file size is under 64KB and validated to meet Slack's emoji requirements (128x128 dimensions, appropriate color count)\n4. The animation loops smoothly with the fully lit state holding briefly before restarting, and the total duration is appropriate for a Slack emoji (1-2 seconds)",
+  "rubric_skill_use": "1. The slack-gif-creator skill is selected for creating the animated GIF\n2. The SKILL.md file from the slack-gif-creator skill is loaded to understand GIF creation methods and Slack constraints\n3. At least three additional files are loaded and used: core/gif_builder.py for assembling the GIF, core/validators.py for checking Slack requirements, and at least one file for creating visual effects (such as core/visual_effects.py, templates/fade.py, or templates/pulse.py)\n4. The skill is used appropriately by creating frames that show the lightbulb state transitions, applying visual effects for the glow/sparkle, optimizing for emoji size constraints (aggressive optimization with limited colors and frames), and validating the final file against Slack's 64KB limit",
+  "files": [
+    "slack-gif-creator/SKILL.md",
+    "slack-gif-creator/core/gif_builder.py",
+    "slack-gif-creator/core/validators.py",
+    "slack-gif-creator/core/visual_effects.py",
+    "slack-gif-creator/core/frame_composer.py",
+    "slack-gif-creator/templates/fade.py",
+    "slack-gif-creator/core/easing.py"
+  ]
+}

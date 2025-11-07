@@ -1,0 +1,17 @@
+{
+  "skill_name": "slack-gif-creator",
+  "task": "Our team wants a fun animated reaction for Slack messages that shows the concept of 'mind blown'. Create an animation that starts with a simple head or face emoji positioned in the center of the frame. The head should initially be calm and static. Then, after a brief pause, the head should start to tremble or vibrate slightly, with increasing intensity over about half a second. At the peak of the trembling, create an explosive effect where the head appears to burst apart into multiple pieces that fly outward in all directions while simultaneously spawning colorful particles (like sparkles or small dots) that scatter across the frame. The pieces should slow down as they reach the edges and start to fade out. The entire animation should be about 2-3 seconds long and optimized for sharing in Slack message threads (not as a custom emoji). Use dimensions around 480x480 pixels and make sure the final file stays well under 2MB. The colors should be vibrant and eye-catching. After creating the GIF, verify that it meets all the file size requirements for Slack message use.",
+  "rubric_task_completion": "1. The GIF depicts a clear 'mind blown' concept with a head/face that starts calm, trembles with increasing intensity, and then explodes into pieces\n2. The explosion effect includes both the head breaking into multiple pieces that fly outward AND colorful particles (sparkles/dots) that scatter across the frame\n3. The animation is 2-3 seconds long, uses dimensions close to 480x480 pixels, and the final file is under 2MB for Slack message use\n4. The file is validated against Slack's requirements and confirmation is provided that it meets the size constraints for message GIFs",
+  "rubric_skill_use": "1. The agent identifies and selects the 'slack-gif-creator' skill as appropriate for creating an animated GIF for Slack\n2. The agent loads the SKILL.md file from the slack-gif-creator skill to understand the toolkit structure, validators, and animation primitives\n3. The agent loads and uses the explosion/particle effect files (slack-gif-creator/templates/explode.py, slack-gif-creator/core/visual_effects.py), trembling/shake animation files (slack-gif-creator/templates/shake.py or slack-gif-creator/templates/wiggle.py), the GIF builder (slack-gif-creator/core/gif_builder.py), validators (slack-gif-creator/core/validators.py), and supporting files like frame_composer.py and easing.py as needed\n4. The agent appropriately combines multiple animation primitives (shake/wiggle for trembling, explode for the burst effect, particle systems for scatter), uses the GIFBuilder to assemble frames with proper optimization settings for message GIFs (not emoji), and runs validators to confirm the file meets Slack's 2MB limit for message GIFs",
+  "files": [
+    "slack-gif-creator/SKILL.md",
+    "slack-gif-creator/core/gif_builder.py",
+    "slack-gif-creator/core/validators.py",
+    "slack-gif-creator/templates/explode.py",
+    "slack-gif-creator/templates/shake.py",
+    "slack-gif-creator/templates/wiggle.py",
+    "slack-gif-creator/core/visual_effects.py",
+    "slack-gif-creator/core/frame_composer.py",
+    "slack-gif-creator/core/easing.py"
+  ]
+}

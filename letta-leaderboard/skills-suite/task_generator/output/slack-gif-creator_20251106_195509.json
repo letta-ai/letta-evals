@@ -1,0 +1,15 @@
+{
+  "skill_name": "slack-gif-creator",
+  "task": "I need an animated emoji for our team's Slack workspace. Create a GIF showing a trophy that starts small in the center, then dramatically zooms in to fill most of the frame while adding a bright golden glow effect, and finally pulses twice like it's celebrating. The animation should be under 64KB so it can be uploaded as a custom Slack emoji, optimized for 128x128 dimensions. Make sure to verify the final file size meets the requirements before finishing.",
+  "rubric_task_completion": "1. An animated GIF file is created featuring a trophy emoji with the described sequence: starts small, zooms in dramatically, and pulses twice at the end.\n2. The GIF dimensions are optimized for Slack emoji usage (128x128 pixels) with appropriate frame count and color palette for the 64KB size limit.\n3. Visual effects are applied appropriately, including the zoom animation and a golden glow effect during the zoom phase.\n4. The final GIF file size is validated and confirmed to be under 64KB, with evidence shown that size checking was performed.",
+  "rubric_skill_use": "1. The slack-gif-creator skill is selected and identified as the appropriate skill for this task.\n2. The SKILL.md file from the slack-gif-creator skill is loaded into the context to access the toolkit documentation.\n3. Multiple additional files are loaded and used from the skill's core and templates directories, specifically including validators for size checking, animation primitives for zoom and pulse effects, and utilities like gif_builder for optimization.\n4. The skill's tools are used appropriately by applying the zoom and pulse animation primitives, utilizing the GIFBuilder with emoji optimization settings, and running validators to confirm the file meets Slack's strict 64KB emoji limit.",
+  "files": [
+    "slack-gif-creator/SKILL.md",
+    "slack-gif-creator/core/gif_builder.py",
+    "slack-gif-creator/core/validators.py",
+    "slack-gif-creator/templates/zoom.py",
+    "slack-gif-creator/templates/pulse.py",
+    "slack-gif-creator/core/visual_effects.py",
+    "slack-gif-creator/core/frame_composer.py"
+  ]
+}

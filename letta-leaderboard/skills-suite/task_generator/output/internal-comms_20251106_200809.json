@@ -1,0 +1,10 @@
+{
+  "skill_name": "internal-comms",
+  "task": "Our company is launching a new hybrid work policy starting next month. Employees have been asking lots of questions in various channels. Write responses to these three frequently asked questions: (1) Will I need manager approval to work from home on specific days, or can I choose my own schedule? (2) How many days per week are we required to be in the office? (3) What happens if I live more than 50 miles from an office location? Make sure the answers are clear, consistent in tone, and address employee concerns while reinforcing the policy that requires 3 days in-office for employees within commuting distance, allows flexible scheduling without pre-approval, and offers fully remote options for those beyond reasonable commuting distance.",
+  "rubric_task_completion": "1. The response addresses all three questions about the hybrid work policy (manager approval, required office days, and distance exceptions).\n2. The answers clearly communicate the key policy details: 3 days in-office requirement, no pre-approval needed for schedule selection, and remote options for employees living more than 50 miles away.\n3. The tone across all three answers is consistent, professional, and appropriately reassuring to address employee concerns.\n4. Each answer is structured to be easily scannable and provides complete information without being overly verbose or leaving ambiguity.",
+  "rubric_skill_use": "1. The internal-comms skill is selected as relevant for completing the task.\n2. The SKILL.md file from the internal-comms skill is loaded to understand how to approach FAQ writing.\n3. The examples/faq-answers.md file is loaded and used to guide the format and approach for answering frequently asked questions.\n4. The FAQ responses follow the guidelines, tone, and formatting principles specified in the loaded skill files, demonstrating appropriate application of the skill's resources.",
+  "files": [
+    "internal-comms/SKILL.md",
+    "internal-comms/examples/faq-answers.md"
+  ]
+}

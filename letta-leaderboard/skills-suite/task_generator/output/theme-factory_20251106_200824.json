@@ -1,0 +1,12 @@
+{
+  "skill_name": "theme-factory",
+  "task": "I'm designing a marketing report for a luxury travel agency that specializes in exotic destinations and high-end resort experiences. The report will be shared with affluent clients and travel partners, showcasing last year's most exclusive destinations, client testimonials, and upcoming premium offerings. The aesthetic needs to feel warm, inviting, and sophisticated\u2014evoking the feeling of golden sunsets over tropical beaches and the refined elegance of five-star hospitality. I want colors that suggest warmth, luxury, and relaxation, paired with typography that's both elegant and approachable. Can you show me available design options that would work for this upscale travel context, and then help me apply the one that best captures that warm, luxurious, sunset-inspired feeling?",
+  "rubric_task_completion": "1. The agent displays the theme showcase PDF to present visual options for available themes without modifying it.\n2. The agent asks the user to select a theme from the available options and waits for explicit confirmation before proceeding.\n3. The agent loads and applies a theme that matches the requirements (warm, luxurious, sunset-inspired colors with elegant typography appropriate for luxury travel).\n4. The agent confirms the theme has been applied and provides details about the specific colors and fonts from the chosen theme that will be used in the marketing report.",
+  "rubric_skill_use": "1. The agent identifies and selects the theme-factory skill as the appropriate skill for this task.\n2. The agent loads the theme-factory/SKILL.md file to understand how to work with themes.\n3. The agent loads theme-factory/theme-showcase.pdf to display options, and loads the appropriate theme file from the themes/ directory (such as sunset-boulevard.md or golden-hour.md based on the warm, luxurious requirements).\n4. The agent follows the proper workflow described in the skill: showing the showcase PDF first, asking for theme selection, waiting for confirmation, and then applying the selected theme with its specific colors and fonts.",
+  "files": [
+    "theme-factory/SKILL.md",
+    "theme-factory/theme-showcase.pdf",
+    "theme-factory/themes/sunset-boulevard.md",
+    "theme-factory/themes/golden-hour.md"
+  ]
+}

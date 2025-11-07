@@ -1,0 +1,16 @@
+{
+  "skill_name": "slack-gif-creator",
+  "task": "Create an animated GIF for our team's Slack workspace that shows the concept of 'loading progress'. The animation should display a progress bar that starts empty at 0%, fills up smoothly to 100%, and when it reaches completion, the entire bar should briefly flash green and shake excitedly to indicate success, then loop back to the beginning. Add a percentage text above the bar that counts up from 0% to 100% in sync with the bar filling. The background should be a clean, light color. This needs to work as a regular message GIF (not a custom emoji), so optimize it for 480x480 dimensions and keep it under 2MB. The animation should be about 3 seconds long with smooth motion throughout. Make sure to verify the final file meets Slack's size requirements for message GIFs.",
+  "rubric_task_completion": "1. The GIF shows a progress bar that visually fills from empty (0%) to full (100%) with smooth animation\n2. Text displaying percentage values (0% to 100%) is present and synchronized with the progress bar filling\n3. Upon reaching 100%, the animation includes both a green flash effect and a shake/excitement effect before looping\n4. The final GIF is verified to meet Slack message GIF requirements (under 2MB, appropriate dimensions around 480x480, and file size is checked using validation tools)",
+  "rubric_skill_use": "1. The agent identifies and selects the slack-gif-creator skill as relevant to the task\n2. The agent loads the slack-gif-creator/SKILL.md file to understand the toolkit capabilities and constraints\n3. The agent loads and uses appropriate additional files including gif_builder.py for assembly, validators.py for size checking, visual_effects.py for flash effects, frame_composer.py or typography.py for text rendering, and at least one animation primitive template (such as shake.py for the excitement effect)\n4. The agent correctly applies the toolkit by composing multiple animation phases (bar filling, percentage counting, flash effect, shake effect), uses GIFBuilder for frame assembly with appropriate settings for message GIFs, implements smooth interpolation/easing for the progress bar fill, and validates the final output against Slack's message GIF constraints using the validators module",
+  "files": [
+    "slack-gif-creator/SKILL.md",
+    "slack-gif-creator/core/gif_builder.py",
+    "slack-gif-creator/core/validators.py",
+    "slack-gif-creator/core/visual_effects.py",
+    "slack-gif-creator/core/frame_composer.py",
+    "slack-gif-creator/core/typography.py",
+    "slack-gif-creator/core/easing.py",
+    "slack-gif-creator/templates/shake.py"
+  ]
+}

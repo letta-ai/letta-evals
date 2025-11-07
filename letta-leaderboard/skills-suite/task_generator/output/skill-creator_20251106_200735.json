@@ -1,0 +1,12 @@
+{
+  "skill_name": "skill-creator",
+  "task": "I work with a lot of scientific datasets stored in HDF5 format, and I'm constantly writing the same code to explore these files. I need a reusable solution that helps me: (1) List all groups and datasets in an HDF5 file hierarchy, (2) Read dataset contents and metadata (shape, dtype, attributes), (3) Export specific datasets to CSV for analysis, and (4) Create visualization plots of numerical datasets. I've already written a Python script that handles the CSV export functionality reliably, and I have detailed documentation about the attribute naming conventions we use in our lab (like 'units', 'description', 'timestamp'). I want to package this into something I can share with my research group so anyone can consistently work with our HDF5 files. The package needs to include my export script, documentation about our metadata conventions, and clear instructions on the complete workflow. Once it's created, I need it properly validated and packaged for distribution to my colleagues.",
+  "rubric_task_completion": "1. The agent creates or initializes a skill directory structure specifically for HDF5 file handling workflows\n2. The agent includes or references the user's CSV export script in an appropriate location within the skill package\n3. The agent creates documentation about metadata conventions and workflow instructions in appropriate skill components (SKILL.md and/or references files)\n4. The agent validates and packages the completed skill into a distributable format (zip file)",
+  "rubric_skill_use": "1. The agent identifies and selects the skill-creator skill as relevant to this task\n2. The agent loads the skill-creator/SKILL.md file to understand the skill creation process\n3. The agent loads and uses the initialization script (init_skill.py) and packaging script (package_skill.py) from the scripts directory\n4. The agent follows the skill creation process systematically: understanding the concrete examples, planning reusable contents, initializing the skill structure, editing SKILL.md with appropriate metadata and instructions, and packaging the final skill with validation",
+  "files": [
+    "skill-creator/SKILL.md",
+    "skill-creator/scripts/init_skill.py",
+    "skill-creator/scripts/package_skill.py",
+    "skill-creator/scripts/quick_validate.py"
+  ]
+}

@@ -1,0 +1,60 @@
+name: skills-eval-baseline
+description: Evaluate if agent can complete tasks in the baseline setting without access to skills
+dataset: data/dataset_select_use.csv
+
+target:
+  kind: letta_code
+  base_url: http://0.0.0.0:8283
+  working_dir: output-baseline
+  timeout: 300
+  max_retries: 1
+  model_handles:
+    - anthropic/claude-sonnet-4-5-20250929
+    - anthropic/claude-haiku-4-5-20251001
+    - anthropic/claude-opus-4-1-20250805
+    - gpt-5-medium
+    - gpt-5-mini-medium
+    - gpt-5-nano-medium
+    - gpt-4.1
+    - gpt-4.1-mini
+    - gpt-4.1-nano
+    - glm-4.6
+    - minimax-m2
+    - kimi-k2
+    - deepseek-chat-v3.1
+
+graders:
+  task_completion:
+    kind: model_judge
+    display_name: "task completion score"
+    prompt_path: rubric_task_completion.txt
+    model: claude-haiku-4-5-20251001
+    temperature: 0.0
+    provider: anthropic
+    max_retries: 3
+    timeout: 120.0
+    extractor: custom_extractor.py:sandbox_files_extractor
+    rubric_vars:
+      - rubric_task_completion
+  
+  skill_use:
+    kind: model_judge
+    display_name: "skill use score"
+    prompt_path: rubric_skill_use.txt
+    model: claude-haiku-4-5-20251001
+    temperature: 0.0
+    provider: anthropic
+    max_retries: 3
+    timeout: 120.0
+    extractor: custom_extractor.py:skill_extractor
+    rubric_vars:
+      - rubric_skill_use
+      - skill
+      - files
+
+gate:
+  kind: simple
+  metric_key: task_completion
+  aggregation: avg_score
+  op: gte
+  value: 0.6

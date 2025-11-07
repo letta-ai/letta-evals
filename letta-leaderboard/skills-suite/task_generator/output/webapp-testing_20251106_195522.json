@@ -1,0 +1,11 @@
+{
+  "skill_name": "webapp-testing",
+  "task": "I'm running a React development server on localhost:3000 that displays a todo list application. I need you to verify that the application works correctly by performing the following tests:\n\n1. Navigate to the application and capture a screenshot of the initial state\n2. Find and click the \"Add Task\" button\n3. Locate the text input field and type \"Buy groceries\" into it\n4. Click the \"Submit\" button to add the task\n5. Verify that \"Buy groceries\" appears in the todo list\n6. Capture a final screenshot showing the added task\n7. Report any console errors that occurred during the testing process\n\nThe server is already running and ready to accept connections. Please provide me with both screenshots and a summary of whether all functionality worked as expected.",
+  "rubric_task_completion": "1. Two screenshots are successfully captured and saved (initial state and final state with the added task)\n2. The automation script successfully interacts with all three UI elements: the \"Add Task\" button, the text input field (with \"Buy groceries\" typed), and the \"Submit\" button\n3. Verification is performed to confirm that \"Buy groceries\" appears in the rendered todo list after submission\n4. Console errors are captured and reported (or confirmed that no errors occurred), along with a summary of whether the functionality worked as expected",
+  "rubric_skill_use": "1. The webapp-testing skill is selected and identified as relevant to the task\n2. The SKILL.md file from the webapp-testing skill is loaded into the context\n3. At least one example file is referenced or consulted (element_discovery.py or console_logging.py would be most relevant for this task)\n4. A native Python Playwright script is written that follows best practices from the skill: uses sync_playwright(), waits for networkidle before DOM inspection, uses appropriate selectors (text=, role=, or CSS), captures screenshots, handles console logging, and properly closes the browser",
+  "files": [
+    "webapp-testing/SKILL.md",
+    "webapp-testing/examples/element_discovery.py",
+    "webapp-testing/examples/console_logging.py"
+  ]
+}

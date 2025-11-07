@@ -1,0 +1,10 @@
+{
+  "skill_name": "internal-comms",
+  "task": "Our engineering team just completed a major database migration project. Write a team update covering what we accomplished this week (successfully migrated 2.5TB of customer data with zero downtime, reduced query latency by 40%, completed performance testing), our plans for next week (monitor system stability, conduct post-migration review meeting on Tuesday, update documentation), and current blockers (the automated backup script is failing intermittently and needs debugging, waiting on infrastructure team to provision additional read replicas). Keep it concise and structured so leadership can quickly understand our status.",
+  "rubric_task_completion": "1. The update includes all three required sections: progress/accomplishments (database migration details), plans (monitoring, review meeting, documentation), and problems/blockers (backup script issue, waiting on infrastructure).\n2. All specific details from the task are incorporated: 2.5TB data migrated, zero downtime, 40% latency reduction, performance testing completion, Tuesday meeting, backup script failure, and read replica provisioning dependency.\n3. The communication is concise and well-structured with clear organization that allows for quick scanning and comprehension.\n4. The tone is appropriate for leadership visibility, presenting technical information in an accessible format without excessive jargon.",
+  "rubric_skill_use": "1. The agent identifies that the internal-comms skill is relevant for writing this team update communication.\n2. The agent loads the SKILL.md file from the internal-comms skill to understand the communication types and how to proceed.\n3. The agent loads the examples/3p-updates.md file since this is clearly a Progress/Plans/Problems update format.\n4. The agent follows the specific formatting guidelines, structural conventions, and tone recommendations from the 3P updates guideline file to produce an appropriately formatted team update.",
+  "files": [
+    "internal-comms/SKILL.md",
+    "internal-comms/examples/3p-updates.md"
+  ]
+}
