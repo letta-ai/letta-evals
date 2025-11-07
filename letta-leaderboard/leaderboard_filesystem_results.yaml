@@ -29,6 +29,10 @@ results:
   average: 55.13
   total_cost: 12.08
   leaderboard_filesystem_100: 55.13
+- model: moonshotai/kimi-k2-thinking
+  average: 55.0
+  total_cost: 21.83
+  leaderboard_filesystem_100: 55.0
 - model: openai/gpt-4.1-2025-04-14
   average: 36.68
   total_cost: 36.85
