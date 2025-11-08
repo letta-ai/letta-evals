@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from typing import Any, List, Optional
 
-from letta_evals.constants import MODEL_ALIASES, MODEL_COSTS
+from letta_evals.constants import MODEL_COSTS, MODEL_NAME_MAPPING
 
 logger = logging.getLogger(__name__)
 
@@ -50,19 +50,29 @@ def load_object(spec: str, base_dir: Path = None) -> Any:
 
 def normalize_model_name(model_name: str) -> str:
     """
-    Normalize model names by resolving aliases and adding provider prefixes.
+    Normalize model names to match MODEL_COSTS keys.
 
     Args:
-        model_name: Raw model name from results
+        model_name: Raw model name (e.g., "gpt-4.1-mini", "openai/gpt-4.1", "claude-sonnet-4-5-20250929")
 
     Returns:
         Normalized model name that can be found in MODEL_COSTS
     """
-    # First, check if it's a direct alias match
-    if model_name in MODEL_ALIASES:
-        return MODEL_ALIASES[model_name]
+    # Direct match in MODEL_COSTS
+    if model_name in MODEL_COSTS:
+        return model_name
 
-    # Then try with provider prefix added
+    # Try the mapping (handles base names like "gpt-4.1-mini" -> "openai/gpt-4.1-mini-2025-04-14")
+    if model_name in MODEL_NAME_MAPPING:
+        return MODEL_NAME_MAPPING[model_name]
+
+    # If it has a provider prefix (e.g., "openai/gpt-4.1"), strip it and try mapping
+    if "/" in model_name:
+        model_part = model_name.split("/", 1)[1]
+        if model_part in MODEL_NAME_MAPPING:
+            return MODEL_NAME_MAPPING[model_part]
+
+    # Try with provider prefix for common patterns
     if model_name.startswith("claude"):
         prefixed = f"anthropic/{model_name}"
         if prefixed in MODEL_COSTS:
@@ -72,7 +82,7 @@ def normalize_model_name(model_name: str) -> str:
         if prefixed in MODEL_COSTS:
             return prefixed
 
-    # Return as-is if no normalization found
+    # No match found
     return model_name
 
 
