@@ -63,6 +63,7 @@ MODEL_COSTS = {
     },
 }
 
+
 # Build reverse mapping: strip provider prefix and date suffix from MODEL_COSTS keys
 # This allows matching "gpt-4.1-mini" to "openai/gpt-4.1-mini-2025-04-14"
 def _build_model_name_mapping() -> dict:
@@ -96,5 +97,6 @@ def _build_model_name_mapping() -> dict:
             mapping[base_name] = full_key
 
     return mapping
+
 
 MODEL_NAME_MAPPING = _build_model_name_mapping()
