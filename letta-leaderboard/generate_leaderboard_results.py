@@ -182,18 +182,31 @@ def parse_result_entry(row: Dict, line_num: int, file_path: Path) -> Tuple[str, 
         model_name = normalize_model_name(model_name)
         score = row["result"]["grade"]["score"]
 
-        # Extract token usage
-        try:
-            prompt_tokens = row["result"]["agent_usage"][0]["prompt_tokens"]
-            completion_tokens = row["result"]["agent_usage"][0]["completion_tokens"]
-            cost = calculate_cost(model_name, prompt_tokens, completion_tokens)
-            has_error = False
-        except (KeyError, IndexError, TypeError) as e:
-            logger.debug(f"Missing token data in {file_path}:{line_num} - {e}")
-            cost = 0.0
-            prompt_tokens = 0
-            completion_tokens = 0
-            has_error = True
+        # Try to get cost directly from the result (computed in real-time by letta-evals)
+        cost = row["result"].get("cost")
+        has_error = False
+
+        # If cost is not available, fall back to calculating from agent_usage
+        if cost is None:
+            try:
+                prompt_tokens = row["result"]["agent_usage"][0]["prompt_tokens"]
+                completion_tokens = row["result"]["agent_usage"][0]["completion_tokens"]
+                cost = calculate_cost(model_name, prompt_tokens, completion_tokens)
+                has_error = False
+            except (KeyError, IndexError, TypeError) as e:
+                logger.debug(f"Missing cost and token data in {file_path}:{line_num} - {e}")
+                cost = 0.0
+                prompt_tokens = 0
+                completion_tokens = 0
+                has_error = True
+        else:
+            # Cost was pre-computed, still extract tokens for statistics if available
+            try:
+                prompt_tokens = row["result"]["agent_usage"][0]["prompt_tokens"]
+                completion_tokens = row["result"]["agent_usage"][0]["completion_tokens"]
+            except (KeyError, IndexError, TypeError):
+                prompt_tokens = 0
+                completion_tokens = 0
 
         return model_name, score, cost, prompt_tokens, completion_tokens, has_error
 

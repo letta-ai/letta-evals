@@ -17,6 +17,7 @@ from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
 from letta_evals.models import (
+    CostMetrics,
     GradeResult,
     LettaJudgeGraderSpec,
     LogicalGateSpec,
@@ -41,7 +42,7 @@ from letta_evals.targets.base import AbstractAgentTarget
 from letta_evals.targets.letta_agent import LettaAgentTarget
 from letta_evals.targets.letta_code_target import LettaCodeTarget
 from letta_evals.types import Aggregation, LogicalOp, TargetKind
-from letta_evals.utils import load_object
+from letta_evals.utils import calculate_cost_from_agent_usage, extract_token_counts, load_object
 from letta_evals.visualization.base import ProgressCallback
 from letta_evals.visualization.factory import ProgressStyle, create_progress_callback
 
@@ -403,6 +404,10 @@ class Runner:
                         metric_rationales=metric_rationales,
                     )
 
+                # Calculate cost and extract token counts from agent usage
+                cost = calculate_cost_from_agent_usage(model_name, agent_usage) if model_name else None
+                prompt_tokens, completion_tokens = extract_token_counts(agent_usage)
+
                 return SampleResult(
                     sample=sample,
                     submission=submission,
@@ -413,6 +418,9 @@ class Runner:
                     grades=grades_dict,
                     model_name=model_name,
                     agent_usage=agent_usage,
+                    cost=cost,
+                    prompt_tokens=prompt_tokens if prompt_tokens > 0 else None,
+                    completion_tokens=completion_tokens if completion_tokens > 0 else None,
                 )
             except Exception as e:
                 if self.progress_callback:
@@ -523,6 +531,9 @@ class Runner:
                                     grades=None,
                                     model_name=model_name,
                                     agent_usage=None,
+                                    cost=None,
+                                    prompt_tokens=None,
+                                    completion_tokens=None,
                                 )
                                 self.results.append(error_result)
                                 if self.stream_writer:
@@ -609,6 +620,25 @@ class Runner:
             default_key = "default"
             metrics_dict[default_key] = avg_score_attempted * 100.0
 
+        # Calculate overall cost and token aggregates
+        costs = [r.cost for r in self.results if r.cost is not None]
+        total_cost = sum(costs) if costs else None
+
+        prompt_tokens_list = [r.prompt_tokens for r in self.results if r.prompt_tokens is not None]
+        total_prompt_tokens = sum(prompt_tokens_list) if prompt_tokens_list else 0
+
+        completion_tokens_list = [r.completion_tokens for r in self.results if r.completion_tokens is not None]
+        total_completion_tokens = sum(completion_tokens_list) if completion_tokens_list else 0
+
+        # Create CostMetrics if we have cost data
+        cost_metrics = None
+        if total_cost is not None and total_cost > 0:
+            cost_metrics = CostMetrics(
+                total_cost=total_cost,
+                total_prompt_tokens=total_prompt_tokens,
+                total_completion_tokens=total_completion_tokens,
+            )
+
         per_model = None
         if self.suite.target.model_configs or self.suite.target.model_handles:
             model_results = defaultdict(list)
@@ -645,6 +675,25 @@ class Runner:
                 model_avg_attempted = sum(model_scores) / len(model_scores) if model_scores else 0.0
                 model_avg_total = sum(model_scores) / len(results) if model_scores else 0.0
 
+                # Calculate cost and token counts for this model
+                model_costs = [r.cost for r in results if r.cost is not None]
+                model_total_cost = sum(model_costs) if model_costs else None
+
+                model_prompt_tokens_list = [r.prompt_tokens for r in results if r.prompt_tokens is not None]
+                model_total_prompt_tokens = sum(model_prompt_tokens_list) if model_prompt_tokens_list else 0
+
+                model_completion_tokens_list = [r.completion_tokens for r in results if r.completion_tokens is not None]
+                model_total_completion_tokens = sum(model_completion_tokens_list) if model_completion_tokens_list else 0
+
+                # Create CostMetrics for this model if we have cost data
+                model_cost_metrics = None
+                if model_total_cost is not None and model_total_cost > 0:
+                    model_cost_metrics = CostMetrics(
+                        total_cost=model_total_cost,
+                        total_prompt_tokens=model_total_prompt_tokens,
+                        total_completion_tokens=model_total_completion_tokens,
+                    )
+
                 per_model.append(
                     ModelMetrics(
                         model_name=model_name,
@@ -653,6 +702,7 @@ class Runner:
                         avg_score_attempted=model_avg_attempted,
                         avg_score_total=model_avg_total,
                         metrics=model_metrics_dict,
+                        cost=model_cost_metrics,
                     )
                 )
 
@@ -664,6 +714,7 @@ class Runner:
             per_model=per_model,
             by_metric=by_metric if by_metric else None,
             metrics=metrics_dict,
+            cost=cost_metrics,
         )
 
     def _compute_aggregation(

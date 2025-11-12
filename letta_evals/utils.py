@@ -1,7 +1,12 @@
 import importlib.util
+import logging
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, List, Optional
+
+from letta_evals.constants import MODEL_COSTS, MODEL_NAME_MAPPING
+
+logger = logging.getLogger(__name__)
 
 
 def load_object(spec: str, base_dir: Path = None) -> Any:
@@ -41,3 +46,119 @@ def load_object(spec: str, base_dir: Path = None) -> Any:
         raise AttributeError(f"Module '{path}' has no attribute '{obj_name}'. Available: {', '.join(available[:10])}")
 
     return getattr(module, obj_name)
+
+
+def normalize_model_name(model_name: str) -> str:
+    """
+    Normalize model names to match MODEL_COSTS keys.
+
+    Args:
+        model_name: Raw model name (e.g., "gpt-4.1-mini", "openai/gpt-4.1", "claude-sonnet-4-5-20250929")
+
+    Returns:
+        Normalized model name that can be found in MODEL_COSTS
+    """
+    # Direct match in MODEL_COSTS
+    if model_name in MODEL_COSTS:
+        return model_name
+
+    # Try the mapping (handles base names like "gpt-4.1-mini" -> "openai/gpt-4.1-mini-2025-04-14")
+    if model_name in MODEL_NAME_MAPPING:
+        return MODEL_NAME_MAPPING[model_name]
+
+    # If it has a provider prefix (e.g., "openai/gpt-4.1"), strip it and try mapping
+    if "/" in model_name:
+        model_part = model_name.split("/", 1)[1]
+        if model_part in MODEL_NAME_MAPPING:
+            return MODEL_NAME_MAPPING[model_part]
+
+    # Try with provider prefix for common patterns
+    if model_name.startswith("claude"):
+        prefixed = f"anthropic/{model_name}"
+        if prefixed in MODEL_COSTS:
+            return prefixed
+    elif model_name.startswith("gpt"):
+        prefixed = f"openai/{model_name}"
+        if prefixed in MODEL_COSTS:
+            return prefixed
+
+    # No match found
+    return model_name
+
+
+def calculate_cost(model_name: str, prompt_tokens: int, completion_tokens: int) -> float:
+    """
+    Calculate the cost for a model's token usage.
+
+    Args:
+        model_name: Name of the model (will be normalized if needed)
+        prompt_tokens: Number of prompt tokens used
+        completion_tokens: Number of completion tokens used
+
+    Returns:
+        Total cost in dollars, or 0.0 if model pricing is not available
+
+    Note:
+        Returns 0.0 if model pricing is not found in MODEL_COSTS instead of raising an error.
+        This allows evaluation to continue even for new/unknown models.
+    """
+    # Normalize model name (resolve aliases and add provider prefix if needed)
+    normalized_name = normalize_model_name(model_name)
+
+    # Check if we have pricing for this model
+    if normalized_name not in MODEL_COSTS:
+        logger.debug(f"No pricing information available for model: {normalized_name} (original: {model_name})")
+        return 0.0
+
+    model_costs = MODEL_COSTS[normalized_name]
+    prompt_cost = model_costs["prompt_tokens"] * prompt_tokens / 1_000_000
+    completion_cost = model_costs["completion_tokens"] * completion_tokens / 1_000_000
+    return prompt_cost + completion_cost
+
+
+def extract_token_counts(agent_usage: Optional[List[dict]]) -> tuple[int, int]:
+    """
+    Extract total token counts from agent_usage data.
+
+    Args:
+        agent_usage: List of usage statistics from the agent run
+
+    Returns:
+        Tuple of (total_prompt_tokens, total_completion_tokens)
+    """
+    if not agent_usage:
+        return 0, 0
+
+    total_prompt_tokens = 0
+    total_completion_tokens = 0
+
+    for usage_record in agent_usage:
+        if usage_record.get("message_type") == "usage_statistics":
+            total_prompt_tokens += usage_record.get("prompt_tokens", 0)
+            total_completion_tokens += usage_record.get("completion_tokens", 0)
+
+    return total_prompt_tokens, total_completion_tokens
+
+
+def calculate_cost_from_agent_usage(model_name: str, agent_usage: Optional[List[dict]]) -> float:
+    """
+    Calculate total cost from agent_usage data.
+
+    Args:
+        model_name: Name of the model
+        agent_usage: List of usage statistics from the agent run
+
+    Returns:
+        Total cost in dollars for the entire agent run
+    """
+    if not agent_usage:
+        return 0.0
+
+    total_cost = 0.0
+    for usage_record in agent_usage:
+        if usage_record.get("message_type") == "usage_statistics":
+            prompt_tokens = usage_record.get("prompt_tokens", 0)
+            completion_tokens = usage_record.get("completion_tokens", 0)
+            total_cost += calculate_cost(model_name, prompt_tokens, completion_tokens)
+
+    return total_cost

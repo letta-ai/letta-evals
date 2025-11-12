@@ -406,6 +406,14 @@ class GradeResult(BaseModel):
 # Runner models
 
 
+class CostMetrics(BaseModel):
+    """Cost and token usage metrics."""
+
+    total_cost: float = Field(description="total cost in dollars")
+    total_prompt_tokens: int = Field(description="total number of prompt tokens")
+    total_completion_tokens: int = Field(description="total number of completion tokens")
+
+
 class ModelMetrics(BaseModel):
     """metrics for a specific model configuration."""
 
@@ -417,6 +425,7 @@ class ModelMetrics(BaseModel):
     metrics: Dict[str, float] = Field(
         default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
     )
+    cost: Optional[CostMetrics] = Field(default=None, description="cost and token usage metrics for this model")
 
 
 class MetricAggregate(BaseModel):
@@ -443,6 +452,7 @@ class Metrics(BaseModel):
     metrics: Dict[str, float] = Field(
         default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
     )
+    cost: Optional[CostMetrics] = Field(default=None, description="cost and token usage metrics across all samples")
 
 
 class RunStatistics(BaseModel):
@@ -477,6 +487,9 @@ class SampleResult(BaseModel):
     agent_usage: Optional[List[dict]] = Field(
         default=None, description="Usage statistics emitted by the agent during the run"
     )
+    cost: Optional[float] = Field(default=None, description="Total cost in dollars for this sample run")
+    prompt_tokens: Optional[int] = Field(default=None, description="Total prompt tokens used for this sample")
+    completion_tokens: Optional[int] = Field(default=None, description="Total completion tokens used for this sample")
 
 
 class RunnerResult(BaseModel):
