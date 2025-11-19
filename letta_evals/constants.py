@@ -17,6 +17,22 @@ MODEL_COSTS = {
         "prompt_tokens": 1,
         "completion_tokens": 5,
     },
+    "google_ai/gemini-3-pro-preview": {
+        "prompt_tokens": 2,
+        "completion_tokens": 12,
+    },
+    "openai/gpt-5.1-codex-mini": {
+        "prompt_tokens": 0.25,
+        "completion_tokens": 2,
+    },
+    "openai/gpt-5.1-codex": {
+        "prompt_tokens": 1.25,
+        "completion_tokens": 10,
+    },
+    "openai/gpt-5.1-2025-11-13": {
+        "prompt_tokens": 1.25,
+        "completion_tokens": 10,
+    },
     "openai/gpt-5-2025-08-07": {
         "prompt_tokens": 1.25,
         "completion_tokens": 10,

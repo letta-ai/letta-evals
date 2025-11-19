@@ -69,6 +69,9 @@ class LettaCodeTarget(AbstractAgentTarget):
 
                 # for multiple inputs, concatenate with newlines
                 prompt = "\n".join(str(inp) for inp in inputs)
+                prompt = prompt.replace(
+                    "{pwd}", self.working_dir.resolve().as_posix()
+                )
 
                 # construct the letta command with json output
                 cmd = [
@@ -77,20 +80,15 @@ class LettaCodeTarget(AbstractAgentTarget):
                     "--yolo",
                     "--output-format",
                     "json",
+                    "--model",
+                    self.model_handle,
                 ]
 
                 # add skills directory if specified
                 if self.skills_dir:
                     cmd.extend(["--skills", str(self.skills_dir)])
-
-                cmd.extend(
-                    [
-                        "--model",
-                        self.model_handle,
-                        "-p",
-                        prompt,
-                    ]
-                )
+                
+                cmd.extend(["-p", prompt])
 
                 # add tool permissions if specified
                 if self.allowed_tools:
