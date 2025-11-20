@@ -31,10 +31,81 @@ git lfs pull
 ```
 
 4. Generate the updated leaderboard:
+
+The `generate_leaderboard_results.py` script reads evaluation results and merges them into the leaderboard YAML file. The script looks for `aggregate_stats.json` (computed from multiple runs) or falls back to `summary.json` (from a single run) in the specified directories.
+
+**Basic usage:**
 ```bash
-python generate_leaderboard_results.py
+python3 generate_leaderboard_results.py \
+  filesystem-agent/results/filesystem-{provider}-{model-name} \
+  --leaderboard leaderboard_filesystem_results.yaml
 ```
 
-5. In case of a new provider, add their logo to [leaderboard_site/src/icons](leaderboard_site/src/icons).
+**Update multiple models at once:**
+```bash
+python3 generate_leaderboard_results.py \
+  filesystem-agent/results/filesystem-model1 \
+  filesystem-agent/results/filesystem-model2 \
+  filesystem-agent/results/filesystem-model3 \
+  --leaderboard leaderboard_filesystem_results.yaml
+```
 
-Results will be added to [leaderboard_results.yaml](leaderboard_results.yaml) and automatically updated.
+**Save to a different file:**
+```bash
+python3 generate_leaderboard_results.py \
+  filesystem-agent/results/filesystem-{provider}-{model-name} \
+  --leaderboard leaderboard_filesystem_results.yaml \
+  --output leaderboard_filesystem_results_updated.yaml
+```
+
+The script will:
+- Read `aggregate_stats.json` if available, otherwise fall back to `summary.json`
+- Extract model performance metrics (scores and costs) from the JSON files
+- Automatically detect the correct metric key from the existing leaderboard
+- Add new models or update existing ones while preserving all data
+- Handle null/missing cost data gracefully
+- Normalize model names with provider prefixes (e.g., `gpt-4` → `openai/gpt-4`)
+
+**File format requirements:**
+- `aggregate_stats.json`: Contains `num_runs`, `individual_run_metrics`, and `per_model` data
+- `summary.json`: Contains `metrics` and `per_model` data
+- Both formats include `model_name`, `avg_score_attempted`, and optional `cost` information
+
+5. In case of a new provider, add their logo to [../leaderboard_site/src/icons](../leaderboard_site/src/icons).
+
+Results will be added to the leaderboard YAML file and automatically updated on the website. To preview changes locally, see [../leaderboard_site/README.md](../leaderboard_site/README.md) for instructions on running the leaderboard site.
+
+## Updating Other Benchmark Leaderboards
+
+The same `generate_leaderboard_results.py` script works for all benchmarks (Filesystem, Skills Suite, etc.). Simply provide the appropriate results directory and leaderboard file:
+
+**For Skills Suite:**
+```bash
+python3 generate_leaderboard_results.py \
+  skills-suite/results/skills-{provider}-{model-name} \
+  --leaderboard leaderboard_skill_results.yaml
+```
+
+**For any custom benchmark:**
+```bash
+python3 generate_leaderboard_results.py \
+  path/to/results/directory \
+  --leaderboard path/to/leaderboard.yaml
+```
+
+The script automatically detects the benchmark type from the existing leaderboard file and uses the correct metric keys.
+
+## Troubleshooting
+
+**Script can't find aggregate_stats.json or summary.json:**
+- Ensure you're pointing to the correct results directory
+- Check that the evaluation completed successfully and generated output files
+- The script will log which file it's looking for and whether it was found
+
+**Model results not updating:**
+- Verify the model names match exactly (including provider prefix)
+- Check that the results directory contains valid JSON data
+- Review the script logs for any parsing errors
+
+**Leaderboard site issues:**
+- See [../leaderboard_site/README.md](../leaderboard_site/README.md) for troubleshooting the website
