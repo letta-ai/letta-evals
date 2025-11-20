@@ -1,13 +1,12 @@
 benchmark_name: Filesystem Suite
-
 metrics:
   leaderboard_filesystem_100:
     name: Filesystem Rubric
-    description: LLM-as-a-judge rubric to evaluate the agent's ability to correctly retrieve and analyze information from filesystem data files
+    description: LLM-as-a-judge rubric to evaluate the agent's ability to correctly
+      retrieve and analyze information from filesystem data files
   average:
     name: Average
     description: Overall average score across all evaluation metrics
-
 results:
 - model: anthropic/claude-haiku-4-5-20251001
   average: 61.02
@@ -25,6 +24,10 @@ results:
   average: 11.97
   total_cost: 2.54
   leaderboard_filesystem_100: 11.97
+- model: google/gemini-3-pro-preview
+  average: 75.33
+  leaderboard_filesystem_100: 75.33
+  total_cost: 95.87
 - model: minimax/minimax-m2
   average: 56.83
   total_cost: 5.21
@@ -61,6 +64,18 @@ results:
   average: 44.83
   total_cost: 2.43
   leaderboard_filesystem_100: 44.83
+- model: openai/gpt-5.1-2025-11-13
+  average: 76.59
+  leaderboard_filesystem_100: 76.59
+  total_cost: 47.22
+- model: openai/gpt-5.1-codex
+  average: 76.17
+  leaderboard_filesystem_100: 76.17
+  total_cost: 63.99
+- model: openai/gpt-5.1-codex-mini
+  average: 70.83
+  leaderboard_filesystem_100: 70.83
+  total_cost: 14.05
 - model: openai/gpt-oss-120b
   average: 20.2
   total_cost: 2.19
