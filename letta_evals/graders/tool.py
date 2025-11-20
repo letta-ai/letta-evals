@@ -50,7 +50,21 @@ class ToolGrader(Grader):
         self, sample: Sample, trajectory: List[List[LettaMessageUnion]], agent_state: Optional[AgentState] = None
     ) -> Tuple[GradeResult, str]:
         """Grade using the tool function."""
+        # Validate trajectory before extraction
+        if not trajectory or not any(turn for turn in trajectory if turn):
+            return GradeResult(
+                score=0.0,
+                rationale="Empty trajectory - agent produced no messages"
+            ), ""
+
         submission = self.extractor(trajectory, agent_state=agent_state)
+
+        # Validate submission after extraction
+        if not submission or submission.strip() == "":
+            return GradeResult(
+                score=0.0,
+                rationale="Empty submission - extractor found no content"
+            ), ""
 
         # check if grader function is async
         if inspect.iscoroutinefunction(self.func):
