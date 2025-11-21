@@ -370,8 +370,10 @@ class Runner:
                 submission = submissions_dict[first_key]
 
                 # Check if graders detected empty trajectory/submission and trigger error callback
-                if grade_result.score == 0.0 and grade_result.rationale and (
-                    "Empty trajectory" in grade_result.rationale or "Empty submission" in grade_result.rationale
+                if (
+                    grade_result.score == 0.0
+                    and grade_result.rationale
+                    and ("Empty trajectory" in grade_result.rationale or "Empty submission" in grade_result.rationale)
                 ):
                     if self.progress_callback:
                         await self.progress_callback.sample_error(

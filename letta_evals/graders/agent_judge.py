@@ -50,19 +50,13 @@ class AgentJudgeGrader(Grader):
         """Grade using agent judge with rubric."""
         # Validate trajectory before extraction
         if not trajectory or not any(turn for turn in trajectory if turn):
-            return GradeResult(
-                score=0.0,
-                rationale="Empty trajectory - agent produced no messages"
-            ), ""
+            return GradeResult(score=0.0, rationale="Empty trajectory - agent produced no messages"), ""
 
         submission = self.extractor(trajectory, agent_state=agent_state)
 
         # Validate submission after extraction
         if not submission or submission.strip() == "":
-            return GradeResult(
-                score=0.0,
-                rationale="Empty submission - extractor found no content"
-            ), ""
+            return GradeResult(score=0.0, rationale="Empty submission - extractor found no content"), ""
 
         judge_prompt = build_judge_prompt(
             self.prompt, sample, submission, self.rubric_vars, judge_tool_name=self.judge_tool_name
