@@ -584,9 +584,14 @@ class Runner:
                 metrics={},
             )
 
-        # success = completed without error; error results have empty trajectory or missing agent_id
+        # success = completed without error; error results have empty trajectory, missing agent_id, or empty submission
         def is_success(r: SampleResult) -> bool:
-            return (r.agent_id is not None) and bool(r.trajectory)
+            if r.agent_id is None or not bool(r.trajectory):
+                return False
+            # Exclude empty submissions detected by graders after extraction
+            if r.grade and r.grade.rationale and "Empty submission" in r.grade.rationale:
+                return False
+            return True
 
         attempted = sum(1 for r in self.results if is_success(r))
 
