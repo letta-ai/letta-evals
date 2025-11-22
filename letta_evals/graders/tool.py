@@ -57,7 +57,7 @@ class ToolGrader(Grader):
         submission = self.extractor(trajectory, agent_state=agent_state)
 
         # Validate submission after extraction
-        if not submission or submission.strip() == "":
+        if not submission:
             return GradeResult(score=0.0, rationale="Empty submission - extractor found no content"), ""
 
         # check if grader function is async
