@@ -369,21 +369,24 @@ class Runner:
                 grade_result = grades_dict[first_key]
                 submission = submissions_dict[first_key]
 
-                # Check if submission is empty and mark as error
-                if not submission or submission.strip() == "":
-                    error_msg = "Empty submission"
+                # Check if graders detected empty trajectory/submission and trigger error callback
+                if (
+                    grade_result.score == 0.0
+                    and grade_result.rationale
+                    and ("Empty trajectory" in grade_result.rationale or "Empty submission" in grade_result.rationale)
+                ):
                     if self.progress_callback:
                         await self.progress_callback.sample_error(
-                            sample_id, error_msg, agent_id=agent_id, model_name=model_name
+                            sample_id, grade_result.rationale, agent_id=agent_id, model_name=model_name
                         )
                     return SampleResult(
                         sample=sample,
-                        submission="",
+                        submission=submission,
                         submissions=submissions_dict,
                         trajectory=trajectory,
                         agent_id=agent_id,
-                        grade=GradeResult(score=0.0, rationale=error_msg),
-                        grades={k: GradeResult(score=0.0, rationale=error_msg) for k in grades_dict.keys()},
+                        grade=grade_result,
+                        grades=grades_dict,
                         model_name=model_name,
                         agent_usage=agent_usage,
                     )
@@ -581,9 +584,14 @@ class Runner:
                 metrics={},
             )
 
-        # success = completed without error; error results have empty trajectory or missing agent_id
+        # success = completed without error; error results have empty trajectory, missing agent_id, or empty submission
         def is_success(r: SampleResult) -> bool:
-            return (r.agent_id is not None) and bool(r.trajectory)
+            if r.agent_id is None or not bool(r.trajectory):
+                return False
+            # Exclude empty submissions detected by graders after extraction
+            if r.grade and r.grade.rationale and "Empty submission" in r.grade.rationale:
+                return False
+            return True
 
         attempted = sum(1 for r in self.results if is_success(r))
 
