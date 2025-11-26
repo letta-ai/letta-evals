@@ -35,6 +35,7 @@ dependencies = [
     "anyio==4.10.0",
     "pandas>=2.3.2",
     "matplotlib>=3.10.6",
+    "pathspec>=0.12.1",
 ]
 
 [project.urls]
