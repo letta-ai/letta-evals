@@ -5,6 +5,10 @@ MAX_SAMPLES_DISPLAY = 50
 
 # Model pricing configuration (costs per million tokens)
 MODEL_COSTS = {
+    "anthropic/claude-opus-4-5-20251101": {
+        "prompt_tokens": 5,
+        "completion_tokens": 25,
+    },
     "anthropic/claude-opus-4-1-20250805": {
         "prompt_tokens": 15,
         "completion_tokens": 75,

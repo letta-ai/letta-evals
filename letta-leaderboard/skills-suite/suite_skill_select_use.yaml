@@ -4,15 +4,19 @@ dataset: data/dataset_select_use.csv
 
 target:
   kind: letta_code
-  base_url: http://0.0.0.0:8283
+  base_url: https://api.letta.com/
   working_dir: output-select-use
   skills_dir: .skills
   timeout: 300
   max_retries: 1
   model_handles:
+    - anthropic/claude-opus-4-5-20251101
     - anthropic/claude-sonnet-4-5-20250929
     - anthropic/claude-haiku-4-5-20251001
     - anthropic/claude-opus-4-1-20250805
+    - gpt-5.1
+    - gpt-5.1-codex
+    - gpt-5.1-codex-mini
     - gpt-5-medium
     - gpt-5-mini-medium
     - gpt-5-nano-medium
@@ -23,6 +27,7 @@ target:
     - minimax-m2
     - kimi-k2
     - deepseek-chat-v3.1
+    - gemini-3-pro
 
 graders:
   task_completion:
