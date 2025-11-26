@@ -16,6 +16,10 @@ results:
   average: 61.0
   total_cost: 110.89
   leaderboard_filesystem_100: 61.0
+- model: anthropic/claude-opus-4-5-20251101
+  average: 76.8
+  leaderboard_filesystem_100: 76.8
+  total_cost: 39.91
 - model: anthropic/claude-sonnet-4-5-20250929
   average: 74.0
   total_cost: 24.58
