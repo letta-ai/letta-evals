@@ -29,6 +29,10 @@ results:
   average: 74.25
   task_completion: 76.5
   skill_use: 72.0
+- model: google/gemini-3-pro
+  average: 68.51
+  task_completion: 72.73
+  skill_use: 64.29
 - model: openai/gpt-4.1-2025-04-14
   average: 33.71
   task_completion: 36.1
