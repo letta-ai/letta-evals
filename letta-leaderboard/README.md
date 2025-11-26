@@ -19,7 +19,7 @@ The benchmark has three suites:
 To add a new model to the leaderboard:
 
 1. Create a model config in [../letta_evals/llm_model_configs](../letta_evals/llm_model_configs).
-2. Add the model to the benchmark config in [filesystem-agent/filesystem.yaml](filesystem-agent/filesystem.yaml):
+2. Add the model to the benchmark config in either [filesystem-agent/filesystem.yaml](filesystem-agent/filesystem.yaml) or [skills-suite/suite_skill_select_use.yaml](skills-suite/suite_skill_select_use.yaml):
 
 ```yaml
 target:
@@ -47,8 +47,7 @@ The `generate_leaderboard_results.py` script reads evaluation results and merges
 **Basic usage:**
 ```bash
 python3 generate_leaderboard_results.py \
-  filesystem-agent/results/filesystem-{provider1}-{model-name-1} \
-  filesystem-agent/results/filesystem-{provider2}-{model-name-2} \
+  filesystem-agent/results/{provider1}-{model-name-1} \
   --leaderboard leaderboard_filesystem_results.yaml \
   [--output leaderboard_filesystem_results_updated.yaml]  # generate new results file
 ```
@@ -68,41 +67,4 @@ The script will:
 
 5. In case of a new provider, add their logo to [../leaderboard_site/src/icons](../leaderboard_site/src/icons).
 
-Results will be added to the leaderboard YAML file and automatically updated on the website. To preview changes locally, see [../leaderboard_site/README.md](../leaderboard_site/README.md) for instructions on running the leaderboard site.
-
-## Updating Other Benchmark Leaderboards
-
-The same `generate_leaderboard_results.py` script works for all benchmarks (Filesystem, Skills Suite, etc.). Simply provide the appropriate results directory and leaderboard file:
-
-**For Skills Suite:**
-```bash
-python generate_leaderboard_results.py \
-  filesystem-agent/results/filesystem-gpt-51-system \
-  filesystem-agent/results/filesystem-opus-45 \
-  filesystem-agent/results/filesystem-gemini3-pro \
-  --leaderboard leaderboard_filesystem_results.yaml
-```
-
-**For any custom benchmark:**
-```bash
-python3 generate_leaderboard_results.py \
-  path/to/results/directory \
-  --leaderboard path/to/leaderboard.yaml
-```
-
-The script automatically detects the benchmark type from the existing leaderboard file and uses the correct metric keys.
-
-## Troubleshooting
-
-**Script can't find aggregate_stats.json or summary.json:**
-- Ensure you're pointing to the correct results directory
-- Check that the evaluation completed successfully and generated output files
-- The script will log which file it's looking for and whether it was found
-
-**Model results not updating:**
-- Verify the model names match exactly (including provider prefix)
-- Check that the results directory contains valid JSON data
-- Review the script logs for any parsing errors
-
-**Leaderboard site issues:**
-- See [../leaderboard_site/README.md](../leaderboard_site/README.md) for troubleshooting the website
+Results will be added to the leaderboard YAML file and automatically updated on the website. To preview changes locally, see [leaderboard_site/README.md](../leaderboard_site/README.md) for instructions on running the leaderboard site.

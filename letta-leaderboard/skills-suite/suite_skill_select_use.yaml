@@ -14,9 +14,9 @@ target:
     - anthropic/claude-sonnet-4-5-20250929
     - anthropic/claude-haiku-4-5-20251001
     - anthropic/claude-opus-4-1-20250805
-    - gpt-5.1
-    - gpt-5.1-codex
-    - gpt-5.1-codex-mini
+    - gpt-5.1-medium
+    - gpt-5.1-codex-medium
+    - gpt-5.1-codex-mini-medium
     - gpt-5-medium
     - gpt-5-mini-medium
     - gpt-5-nano-medium
@@ -27,7 +27,7 @@ target:
     - minimax-m2
     - kimi-k2
     - deepseek-chat-v3.1
-    - gemini-3-pro
+    - gemini-3
 
 graders:
   task_completion:
