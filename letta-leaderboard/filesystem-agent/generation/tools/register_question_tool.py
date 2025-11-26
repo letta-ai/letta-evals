@@ -155,7 +155,7 @@ class RegisterQuestionTool:
             # Append to output file
             with open(self.output_path, "a") as f:
                 f.write(json.dumps(question_data) + "\n")
-            
+
             # letta-evals format
             question_data_formatted = {
                 "input": question,

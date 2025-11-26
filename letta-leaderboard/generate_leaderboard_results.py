@@ -9,13 +9,12 @@ import argparse
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import yaml
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
-
 
 
 def normalize_model_name(model_name: str) -> str:
@@ -131,12 +130,14 @@ def extract_model_results_from_aggregate(stats: Dict) -> List[Dict]:
             for metric_name, metric_values in data["metrics"].items():
                 avg_metrics[metric_name] = sum(metric_values) / len(metric_values) if metric_values else 0
 
-            model_results.append({
-                "model_name": model_name,
-                "score": avg_score,
-                "cost": avg_cost,
-                "metrics": avg_metrics,
-            })
+            model_results.append(
+                {
+                    "model_name": model_name,
+                    "score": avg_score,
+                    "cost": avg_cost,
+                    "metrics": avg_metrics,
+                }
+            )
 
     return model_results
 
@@ -165,12 +166,14 @@ def extract_model_results_from_summary(stats: Dict) -> List[Dict]:
             # Extract individual metrics (e.g., task_completion, skill_use)
             metrics_data = model_info.get("metrics", {})
 
-            model_results.append({
-                "model_name": model_name,
-                "score": score,
-                "cost": cost,
-                "metrics": metrics_data,
-            })
+            model_results.append(
+                {
+                    "model_name": model_name,
+                    "score": score,
+                    "cost": cost,
+                    "metrics": metrics_data,
+                }
+            )
 
     return model_results
 
@@ -187,11 +190,7 @@ def load_leaderboard_yaml(yaml_path: Path) -> Dict:
     """
     if not yaml_path.exists():
         logger.warning(f"Leaderboard file {yaml_path} does not exist. Creating new leaderboard.")
-        return {
-            "benchmark_name": "Benchmark",
-            "metrics": {},
-            "results": []
-        }
+        return {"benchmark_name": "Benchmark", "metrics": {}, "results": []}
 
     try:
         with open(yaml_path, "r") as f:
@@ -324,23 +323,13 @@ def parse_arguments() -> argparse.Namespace:
         description="Generate or update leaderboard results from aggregate_stats.json or summary.json files"
     )
     parser.add_argument(
-        "directories",
-        nargs="+",
-        type=Path,
-        help="Directories containing aggregate_stats.json or summary.json files"
+        "directories", nargs="+", type=Path, help="Directories containing aggregate_stats.json or summary.json files"
     )
     parser.add_argument(
-        "--leaderboard",
-        "-l",
-        type=Path,
-        required=True,
-        help="Path to the leaderboard YAML file (input and output)"
+        "--leaderboard", "-l", type=Path, required=True, help="Path to the leaderboard YAML file (input and output)"
     )
     parser.add_argument(
-        "--output",
-        "-o",
-        type=Path,
-        help="Path to output YAML file (defaults to same as --leaderboard)"
+        "--output", "-o", type=Path, help="Path to output YAML file (defaults to same as --leaderboard)"
     )
 
     return parser.parse_args()

@@ -2,9 +2,17 @@
 
 Evaluation benchmarks for testing Letta agents across different language models. View the leaderboard at https://leaderboard.letta.com/.
 
-## Filesystem Agent Task
+## Filesystem Suite
 
 Tests an agent's ability to navigate files and answer questions that require multi-file lookups. The agent has access to 10 structured text files (people, vehicles, pets, bank accounts, etc.) and must use the `open_files` and `grep_files` tools to find and synthesize information.
+
+## Skills Suite
+
+Tests an agent's ability to complete tasks that require external skills. The agent must discover and load relevant skills from a skill library to satisfy all completion criteria.
+The benchmark has three suites:
+- `suite_baseline.yaml`: Agent does not have access to skills
+- `suite_skill_use.yaml`: Agent is given the right skill and only has to load and use it (no selection required)
+- `suite_skill_select_use.yaml`: Agent has to select the right skill, load and use it
 
 ## Adding New Models
 
@@ -19,15 +27,17 @@ target:
     - provider-model-name
 ```
 
-3. Run the evaluation:
+3. Run the evaluation suite:
+Filesystem Suite:
 ```bash
 letta-evals run letta-leaderboard/filesystem-agent/filesystem.yaml \
-  --output letta-leaderboard/filesystem-agent/results/filesystem-{provider}-{model-name}
+  --output letta-leaderboard/filesystem-agent/results/{provider}-{model-name}
 ```
 
-Note: The `filesystem-agent/results/` directory uses Git LFS (Large File Storage) to manage result files. Ensure you have [Git LFS installed](https://git-lfs.com/) and configured before committing results. To pull existing result files, run:
+Skills Suite:
 ```bash
-git lfs pull
+letta-evals run letta-leaderboard/skills-suite/suite_skill_select_use.yaml \
+  --output letta-leaderboard/skills-suite/results/{provider}-{model-name}
 ```
 
 4. Generate the updated leaderboard:
@@ -37,25 +47,10 @@ The `generate_leaderboard_results.py` script reads evaluation results and merges
 **Basic usage:**
 ```bash
 python3 generate_leaderboard_results.py \
-  filesystem-agent/results/filesystem-{provider}-{model-name} \
-  --leaderboard leaderboard_filesystem_results.yaml
-```
-
-**Update multiple models at once:**
-```bash
-python3 generate_leaderboard_results.py \
-  filesystem-agent/results/filesystem-model1 \
-  filesystem-agent/results/filesystem-model2 \
-  filesystem-agent/results/filesystem-model3 \
-  --leaderboard leaderboard_filesystem_results.yaml
-```
-
-**Save to a different file:**
-```bash
-python3 generate_leaderboard_results.py \
-  filesystem-agent/results/filesystem-{provider}-{model-name} \
+  filesystem-agent/results/filesystem-{provider1}-{model-name-1} \
+  filesystem-agent/results/filesystem-{provider2}-{model-name-2} \
   --leaderboard leaderboard_filesystem_results.yaml \
-  --output leaderboard_filesystem_results_updated.yaml
+  [--output leaderboard_filesystem_results_updated.yaml]  # generate new results file
 ```
 
 The script will:
@@ -81,9 +76,11 @@ The same `generate_leaderboard_results.py` script works for all benchmarks (File
 
 **For Skills Suite:**
 ```bash
-python3 generate_leaderboard_results.py \
-  skills-suite/results/skills-{provider}-{model-name} \
-  --leaderboard leaderboard_skill_results.yaml
+python generate_leaderboard_results.py \
+  filesystem-agent/results/filesystem-gpt-51-system \
+  filesystem-agent/results/filesystem-opus-45 \
+  filesystem-agent/results/filesystem-gemini3-pro \
+  --leaderboard leaderboard_filesystem_results.yaml
 ```
 
 **For any custom benchmark:**
