@@ -69,7 +69,8 @@
 
         <div class="chart-container--inner">
             {%- assign leaderboard_data = benchmark[1] -%}
-            {%- include "leaderboard-chart.liquid", leaderboard_data: leaderboard_data -%}
+            {%- assign benchmark_key = benchmark[0] -%}
+            {%- include "leaderboard-chart.liquid", leaderboard_data: leaderboard_data, benchmark_key: benchmark_key -%}
         </div>
     </div>
     {%- endfor -%}

@@ -18,9 +18,12 @@
     {%- assign has_multiple_metrics = true -%}
 {%- endif -%}
 
+{%- comment -%} Get arrange_by configuration for this benchmark (default to "average") {%- endcomment -%}
+{%- assign arrange_by_metric = arrangeByConfig[benchmark_key] | default: "average" -%}
+
 {%- if has_multiple_metrics -%}
     {%- comment -%} Multiple metrics case: show model once with metrics side by side {%- endcomment -%}
-    {%- assign sorted_by_score = leaderboard_data | sort: "average" | reverse -%}
+    {%- assign sorted_by_score = leaderboard_data | sort: arrange_by_metric | reverse -%}
 
     {%- comment -%} Calculate cost range if costs exist {%- endcomment -%}
     {%- if has_costs -%}
@@ -92,8 +95,8 @@
     </div>
     {%- endfor -%}
 {%- else -%}
-    {%- comment -%} Single metric case: use average (original behavior) {%- endcomment -%}
-    {%- assign sorted_by_score = leaderboard_data | sort: "average" | reverse -%}
+    {%- comment -%} Single metric case: use arrange_by config or default to average {%- endcomment -%}
+    {%- assign sorted_by_score = leaderboard_data | sort: arrange_by_metric | reverse -%}
     {%- assign max_score = sorted_by_score[0].average -%}
     {%- if has_costs -%}
         {%- assign sorted_by_cost = leaderboard_data | sort: "total_cost" -%}

@@ -132,6 +132,43 @@ module.exports = function(eleventyConfig) {
     return allMetrics;
   });
 
+  // Load arrange_by configuration from each leaderboard file
+  eleventyConfig.addGlobalData("arrangeByConfig", function() {
+    const leaderboardDir = '../letta-leaderboard';
+    const arrangeByConfig = {};
+
+    // Find all leaderboard_*.yaml files
+    if (fs.existsSync(leaderboardDir)) {
+      const files = fs.readdirSync(leaderboardDir);
+
+      files.forEach(filename => {
+        if (filename.startsWith('leaderboard_') && filename.endsWith('.yaml')) {
+          const filePath = path.join(leaderboardDir, filename);
+
+          // Extract benchmark key from filename
+          let benchmarkKey = filename.replace('leaderboard_', '').replace('.yaml', '');
+          benchmarkKey = benchmarkKey.replace('_results', '');
+
+          if (benchmarkKey === 'results' || benchmarkKey === 'all') {
+            return;
+          }
+
+          const fileContents = fs.readFileSync(filePath, 'utf8');
+          const data = yaml.load(fileContents);
+
+          // Extract arrange_by if it exists (default to "average")
+          if (data && typeof data === 'object' && data.arrange_by) {
+            arrangeByConfig[benchmarkKey] = data.arrange_by;
+          } else {
+            arrangeByConfig[benchmarkKey] = "average";
+          }
+        }
+      });
+    }
+
+    return arrangeByConfig;
+  });
+
   // Keep backward compatibility with single leaderboard
   eleventyConfig.addGlobalData("leaderboard", function() {
     const fallbackPath = '../letta-leaderboard/leaderboard_results.yaml';

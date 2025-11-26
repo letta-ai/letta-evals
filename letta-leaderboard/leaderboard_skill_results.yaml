@@ -1,4 +1,5 @@
 benchmark_name: Skills Suite
+arrange_by: task_completion
 metrics:
   task_completion:
     name: Task Completion Rubric
