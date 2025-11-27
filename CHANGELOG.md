@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.8.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.7.0...letta-evals-v0.8.0) (2025-11-27)
+
+
+### Features
+
+* Add kimi-k2-thinking ([#125](https://github.com/letta-ai/letta-evals/issues/125)) ([a5ca7e7](https://github.com/letta-ai/letta-evals/commit/a5ca7e7257ea9dc2ca4d6f3ba7e9bc34376232ff))
+* Add skills suite for leaderboard ([#128](https://github.com/letta-ai/letta-evals/issues/128)) ([d252523](https://github.com/letta-ai/letta-evals/commit/d252523263f01e6a01e63f7e631aaad4511b100f))
+* Remove instance level pass/fail metrics ([#127](https://github.com/letta-ai/letta-evals/issues/127)) ([b7e91b6](https://github.com/letta-ai/letta-evals/commit/b7e91b6d529f0a31cf92699d9ee1001618a16d47))
+
+
+### Bug Fixes
+
+* Fix visualization status bar + mark empty submissions as errors ([#126](https://github.com/letta-ai/letta-evals/issues/126)) ([ffe75d2](https://github.com/letta-ai/letta-evals/commit/ffe75d2fd265a67e5346e5fa21dbc28494426721))
+* Leaderboard tooltip, spacing ([#129](https://github.com/letta-ai/letta-evals/issues/129)) ([993683f](https://github.com/letta-ai/letta-evals/commit/993683f020b247a0c6b684fba4138140908e2ca4))
+* update index.html ([2dda09f](https://github.com/letta-ai/letta-evals/commit/2dda09f6534b82aae9674243810b83433fbe0ba7))
+
+
+### Chores
+
+* GPT5.1, Gemini 3, Opus 4.5 updates ([#133](https://github.com/letta-ai/letta-evals/issues/133)) ([de1f4ca](https://github.com/letta-ai/letta-evals/commit/de1f4ca6c01065c3020f64430d4d2125cecc386e))
+* Improve empty submission check ([#132](https://github.com/letta-ai/letta-evals/issues/132)) ([2463a5b](https://github.com/letta-ai/letta-evals/commit/2463a5bf7616b4ca735bfa73f31b271b303ed5f2))
+* Multiple benchmarks on leaderboard ([#124](https://github.com/letta-ai/letta-evals/issues/124)) ([39cb733](https://github.com/letta-ai/letta-evals/commit/39cb733e08f8896c634e56025ac2aa81b6cd7d70))
+* Track costs during runs ([#130](https://github.com/letta-ai/letta-evals/issues/130)) ([dc980a1](https://github.com/letta-ai/letta-evals/commit/dc980a1d2744eb66e8c095ddc617562f17c07e2c))
+
 ## [0.7.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.6.1...letta-evals-v0.7.0) (2025-11-04)
 
 
