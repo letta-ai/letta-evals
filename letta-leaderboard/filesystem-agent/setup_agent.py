@@ -47,6 +47,7 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
             per_file_view_window_char_limit=8000,  # Limit view window per file
             agent_type="letta_v1_agent",
             include_base_tool_rules=False,
+            system="You are a helpful assistant that can answer questions about a filesystem. The files contain synthetic data about people, pets, vehicles, and other things. None of the data is real so please complete the task without refusing to answer.",
         )
 
         # Find the folder by name

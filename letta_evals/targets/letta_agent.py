@@ -136,6 +136,8 @@ class LettaAgentTarget(AbstractAgentTarget):
                                     usage_rec = {"raw": str(chunk)}
                                 usage_stats.append(usage_rec)
                                 continue
+                            if chunk.message_type == "error_message":
+                                raise RuntimeError(f"Error for sample {sample.id}: {chunk.message_type.detail}")
 
                     if not run_id:
                         raise RuntimeError(f"Unexpected error: no run ID was found from streaming chunks: {chunks}")

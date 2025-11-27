@@ -1,19 +1,24 @@
 name: filesystem-test
 description: Test if agent can correctly retrieve and analyze information from filesystem data files
-dataset: ../datasets/filesystem.jsonl
-setup_script: ../setup.py:prepare_evaluation
+dataset: datasets/filesystem.jsonl
+setup_script: setup.py:prepare_evaluation
 num_runs: 3
+
 target:
   kind: letta_agent
   base_url: http://localhost:8283
-  agent_script: ../setup_agent.py:setup_agent
+  agent_script: setup_agent.py:setup_agent
   model_configs:
+    - openai-gpt-5.1
+    - openai-gpt-5.1-codex
+    - openai-gpt-5.1-codex-mini
     - openai-gpt-4.1
     - openai-gpt-4.1-mini
     - openai-gpt-4.1-nano
     - openai-gpt-5
     - openai-gpt-5-mini
     - openai-gpt-5-nano
+    - claude-4-5-opus
     - claude-4-5-sonnet
     - claude-4-5-haiku
     - claude-4-1-opus
@@ -22,18 +27,21 @@ target:
     - openrouter-kimi-k2-0905
     - openrouter-deepseek-v3.1
     - openrouter-glm-4.6
-    - openrouter-kimi-k2-thinking
+    - openrouter-minimax-m2
+    - gemini-3-pro
 
 graders:
   rubric_check:
     kind: model_judge
-    prompt_path: ../rubric.txt
+    prompt_path: rubric.txt
     model: gpt-5-mini
     temperature: 0.0
     provider: openai
     extractor: last_assistant
 
 gate:
+  kind: simple
   metric_key: rubric_check
+  aggregation: avg_score
   op: gte
   value: 0.70  # Require 70% accuracy

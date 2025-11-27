@@ -5,6 +5,10 @@ MAX_SAMPLES_DISPLAY = 50
 
 # Model pricing configuration (costs per million tokens)
 MODEL_COSTS = {
+    "anthropic/claude-opus-4-5-20251101": {
+        "prompt_tokens": 5,
+        "completion_tokens": 25,
+    },
     "anthropic/claude-opus-4-1-20250805": {
         "prompt_tokens": 15,
         "completion_tokens": 75,
@@ -16,6 +20,22 @@ MODEL_COSTS = {
     "anthropic/claude-haiku-4-5-20251001": {
         "prompt_tokens": 1,
         "completion_tokens": 5,
+    },
+    "google_ai/gemini-3-pro-preview": {
+        "prompt_tokens": 2,
+        "completion_tokens": 12,
+    },
+    "openai/gpt-5.1-codex-mini": {
+        "prompt_tokens": 0.25,
+        "completion_tokens": 2,
+    },
+    "openai/gpt-5.1-codex": {
+        "prompt_tokens": 1.25,
+        "completion_tokens": 10,
+    },
+    "openai/gpt-5.1-2025-11-13": {
+        "prompt_tokens": 1.25,
+        "completion_tokens": 10,
     },
     "openai/gpt-5-2025-08-07": {
         "prompt_tokens": 1.25,

@@ -1,89 +1,25 @@
 """
 Leaderboard Results Generator
 
-Processes evaluation results from filesystem benchmarks and generates
-a YAML leaderboard with model performance metrics and costs.
+Processes evaluation results from aggregate_stats.json or summary.json files
+and merges them with an existing leaderboard YAML file.
 """
 
+import argparse
 import json
 import logging
-from collections import defaultdict
-from glob import glob
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional
 
-import pandas as pd
 import yaml
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-# Model pricing configuration (costs per million tokens)
-MODEL_COSTS = {
-    "anthropic/claude-opus-4-1-20250805": {
-        "prompt_tokens": 15,
-        "completion_tokens": 75,
-    },
-    "anthropic/claude-sonnet-4-5-20250929": {
-        "prompt_tokens": 3,
-        "completion_tokens": 15,
-    },
-    "anthropic/claude-haiku-4-5-20251001": {
-        "prompt_tokens": 1,
-        "completion_tokens": 5,
-    },
-    "openai/gpt-5-2025-08-07": {
-        "prompt_tokens": 1.25,
-        "completion_tokens": 10,
-    },
-    "openai/gpt-5-mini-2025-08-07": {
-        "prompt_tokens": 0.25,
-        "completion_tokens": 2,
-    },
-    "openai/gpt-5-nano-2025-08-07": {
-        "prompt_tokens": 0.05,
-        "completion_tokens": 0.4,
-    },
-    "openai/gpt-4.1-2025-04-14": {
-        "prompt_tokens": 2,
-        "completion_tokens": 8,
-    },
-    "openai/gpt-4.1-mini-2025-04-14": {
-        "prompt_tokens": 0.4,
-        "completion_tokens": 1.6,
-    },
-    "openai/gpt-4.1-nano-2025-04-14": {
-        "prompt_tokens": 0.10,
-        "completion_tokens": 0.4,
-    },
-    "deepseek/deepseek-chat-v3.1": {
-        "prompt_tokens": 0.27,
-        "completion_tokens": 1,
-    },
-    "moonshotai/kimi-k2-0905": {
-        "prompt_tokens": 0.39,
-        "completion_tokens": 1.9,
-    },
-    "z-ai/glm-4.6": {
-        "prompt_tokens": 0.5,
-        "completion_tokens": 1.75,
-    },
-    "openai/gpt-oss-120b": {
-        "prompt_tokens": 0.15,
-        "completion_tokens": 0.6,
-    },
-    "openai/gpt-oss-20b": {
-        "prompt_tokens": 0.05,
-        "completion_tokens": 0.2,
-    },
-}
-
-EXCLUDED_MODELS = {"moonshotai/Kimi-K2-Instruct-0905"}
-
 
 def normalize_model_name(model_name: str) -> str:
     """
-    Normalize model names by adding provider prefixes.
+    Normalize model names by adding provider prefixes if not already present.
 
     Args:
         model_name: Raw model name from results
@@ -91,426 +27,423 @@ def normalize_model_name(model_name: str) -> str:
     Returns:
         Normalized model name with provider prefix
     """
+    if "/" in model_name:
+        return model_name
     if model_name.startswith("claude"):
         return f"anthropic/{model_name}"
     if model_name.startswith("gpt"):
         return f"openai/{model_name}"
+    if model_name.startswith("gemini"):
+        return f"google/{model_name}"
     return model_name
 
 
-def calculate_cost(model_name: str, prompt_tokens: int, completion_tokens: int) -> float:
+def read_stats_file(directory: Path) -> Optional[Dict]:
     """
-    Calculate the cost for a model's token usage.
+    Read aggregate_stats.json or fallback to summary.json from a directory.
 
     Args:
-        model_name: Name of the model
-        prompt_tokens: Number of prompt tokens used
-        completion_tokens: Number of completion tokens used
+        directory: Path to directory containing stats files
 
     Returns:
-        Total cost in dollars
-
-    Raises:
-        KeyError: If model_name is not in MODEL_COSTS
+        Dictionary containing the stats data, or None if neither file exists
     """
-    model_costs = MODEL_COSTS[model_name]
-    prompt_cost = model_costs["prompt_tokens"] * prompt_tokens / 1_000_000
-    completion_cost = model_costs["completion_tokens"] * completion_tokens / 1_000_000
-    return prompt_cost + completion_cost
+    aggregate_stats_path = directory / "aggregate_stats.json"
+    summary_path = directory / "summary.json"
 
-
-def find_result_files(pattern: str = "results/filesystem-*/**/results.jsonl") -> List[Path]:
-    """
-    Find all result files matching the given pattern.
-
-    Args:
-        pattern: Glob pattern for finding result files
-
-    Returns:
-        Sorted list of Path objects for result files
-    """
-    paths = sorted(glob(pattern, recursive=True))
-    logger.info(f"Found {len(paths)} result files")
-    return [Path(p) for p in paths]
-
-
-def extract_benchmark_name(file_path: Path) -> str:
-    """
-    Extract the benchmark name from a result file path.
-
-    Args:
-        file_path: Path to a results file
-
-    Returns:
-        Benchmark name (e.g., 'filesystem', 'core-memory-read')
-    """
-    # Extract from path like "results/filesystem-*" or "results/core-memory-read-*"
-    parts = file_path.parts
-    for part in parts:
-        if part.startswith("results/"):
-            continue
-        if any(benchmark in part for benchmark in ["filesystem-", "core-memory-read-", "core-memory-update-"]):
-            # Extract the benchmark prefix
-            if part.startswith("filesystem-"):
-                return "filesystem"
-            elif part.startswith("core-memory-read-"):
-                return "core-memory-read"
-            elif part.startswith("core-memory-update-"):
-                return "core-memory-update"
-    return "unknown"
-
-
-def parse_result_entry(row: Dict, line_num: int, file_path: Path) -> Tuple[str, float, float, int, int, bool]:
-    """
-    Parse a single result entry from a JSONL file.
-
-    Args:
-        row: Parsed JSON row from results file
-        line_num: Line number in file (for error reporting)
-        file_path: Path to the file being processed
-
-    Returns:
-        Tuple of (model_name, score, cost, prompt_tokens, completion_tokens, has_error)
-    """
-    try:
-        model_name = row["result"]["model_name"]
-
-        # Skip excluded models
-        if model_name in EXCLUDED_MODELS:
-            return None, None, None, None, None, False
-
-        model_name = normalize_model_name(model_name)
-        score = row["result"]["grade"]["score"]
-
-        # Try to get cost directly from the result (computed in real-time by letta-evals)
-        cost = row["result"].get("cost")
-        has_error = False
-
-        # If cost is not available, fall back to calculating from agent_usage
-        if cost is None:
-            try:
-                prompt_tokens = row["result"]["agent_usage"][0]["prompt_tokens"]
-                completion_tokens = row["result"]["agent_usage"][0]["completion_tokens"]
-                cost = calculate_cost(model_name, prompt_tokens, completion_tokens)
-                has_error = False
-            except (KeyError, IndexError, TypeError) as e:
-                logger.debug(f"Missing cost and token data in {file_path}:{line_num} - {e}")
-                cost = 0.0
-                prompt_tokens = 0
-                completion_tokens = 0
-                has_error = True
-        else:
-            # Cost was pre-computed, still extract tokens for statistics if available
-            try:
-                prompt_tokens = row["result"]["agent_usage"][0]["prompt_tokens"]
-                completion_tokens = row["result"]["agent_usage"][0]["completion_tokens"]
-            except (KeyError, IndexError, TypeError):
-                prompt_tokens = 0
-                completion_tokens = 0
-
-        return model_name, score, cost, prompt_tokens, completion_tokens, has_error
-
-    except (KeyError, TypeError) as e:
-        logger.error(f"Error parsing entry in {file_path}:{line_num} - {e}")
-        return None, None, None, None, None, True
-
-
-def load_results(result_files: List[Path]) -> Tuple[Dict[str, List], int, int]:
-    """
-    Load and parse all result files.
-
-    Args:
-        result_files: List of paths to result files
-
-    Returns:
-        Tuple of (results_dict, total_samples, error_count)
-    """
-    results = defaultdict(list)
-    num_total = 0
-    num_errors = 0
-
-    for file_path in result_files:
-        benchmark_name = extract_benchmark_name(file_path)
-        logger.info(f"Processing file: {file_path} (benchmark: {benchmark_name})")
+    if aggregate_stats_path.exists():
+        logger.info(f"Reading aggregate_stats.json from {directory}")
         try:
-            with open(file_path, "r") as f:
-                for line_num, line in enumerate(f, start=1):
-                    num_total += 1
-                    try:
-                        row = json.loads(line)
-                        # print(f"Row: {row['result'].keys()}")
-                        model_name, score, cost, prompt_tokens, completion_tokens, has_error = parse_result_entry(
-                            row, line_num, file_path
-                        )
-                        # print(f"Model name: {model_name}, Score: {score}, Cost: {cost}, Has error: {has_error}")
+            with open(aggregate_stats_path, "r") as f:
+                return json.load(f)
+        except (IOError, json.JSONDecodeError) as e:
+            logger.error(f"Error reading {aggregate_stats_path}: {e}")
+            return None
 
-                        if model_name is None:
-                            continue
+    elif summary_path.exists():
+        logger.info(f"Reading summary.json from {directory}")
+        try:
+            with open(summary_path, "r") as f:
+                return json.load(f)
+        except (IOError, json.JSONDecodeError) as e:
+            logger.error(f"Error reading {summary_path}: {e}")
+            return None
 
-                        if model_name in [
-                            "anthropic/claude-sonnet-4-5-20250929",
-                            "anthropic/claude-opus-4-1-20250805",
-                        ] and "answerable-6" not in str(file_path):
-                            continue
-
-                        if has_error:
-                            num_errors += 1
-
-                        results["model_name"].append(model_name)
-                        results["score"].append(score)
-                        results["cost"].append(cost)
-                        results["prompt_tokens"].append(prompt_tokens)
-                        results["completion_tokens"].append(completion_tokens)
-                        results["benchmark"].append(benchmark_name)
-
-                    except json.JSONDecodeError as e:
-                        logger.error(f"Invalid JSON in {file_path}:{line_num} - {e}")
-                        num_errors += 1
-
-        except IOError as e:
-            logger.error(f"Error reading file {file_path} - {e}")
-            continue
-
-    results_df = pd.DataFrame(results)
-    print("=" * 40)
-    print("MODEL COUNTS")
-    print("=" * 40)
-    print(results_df["model_name"].value_counts())
-    print("=" * 40)
-    return results, num_total, num_errors
+    else:
+        logger.warning(f"Neither aggregate_stats.json nor summary.json found in {directory}")
+        return None
 
 
-def aggregate_model_stats(results: Dict[str, List]) -> Dict[str, Dict[str, List]]:
+def extract_model_results_from_aggregate(stats: Dict) -> List[Dict]:
     """
-    Aggregate results by model.
+    Extract model results from aggregate_stats.json.
 
     Args:
-        results: Dictionary with model_name, score, cost, prompt_tokens, and completion_tokens lists
+        stats: Parsed aggregate_stats.json data
 
     Returns:
-        Dictionary mapping model names to their scores, costs, and token counts
+        List of model result dictionaries with name, score, cost, and individual metrics
     """
-    model_stats = defaultdict(lambda: {"scores": [], "costs": [], "prompt_tokens": [], "completion_tokens": []})
+    model_results = []
 
-    for model, score, cost, prompt_tokens, completion_tokens in zip(
-        results["model_name"], results["score"], results["cost"], results["prompt_tokens"], results["completion_tokens"]
-    ):
-        model_stats[model]["scores"].append(score)
-        model_stats[model]["costs"].append(cost)
-        model_stats[model]["prompt_tokens"].append(prompt_tokens)
-        model_stats[model]["completion_tokens"].append(completion_tokens)
+    # Check if this is aggregate stats (has num_runs and individual_run_metrics)
+    if "num_runs" in stats and "individual_run_metrics" in stats:
+        # Aggregate model results across all runs
+        model_data = {}
 
-    return model_stats
+        for run_metrics in stats["individual_run_metrics"]:
+            if "per_model" not in run_metrics:
+                continue
+
+            for model_info in run_metrics["per_model"]:
+                model_name = normalize_model_name(model_info["model_name"])
+
+                if model_name not in model_data:
+                    model_data[model_name] = {
+                        "scores": [],
+                        "costs": [],
+                        "metrics": {},
+                    }
+
+                # Score is already in percentage (e.g., 77.0)
+                score = model_info.get("avg_score_attempted", 0) * 100
+                cost_data = model_info.get("cost")
+                cost = cost_data.get("total_cost", 0) if cost_data else 0
+
+                model_data[model_name]["scores"].append(score)
+                model_data[model_name]["costs"].append(cost)
+
+                # Extract individual metrics (e.g., task_completion, skill_use)
+                metrics_data = model_info.get("metrics", {})
+                for metric_name, metric_value in metrics_data.items():
+                    if metric_name not in model_data[model_name]["metrics"]:
+                        model_data[model_name]["metrics"][metric_name] = []
+                    model_data[model_name]["metrics"][metric_name].append(metric_value)
+
+        # Compute averages
+        for model_name, data in model_data.items():
+            avg_score = sum(data["scores"]) / len(data["scores"]) if data["scores"] else 0
+            avg_cost = sum(data["costs"]) / len(data["costs"]) if data["costs"] else 0
+
+            # Average individual metrics
+            avg_metrics = {}
+            for metric_name, metric_values in data["metrics"].items():
+                avg_metrics[metric_name] = sum(metric_values) / len(metric_values) if metric_values else 0
+
+            model_results.append(
+                {
+                    "model_name": model_name,
+                    "score": avg_score,
+                    "cost": avg_cost,
+                    "metrics": avg_metrics,
+                }
+            )
+
+    return model_results
 
 
-def aggregate_model_stats_by_benchmark(results: Dict[str, List]) -> Dict[str, Dict[str, Dict[str, List]]]:
+def extract_model_results_from_summary(stats: Dict) -> List[Dict]:
     """
-    Aggregate results by model and benchmark.
+    Extract model results from summary.json.
 
     Args:
-        results: Dictionary with model_name, score, cost, prompt_tokens, completion_tokens, and benchmark lists
+        stats: Parsed summary.json data
 
     Returns:
-        Dictionary mapping benchmark names to model stats
+        List of model result dictionaries with name, score, cost, and individual metrics
     """
-    benchmark_stats = defaultdict(
-        lambda: defaultdict(lambda: {"scores": [], "costs": [], "prompt_tokens": [], "completion_tokens": []})
-    )
+    model_results = []
 
-    for model, score, cost, prompt_tokens, completion_tokens, benchmark in zip(
-        results["model_name"],
-        results["score"],
-        results["cost"],
-        results["prompt_tokens"],
-        results["completion_tokens"],
-        results["benchmark"],
-    ):
-        benchmark_stats[benchmark][model]["scores"].append(score)
-        benchmark_stats[benchmark][model]["costs"].append(cost)
-        benchmark_stats[benchmark][model]["prompt_tokens"].append(prompt_tokens)
-        benchmark_stats[benchmark][model]["completion_tokens"].append(completion_tokens)
+    if "metrics" in stats and "per_model" in stats["metrics"]:
+        for model_info in stats["metrics"]["per_model"]:
+            model_name = normalize_model_name(model_info["model_name"])
 
-    return benchmark_stats
+            # Score is already in percentage (e.g., 77.0)
+            score = model_info.get("avg_score_attempted", 0) * 100
+            cost_data = model_info.get("cost")
+            cost = cost_data.get("total_cost", 0) if cost_data else 0
+
+            # Extract individual metrics (e.g., task_completion, skill_use)
+            metrics_data = model_info.get("metrics", {})
+
+            model_results.append(
+                {
+                    "model_name": model_name,
+                    "score": score,
+                    "cost": cost,
+                    "metrics": metrics_data,
+                }
+            )
+
+    return model_results
 
 
-def format_leaderboard_output(
-    model_stats: Dict[str, Dict[str, List]], benchmark_name: str = "filesystem"
-) -> List[Dict]:
+def load_leaderboard_yaml(yaml_path: Path) -> Dict:
     """
-    Format aggregated model statistics for YAML output.
+    Load existing leaderboard YAML file.
 
     Args:
-        model_stats: Dictionary of model statistics
-        benchmark_name: Name of the benchmark
+        yaml_path: Path to the leaderboard YAML file
 
     Returns:
-        List of dictionaries formatted for YAML output
+        Dictionary containing the leaderboard data
     """
-    yaml_output = []
+    if not yaml_path.exists():
+        logger.warning(f"Leaderboard file {yaml_path} does not exist. Creating new leaderboard.")
+        return {"benchmark_name": "Benchmark", "metrics": {}, "results": []}
 
-    for model_name in sorted(model_stats.keys()):
-        scores = model_stats[model_name]["scores"]
-        costs = model_stats[model_name]["costs"]
-
-        # scores and costs per-run
-        avg_score = sum(scores) * 100 / len(scores)
-        total_cost = sum(costs) * 100 / len(costs)
-
-        yaml_output.append(
-            {
-                "model": model_name,
-                "average": round(avg_score, 2),
-                "total_cost": round(total_cost, 2),
-                f"leaderboard_{benchmark_name}_100": round(avg_score, 2),
-            }
-        )
-
-    return yaml_output
+    try:
+        with open(yaml_path, "r") as f:
+            data = yaml.safe_load(f)
+            if data is None:
+                data = {"benchmark_name": "Benchmark", "metrics": {}, "results": []}
+            return data
+    except (IOError, yaml.YAMLError) as e:
+        logger.error(f"Error reading {yaml_path}: {e}")
+        raise
 
 
-def format_leaderboard_output_by_benchmark(
-    benchmark_stats: Dict[str, Dict[str, Dict[str, List]]],
-) -> Dict[str, List[Dict]]:
+def merge_results(existing_results: List[Dict], new_results: List[Dict], metric_key: str) -> List[Dict]:
     """
-    Format aggregated model statistics by benchmark for YAML output.
+    Merge new results with existing leaderboard results.
+    Handles both single-metric and multi-metric benchmarks.
 
     Args:
-        benchmark_stats: Dictionary mapping benchmark names to model stats
+        existing_results: List of existing model results from leaderboard
+        new_results: List of new model results to add
+        metric_key: The metric key to use for single-metric benchmarks (e.g., 'leaderboard_filesystem_100')
 
     Returns:
-        Dictionary mapping benchmark names to formatted leaderboard data
+        Merged list of model results
     """
-    all_benchmarks = {}
+    # Create a dictionary for easy lookup and update
+    results_dict = {}
 
-    for benchmark_name, model_stats in benchmark_stats.items():
-        all_benchmarks[benchmark_name] = format_leaderboard_output(model_stats, benchmark_name)
+    # Check if existing results include total_cost field
+    include_cost = False
+    if existing_results:
+        include_cost = "total_cost" in existing_results[0]
 
-    return all_benchmarks
+    # Add existing results
+    for result in existing_results:
+        model_name = result["model"]
+        results_dict[model_name] = result.copy()
+
+    # Merge/add new results
+    for new_result in new_results:
+        model_name = new_result["model_name"]
+        cost = round(new_result["cost"], 2)
+
+        # Check if this is a multi-metric benchmark (2+ individual metrics)
+        individual_metrics = new_result.get("metrics", {})
+
+        if individual_metrics and len(individual_metrics) > 1:
+            # Multi-metric benchmark: populate each metric individually
+            rounded_metrics = {k: round(v, 2) for k, v in individual_metrics.items()}
+
+            # Calculate average across all metrics
+            if rounded_metrics:
+                avg_score = round(sum(rounded_metrics.values()) / len(rounded_metrics), 2)
+            else:
+                avg_score = round(new_result["score"], 2)
+
+            if model_name in results_dict:
+                # Update existing entry
+                results_dict[model_name]["average"] = avg_score
+                if include_cost:
+                    results_dict[model_name]["total_cost"] = cost
+                # Update all individual metrics
+                for metric_name, metric_value in rounded_metrics.items():
+                    results_dict[model_name][metric_name] = metric_value
+                logger.info(f"Updated results for {model_name} (multi-metric)")
+            else:
+                # Add new entry
+                entry = {
+                    "model": model_name,
+                    "average": avg_score,
+                }
+                if include_cost:
+                    entry["total_cost"] = cost
+                # Add all individual metrics
+                entry.update(rounded_metrics)
+                results_dict[model_name] = entry
+                logger.info(f"Added new results for {model_name} (multi-metric)")
+        else:
+            # Single-metric benchmark: use the provided metric_key
+            score = round(new_result["score"], 2)
+
+            if model_name in results_dict:
+                # Update existing entry
+                results_dict[model_name]["average"] = score
+                if include_cost:
+                    results_dict[model_name]["total_cost"] = cost
+                results_dict[model_name][metric_key] = score
+                logger.info(f"Updated results for {model_name} (single-metric)")
+            else:
+                # Add new entry
+                entry = {
+                    "model": model_name,
+                    "average": score,
+                    metric_key: score,
+                }
+                if include_cost:
+                    entry["total_cost"] = cost
+                results_dict[model_name] = entry
+                logger.info(f"Added new results for {model_name} (single-metric)")
+
+    # Convert back to list and sort by model name
+    return sorted(results_dict.values(), key=lambda x: x["model"])
 
 
-def write_yaml_output(data: List[Dict], output_path: str = "leaderboard_results.yaml") -> None:
+def write_leaderboard_yaml(data: Dict, output_path: Path) -> None:
     """
     Write leaderboard data to a YAML file.
 
     Args:
-        data: List of model result dictionaries
+        data: Dictionary containing leaderboard data
         output_path: Path to output YAML file
     """
     try:
         with open(output_path, "w") as f:
             yaml.dump(data, f, default_flow_style=False, sort_keys=False)
-        logger.info(f"Results written to {output_path}")
+        logger.info(f"Updated leaderboard written to {output_path}")
     except IOError as e:
-        logger.error(f"Error writing to {output_path} - {e}")
+        logger.error(f"Error writing to {output_path}: {e}")
         raise
 
 
-def write_yaml_output_by_benchmark(all_benchmarks: Dict[str, List[Dict]]) -> None:
+def parse_arguments() -> argparse.Namespace:
     """
-    Write leaderboard data for each benchmark to separate YAML files.
+    Parse command-line arguments.
+
+    Returns:
+        Parsed arguments
+    """
+    parser = argparse.ArgumentParser(
+        description="Generate or update leaderboard results from aggregate_stats.json or summary.json files"
+    )
+    parser.add_argument(
+        "directories", nargs="+", type=Path, help="Directories containing aggregate_stats.json or summary.json files"
+    )
+    parser.add_argument(
+        "--leaderboard", "-l", type=Path, required=True, help="Path to the leaderboard YAML file (input and output)"
+    )
+    parser.add_argument(
+        "--output", "-o", type=Path, help="Path to output YAML file (defaults to same as --leaderboard)"
+    )
+
+    return parser.parse_args()
+
+
+def extract_benchmark_name_from_path(directory: Path) -> str:
+    """
+    Extract benchmark name from directory path.
 
     Args:
-        all_benchmarks: Dictionary mapping benchmark names to leaderboard data
+        directory: Path to the results directory
+
+    Returns:
+        Benchmark name (e.g., 'filesystem', 'skills')
     """
-    for benchmark_name, data in all_benchmarks.items():
-        output_path = f"leaderboard_{benchmark_name}.yaml"
-        write_yaml_output(data, output_path)
+    # Look for common benchmark patterns in the path
+    path_str = str(directory)
+    if "filesystem" in path_str.lower():
+        return "filesystem"
+    elif "skill" in path_str.lower():
+        return "skills"
+    elif "memory" in path_str.lower():
+        return "memory"
 
-    # Also write a combined file with all benchmarks
-    combined_path = "leaderboard_all.yaml"
-    try:
-        with open(combined_path, "w") as f:
-            yaml.dump(all_benchmarks, f, default_flow_style=False, sort_keys=False)
-        logger.info(f"Combined results written to {combined_path}")
-    except IOError as e:
-        logger.error(f"Error writing to {combined_path} - {e}")
-        raise
-
-
-def print_token_statistics(model_stats: Dict[str, Dict[str, List]]) -> None:
-    """
-    Print aggregated token usage statistics for each model.
-
-    Args:
-        model_stats: Dictionary of model statistics including token counts
-    """
-    print("\n" + "=" * 80)
-    print("TOKEN USAGE BY MODEL")
-    print("=" * 80)
-    print(f"{'Model':<50} {'Prompt Tokens':>15} {'Completion Tokens':>15}")
-    print("-" * 80)
-
-    for model_name in sorted(model_stats.keys()):
-        prompt_tokens = model_stats[model_name]["prompt_tokens"]
-        completion_tokens = model_stats[model_name]["completion_tokens"]
-
-        # tokens per-run
-        total_prompt = int(sum(prompt_tokens) * 100 / len(prompt_tokens))
-        total_completion = int(sum(completion_tokens) * 100 / len(completion_tokens))
-
-        print(f"{model_name:<50} {total_prompt:>15,} {total_completion:>15,}")
-
-    print("=" * 80 + "\n")
-
-
-def print_summary(result_files: List[Path], yaml_output: List[Dict], num_total: int, num_errors: int) -> None:
-    """
-    Print a summary of the leaderboard generation.
-
-    Args:
-        result_files: List of result files
-        yaml_output: Generated leaderboard data
-        num_total: Total number of samples processed
-        num_errors: Number of errors encountered
-    """
-    print("=" * 40)
-    print("LEADERBOARD RESULTS SUMMARY")
-    print("=" * 40)
-    print(f"Total files:  {len(result_files)}")
-    print(f"Total models:  {len(yaml_output)}")
-    print(f"Total samples: {num_total}")
-    print(f"Total errors:  {num_errors}")
-    print("=" * 40 + "\n")
+    # Default to the directory name
+    return directory.name
 
 
 def main() -> None:
     """Main execution function."""
-    # Find all result files from all benchmarks
-    patterns = [
-        "results/filesystem-*/**/results.jsonl",
-    ]
+    args = parse_arguments()
 
-    all_result_files = []
-    for pattern in patterns:
-        all_result_files.extend(find_result_files(pattern))
+    # Load existing leaderboard
+    leaderboard_data = load_leaderboard_yaml(args.leaderboard)
 
-    if not all_result_files:
-        logger.error("No result files found")
+    # Extract metric key from existing results or generate from benchmark name
+    existing_results = leaderboard_data.get("results", [])
+    metric_key = None
+
+    # Try to find the metric key from existing results
+    if existing_results:
+        # Look for a key that starts with "leaderboard_" and ends with "_100"
+        for key in existing_results[0].keys():
+            if key.startswith("leaderboard_") and key.endswith("_100"):
+                metric_key = key
+                break
+
+    # If no metric key found, try to extract from metrics section
+    if not metric_key:
+        metrics = leaderboard_data.get("metrics", {})
+        for key in metrics.keys():
+            if key.startswith("leaderboard_") and key.endswith("_100"):
+                metric_key = key
+                break
+
+    # If still no metric key, generate one from benchmark name or directory
+    if not metric_key:
+        benchmark_name = leaderboard_data.get("benchmark_name", "benchmark")
+        if benchmark_name == "Benchmark" and args.directories:
+            benchmark_name = extract_benchmark_name_from_path(args.directories[0])
+        # Normalize benchmark name to lowercase without spaces
+        normalized_name = benchmark_name.lower().replace(" ", "_").replace("-", "_")
+        metric_key = f"leaderboard_{normalized_name}_100"
+
+    logger.info(f"Using metric key: {metric_key}")
+
+    # Collect all model results from all directories
+    all_new_results = []
+
+    for directory in args.directories:
+        if not directory.exists():
+            logger.warning(f"Directory {directory} does not exist, skipping")
+            continue
+
+        # Read stats file
+        stats = read_stats_file(directory)
+        if stats is None:
+            continue
+
+        # Extract model results based on file type
+        if "num_runs" in stats:
+            model_results = extract_model_results_from_aggregate(stats)
+        elif "metrics" in stats:
+            model_results = extract_model_results_from_summary(stats)
+        else:
+            logger.warning(f"Unknown stats format in {directory}, skipping")
+            continue
+
+        all_new_results.extend(model_results)
+        logger.info(f"Extracted {len(model_results)} model results from {directory}")
+
+    if not all_new_results:
+        logger.error("No results found in any of the specified directories")
         return
 
-    # Load and process all results
-    results, num_total, num_errors = load_results(all_result_files)
+    # Merge results
+    merged_results = merge_results(existing_results, all_new_results, metric_key)
 
-    # Generate benchmark-specific leaderboards
-    benchmark_stats = aggregate_model_stats_by_benchmark(results)
-    all_benchmarks = format_leaderboard_output_by_benchmark(benchmark_stats)
-    write_yaml_output_by_benchmark(all_benchmarks)
+    # Update leaderboard data
+    leaderboard_data["results"] = merged_results
 
-    # Also generate overall leaderboard for backward compatibility
-    model_stats = aggregate_model_stats(results)
-    yaml_output = format_leaderboard_output(model_stats)
-    write_yaml_output(yaml_output)
+    # Write output
+    output_path = args.output or args.leaderboard
+    write_leaderboard_yaml(leaderboard_data, output_path)
 
-    print_summary(all_result_files, yaml_output, num_total, num_errors)
-    print_token_statistics(model_stats)
-
-    # Print benchmark-specific summaries
+    # Print summary
     print("\n" + "=" * 80)
-    print("BENCHMARK-SPECIFIC RESULTS")
+    print("LEADERBOARD UPDATE SUMMARY")
     print("=" * 80)
-    for benchmark_name, data in all_benchmarks.items():
-        print(f"\n{benchmark_name.upper()}: {len(data)} models")
-    print("=" * 80)
+    print(f"Processed directories: {len(args.directories)}")
+    print(f"New/updated models: {len(all_new_results)}")
+    print(f"Total models in leaderboard: {len(merged_results)}")
+    print(f"Output written to: {output_path}")
+    print("=" * 80 + "\n")
 
 
 if __name__ == "__main__":

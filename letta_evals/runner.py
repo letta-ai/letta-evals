@@ -520,7 +520,7 @@ class Runner:
                                     model_name = cfg
                                 else:
                                     model_name = None
-                                logger.error(f"Error running sample {s.id} with model {model_name}: {e}")
+                                logger.error(f"Error running sample {s.id + 1} with model {model_name}: {e}")
                                 if self.progress_callback:
                                     await self.progress_callback.sample_error(s.id, str(e), model_name=model_name)
 
