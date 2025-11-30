@@ -23,7 +23,7 @@ class RubricGrader(Grader):
     def __init__(
         self,
         prompt: str,
-        model: str = "gpt-4o-mini",
+        model: str = "gpt-5-mini",
         temperature: float = 0.0,
         provider: LLMProvider = LLMProvider.OPENAI,
         max_retries: int = 5,
