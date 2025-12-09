@@ -29,10 +29,22 @@ results:
   average: 74.25
   task_completion: 76.5
   skill_use: 72.0
+- model: deepseek-chat
+  average: 64.47
+  task_completion: 75.33
+  skill_use: 53.62
+- model: deepseek-reasoner
+  average: 63.3
+  task_completion: 70.48
+  skill_use: 56.12
 - model: google/gemini-3-pro
   average: 68.51
   task_completion: 72.73
   skill_use: 64.29
+- model: mistral-large-3
+  average: 46.59
+  task_completion: 56.25
+  skill_use: 36.93
 - model: openai/gpt-4.1-2025-04-14
   average: 33.71
   task_completion: 36.1

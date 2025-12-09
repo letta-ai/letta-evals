@@ -24,6 +24,14 @@ results:
   average: 74.0
   total_cost: 24.58
   leaderboard_filesystem_100: 74.0
+- model: deepseek-chat
+  average: 63.35
+  leaderboard_filesystem_100: 63.35
+  total_cost: 13.05
+- model: deepseek-reasoner
+  average: 73.05
+  leaderboard_filesystem_100: 73.05
+  total_cost: 16.03
 - model: deepseek/deepseek-chat-v3.1
   average: 11.97
   total_cost: 2.54
@@ -36,6 +44,10 @@ results:
   average: 56.83
   total_cost: 5.21
   leaderboard_filesystem_100: 56.83
+- model: mistralai/mistral-large-2512
+  average: 23.8
+  leaderboard_filesystem_100: 23.8
+  total_cost: 8.97
 - model: moonshotai/kimi-k2-0905
   average: 55.13
   total_cost: 12.08
