@@ -81,6 +81,18 @@ MODEL_COSTS = {
         "prompt_tokens": 0.05,
         "completion_tokens": 0.2,
     },
+    "deepseek/deepseek-reasoner": {
+        "prompt_tokens": 0.28,
+        "completion_tokens": 0.42,
+    },
+    "deepseek/deepseek-chat": {
+        "prompt_tokens": 0.28,
+        "completion_tokens": 0.42,
+    },
+    "mistralai/mistral-large-2512": {
+        "prompt_tokens": 0.5,
+        "completion_tokens": 1.5,
+    },
 }
 
 

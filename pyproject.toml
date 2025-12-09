@@ -69,7 +69,11 @@ build-backend = "hatchling.build"
 [tool.ruff]
 line-length = 120
 target-version = "py311"
-exclude = ["examples/letta-code-simple-edit/sandbox", "examples/letta-code-simple-edit/init_sandbox"]
+exclude = [
+    "examples/letta-code-simple-edit/sandbox", 
+    "examples/letta-code-simple-edit/init_sandbox",
+    "letta-leaderboard/skills-suite/.skills",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
