@@ -707,6 +707,19 @@ class EvalProgress(ProgressCallback):
         self.console.print(f"  Average score (attempted): {metrics.avg_score_attempted:.2f}")
         self.console.print(f"  Average score (total): {metrics.avg_score_total:.2f}")
 
+        # cost and token usage metrics
+        if metrics.cost:
+            self.console.print("\n[bold]Cost and Token Usage:[/bold]")
+            self.console.print(f"  Total cost: ${metrics.cost.total_cost:.4f}")
+            self.console.print(f"  Total prompt tokens: {metrics.cost.total_prompt_tokens:,}")
+            self.console.print(f"  Total completion tokens: {metrics.cost.total_completion_tokens:,}")
+            if metrics.cost.total_cached_input_tokens > 0:
+                self.console.print(f"  Total cached input tokens: {metrics.cost.total_cached_input_tokens:,}")
+            if metrics.cost.total_cache_write_tokens > 0:
+                self.console.print(f"  Total cache write tokens: {metrics.cost.total_cache_write_tokens:,}")
+            if metrics.cost.total_reasoning_tokens > 0:
+                self.console.print(f"  Total reasoning tokens: {metrics.cost.total_reasoning_tokens:,}")
+
         # per-metric aggregates
         if hasattr(metrics, "by_metric") and metrics.by_metric:
             self.console.print("\n[bold]Metrics by Metric:[/bold]")
@@ -745,6 +758,36 @@ class EvalProgress(ProgressCallback):
                 )
 
             self.console.print(model_table)
+
+            # per-model cost and token usage
+            has_cost_data = any(m.cost for m in metrics.per_model)
+            if has_cost_data:
+                self.console.print("\n[bold]Per-Model Cost and Token Usage:[/bold]")
+                cost_table = Table()
+                cost_table.add_column("Model", style="cyan")
+                cost_table.add_column("Cost", style="white")
+                cost_table.add_column("Prompt Tokens", style="white")
+                cost_table.add_column("Completion Tokens", style="white")
+                cost_table.add_column("Cached Input", style="dim white")
+                cost_table.add_column("Cache Write", style="dim white")
+                cost_table.add_column("Reasoning", style="dim white")
+
+                for model_metrics in metrics.per_model:
+                    if model_metrics.cost:
+                        cached_str = f"{model_metrics.cost.total_cached_input_tokens:,}" if model_metrics.cost.total_cached_input_tokens > 0 else "-"
+                        cache_write_str = f"{model_metrics.cost.total_cache_write_tokens:,}" if model_metrics.cost.total_cache_write_tokens > 0 else "-"
+                        reasoning_str = f"{model_metrics.cost.total_reasoning_tokens:,}" if model_metrics.cost.total_reasoning_tokens > 0 else "-"
+                        cost_table.add_row(
+                            model_metrics.model_name,
+                            f"${model_metrics.cost.total_cost:.4f}",
+                            f"{model_metrics.cost.total_prompt_tokens:,}",
+                            f"{model_metrics.cost.total_completion_tokens:,}",
+                            cached_str,
+                            cache_write_str,
+                            reasoning_str,
+                        )
+
+                self.console.print(cost_table)
 
         # gate status
         gate = result.config["gate"]
