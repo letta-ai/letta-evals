@@ -12,7 +12,7 @@ Tests an agent's ability to complete tasks that require external skills. The age
 The benchmark has three suites:
 - `suite_baseline.yaml`: Agent does not have access to skills
 - `suite_skill_use.yaml`: Agent is given the right skill and only has to load and use it (no selection required)
-- `suite_skill_select_use.yaml`: Agent has to select the right skill, load and use it
+- `suite_skill_select_use.yaml`: Agent has to select the right skill, load and use it -> shown on leaderboard
 
 ## Adding New Models
 
@@ -65,6 +65,8 @@ The script will:
 - `summary.json`: Contains `metrics` and `per_model` data
 - Both formats include `model_name`, `avg_score_attempted`, and optional `cost` information
 
-5. In case of a new provider, add their logo to [../leaderboard_site/src/icons](../leaderboard_site/src/icons).
+5. Update leaderboard site
+- Add new models and any analysis / commentary to [updates.md](../leaderboard_site/src/_includes/updates.md).
+- In case of a new provider, add their logo to [leaderboard_site/src/icons](../leaderboard_site/src/icons).
 
-Results will be added to the leaderboard YAML file and automatically updated on the website. To preview changes locally, see [leaderboard_site/README.md](../leaderboard_site/README.md) for instructions on running the leaderboard site.
+Results will be added to the leaderboard YAML file and automatically updated on the website. To preview changes locally, see [README.md](../leaderboard_site/README.md) for instructions on running the leaderboard site.
