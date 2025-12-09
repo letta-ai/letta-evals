@@ -1,4 +1,5 @@
 benchmark_name: Skills Suite
+last_updated: Dec 9, 2025
 arrange_by: task_completion
 metrics:
   task_completion:
