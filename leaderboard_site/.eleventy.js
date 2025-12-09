@@ -1,6 +1,7 @@
 const yaml = require('js-yaml');
 const fs = require('fs');
 const path = require('path');
+const MarkdownIt = require('markdown-it');
 
 module.exports = function(eleventyConfig) {
   // Load all leaderboard YAML files
@@ -167,6 +168,21 @@ module.exports = function(eleventyConfig) {
     }
 
     return arrangeByConfig;
+  });
+
+  // Load updates content from markdown file
+  eleventyConfig.addGlobalData("updatesContent", function() {
+    const updatesPath = path.join(__dirname, 'src', '_includes', 'updates.md');
+    if (fs.existsSync(updatesPath)) {
+      const md = new MarkdownIt({
+        html: true,
+        linkify: true,
+        typographer: true
+      });
+      const markdown = fs.readFileSync(updatesPath, 'utf8');
+      return md.render(markdown);
+    }
+    return '<p>No updates available.</p>';
   });
 
   // Keep backward compatibility with single leaderboard

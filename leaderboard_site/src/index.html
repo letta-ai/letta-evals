@@ -59,6 +59,7 @@
                 {%- endif -%}
             </button>
             {%- endfor -%}
+            <button class="tab-button" data-tab="updates">Updates</button>
         </div>
     </div>
     {%- endif -%}
@@ -74,6 +75,12 @@
         </div>
     </div>
     {%- endfor -%}
+
+    <div class="updates-container tab-content" data-content="updates">
+        <div class="updates-content">
+            {{ updatesContent }}
+        </div>
+    </div>
 
     <script>
         document.documentElement.classList.remove('no-js');
