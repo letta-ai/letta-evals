@@ -8,6 +8,7 @@ and merges them with an existing leaderboard YAML file.
 import argparse
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -434,6 +435,9 @@ def main() -> None:
 
     # Update leaderboard data
     leaderboard_data["results"] = merged_results
+
+    # Update last_updated timestamp
+    leaderboard_data["last_updated"] = datetime.now().strftime("%b %d, %Y")
 
     # Write output
     output_path = args.output or args.leaderboard

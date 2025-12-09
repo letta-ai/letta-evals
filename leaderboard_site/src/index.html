@@ -32,12 +32,14 @@
             <p>Context-Bench measures an agent's ability to perform context engineering with:</p>
             <ul>
                 <li><a href="https://letta.com/blog/context-bench">Filesystem Suite</a>: Evaluates how well language models can chain file operations, trace entity relationships, and manage multi-step information retrieval.</li>
-                <li><a href="https://www.letta.com/blog/context-bench-skills">Skills Suite</a>: Evalutes how well language models can discover and load relevant skills from a library to complete tasks.</li>
+                <li><a href="https://letta.com/blog/context-bench-skills">Skills Suite</a>: Evalutes how well language models can discover and load relevant skills from a library to complete tasks.</li>
             </ul>
+            {%- if lastUpdated -%}
+            <p class="last-updated">Last updated: {{ lastUpdated }}</p>
+            {%- endif -%}
             <p>Interested in contributing a task or model? <a href="mailto:research@letta.com">Email us</a> or <a href="https://github.com/letta-ai/letta-evals/issues">open an issue</a> on GitHub.</p>
         </div>
     </div>
-
     {%- assign has_multiple_benchmarks = false -%}
     {%- assign benchmark_count = 0 -%}
     {%- for benchmark in leaderboards -%}
@@ -46,7 +48,6 @@
     {%- if benchmark_count > 1 -%}
         {%- assign has_multiple_benchmarks = true -%}
     {%- endif -%}
-
     {%- if has_multiple_benchmarks -%}
     <div class="tabs-container">
         <div class="tabs">
@@ -59,6 +60,7 @@
                 {%- endif -%}
             </button>
             {%- endfor -%}
+            <button class="tab-button" data-tab="updates">Updates</button>
         </div>
     </div>
     {%- endif -%}
@@ -74,6 +76,12 @@
         </div>
     </div>
     {%- endfor -%}
+
+    <div class="updates-container tab-content" data-content="updates">
+        <div class="updates-content">
+            {{ updatesContent }}
+        </div>
+    </div>
 
     <script>
         document.documentElement.classList.remove('no-js');
