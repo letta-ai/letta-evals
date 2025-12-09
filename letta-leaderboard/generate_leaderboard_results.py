@@ -35,6 +35,10 @@ def normalize_model_name(model_name: str) -> str:
         return f"openai/{model_name}"
     if model_name.startswith("gemini"):
         return f"google/{model_name}"
+    if model_name.startswith("mistral-"):
+        return f"mistralai/{model_name}"
+    if model_name.startswith("deepseek"):
+        return f"deepseek/{model_name}"
     return model_name
 
 

@@ -24,18 +24,18 @@ results:
   average: 74.0
   total_cost: 24.58
   leaderboard_filesystem_100: 74.0
-- model: deepseek-chat
+- model: deepseek/deepseek-chat
   average: 63.35
   leaderboard_filesystem_100: 63.35
   total_cost: 13.05
-- model: deepseek-reasoner
-  average: 73.05
-  leaderboard_filesystem_100: 73.05
-  total_cost: 16.03
 - model: deepseek/deepseek-chat-v3.1
   average: 11.97
   total_cost: 2.54
   leaderboard_filesystem_100: 11.97
+- model: deepseek/deepseek-reasoner
+  average: 73.05
+  leaderboard_filesystem_100: 73.05
+  total_cost: 16.03
 - model: google/gemini-3-pro-preview
   average: 75.33
   leaderboard_filesystem_100: 75.33
