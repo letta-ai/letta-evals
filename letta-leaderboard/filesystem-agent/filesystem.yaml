@@ -6,9 +6,12 @@ num_runs: 3
 
 target:
   kind: letta_agent
-  base_url: http://localhost:9005
+  base_url: http://localhost:9005  # local
+  # base_url: https://api.letta.com/  # cloud
   agent_script: setup_agent.py:setup_agent
   model_configs:
+    - openai-gpt-5.2-medium
+    - openai-gpt-5.2-high
     - openai-gpt-5.1
     - openai-gpt-5.1-codex
     - openai-gpt-5.1-codex-mini

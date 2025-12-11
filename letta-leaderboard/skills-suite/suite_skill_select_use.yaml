@@ -4,7 +4,8 @@ dataset: data/dataset_select_use.csv
 
 target:
   kind: letta_code
-  base_url: http://localhost:9005
+  base_url: http://localhost:9005  # local
+  # base_url: https://api.letta.com/  # cloud
   working_dir: output-select-use
   skills_dir: .skills
   timeout: 600
@@ -14,6 +15,8 @@ target:
     - anthropic/claude-sonnet-4-5-20250929
     - anthropic/claude-haiku-4-5-20251001
     - anthropic/claude-opus-4-1-20250805
+    - gpt-5.2-medium
+    - gpt-5.2-high
     - gpt-5.1-codex-max-medium
     - gpt-5.1-medium
     - gpt-5.1-codex-medium
