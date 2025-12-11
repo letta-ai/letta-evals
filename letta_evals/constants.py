@@ -25,6 +25,10 @@ MODEL_COSTS = {
         "prompt_tokens": 2,
         "completion_tokens": 12,
     },
+    "openai/gpt-5.2-2025-12-11": {
+        "prompt_tokens": 1.75,
+        "completion_tokens": 14,
+    },
     "openai/gpt-5.1-codex-mini": {
         "prompt_tokens": 0.25,
         "completion_tokens": 2,
