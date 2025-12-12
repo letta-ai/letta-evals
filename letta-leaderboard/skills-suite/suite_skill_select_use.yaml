@@ -17,6 +17,7 @@ target:
     - anthropic/claude-opus-4-1-20250805
     - gpt-5.2-medium
     - gpt-5.2-high
+    - gpt-5.2-xhigh
     - gpt-5.1-codex-max-medium
     - gpt-5.1-medium
     - gpt-5.1-codex-medium
