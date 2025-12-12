@@ -75,12 +75,17 @@ class LettaCodeTarget(AbstractAgentTarget):
                 cmd = [
                     "letta",
                     "--new",
+                    "--fresh-blocks",
                     "--yolo",
                     "--output-format",
                     "json",
                     "--model",
                     self.model_handle,
                 ]
+
+                if "gpt" in self.model_handle:
+                    cmd.extend(["--system", "letta-codex"])
+                    cmd.extend(["--init-blocks", "skills,loaded_skills"])
 
                 # add skills directory if specified
                 if self.skills_dir:
