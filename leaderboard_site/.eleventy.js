@@ -210,7 +210,7 @@ module.exports = function(eleventyConfig) {
 
   // Load updates content from markdown file
   eleventyConfig.addGlobalData("updatesContent", function() {
-    const updatesPath = path.join(__dirname, 'src', '_includes', 'updates.md');
+    const updatesPath = path.join(__dirname, '..', 'letta-leaderboard', 'updates.md');
     if (fs.existsSync(updatesPath)) {
       const md = new MarkdownIt({
         html: true,
