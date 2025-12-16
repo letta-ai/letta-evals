@@ -28,16 +28,18 @@ async def prepare_evaluation(client: AsyncLetta) -> None:
 
     # Create a folder with all the data files
     folder_name = "filesystem_data"
-    folders = await client.folders.list()
+    folders_page = await client.folders.list()
 
     # delete the folder if it exists
-    for folder in folders:
+    folder_exists = False
+    for folder in folders_page.items:
         if folder.name == folder_name:
             await client.folders.delete(folder_id=folder.id)
             print(f"Deleted folder: {folder.id}")
+            folder_exists = True
             break
 
-    if folder_name not in folders:
+    if not folder_exists:
         # Create the folder
         folder = await client.folders.create(name=folder_name, embedding="openai/text-embedding-3-small")
         print(f"Created folder: {folder.id}")

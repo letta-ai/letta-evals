@@ -2,7 +2,8 @@ import os
 import sys
 from pathlib import Path
 
-from letta_client import AsyncLetta, CreateBlock
+from letta_client import AsyncLetta
+from letta_client.types import CreateBlockParam
 
 from letta_evals.decorators import agent_factory
 from letta_evals.models import Sample
@@ -19,10 +20,10 @@ async def create_inventory_agent(client: AsyncLetta, sample: Sample) -> str:
 
     The agent is customized with item details from sample.agent_args.
     """
-    tools = await client.tools.list(name=TEST_TOOL_NAME)
-    if not tools:
+    tools_page = await client.tools.list(name=TEST_TOOL_NAME)
+    if not tools_page.items:
         raise RuntimeError(f"Tool '{TEST_TOOL_NAME}' not found. Please ensure setup has been run.")
-    tool = tools[0]
+    tool = tools_page.items[0]
 
     item = sample.agent_args["item"]
     item_context = f"""Target Item Details:
@@ -34,11 +35,11 @@ async def create_inventory_agent(client: AsyncLetta, sample: Sample) -> str:
     agent = await client.agents.create(
         name="inventory-assistant",
         memory_blocks=[
-            CreateBlock(
+            CreateBlockParam(
                 label="persona",
                 value="You are a helpful inventory management assistant.",
             ),
-            CreateBlock(
+            CreateBlockParam(
                 label="item_context",
                 value=item_context,
             ),

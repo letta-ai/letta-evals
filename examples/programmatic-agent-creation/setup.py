@@ -14,8 +14,8 @@ from inventory_tool import TEST_TOOL_NAME, ManageInventoryTool
 @suite_setup
 async def prepare_evaluation(client: AsyncLetta) -> None:
     """Set up the evaluation environment by creating required tools."""
-    tools = await client.tools.list(name=TEST_TOOL_NAME)
-    if not tools:
+    tools_page = await client.tools.list(name=TEST_TOOL_NAME)
+    if not tools_page.items:
         await client.tools.add(tool=ManageInventoryTool())
         print(f"Created {TEST_TOOL_NAME} tool")
     else:

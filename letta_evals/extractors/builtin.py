@@ -1,7 +1,8 @@
 import re
 from typing import List, Optional
 
-from letta_client import AgentState, AssistantMessage, LettaMessageUnion, ToolCallMessage, ToolReturnMessage
+from letta_client.types import ToolReturnMessage
+from letta_client.types.agents import AssistantMessage, ToolCallMessage
 
 from letta_evals.decorators import extractor
 from letta_evals.extractors.utils import (
@@ -9,6 +10,7 @@ from letta_evals.extractors.utils import (
     get_assistant_messages,
     get_last_turn_messages,
 )
+from letta_evals.models import AgentState, LettaMessageUnion
 
 
 @extractor
@@ -81,8 +83,13 @@ def tool_arguments(trajectory: List[List[LettaMessageUnion]], config: dict) -> s
     for turn in trajectory:
         for message in turn:
             if isinstance(message, ToolCallMessage):
-                if message.tool_call.name == tool_name:
-                    return message.tool_call.arguments
+                # SDK v1.0 uses tool_calls (array), fall back to tool_call (singular) for compatibility
+                tool_calls = (
+                    message.tool_calls if message.tool_calls else ([message.tool_call] if message.tool_call else [])
+                )
+                for tool_call in tool_calls:
+                    if tool_call.name == tool_name:
+                        return tool_call.arguments
 
     return "{}"
 
@@ -97,9 +104,14 @@ def tool_output(trajectory: List[List[LettaMessageUnion]], config: dict) -> str:
     for turn in trajectory:
         for message in turn:
             if isinstance(message, ToolCallMessage):
-                if message.tool_call.name == tool_name:
-                    tool_call_id = message.tool_call.tool_call_id
-                    break
+                # SDK v1.0 uses tool_calls (array), fall back to tool_call (singular) for compatibility
+                tool_calls = (
+                    message.tool_calls if message.tool_calls else ([message.tool_call] if message.tool_call else [])
+                )
+                for tool_call in tool_calls:
+                    if tool_call.name == tool_name:
+                        tool_call_id = tool_call.tool_call_id
+                        break
             if tool_call_id:
                 break
         if tool_call_id:
@@ -159,7 +171,9 @@ def memory_block(trajectory: List[List[LettaMessageUnion]], config: dict, agent_
         raise ValueError("memory_block extractor requires 'block_label' in config")
 
     # search for the block with the specified label
-    for block in agent_state.memory.blocks:
+    # Use agent_state.blocks (SDK v1.0) instead of deprecated agent_state.memory.blocks
+    blocks = agent_state.blocks if agent_state.blocks else []
+    for block in blocks:
         if block.label == block_label:
             return block.value
 

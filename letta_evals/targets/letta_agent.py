@@ -3,7 +3,8 @@ from pathlib import Path
 from typing import Optional
 
 import anyio
-from letta_client import AsyncLetta, LlmConfig, MessageCreate
+from letta_client import AsyncLetta
+from letta_client.types import LlmConfig, MessageCreateParam
 
 from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.base import AbstractAgentTarget
@@ -71,9 +72,9 @@ class LettaAgentTarget(AbstractAgentTarget):
                     agent_id_to_cleanup = agent_id
 
                 if self.llm_config and agent_id:
-                    await self.client.agents.modify(agent_id=agent_id, llm_config=self.llm_config)
+                    await self.client.agents.update(agent_id=agent_id, llm_config=self.llm_config)
                 elif self.model_handle and agent_id:
-                    await self.client.agents.modify(agent_id=agent_id, model=self.model_handle)
+                    await self.client.agents.update(agent_id=agent_id, model=self.model_handle)
 
                 agent = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=[])
                 if self.llm_config:
@@ -98,9 +99,9 @@ class LettaAgentTarget(AbstractAgentTarget):
                             sample.id, i + 1, total_messages, agent_id=agent_id, model_name=model_name
                         )
 
-                    stream = self.client.agents.messages.create_stream(
+                    stream = await self.client.agents.messages.stream(
                         agent_id=agent_id,
-                        messages=[MessageCreate(role="user", content=str(input_msg))],
+                        messages=[MessageCreateParam(role="user", content=str(input_msg))],
                         stream_tokens=True,
                     )
 
@@ -143,8 +144,8 @@ class LettaAgentTarget(AbstractAgentTarget):
                         raise RuntimeError(f"Unexpected error: no run ID was found from streaming chunks: {chunks}")
 
                     # TODO: Set limit here potentially, this is capped to 100
-                    messages = await self.client.runs.messages.list(run_id=run_id)
-                    trajectory.append(messages)
+                    messages_page = await self.client.runs.messages.list(run_id=run_id)
+                    trajectory.append(messages_page.items)
 
                 final_agent_state = None
                 if retrieve_agent_state:
