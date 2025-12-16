@@ -178,8 +178,10 @@ class AgentJudgeGrader(Grader):
             ValueError: If submit_grade tool call not found or malformed
         """
         for msg in messages:
-            if isinstance(msg, ToolCallMessage) and msg.tool_calls:
-                for tool_call in msg.tool_calls:
+            if isinstance(msg, ToolCallMessage):
+                # SDK v1.0 uses tool_calls (array), fall back to tool_call (singular) for compatibility
+                tool_calls = msg.tool_calls if msg.tool_calls else ([msg.tool_call] if msg.tool_call else [])
+                for tool_call in tool_calls:
                     # In SDK v1.0, tool_calls items are ToolCall objects
                     if isinstance(tool_call, dict):
                         tool_call = ToolCall(**tool_call)

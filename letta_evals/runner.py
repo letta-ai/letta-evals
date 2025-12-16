@@ -73,15 +73,15 @@ class Runner:
         env_project_id = os.getenv("LETTA_PROJECT_ID")
 
         # priority: cli arg > yaml suite config > env var
-        token = letta_api_key or self.suite.target.api_key or env_api_key
+        api_key = letta_api_key or self.suite.target.api_key or env_api_key
         base_url = letta_base_url or self.suite.target.base_url or env_base_url
         self.project_id = letta_project_id or self.suite.target.project_id or env_project_id
 
         client_kwargs: dict[str, object] = {"timeout": self.suite.target.timeout}
         if base_url:
             client_kwargs["base_url"] = base_url
-        if token:
-            client_kwargs["token"] = token
+        if api_key:
+            client_kwargs["api_key"] = api_key
 
         self.client = AsyncLetta(**client_kwargs)
 

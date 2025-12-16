@@ -82,8 +82,12 @@ def tool_arguments(trajectory: List[List[LettaMessageUnion]], config: dict) -> s
 
     for turn in trajectory:
         for message in turn:
-            if isinstance(message, ToolCallMessage) and message.tool_calls:
-                for tool_call in message.tool_calls:
+            if isinstance(message, ToolCallMessage):
+                # SDK v1.0 uses tool_calls (array), fall back to tool_call (singular) for compatibility
+                tool_calls = (
+                    message.tool_calls if message.tool_calls else ([message.tool_call] if message.tool_call else [])
+                )
+                for tool_call in tool_calls:
                     if tool_call.name == tool_name:
                         return tool_call.arguments
 
@@ -99,8 +103,12 @@ def tool_output(trajectory: List[List[LettaMessageUnion]], config: dict) -> str:
     tool_call_id = None
     for turn in trajectory:
         for message in turn:
-            if isinstance(message, ToolCallMessage) and message.tool_calls:
-                for tool_call in message.tool_calls:
+            if isinstance(message, ToolCallMessage):
+                # SDK v1.0 uses tool_calls (array), fall back to tool_call (singular) for compatibility
+                tool_calls = (
+                    message.tool_calls if message.tool_calls else ([message.tool_call] if message.tool_call else [])
+                )
+                for tool_call in tool_calls:
                     if tool_call.name == tool_name:
                         tool_call_id = tool_call.tool_call_id
                         break
