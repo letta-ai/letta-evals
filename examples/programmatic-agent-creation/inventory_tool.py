@@ -1,6 +1,7 @@
 from typing import List, Type
 
-from letta_client.client import BaseTool
+# SDK v1.0+: BaseTool moved out of letta_client.client
+from letta_client.types.tool import BaseTool
 from pydantic import BaseModel
 
 TEST_TOOL_NAME = "evals_ci_manage_inventory_tool"

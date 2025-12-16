@@ -60,7 +60,7 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
         # Send contradicting fact first if available
         if contradicting_fact:
             try:
-                stream = client.agents.messages.stream(
+                stream = await client.agents.messages.stream(
                     agent_id=agent.id,
                     messages=[
                         MessageCreateParam(

@@ -99,7 +99,7 @@ class LettaAgentTarget(AbstractAgentTarget):
                             sample.id, i + 1, total_messages, agent_id=agent_id, model_name=model_name
                         )
 
-                    stream = self.client.agents.messages.stream(
+                    stream = await self.client.agents.messages.stream(
                         agent_id=agent_id,
                         messages=[MessageCreateParam(role="user", content=str(input_msg))],
                         stream_tokens=True,

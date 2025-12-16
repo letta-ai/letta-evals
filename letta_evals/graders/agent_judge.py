@@ -77,7 +77,7 @@ class AgentJudgeGrader(Grader):
                 judge_agent_id = resp.agent_ids[0]
 
             # send prompt to judge agent
-            stream = self.client.agents.messages.stream(
+            stream = await self.client.agents.messages.stream(
                 agent_id=judge_agent_id,
                 messages=[MessageCreateParam(role="user", content=judge_prompt)],
                 stream_tokens=False,

@@ -71,20 +71,20 @@ class LettaCodeTarget(AbstractAgentTarget):
                 prompt = "\n".join(str(inp) for inp in inputs)
                 prompt = prompt.replace("{pwd}", self.working_dir.resolve().as_posix())
 
-                # construct the letta command with json output
+                # construct the letta-code CLI command (headless JSON output)
+                # NOTE: letta-code CLI flags have changed over time; keep to stable, documented flags.
                 cmd = [
                     "letta",
                     "--new",
-                    "--fresh-blocks",
-                    "--yolo",
                     "--output-format",
                     "json",
                     "--model",
                     self.model_handle,
                 ]
 
+                # Use codex system prompt for GPT-style models (matches `letta --help` examples)
                 if "gpt" in self.model_handle:
-                    cmd.extend(["--system", "letta-codex"])
+                    cmd.extend(["--system", "codex"])
                     cmd.extend(["--init-blocks", "skills,loaded_skills"])
 
                 # add skills directory if specified
@@ -93,11 +93,8 @@ class LettaCodeTarget(AbstractAgentTarget):
 
                 cmd.extend(["-p", prompt])
 
-                # add tool permissions if specified
-                if self.allowed_tools:
-                    cmd.extend(["--allowedTools", ",".join(self.allowed_tools)])
-                if self.disallowed_tools:
-                    cmd.extend(["--disallowedTools", ",".join(self.disallowed_tools)])
+                # NOTE: older versions of letta-code supported --allowedTools/--disallowedTools.
+                # The current CLI (0.6.x) does not expose these flags; we intentionally do not pass them.
 
                 logger.info(f"Running letta command for sample {sample.id}")
 
