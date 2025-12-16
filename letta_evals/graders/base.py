@@ -1,9 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
-from letta_client import AgentState, LettaMessageUnion
-
-from letta_evals.models import GradeResult, Sample
+from letta_evals.models import AgentState, GradeResult, LettaMessageUnion, Sample
 
 
 class Grader(ABC):

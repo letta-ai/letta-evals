@@ -143,10 +143,10 @@ class LettaCodeTarget(AbstractAgentTarget):
                 logger.info(f"Retrieving messages for agent {agent_id}")
 
                 # retrieve messages from the agent's last run
-                messages = await self.client.agents.messages.list(agent_id=agent_id)
+                messages_page = await self.client.agents.messages.list(agent_id=agent_id)
 
                 # wrap messages in a single turn
-                trajectory = [messages] if messages else []
+                trajectory = [messages_page.items] if messages_page.items else []
 
                 # extract usage stats if available
                 usage_stats = []

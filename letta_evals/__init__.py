@@ -6,9 +6,11 @@ from importlib.metadata import version as _pkg_version
 from letta_evals.decorators import agent_factory, extractor, grader, suite_setup
 from letta_evals.graders import AgentJudgeGrader, Grader, RubricGrader, ToolGrader
 from letta_evals.models import (
+    AgentState,
     GateSpec,
     GradeResult,
     GraderSpec,
+    LettaMessageUnion,
     MetricAggregate,
     Metrics,
     ModelMetrics,
@@ -31,6 +33,8 @@ except PackageNotFoundError:
     __version__ = "0.7.0"
 
 __all__ = [
+    "AgentState",
+    "LettaMessageUnion",
     "Sample",
     "SuiteSpec",
     "GateSpec",

@@ -2,12 +2,14 @@ import json
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from letta_client import AgentState, AsyncLetta, LettaMessageUnion, MessageCreate, ToolCall, ToolCallMessage
+from letta_client import AsyncLetta
+from letta_client.types import MessageCreateParam
+from letta_client.types.agents import ToolCall, ToolCallMessage
 
 from letta_evals.extractors import extractor_requires_agent_state, get_extractor
 from letta_evals.graders.base import Grader
 from letta_evals.graders.prompt_utils import build_judge_prompt
-from letta_evals.models import GradeResult, Sample
+from letta_evals.models import AgentState, GradeResult, LettaMessageUnion, Sample
 
 
 class AgentJudgeGrader(Grader):
@@ -75,9 +77,9 @@ class AgentJudgeGrader(Grader):
                 judge_agent_id = resp.agent_ids[0]
 
             # send prompt to judge agent
-            stream = self.client.agents.messages.create_stream(
+            stream = self.client.agents.messages.stream(
                 agent_id=judge_agent_id,
-                messages=[MessageCreate(role="user", content=judge_prompt)],
+                messages=[MessageCreateParam(role="user", content=judge_prompt)],
                 stream_tokens=False,
             )
 
@@ -90,8 +92,8 @@ class AgentJudgeGrader(Grader):
             if not run_id:
                 raise RuntimeError("No run_id received from judge agent stream")
 
-            messages = await self.client.runs.messages.list(run_id=run_id)
-            score, rationale = self._parse_tool_calls(messages)
+            messages_page = await self.client.runs.messages.list(run_id=run_id)
+            score, rationale = self._parse_tool_calls(messages_page.items)
 
             return GradeResult(
                 score=score,
@@ -176,9 +178,11 @@ class AgentJudgeGrader(Grader):
             ValueError: If submit_grade tool call not found or malformed
         """
         for msg in messages:
-            if isinstance(msg, ToolCallMessage):
+            if isinstance(msg, ToolCallMessage) and msg.tool_calls:
                 for tool_call in msg.tool_calls:
-                    tool_call = ToolCall(**tool_call)
+                    # In SDK v1.0, tool_calls items are ToolCall objects
+                    if isinstance(tool_call, dict):
+                        tool_call = ToolCall(**tool_call)
                     if tool_call.name == self.judge_tool_name:
                         try:
                             args = json.loads(tool_call.arguments)

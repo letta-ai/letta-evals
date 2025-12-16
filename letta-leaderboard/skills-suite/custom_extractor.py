@@ -6,13 +6,13 @@ from typing import List
 
 import anthropic
 import pathspec
-from letta_client import LettaMessageUnion
 
 from letta_evals.decorators import extractor
 from letta_evals.extractors.utils import (
     flatten_content,
     get_assistant_messages,
 )
+from letta_evals.models import LettaMessageUnion
 
 try:
     import openpyxl

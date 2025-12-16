@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11, <3.14"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -284,15 +284,6 @@ wheels = [
 ]
 
 [[package]]
-name = "httpx-sse"
-version = "0.4.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4c/60/8f4281fa9bbf3c8034fd54c0e7412e66edbab6bc74c4996bd616f8d0406e/httpx-sse-0.4.0.tar.gz", hash = "sha256:1e81a3a3070ce322add1d3529ed42eb5f70817f45ed6ec915ab753f961139721", size = 12624, upload-time = "2023-12-22T08:01:21.083Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e1/9b/a181f281f65d776426002f330c31849b86b31fc9d848db62e16f03ff739f/httpx_sse-0.4.0-py3-none-any.whl", hash = "sha256:f329af6eae57eaa2bdfd962b42524764af68075ea87370a2de920af5341e318f", size = 7819, upload-time = "2023-12-22T08:01:19.89Z" },
-]
-
-[[package]]
 name = "identify"
 version = "2.6.14"
 source = { registry = "https://pypi.org/simple" }
@@ -456,18 +447,19 @@ wheels = [
 
 [[package]]
 name = "letta-client"
-version = "0.1.319"
+version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "anyio" },
+    { name = "distro" },
     { name = "httpx" },
-    { name = "httpx-sse" },
     { name = "pydantic" },
-    { name = "pydantic-core" },
+    { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/07/48/8a70ff23e9adcf7b3a9262b03fd0576eae03bafb61b7d229e1059c16ce7c/letta_client-0.1.319.tar.gz", hash = "sha256:30a2bd63d5e27759ca57a3850f2be3d81d828e90b5a7a6c35285b4ecceaafc74", size = 197085, upload-time = "2025-09-08T23:17:40.636Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c7/6f/7e66e5a40c400abb246a1f7b58ad3a4055951c242c7c98cf052340e06cd4/letta_client-1.4.0.tar.gz", hash = "sha256:18f879d7f9be3335db9c4430f0c4bc049a075702a7864c75d1d4e77455cd4c15", size = 250253, upload-time = "2025-12-15T21:51:40.911Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1a/78/52d64b29ce0ffcd5cc3f1318a5423c9ead95c1388e8a95bd6156b7335ad3/letta_client-0.1.319-py3-none-any.whl", hash = "sha256:e93cda21d39de21bf2353f1aa71e82054eac209156bd4f1780efff85949a32d3", size = 493310, upload-time = "2025-09-08T23:17:39.134Z" },
+    { url = "https://files.pythonhosted.org/packages/37/8c/82eb5035f93f795ad15fdc022d924da7daaf37b14e95eb42f374526887fa/letta_client-1.4.0-py3-none-any.whl", hash = "sha256:e2e45e80eca8f4bb2980568d241a786f473b2426a17ad0ffe67d1075787a1cc3", size = 387746, upload-time = "2025-12-15T21:51:39.641Z" },
 ]
 
 [[package]]
@@ -514,7 +506,7 @@ requires-dist = [
     { name = "faker", marker = "extra == 'filesystem'", specifier = ">=37.6.0" },
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "jsonpath-ng", specifier = ">=1.6.0" },
-    { name = "letta-client", specifier = ">=0.1.319" },
+    { name = "letta-client", specifier = ">=1.0.0" },
     { name = "matplotlib", specifier = ">=3.10.6" },
     { name = "openai", specifier = ">=1.0.0" },
     { name = "openpyxl", marker = "extra == 'skills'", specifier = ">=3.1.5" },

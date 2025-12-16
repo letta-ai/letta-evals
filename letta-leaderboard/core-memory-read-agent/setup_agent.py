@@ -2,7 +2,8 @@
 Setup script to create agent with core memory populated with facts for each test case.
 """
 
-from letta_client import AsyncLetta, CreateBlock
+from letta_client import AsyncLetta
+from letta_client.types import CreateBlockParam
 
 from letta_evals.decorators import agent_factory
 from letta_evals.models import Sample
@@ -40,11 +41,11 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
         agent = await client.agents.create(
             name="Core Memory Reader",
             memory_blocks=[
-                CreateBlock(
+                CreateBlockParam(
                     label="persona",
                     value="You are an AI assistant that answers questions based on the facts stored in your core memory. Use only the information provided in your Supporting Facts memory block to answer questions accurately.",
                 ),
-                CreateBlock(label="Supporting Facts", value=facts_context),
+                CreateBlockParam(label="Supporting Facts", value=facts_context),
             ],
             model="openai/gpt-4o-mini",
             embedding="openai/text-embedding-3-small",

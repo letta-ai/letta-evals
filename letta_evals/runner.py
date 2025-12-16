@@ -8,7 +8,8 @@ from typing import Any, Dict, List, Optional
 
 import anyio
 import yaml
-from letta_client import AgentState, AsyncLetta, LettaMessageUnion, LlmConfig
+from letta_client import AsyncLetta
+from letta_client.types import LlmConfig
 from rich.console import Console
 
 from letta_evals.datasets.loader import load_dataset
@@ -17,9 +18,11 @@ from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
 from letta_evals.models import (
+    AgentState,
     CostMetrics,
     GradeResult,
     LettaJudgeGraderSpec,
+    LettaMessageUnion,
     LogicalGateSpec,
     MetricAggregate,
     Metrics,

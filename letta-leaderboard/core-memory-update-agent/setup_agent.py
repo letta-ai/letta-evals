@@ -2,7 +2,8 @@
 Setup script to create agent with core memory populated with facts and then updated with contradicting facts.
 """
 
-from letta_client import AsyncLetta, CreateBlock, MessageCreate
+from letta_client import AsyncLetta
+from letta_client.types import CreateBlockParam, MessageCreateParam
 
 from letta_evals.decorators import agent_factory
 from letta_evals.models import Sample
@@ -43,11 +44,11 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
         agent = await client.agents.create(
             name="Core Memory Updater",
             memory_blocks=[
-                CreateBlock(
+                CreateBlockParam(
                     label="persona",
                     value="You are an AI assistant that answers questions based on the facts stored in your core memory. When you receive new information that contradicts existing facts, you should update your Supporting Facts memory block to reflect the new information. Always use the most recent information to answer questions accurately.",
                 ),
-                CreateBlock(label="Supporting Facts", value=facts_context),
+                CreateBlockParam(label="Supporting Facts", value=facts_context),
             ],
             model="openai/gpt-4o-mini",
             embedding="openai/text-embedding-3-small",
@@ -59,10 +60,10 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
         # Send contradicting fact first if available
         if contradicting_fact:
             try:
-                stream = client.agents.messages.create_stream(
+                stream = client.agents.messages.stream(
                     agent_id=agent.id,
                     messages=[
-                        MessageCreate(
+                        MessageCreateParam(
                             role="user",
                             content=f"Please update your knowledge with this new information: {contradicting_fact}",
                         )

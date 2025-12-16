@@ -1,10 +1,10 @@
 import json
 from typing import List
 
-from letta_client import LettaMessageUnion, ToolCallMessage
+from letta_client.types.agents import ToolCallMessage
 
 from letta_evals.decorators import extractor, grader
-from letta_evals.models import GradeResult, Sample
+from letta_evals.models import GradeResult, LettaMessageUnion, Sample
 
 
 @extractor
@@ -12,8 +12,10 @@ def memory_insert_extractor(trajectory: List[List[LettaMessageUnion]], config: d
     """Extract memory_insert tool calls from trajectory."""
     for turn in trajectory:
         for message in turn:
-            if isinstance(message, ToolCallMessage) and message.tool_call.name == "memory_insert":
-                return message.tool_call.arguments
+            if isinstance(message, ToolCallMessage) and message.tool_calls:
+                for tool_call in message.tool_calls:
+                    if tool_call.name == "memory_insert":
+                        return tool_call.arguments
 
     return "{}"
 
