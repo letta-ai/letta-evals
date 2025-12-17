@@ -72,7 +72,10 @@ class LettaAgentTarget(AbstractAgentTarget):
                     agent_id_to_cleanup = agent_id
 
                 if self.llm_config and agent_id:
-                    await self.client.agents.update(agent_id=agent_id, llm_config=self.llm_config)
+                    # Workaround for letta-client SDK bug: serialize with aliases
+                    # The SDK doesn't use by_alias=True, causing model_endpoint_type -> api_model_endpoint_type
+                    llm_config_dict = self.llm_config.model_dump(by_alias=True, exclude_none=True)
+                    await self.client.agents.update(agent_id=agent_id, llm_config=llm_config_dict)
                 elif self.model_handle and agent_id:
                     await self.client.agents.update(agent_id=agent_id, model=self.model_handle)
 
