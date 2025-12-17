@@ -76,6 +76,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                 cmd = [
                     "letta",
                     "--new",
+                    "--yolo",
                     "--output-format",
                     "json",
                     "--model",
