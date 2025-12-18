@@ -850,7 +850,8 @@ class EvalProgress(ProgressCallback):
         self.console.print("\n[bold]Sample Results:[/bold]")
 
         total_samples = len(result.results)
-        samples_to_display = result.results[:MAX_SAMPLES_DISPLAY]
+        sorted_results = sorted(result.results, key=lambda r: r.sample.id)
+        samples_to_display = sorted_results[:MAX_SAMPLES_DISPLAY]
 
         if total_samples > MAX_SAMPLES_DISPLAY:
             self.console.print(f"[dim]Showing first {MAX_SAMPLES_DISPLAY} of {total_samples} samples[/dim]")

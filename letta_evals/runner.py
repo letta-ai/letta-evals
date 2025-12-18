@@ -688,7 +688,7 @@ class Runner:
                 model_results[result.model_name].append(result)
 
             per_model = []
-            for model_name, results in model_results.items():
+            for model_name, results in sorted(model_results.items()):
                 model_attempted = sum(1 for r in results if is_success(r))
                 model_metrics_dict: Dict[str, float] = {}
 
