@@ -153,6 +153,9 @@ class Runner:
         elif self.suite.target.kind == TargetKind.LETTA_CODE:
             model_handle = llm_config if isinstance(llm_config, str) else None
 
+            if not model_handle:
+                raise ValueError("LettaCodeTarget requires a model_handle (string), but got None")
+
             # create sandbox working directory for the model
             model_name = model_handle.split("/")[-1]
             working_dir = self.suite.target.working_dir / model_name
@@ -382,6 +385,11 @@ class Runner:
                         await self.progress_callback.sample_error(
                             sample_id, grade_result.rationale, agent_id=agent_id, model_name=model_name
                         )
+                    # Extract token counts even for error cases if agent_usage is available
+                    cost = calculate_cost_from_agent_usage(model_name, agent_usage) if model_name else None
+                    prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
+                        extract_token_counts(agent_usage)
+                    )
                     return SampleResult(
                         sample=sample,
                         submission=submission,
@@ -392,6 +400,12 @@ class Runner:
                         grades=grades_dict,
                         model_name=model_name,
                         agent_usage=agent_usage,
+                        cost=cost,
+                        prompt_tokens=prompt_tokens if prompt_tokens > 0 else None,
+                        completion_tokens=completion_tokens if completion_tokens > 0 else None,
+                        cached_input_tokens=cached_input_tokens if cached_input_tokens > 0 else None,
+                        cache_write_tokens=cache_write_tokens if cache_write_tokens > 0 else None,
+                        reasoning_tokens=reasoning_tokens if reasoning_tokens > 0 else None,
                     )
 
                 if self.progress_callback:
@@ -412,7 +426,9 @@ class Runner:
 
                 # Calculate cost and extract token counts from agent usage
                 cost = calculate_cost_from_agent_usage(model_name, agent_usage) if model_name else None
-                prompt_tokens, completion_tokens = extract_token_counts(agent_usage)
+                prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
+                    extract_token_counts(agent_usage)
+                )
 
                 return SampleResult(
                     sample=sample,
@@ -427,6 +443,9 @@ class Runner:
                     cost=cost,
                     prompt_tokens=prompt_tokens if prompt_tokens > 0 else None,
                     completion_tokens=completion_tokens if completion_tokens > 0 else None,
+                    cached_input_tokens=cached_input_tokens if cached_input_tokens > 0 else None,
+                    cache_write_tokens=cache_write_tokens if cache_write_tokens > 0 else None,
+                    reasoning_tokens=reasoning_tokens if reasoning_tokens > 0 else None,
                 )
             except Exception as e:
                 if self.progress_callback:
@@ -641,6 +660,15 @@ class Runner:
         completion_tokens_list = [r.completion_tokens for r in self.results if r.completion_tokens is not None]
         total_completion_tokens = sum(completion_tokens_list) if completion_tokens_list else 0
 
+        cached_input_tokens_list = [r.cached_input_tokens for r in self.results if r.cached_input_tokens is not None]
+        total_cached_input_tokens = sum(cached_input_tokens_list) if cached_input_tokens_list else 0
+
+        cache_write_tokens_list = [r.cache_write_tokens for r in self.results if r.cache_write_tokens is not None]
+        total_cache_write_tokens = sum(cache_write_tokens_list) if cache_write_tokens_list else 0
+
+        reasoning_tokens_list = [r.reasoning_tokens for r in self.results if r.reasoning_tokens is not None]
+        total_reasoning_tokens = sum(reasoning_tokens_list) if reasoning_tokens_list else 0
+
         # Create CostMetrics if we have cost data
         cost_metrics = None
         if total_cost is not None and total_cost > 0:
@@ -648,6 +676,9 @@ class Runner:
                 total_cost=total_cost,
                 total_prompt_tokens=total_prompt_tokens,
                 total_completion_tokens=total_completion_tokens,
+                total_cached_input_tokens=total_cached_input_tokens,
+                total_cache_write_tokens=total_cache_write_tokens,
+                total_reasoning_tokens=total_reasoning_tokens,
             )
 
         per_model = None
@@ -696,6 +727,23 @@ class Runner:
                 model_completion_tokens_list = [r.completion_tokens for r in results if r.completion_tokens is not None]
                 model_total_completion_tokens = sum(model_completion_tokens_list) if model_completion_tokens_list else 0
 
+                model_cached_input_tokens_list = [
+                    r.cached_input_tokens for r in results if r.cached_input_tokens is not None
+                ]
+                model_total_cached_input_tokens = (
+                    sum(model_cached_input_tokens_list) if model_cached_input_tokens_list else 0
+                )
+
+                model_cache_write_tokens_list = [
+                    r.cache_write_tokens for r in results if r.cache_write_tokens is not None
+                ]
+                model_total_cache_write_tokens = (
+                    sum(model_cache_write_tokens_list) if model_cache_write_tokens_list else 0
+                )
+
+                model_reasoning_tokens_list = [r.reasoning_tokens for r in results if r.reasoning_tokens is not None]
+                model_total_reasoning_tokens = sum(model_reasoning_tokens_list) if model_reasoning_tokens_list else 0
+
                 # Create CostMetrics for this model if we have cost data
                 model_cost_metrics = None
                 if model_total_cost is not None and model_total_cost > 0:
@@ -703,6 +751,9 @@ class Runner:
                         total_cost=model_total_cost,
                         total_prompt_tokens=model_total_prompt_tokens,
                         total_completion_tokens=model_total_completion_tokens,
+                        total_cached_input_tokens=model_total_cached_input_tokens,
+                        total_cache_write_tokens=model_total_cache_write_tokens,
+                        total_reasoning_tokens=model_total_reasoning_tokens,
                     )
 
                 per_model.append(

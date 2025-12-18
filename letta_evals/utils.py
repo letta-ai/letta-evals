@@ -116,7 +116,7 @@ def calculate_cost(model_name: str, prompt_tokens: int, completion_tokens: int) 
     return prompt_cost + completion_cost
 
 
-def extract_token_counts(agent_usage: Optional[List[dict]]) -> tuple[int, int]:
+def extract_token_counts(agent_usage: Optional[List[dict]]) -> tuple[int, int, int, int, int]:
     """
     Extract total token counts from agent_usage data.
 
@@ -124,20 +124,62 @@ def extract_token_counts(agent_usage: Optional[List[dict]]) -> tuple[int, int]:
         agent_usage: List of usage statistics from the agent run
 
     Returns:
-        Tuple of (total_prompt_tokens, total_completion_tokens)
+        Tuple of (total_prompt_tokens, total_completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens)
     """
     if not agent_usage:
-        return 0, 0
+        return 0, 0, 0, 0, 0
 
     total_prompt_tokens = 0
     total_completion_tokens = 0
+    total_cached_input_tokens = 0
+    total_cache_write_tokens = 0
+    total_reasoning_tokens = 0
 
     for usage_record in agent_usage:
         if usage_record.get("message_type") == "usage_statistics":
-            total_prompt_tokens += usage_record.get("prompt_tokens", 0)
-            total_completion_tokens += usage_record.get("completion_tokens", 0)
+            # Handle None values explicitly: .get() returns None if key exists with None value
+            # Using 'or 0' ensures we treat None, missing keys, and falsy values as 0
+            total_prompt_tokens += usage_record.get("prompt_tokens") or 0
+            total_completion_tokens += usage_record.get("completion_tokens") or 0
 
-    return total_prompt_tokens, total_completion_tokens
+            # Extract cached input tokens - check both top-level and nested prompt_tokens_details
+            cached_input = usage_record.get("cached_input_tokens") or 0
+            if cached_input == 0:
+                # Check nested prompt_tokens_details structure
+                prompt_details = usage_record.get("prompt_tokens_details") or {}
+                if isinstance(prompt_details, dict):
+                    # Try different field names used by different providers
+                    cached_input = (
+                        prompt_details.get("cached_tokens")  # OpenAI/Gemini
+                        or prompt_details.get("cache_read_tokens")  # Anthropic
+                        or prompt_details.get("cached_input_tokens")
+                        or 0
+                    )
+            total_cached_input_tokens += cached_input
+
+            # Extract cache write tokens - check both top-level and nested
+            cache_write = usage_record.get("cache_write_tokens") or 0
+            if cache_write == 0:
+                prompt_details = usage_record.get("prompt_tokens_details") or {}
+                if isinstance(prompt_details, dict):
+                    cache_write = prompt_details.get("cache_creation_tokens") or 0
+            total_cache_write_tokens += cache_write
+
+            # Extract reasoning tokens - check both top-level and nested completion_tokens_details
+            reasoning = usage_record.get("reasoning_tokens") or 0
+            if reasoning == 0:
+                completion_details = usage_record.get("completion_tokens_details") or {}
+                if isinstance(completion_details, dict):
+                    reasoning = completion_details.get("reasoning_tokens") or 0
+            total_reasoning_tokens += reasoning
+
+    return (
+        total_prompt_tokens,
+        total_completion_tokens,
+        total_cached_input_tokens,
+        total_cache_write_tokens,
+        total_reasoning_tokens,
+    )
 
 
 def calculate_cost_from_agent_usage(model_name: str, agent_usage: Optional[List[dict]]) -> float:
@@ -157,8 +199,9 @@ def calculate_cost_from_agent_usage(model_name: str, agent_usage: Optional[List[
     total_cost = 0.0
     for usage_record in agent_usage:
         if usage_record.get("message_type") == "usage_statistics":
-            prompt_tokens = usage_record.get("prompt_tokens", 0)
-            completion_tokens = usage_record.get("completion_tokens", 0)
+            # Handle None values explicitly: .get() returns None if key exists with None value
+            prompt_tokens = usage_record.get("prompt_tokens") or 0
+            completion_tokens = usage_record.get("completion_tokens") or 0
             total_cost += calculate_cost(model_name, prompt_tokens, completion_tokens)
 
     return total_cost
