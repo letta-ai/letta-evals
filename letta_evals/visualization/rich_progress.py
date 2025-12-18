@@ -340,12 +340,13 @@ class EvalProgress(ProgressCallback):
         # gather all samples
         samples_list = list(self.samples.values())
         active = [s for s in samples_list if s.state in active_states]
-        active.sort(key=last_update_key, reverse=True)
+        active.sort(key=lambda s: (s.model_name, s.sample_id))
 
         recent_done = [s for s in samples_list if s.state in completed_states]
-        recent_done.sort(key=last_update_key, reverse=True)
+        recent_done.sort(key=lambda s: (s.model_name, s.sample_id))
 
         queued = [s for s in samples_list if s.state == SampleState.QUEUED]
+        queued.sort(key=lambda s: (s.model_name, s.sample_id))
 
         rows: List[SampleProgress] = []
 
@@ -850,7 +851,7 @@ class EvalProgress(ProgressCallback):
         self.console.print("\n[bold]Sample Results:[/bold]")
 
         total_samples = len(result.results)
-        sorted_results = sorted(result.results, key=lambda r: r.sample.id)
+        sorted_results = sorted(result.results, key=lambda r: (r.model_name or "", r.sample.id))
         samples_to_display = sorted_results[:MAX_SAMPLES_DISPLAY]
 
         if total_samples > MAX_SAMPLES_DISPLAY:

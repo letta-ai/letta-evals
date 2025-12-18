@@ -159,7 +159,7 @@ class SimpleProgress(ProgressCallback):
         self.console.print("\n[bold]Sample Results:[/bold]")
 
         total_samples = len(result.results)
-        sorted_results = sorted(result.results, key=lambda r: r.sample.id)
+        sorted_results = sorted(result.results, key=lambda r: (r.model_name, r.sample.id))
         samples_to_display = sorted_results[:MAX_SAMPLES_DISPLAY]
 
         if total_samples > MAX_SAMPLES_DISPLAY:
