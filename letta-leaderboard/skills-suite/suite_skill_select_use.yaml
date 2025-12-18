@@ -32,7 +32,8 @@ target:
     - minimax-m2
     - kimi-k2
     - deepseek-chat-v3.1
-    - gemini-3
+    - gemini-3-pro
+    - gemini-3-flash
     - deepseek-reasoner
     - deepseek-chat
     - mistral-large-3
