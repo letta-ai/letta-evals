@@ -1,5 +1,5 @@
 benchmark_name: Filesystem Suite
-last_updated: Dec 11, 2025
+last_updated: Dec 18, 2025
 metrics:
   leaderboard_filesystem_100:
     name: Filesystem Rubric
@@ -37,6 +37,10 @@ results:
   average: 73.05
   leaderboard_filesystem_100: 73.05
   total_cost: 16.03
+- model: google/gemini-3-flash-preview
+  average: 68.17
+  leaderboard_filesystem_100: 68.17
+  total_cost: 36.74
 - model: google/gemini-3-pro-preview
   average: 75.33
   leaderboard_filesystem_100: 75.33
