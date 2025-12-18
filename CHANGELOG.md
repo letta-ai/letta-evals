@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.8.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.8.0...letta-evals-v0.8.1) (2025-12-18)
+
+
+### Chores
+
+* Add Gemini 3 Flash to leaderboard ([#146](https://github.com/letta-ai/letta-evals/issues/146)) ([bd05b8e](https://github.com/letta-ai/letta-evals/commit/bd05b8ebce574f8cfc0381514e8b66a632ae5652))
+
+## [0.8.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.7.0...letta-evals-v0.8.0) (2025-12-16)
+
+
+### Features
+
+* Add kimi-k2-thinking ([#125](https://github.com/letta-ai/letta-evals/issues/125)) ([a5ca7e7](https://github.com/letta-ai/letta-evals/commit/a5ca7e7257ea9dc2ca4d6f3ba7e9bc34376232ff))
+* Add skills suite for leaderboard ([#128](https://github.com/letta-ai/letta-evals/issues/128)) ([d252523](https://github.com/letta-ai/letta-evals/commit/d252523263f01e6a01e63f7e631aaad4511b100f))
+* Remove instance level pass/fail metrics ([#127](https://github.com/letta-ai/letta-evals/issues/127)) ([b7e91b6](https://github.com/letta-ai/letta-evals/commit/b7e91b6d529f0a31cf92699d9ee1001618a16d47))
+
+
+### Bug Fixes
+
+* Fix visualization status bar + mark empty submissions as errors ([#126](https://github.com/letta-ai/letta-evals/issues/126)) ([ffe75d2](https://github.com/letta-ai/letta-evals/commit/ffe75d2fd265a67e5346e5fa21dbc28494426721))
+* Google loads `google.svg` ([#134](https://github.com/letta-ai/letta-evals/issues/134)) ([877538c](https://github.com/letta-ai/letta-evals/commit/877538cd7687e38124734d83d2f91819ad0834b9))
+* Leaderboard tooltip, spacing ([#129](https://github.com/letta-ai/letta-evals/issues/129)) ([993683f](https://github.com/letta-ai/letta-evals/commit/993683f020b247a0c6b684fba4138140908e2ca4))
+* Migrate to 1.0 SDK ([#143](https://github.com/letta-ai/letta-evals/issues/143)) ([08a2854](https://github.com/letta-ai/letta-evals/commit/08a2854502c93178a8bcfa13b16db85e24b1fd29))
+* update index.html ([2dda09f](https://github.com/letta-ai/letta-evals/commit/2dda09f6534b82aae9674243810b83433fbe0ba7))
+
+
+### Chores
+
+* Add leaderboard favicon ([#138](https://github.com/letta-ai/letta-evals/issues/138)) ([313f380](https://github.com/letta-ai/letta-evals/commit/313f3808315384abae61a396cef1b41f412ab75d))
+* Add updates tab to leaderboard ([#137](https://github.com/letta-ai/letta-evals/issues/137)) ([44b0255](https://github.com/letta-ai/letta-evals/commit/44b025518936107bf3aeceef4f043226fc021614))
+* GPT 5.2 leaderboard evals ([#139](https://github.com/letta-ai/letta-evals/issues/139)) ([00894cb](https://github.com/letta-ai/letta-evals/commit/00894cb926a45f5085f6f75d708f421d5e3583af))
+* GPT 5.2 xhigh leaderboard evals ([#141](https://github.com/letta-ai/letta-evals/issues/141)) ([7f7c4cb](https://github.com/letta-ai/letta-evals/commit/7f7c4cbc8a9efbeb6e7282423e45b7717e12cff5))
+* GPT5.1, Gemini 3, Opus 4.5 updates ([#133](https://github.com/letta-ai/letta-evals/issues/133)) ([de1f4ca](https://github.com/letta-ai/letta-evals/commit/de1f4ca6c01065c3020f64430d4d2125cecc386e))
+* Improve empty submission check ([#132](https://github.com/letta-ai/letta-evals/issues/132)) ([2463a5b](https://github.com/letta-ai/letta-evals/commit/2463a5bf7616b4ca735bfa73f31b271b303ed5f2))
+* Multiple benchmarks on leaderboard ([#124](https://github.com/letta-ai/letta-evals/issues/124)) ([39cb733](https://github.com/letta-ai/letta-evals/commit/39cb733e08f8896c634e56025ac2aa81b6cd7d70))
+* Track costs during runs ([#130](https://github.com/letta-ai/letta-evals/issues/130)) ([dc980a1](https://github.com/letta-ai/letta-evals/commit/dc980a1d2744eb66e8c095ddc617562f17c07e2c))
+* Update leaderboard logs ([#142](https://github.com/letta-ai/letta-evals/issues/142)) ([e34e0cd](https://github.com/letta-ai/letta-evals/commit/e34e0cd7d12d0869f118ef4d573c7028370db299))
+* Update leaderboard with Deepseek v3.2 and Mistral large 3 ([#136](https://github.com/letta-ai/letta-evals/issues/136)) ([01a17cb](https://github.com/letta-ai/letta-evals/commit/01a17cb0ac1cf0ca7eb5040328675fba44815297))
+
 ## [0.7.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.6.1...letta-evals-v0.7.0) (2025-11-04)
 
 

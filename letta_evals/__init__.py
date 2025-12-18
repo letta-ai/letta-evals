@@ -6,9 +6,11 @@ from importlib.metadata import version as _pkg_version
 from letta_evals.decorators import agent_factory, extractor, grader, suite_setup
 from letta_evals.graders import AgentJudgeGrader, Grader, RubricGrader, ToolGrader
 from letta_evals.models import (
+    AgentState,
     GateSpec,
     GradeResult,
     GraderSpec,
+    LettaMessageUnion,
     MetricAggregate,
     Metrics,
     ModelMetrics,
@@ -28,9 +30,11 @@ from letta_evals.visualization.factory import ProgressStyle, create_progress_cal
 try:
     __version__: str = _pkg_version("letta-evals")
 except PackageNotFoundError:
-    __version__ = "0.7.0"
+    __version__ = "0.8.1"
 
 __all__ = [
+    "AgentState",
+    "LettaMessageUnion",
     "Sample",
     "SuiteSpec",
     "GateSpec",

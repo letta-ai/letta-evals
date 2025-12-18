@@ -2,12 +2,10 @@ import inspect
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from letta_client import AgentState, LettaMessageUnion
-
 from letta_evals.decorators import GRADER_REGISTRY
 from letta_evals.extractors import extractor_requires_agent_state, get_extractor
 from letta_evals.graders.base import Grader
-from letta_evals.models import GradeResult, Sample
+from letta_evals.models import AgentState, GradeResult, LettaMessageUnion, Sample
 from letta_evals.utils import load_object
 
 

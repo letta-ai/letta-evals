@@ -1,11 +1,9 @@
 from typing import Any, List
 
-from letta_client import (
-    AssistantMessage,
-    LettaMessageUnion,
-    ToolCallMessage,
-    ToolReturnMessage,
-)
+from letta_client.types import ToolReturnMessage
+from letta_client.types.agents import AssistantMessage, ToolCallMessage
+
+from letta_evals.models import LettaMessageUnion
 
 
 def flatten_content(content: Any) -> str:

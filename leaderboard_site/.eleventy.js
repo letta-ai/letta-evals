@@ -1,6 +1,7 @@
 const yaml = require('js-yaml');
 const fs = require('fs');
 const path = require('path');
+const MarkdownIt = require('markdown-it');
 
 module.exports = function(eleventyConfig) {
   // Load all leaderboard YAML files
@@ -167,6 +168,59 @@ module.exports = function(eleventyConfig) {
     }
 
     return arrangeByConfig;
+  });
+
+  // Load the latest last_updated date from all leaderboard files
+  eleventyConfig.addGlobalData("lastUpdated", function() {
+    const leaderboardDir = '../letta-leaderboard';
+    let latestDate = null;
+
+    // Find all leaderboard_*.yaml files
+    if (fs.existsSync(leaderboardDir)) {
+      const files = fs.readdirSync(leaderboardDir);
+
+      files.forEach(filename => {
+        if (filename.startsWith('leaderboard_') && filename.endsWith('.yaml')) {
+          const filePath = path.join(leaderboardDir, filename);
+
+          // Extract benchmark key from filename
+          let benchmarkKey = filename.replace('leaderboard_', '').replace('.yaml', '');
+          benchmarkKey = benchmarkKey.replace('_results', '');
+
+          if (benchmarkKey === 'results' || benchmarkKey === 'all') {
+            return;
+          }
+
+          const fileContents = fs.readFileSync(filePath, 'utf8');
+          const data = yaml.load(fileContents);
+
+          // Extract last_updated if it exists and compare to find latest
+          if (data && typeof data === 'object' && data.last_updated) {
+            const dateStr = data.last_updated;
+            if (!latestDate || dateStr > latestDate) {
+              latestDate = dateStr;
+            }
+          }
+        }
+      });
+    }
+
+    return latestDate;
+  });
+
+  // Load updates content from markdown file
+  eleventyConfig.addGlobalData("updatesContent", function() {
+    const updatesPath = path.join(__dirname, '..', 'letta-leaderboard', 'updates.md');
+    if (fs.existsSync(updatesPath)) {
+      const md = new MarkdownIt({
+        html: true,
+        linkify: true,
+        typographer: true
+      });
+      const markdown = fs.readFileSync(updatesPath, 'utf8');
+      return md.render(markdown);
+    }
+    return '<p>No updates available.</p>';
   });
 
   // Keep backward compatibility with single leaderboard

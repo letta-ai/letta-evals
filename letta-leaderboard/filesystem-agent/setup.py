@@ -28,41 +28,38 @@ async def prepare_evaluation(client: AsyncLetta) -> None:
 
     # Create a folder with all the data files
     folder_name = "filesystem_data"
-    folders = await client.folders.list()
+    folders_page = await client.folders.list()
 
     # delete the folder if it exists
-    for folder in folders:
+    for folder in folders_page.items:
         if folder.name == folder_name:
             await client.folders.delete(folder_id=folder.id)
             print(f"Deleted folder: {folder.id}")
             break
 
-    if folder_name not in folders:
-        # Create the folder
-        folder = await client.folders.create(name=folder_name, embedding="openai/text-embedding-3-small")
-        print(f"Created folder: {folder.id}")
+    # Create the folder
+    folder = await client.folders.create(name=folder_name, embedding="openai/text-embedding-3-small")
+    print(f"Created folder: {folder.id}")
 
-        # Upload all data files to the folder
-        data_files = [
-            "people.txt",
-            "vehicles.txt",
-            "pets.txt",
-            "bank_accounts.txt",
-            "credit_cards.txt",
-            "addresses.txt",
-            "employments.txt",
-            "internet_accounts.txt",
-            "insurance_policies.txt",
-            "medical_records.txt",
-        ]
+    # Upload all data files to the folder
+    data_files = [
+        "people.txt",
+        "vehicles.txt",
+        "pets.txt",
+        "bank_accounts.txt",
+        "credit_cards.txt",
+        "addresses.txt",
+        "employments.txt",
+        "internet_accounts.txt",
+        "insurance_policies.txt",
+        "medical_records.txt",
+    ]
 
-        for filename in data_files:
-            file_path = dataset_dir / filename
-            if file_path.exists():
-                with open(file_path, "rb") as f:
-                    await client.folders.files.upload(folder_id=folder.id, file=f)
-                print(f"Uploaded {filename} to folder")
-            else:
-                print(f"Warning: {filename} not found in dataset directory")
-    else:
-        print(f"Folder {folder_name} already exists")
+    for filename in data_files:
+        file_path = dataset_dir / filename
+        if file_path.exists():
+            with open(file_path, "rb") as f:
+                await client.folders.files.upload(folder_id=folder.id, file=f)
+            print(f"Uploaded {filename} to folder")
+        else:
+            print(f"Warning: {filename} not found in dataset directory")

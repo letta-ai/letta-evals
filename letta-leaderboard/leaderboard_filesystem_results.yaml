@@ -1,4 +1,5 @@
 benchmark_name: Filesystem Suite
+last_updated: Dec 18, 2025
 metrics:
   leaderboard_filesystem_100:
     name: Filesystem Rubric
@@ -24,10 +25,22 @@ results:
   average: 74.0
   total_cost: 24.58
   leaderboard_filesystem_100: 74.0
+- model: deepseek/deepseek-chat
+  average: 63.35
+  leaderboard_filesystem_100: 63.35
+  total_cost: 13.05
 - model: deepseek/deepseek-chat-v3.1
   average: 11.97
   total_cost: 2.54
   leaderboard_filesystem_100: 11.97
+- model: deepseek/deepseek-reasoner
+  average: 73.05
+  leaderboard_filesystem_100: 73.05
+  total_cost: 16.03
+- model: google/gemini-3-flash-preview
+  average: 68.17
+  leaderboard_filesystem_100: 68.17
+  total_cost: 36.74
 - model: google/gemini-3-pro-preview
   average: 75.33
   leaderboard_filesystem_100: 75.33
@@ -36,6 +49,10 @@ results:
   average: 56.83
   total_cost: 5.21
   leaderboard_filesystem_100: 56.83
+- model: mistralai/mistral-large-2512
+  average: 23.8
+  leaderboard_filesystem_100: 23.8
+  total_cost: 8.97
 - model: moonshotai/kimi-k2-0905
   average: 55.13
   total_cost: 12.08
@@ -80,6 +97,18 @@ results:
   average: 70.83
   leaderboard_filesystem_100: 70.83
   total_cost: 14.05
+- model: openai/gpt-5.2-2025-12-11 (high)
+  average: 80.5
+  leaderboard_filesystem_100: 80.5
+  total_cost: 68.53
+- model: openai/gpt-5.2-2025-12-11 (medium)
+  average: 73.32
+  leaderboard_filesystem_100: 73.32
+  total_cost: 60.34
+- model: openai/gpt-5.2-2025-12-11 (xhigh)
+  average: 82.61
+  leaderboard_filesystem_100: 82.61
+  total_cost: 84.66
 - model: openai/gpt-oss-120b
   average: 20.2
   total_cost: 2.19

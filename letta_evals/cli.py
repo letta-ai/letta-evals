@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from letta_evals.datasets.loader import load_dataset
-from letta_evals.models import SuiteSpec
+from letta_evals.models import GateKind, SuiteSpec
 from letta_evals.runner import run_suite
 from letta_evals.visualization.factory import ProgressStyle
 
@@ -202,10 +202,20 @@ def validate(suite_path: Path = typer.Argument(..., help="Path to suite YAML fil
                 label = gspec.display_name or key
                 console.print(f"    - {label}: {gspec.kind.value}")
         if suite.gate:
-            metric_key = suite.gate.metric_key or "<default>"
-            console.print(
-                f"  Gate: metric_key={metric_key} aggregate={suite.gate.metric.value} {suite.gate.op.value} {suite.gate.value}"
-            )
+            gate = suite.gate
+            if gate.kind == GateKind.SIMPLE:
+                console.print(
+                    f"  Gate: kind=simple metric_key={gate.metric_key} aggregate={gate.aggregation.value} {gate.op.value} {gate.value}"
+                )
+            elif gate.kind == GateKind.WEIGHTED_AVERAGE:
+                weights_str = ", ".join(f"{k}={v}" for k, v in gate.weights.items())
+                console.print(
+                    f"  Gate: kind=weighted_average weights=({weights_str}) aggregate={gate.aggregation.value} {gate.op.value} {gate.value}"
+                )
+            elif gate.kind == GateKind.LOGICAL:
+                console.print(f"  Gate: kind=logical operator={gate.operator.value} conditions={len(gate.conditions)}")
+            else:
+                console.print(f"  Gate: kind={gate.kind.value}")
 
     except Exception as e:
         console.print(f"[red]Invalid suite configuration: {e}[/red]")

@@ -30,9 +30,9 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
         required_tool_ids = []
 
         for tool_name in required_tool_names:
-            tools = await client.tools.list(name=tool_name)
-            if tools:
-                required_tool_ids.append(tools[0].id)
+            tools_page = await client.tools.list(name=tool_name)
+            if tools_page.items:
+                required_tool_ids.append(tools_page.items[0].id)
             else:
                 print(f"Warning: Tool '{tool_name}' not found")
 
@@ -52,10 +52,10 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
 
         # Find the folder by name
         folder_name = "filesystem_data"
-        folders = await client.folders.list()
+        folders_page = await client.folders.list()
 
         folder_id = None
-        for folder in folders:
+        for folder in folders_page.items:
             if folder.name == folder_name:
                 folder_id = folder.id
                 break

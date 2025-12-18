@@ -1,10 +1,37 @@
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
-from letta_client import AgentState, LettaMessageUnion
+from letta_client.types import AgentState, ToolReturnMessage
+from letta_client.types.agents import (
+    ApprovalRequestMessage,
+    ApprovalResponseMessage,
+    AssistantMessage,
+    EventMessage,
+    HiddenReasoningMessage,
+    ReasoningMessage,
+    SummaryMessage,
+    SystemMessage,
+    ToolCallMessage,
+    UserMessage,
+)
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from letta_evals.types import Aggregation, GateKind, GraderKind, LLMProvider, LogicalOp, MetricOp, TargetKind
+
+# Type alias for message union (replaces LettaMessageUnion from v0.x SDK)
+LettaMessageUnion = Union[
+    SystemMessage,
+    UserMessage,
+    ReasoningMessage,
+    HiddenReasoningMessage,
+    ToolCallMessage,
+    ToolReturnMessage,
+    AssistantMessage,
+    ApprovalRequestMessage,
+    ApprovalResponseMessage,
+    SummaryMessage,
+    EventMessage,
+]
 
 # Dataset models
 

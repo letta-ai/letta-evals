@@ -5,13 +5,12 @@ from typing import List, Optional, Tuple
 
 from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
-from letta_client import AgentState, LettaMessageUnion
 from openai import AsyncOpenAI
 
 from letta_evals.extractors import extractor_requires_agent_state, get_extractor
 from letta_evals.graders.base import Grader
 from letta_evals.graders.prompt_utils import JUDGE_SYSTEM_PROMPT, build_judge_prompt
-from letta_evals.models import GradeResult, Sample
+from letta_evals.models import AgentState, GradeResult, LettaMessageUnion, Sample
 from letta_evals.types import LLMProvider
 
 load_dotenv()

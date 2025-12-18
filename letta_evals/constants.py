@@ -25,6 +25,14 @@ MODEL_COSTS = {
         "prompt_tokens": 2,
         "completion_tokens": 12,
     },
+    "google_ai/gemini-3-flash-preview": {
+        "prompt_tokens": 0.5,
+        "completion_tokens": 3,
+    },
+    "openai/gpt-5.2-2025-12-11": {
+        "prompt_tokens": 1.75,
+        "completion_tokens": 14,
+    },
     "openai/gpt-5.1-codex-mini": {
         "prompt_tokens": 0.25,
         "completion_tokens": 2,
@@ -80,6 +88,18 @@ MODEL_COSTS = {
     "openai/gpt-oss-20b": {
         "prompt_tokens": 0.05,
         "completion_tokens": 0.2,
+    },
+    "deepseek/deepseek-reasoner": {
+        "prompt_tokens": 0.28,
+        "completion_tokens": 0.42,
+    },
+    "deepseek/deepseek-chat": {
+        "prompt_tokens": 0.28,
+        "completion_tokens": 0.42,
+    },
+    "mistralai/mistral-large-2512": {
+        "prompt_tokens": 0.5,
+        "completion_tokens": 1.5,
     },
 }
 

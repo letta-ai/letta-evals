@@ -8,6 +8,7 @@ and merges them with an existing leaderboard YAML file.
 import argparse
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -35,6 +36,10 @@ def normalize_model_name(model_name: str) -> str:
         return f"openai/{model_name}"
     if model_name.startswith("gemini"):
         return f"google/{model_name}"
+    if model_name.startswith("mistral-"):
+        return f"mistralai/{model_name}"
+    if model_name.startswith("deepseek"):
+        return f"deepseek/{model_name}"
     return model_name
 
 
@@ -430,6 +435,9 @@ def main() -> None:
 
     # Update leaderboard data
     leaderboard_data["results"] = merged_results
+
+    # Update last_updated timestamp
+    leaderboard_data["last_updated"] = datetime.now().strftime("%b %d, %Y")
 
     # Write output
     output_path = args.output or args.leaderboard

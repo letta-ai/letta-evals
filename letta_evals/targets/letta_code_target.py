@@ -71,7 +71,8 @@ class LettaCodeTarget(AbstractAgentTarget):
                 prompt = "\n".join(str(inp) for inp in inputs)
                 prompt = prompt.replace("{pwd}", self.working_dir.resolve().as_posix())
 
-                # construct the letta command with json output
+                # construct the letta-code CLI command (headless JSON output)
+                # NOTE: letta-code CLI flags have changed over time; keep to stable, documented flags.
                 cmd = [
                     "letta",
                     "--new",
@@ -82,17 +83,19 @@ class LettaCodeTarget(AbstractAgentTarget):
                     self.model_handle,
                 ]
 
+                # Use codex system prompt for GPT-style models (matches `letta --help` examples)
+                if "gpt" in self.model_handle:
+                    cmd.extend(["--system", "codex"])
+                    cmd.extend(["--init-blocks", "skills,loaded_skills"])
+
                 # add skills directory if specified
                 if self.skills_dir:
                     cmd.extend(["--skills", str(self.skills_dir)])
 
                 cmd.extend(["-p", prompt])
 
-                # add tool permissions if specified
-                if self.allowed_tools:
-                    cmd.extend(["--allowedTools", ",".join(self.allowed_tools)])
-                if self.disallowed_tools:
-                    cmd.extend(["--disallowedTools", ",".join(self.disallowed_tools)])
+                # NOTE: older versions of letta-code supported --allowedTools/--disallowedTools.
+                # The current CLI (0.6.x) does not expose these flags; we intentionally do not pass them.
 
                 logger.info(f"Running letta command for sample {sample.id}")
 
@@ -138,10 +141,10 @@ class LettaCodeTarget(AbstractAgentTarget):
                 logger.info(f"Retrieving messages for agent {agent_id}")
 
                 # retrieve messages from the agent's last run
-                messages = await self.client.agents.messages.list(agent_id=agent_id)
+                messages_page = await self.client.agents.messages.list(agent_id=agent_id)
 
                 # wrap messages in a single turn
-                trajectory = [messages] if messages else []
+                trajectory = [messages_page.items] if messages_page.items else []
 
                 # extract usage stats if available
                 usage_stats = []
