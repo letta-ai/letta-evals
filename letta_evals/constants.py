@@ -1,7 +1,7 @@
 """Constants used across the letta_evals."""
 
 # CLI constants
-MAX_SAMPLES_DISPLAY = 50
+MAX_SAMPLES_DISPLAY = 10
 
 # Model pricing configuration (costs per million tokens)
 MODEL_COSTS = {
