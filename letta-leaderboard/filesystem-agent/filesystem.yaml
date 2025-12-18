@@ -33,6 +33,7 @@ target:
     - openrouter-glm-4.6
     - openrouter-minimax-m2
     - gemini-3-pro
+    - gemini-3-flash
     - deepseek-reasoner
     - deepseek-chat
     - openrouter-mistral-large-3

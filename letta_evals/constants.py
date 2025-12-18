@@ -25,6 +25,10 @@ MODEL_COSTS = {
         "prompt_tokens": 2,
         "completion_tokens": 12,
     },
+    "google_ai/gemini-3-flash-preview": {
+        "prompt_tokens": 0.5,
+        "completion_tokens": 3,
+    },
     "openai/gpt-5.2-2025-12-11": {
         "prompt_tokens": 1.75,
         "completion_tokens": 14,

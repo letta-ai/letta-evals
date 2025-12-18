@@ -1,5 +1,5 @@
 benchmark_name: Skills Suite
-last_updated: Dec 11, 2025
+last_updated: Dec 18, 2025
 arrange_by: task_completion
 metrics:
   task_completion:
@@ -38,6 +38,10 @@ results:
   average: 63.3
   task_completion: 70.48
   skill_use: 56.12
+- model: google/gemini-3-flash
+  average: 59.54
+  task_completion: 59.54
+  skill_use: 59.54
 - model: google/gemini-3-pro
   average: 68.51
   task_completion: 72.73

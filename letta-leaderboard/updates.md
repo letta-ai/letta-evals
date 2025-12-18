@@ -1,5 +1,10 @@
 # Leaderboard Updates
 
+### December 18, 2025
+- Gemini 3 Flash
+    - Outperforms Haiku and GPT 5 Mini on Filesystem
+    - Less token efficient, leading to higher costs
+
 ### December 11, 2025
 - GPT 5.2 (medium, high, xhigh)
     - #1 on Filesystem (6% ↑) and Skills (9% ↑)
