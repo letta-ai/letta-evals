@@ -774,9 +774,21 @@ class EvalProgress(ProgressCallback):
 
                 for model_metrics in metrics.per_model:
                     if model_metrics.cost:
-                        cached_str = f"{model_metrics.cost.total_cached_input_tokens:,}" if model_metrics.cost.total_cached_input_tokens > 0 else "-"
-                        cache_write_str = f"{model_metrics.cost.total_cache_write_tokens:,}" if model_metrics.cost.total_cache_write_tokens > 0 else "-"
-                        reasoning_str = f"{model_metrics.cost.total_reasoning_tokens:,}" if model_metrics.cost.total_reasoning_tokens > 0 else "-"
+                        cached_str = (
+                            f"{model_metrics.cost.total_cached_input_tokens:,}"
+                            if model_metrics.cost.total_cached_input_tokens > 0
+                            else "-"
+                        )
+                        cache_write_str = (
+                            f"{model_metrics.cost.total_cache_write_tokens:,}"
+                            if model_metrics.cost.total_cache_write_tokens > 0
+                            else "-"
+                        )
+                        reasoning_str = (
+                            f"{model_metrics.cost.total_reasoning_tokens:,}"
+                            if model_metrics.cost.total_reasoning_tokens > 0
+                            else "-"
+                        )
                         cost_table.add_row(
                             model_metrics.model_name,
                             f"${model_metrics.cost.total_cost:.4f}",

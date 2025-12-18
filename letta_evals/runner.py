@@ -389,7 +389,9 @@ class Runner:
                         )
                     # Extract token counts even for error cases if agent_usage is available
                     cost = calculate_cost_from_agent_usage(model_name, agent_usage) if model_name else None
-                    prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = extract_token_counts(agent_usage)
+                    prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
+                        extract_token_counts(agent_usage)
+                    )
                     return SampleResult(
                         sample=sample,
                         submission=submission,
@@ -426,7 +428,9 @@ class Runner:
 
                 # Calculate cost and extract token counts from agent usage
                 cost = calculate_cost_from_agent_usage(model_name, agent_usage) if model_name else None
-                prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = extract_token_counts(agent_usage)
+                prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
+                    extract_token_counts(agent_usage)
+                )
 
                 return SampleResult(
                     sample=sample,
@@ -725,11 +729,19 @@ class Runner:
                 model_completion_tokens_list = [r.completion_tokens for r in results if r.completion_tokens is not None]
                 model_total_completion_tokens = sum(model_completion_tokens_list) if model_completion_tokens_list else 0
 
-                model_cached_input_tokens_list = [r.cached_input_tokens for r in results if r.cached_input_tokens is not None]
-                model_total_cached_input_tokens = sum(model_cached_input_tokens_list) if model_cached_input_tokens_list else 0
+                model_cached_input_tokens_list = [
+                    r.cached_input_tokens for r in results if r.cached_input_tokens is not None
+                ]
+                model_total_cached_input_tokens = (
+                    sum(model_cached_input_tokens_list) if model_cached_input_tokens_list else 0
+                )
 
-                model_cache_write_tokens_list = [r.cache_write_tokens for r in results if r.cache_write_tokens is not None]
-                model_total_cache_write_tokens = sum(model_cache_write_tokens_list) if model_cache_write_tokens_list else 0
+                model_cache_write_tokens_list = [
+                    r.cache_write_tokens for r in results if r.cache_write_tokens is not None
+                ]
+                model_total_cache_write_tokens = (
+                    sum(model_cache_write_tokens_list) if model_cache_write_tokens_list else 0
+                )
 
                 model_reasoning_tokens_list = [r.reasoning_tokens for r in results if r.reasoning_tokens is not None]
                 model_total_reasoning_tokens = sum(model_reasoning_tokens_list) if model_reasoning_tokens_list else 0

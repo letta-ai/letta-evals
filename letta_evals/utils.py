@@ -141,7 +141,7 @@ def extract_token_counts(agent_usage: Optional[List[dict]]) -> tuple[int, int, i
             # Using 'or 0' ensures we treat None, missing keys, and falsy values as 0
             total_prompt_tokens += usage_record.get("prompt_tokens") or 0
             total_completion_tokens += usage_record.get("completion_tokens") or 0
-            
+
             # Extract cached input tokens - check both top-level and nested prompt_tokens_details
             cached_input = usage_record.get("cached_input_tokens") or 0
             if cached_input == 0:
@@ -150,13 +150,13 @@ def extract_token_counts(agent_usage: Optional[List[dict]]) -> tuple[int, int, i
                 if isinstance(prompt_details, dict):
                     # Try different field names used by different providers
                     cached_input = (
-                        prompt_details.get("cached_tokens") or  # OpenAI/Gemini
-                        prompt_details.get("cache_read_tokens") or  # Anthropic
-                        prompt_details.get("cached_input_tokens") or
-                        0
+                        prompt_details.get("cached_tokens")  # OpenAI/Gemini
+                        or prompt_details.get("cache_read_tokens")  # Anthropic
+                        or prompt_details.get("cached_input_tokens")
+                        or 0
                     )
             total_cached_input_tokens += cached_input
-            
+
             # Extract cache write tokens - check both top-level and nested
             cache_write = usage_record.get("cache_write_tokens") or 0
             if cache_write == 0:
@@ -164,7 +164,7 @@ def extract_token_counts(agent_usage: Optional[List[dict]]) -> tuple[int, int, i
                 if isinstance(prompt_details, dict):
                     cache_write = prompt_details.get("cache_creation_tokens") or 0
             total_cache_write_tokens += cache_write
-            
+
             # Extract reasoning tokens - check both top-level and nested completion_tokens_details
             reasoning = usage_record.get("reasoning_tokens") or 0
             if reasoning == 0:
@@ -173,7 +173,13 @@ def extract_token_counts(agent_usage: Optional[List[dict]]) -> tuple[int, int, i
                     reasoning = completion_details.get("reasoning_tokens") or 0
             total_reasoning_tokens += reasoning
 
-    return total_prompt_tokens, total_completion_tokens, total_cached_input_tokens, total_cache_write_tokens, total_reasoning_tokens
+    return (
+        total_prompt_tokens,
+        total_completion_tokens,
+        total_cached_input_tokens,
+        total_cache_write_tokens,
+        total_reasoning_tokens,
+    )
 
 
 def calculate_cost_from_agent_usage(model_name: str, agent_usage: Optional[List[dict]]) -> float:

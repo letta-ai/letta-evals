@@ -439,7 +439,9 @@ class CostMetrics(BaseModel):
     total_cost: float = Field(description="total cost in dollars")
     total_prompt_tokens: int = Field(description="total number of prompt tokens")
     total_completion_tokens: int = Field(description="total number of completion tokens")
-    total_cached_input_tokens: int = Field(default=0, description="total number of cached input tokens served from cache")
+    total_cached_input_tokens: int = Field(
+        default=0, description="total number of cached input tokens served from cache"
+    )
     total_cache_write_tokens: int = Field(default=0, description="total number of cache write tokens (Anthropic only)")
     total_reasoning_tokens: int = Field(default=0, description="total number of reasoning/thinking tokens generated")
 
@@ -520,9 +522,15 @@ class SampleResult(BaseModel):
     cost: Optional[float] = Field(default=None, description="Total cost in dollars for this sample run")
     prompt_tokens: Optional[int] = Field(default=None, description="Total prompt tokens used for this sample")
     completion_tokens: Optional[int] = Field(default=None, description="Total completion tokens used for this sample")
-    cached_input_tokens: Optional[int] = Field(default=None, description="Total cached input tokens served from cache for this sample")
-    cache_write_tokens: Optional[int] = Field(default=None, description="Total cache write tokens for this sample (Anthropic only)")
-    reasoning_tokens: Optional[int] = Field(default=None, description="Total reasoning/thinking tokens generated for this sample")
+    cached_input_tokens: Optional[int] = Field(
+        default=None, description="Total cached input tokens served from cache for this sample"
+    )
+    cache_write_tokens: Optional[int] = Field(
+        default=None, description="Total cache write tokens for this sample (Anthropic only)"
+    )
+    reasoning_tokens: Optional[int] = Field(
+        default=None, description="Total reasoning/thinking tokens generated for this sample"
+    )
 
 
 class RunnerResult(BaseModel):
