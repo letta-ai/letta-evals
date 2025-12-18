@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.8.0...letta-evals-v0.8.1) (2025-12-18)
+
+
+### Chores
+
+* Add Gemini 3 Flash to leaderboard ([#146](https://github.com/letta-ai/letta-evals/issues/146)) ([bd05b8e](https://github.com/letta-ai/letta-evals/commit/bd05b8ebce574f8cfc0381514e8b66a632ae5652))
+
 ## [0.8.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.7.0...letta-evals-v0.8.0) (2025-12-16)
 
 
