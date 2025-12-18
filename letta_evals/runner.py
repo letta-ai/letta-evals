@@ -106,9 +106,7 @@ class Runner:
         has_handles = self.suite.target.model_handles is not None
 
         if not has_configs and not has_handles:
-            # Default to gpt-5-mini when no model is specified
-            # Server expects format: provider/model_name
-            return ["openai/gpt-5-mini"]
+            return [None]  # no model configs or handles, use default
 
         if has_configs and has_handles:
             raise ValueError("Cannot specify both model_configs and model_handles in target spec")

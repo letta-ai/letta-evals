@@ -5,8 +5,6 @@ target:
   kind: letta_agent
   agent_file: test-fetch-webpage-simple-agent.af
   base_url: http://localhost:8283
-  model_handles:
-    - anthropic/claude-sonnet-4-5-20250929
 graders:
   contains_check:
     kind: tool

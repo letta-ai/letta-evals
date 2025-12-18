@@ -101,7 +101,7 @@
           "batch_item_id": null,
           "group_id": null,
           "id": "message-0",
-          "model": "gpt-5-mini",
+          "model": "gpt-4o-mini",
           "agent_id": "agent-0",
           "tool_calls": null,
           "tool_call_id": null,
