@@ -41,7 +41,10 @@ class Sample(BaseModel):
 
     id: int = Field(description="Sample ID (0-based index from dataset)")
     input: Union[str, List[str]] = Field(description="Input message(s) to send to the agent")
-    ground_truth: Optional[str] = Field(default=None, description="Expected ground_truth response for grading")
+    ground_truth: Optional[Union[str, List[str]]] = Field(
+        default=None,
+        description="Expected ground_truth response for grading. Can be a list for per-turn evaluation in multi-turn conversations.",
+    )
     agent_args: Optional[Dict[str, Any]] = Field(default=None, description="Custom arguments for agent creation")
     rubric_vars: Optional[Dict[str, Any]] = Field(
         default=None, description="Variables for prompt substitution in rubric graders"
@@ -49,6 +52,23 @@ class Sample(BaseModel):
     extra_vars: Optional[Dict[str, Any]] = Field(
         default=None, description="Custom user-supplied variables. Useful when writing custom extractors, graders, etc."
     )
+
+    @model_validator(mode="after")
+    def validate_ground_truth_format(self):
+        """Validate ground_truth format matches input format."""
+        # Reject str input with list ground_truth (doesn't make sense)
+        if isinstance(self.ground_truth, list) and not isinstance(self.input, list):
+            raise ValueError("ground_truth cannot be a list when input is a string")
+
+        # Ensure lengths match when both are lists
+        if isinstance(self.input, list) and isinstance(self.ground_truth, list):
+            if len(self.input) != len(self.ground_truth):
+                raise ValueError(
+                    f"input has {len(self.input)} items but ground_truth has {len(self.ground_truth)} items. "
+                    f"For per-turn evaluation, each input must have a corresponding ground_truth."
+                )
+
+        return self
 
 
 # Config models

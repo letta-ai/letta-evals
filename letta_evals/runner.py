@@ -52,6 +52,11 @@ from letta_evals.visualization.factory import ProgressStyle, create_progress_cal
 logger = logging.getLogger(__name__)
 
 
+def _is_per_turn_evaluation(sample: Sample) -> bool:
+    """Check if sample requires per-turn evaluation (both input and ground_truth are lists)."""
+    return isinstance(sample.input, list) and isinstance(sample.ground_truth, list)
+
+
 class Runner:
     """Main evaluation runner."""
 
@@ -365,10 +370,68 @@ class Runner:
 
                 grades_dict: Optional[Dict[str, GradeResult]] = {}
                 submissions_dict: Optional[Dict[str, str]] = {}
-                for key, grader in self.graders.items():  # type: ignore[union-attr]
-                    gr, sub = await grader.grade(sample, trajectory, agent_state=agent_state)
-                    grades_dict[key] = gr
-                    submissions_dict[key] = sub
+
+                # Check if this is a per-turn evaluation (both input and ground_truth are lists)
+                if _is_per_turn_evaluation(sample):
+                    # Per-turn evaluation: grade each turn against its corresponding ground_truth
+                    ground_truths = sample.ground_truth  # type: List[str]
+                    num_turns = len(ground_truths)
+
+                    for key, grader in self.graders.items():  # type: ignore[union-attr]
+                        per_turn_grades = []
+
+                        for turn_idx in range(num_turns):
+                            # Create single-turn trajectory for this turn
+                            single_turn_trajectory = [trajectory[turn_idx]] if turn_idx < len(trajectory) else []
+
+                            # Create a modified sample with the turn's ground_truth
+                            turn_sample = Sample(
+                                id=sample.id,
+                                input=sample.input[turn_idx] if isinstance(sample.input, list) else sample.input,
+                                ground_truth=ground_truths[turn_idx],
+                                agent_args=sample.agent_args,
+                                rubric_vars=sample.rubric_vars,
+                                extra_vars=sample.extra_vars,
+                            )
+
+                            # Grade this turn
+                            turn_grade, turn_submission = await grader.grade(
+                                turn_sample, single_turn_trajectory, agent_state=agent_state
+                            )
+
+                            per_turn_grades.append({
+                                "turn": turn_idx,
+                                "score": turn_grade.score,
+                                "rationale": turn_grade.rationale,
+                                "submission": turn_submission,
+                                "ground_truth": ground_truths[turn_idx],
+                            })
+
+                        # Calculate proportional score (average across turns)
+                        total_score = sum(g["score"] for g in per_turn_grades)
+                        final_score = total_score / num_turns if num_turns > 0 else 0.0
+
+                        # Combine submissions for display (join all turn submissions)
+                        combined_submission = " | ".join(
+                            f"[Turn {g['turn']}] {g['submission']}" for g in per_turn_grades
+                        )
+
+                        grades_dict[key] = GradeResult(
+                            score=final_score,
+                            rationale=None,  # Per-turn rationales stored in metadata
+                            metadata={
+                                "per_turn_grades": per_turn_grades,
+                                "turns_passed": sum(1 for g in per_turn_grades if g["score"] >= 1.0),
+                                "turns_total": num_turns,
+                            },
+                        )
+                        submissions_dict[key] = combined_submission
+                else:
+                    # Standard evaluation: grade the full trajectory against single ground_truth
+                    for key, grader in self.graders.items():  # type: ignore[union-attr]
+                        gr, sub = await grader.grade(sample, trajectory, agent_state=agent_state)
+                        grades_dict[key] = gr
+                        submissions_dict[key] = sub
 
                 # use first grader as primary for legacy grade_result/submission
                 first_key = next(iter(grades_dict.keys()))
