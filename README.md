@@ -114,6 +114,7 @@ We suggest getting started with these examples:
 - **Agent-as-judge grading**: [`examples/letta-agent-rubric-grader/`](examples/letta-agent-rubric-grader/) - Using a Letta agent as an LLM judge (no API keys required!)
 - **Multi-grader gates**: [`examples/multi-grader-gate/`](examples/multi-grader-gate/) - Combining multiple graders with logical AND/OR gates, weighted averages, and advanced aggregation functions
 - **Memory block extraction**: [`examples/multiturn-memory-block-extractor/`](examples/multiturn-memory-block-extractor/) - Extracting and evaluating agent memory across multiturn conversations
+- **Per-turn evaluation**: [`examples/multiturn-per-turn-grading/`](examples/multiturn-per-turn-grading/) - Grade each turn independently in multi-turn conversations with proportional scoring
 - **Multi-model evaluation**: [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) - Testing across multiple LLM configurations
 - **Programmatic agent creation**: [`examples/programmatic-agent-creation/`](examples/programmatic-agent-creation/) - Using agent factories to create agents dynamically per sample
 - **Custom graders and extractors**: [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-and-extractor/) - Implementing custom evaluation logic with Python decorators
@@ -146,6 +147,14 @@ See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-a
 **How do I evaluate multi-turn agent interactions?**
 
 * Letta Evals natively supports multiturn conversations! Simply provide `input` as a list of strings in your dataset instead of a single string. The framework will send each message sequentially and capture the full trajectory. Use extractors like `last_turn`, `all_assistant`, or `memory_block` to evaluate different aspects of the multiturn interaction. See [`examples/multiturn-memory-block-extractor/`](examples/multiturn-memory-block-extractor/) for a complete example testing memory updates across conversation turns.
+
+**Can I grade each turn independently in a multi-turn conversation?**
+
+* Yes! Use per-turn evaluation by providing both `input` and `ground_truth` as lists of the same length in your dataset:
+  ```json
+  {"input": ["What is 2+2?", "What is 3+3?"], "ground_truth": ["4", "6"]}
+  ```
+  Each turn is graded independently against its corresponding ground truth, and the final score is the average across all turns (e.g., 2/3 correct = 0.67). Access per-turn results via `sample_result.grades["grader_key"].per_turn_grades`. See [`examples/multiturn-per-turn-grading/`](examples/multiturn-per-turn-grading/) for a complete example.
 
 **Can I test the same agent with different LLM models?**
 

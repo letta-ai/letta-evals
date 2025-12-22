@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 from letta_evals.constants import MODEL_COSTS, MODEL_NAME_MAPPING
+from letta_evals.models import Sample
 
 logger = logging.getLogger(__name__)
 
@@ -205,3 +206,20 @@ def calculate_cost_from_agent_usage(model_name: str, agent_usage: Optional[List[
             total_cost += calculate_cost(model_name, prompt_tokens, completion_tokens)
 
     return total_cost
+
+
+def is_per_turn_evaluation(sample: Sample) -> bool:
+    """Check if sample requires per-turn evaluation.
+
+    Per-turn evaluation is used when both input and ground_truth are lists,
+    allowing each turn in a multi-turn conversation to be evaluated against
+    its own ground truth.
+
+    Args:
+        sample: The evaluation sample to check
+
+    Returns:
+        True if both input and ground_truth are lists (per-turn mode),
+        False otherwise (standard evaluation mode)
+    """
+    return isinstance(sample.input, list) and isinstance(sample.ground_truth, list)

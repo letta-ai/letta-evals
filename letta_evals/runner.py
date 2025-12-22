@@ -28,6 +28,7 @@ from letta_evals.models import (
     Metrics,
     ModelJudgeGraderSpec,
     ModelMetrics,
+    PerTurnGrade,
     RunnerResult,
     RunStatistics,
     Sample,
@@ -45,7 +46,7 @@ from letta_evals.targets.base import AbstractAgentTarget
 from letta_evals.targets.letta_agent import LettaAgentTarget
 from letta_evals.targets.letta_code_target import LettaCodeTarget
 from letta_evals.types import Aggregation, LogicalOp, TargetKind
-from letta_evals.utils import calculate_cost_from_agent_usage, extract_token_counts, load_object
+from letta_evals.utils import calculate_cost_from_agent_usage, extract_token_counts, is_per_turn_evaluation, load_object
 from letta_evals.visualization.base import ProgressCallback
 from letta_evals.visualization.factory import ProgressStyle, create_progress_callback
 
@@ -365,10 +366,79 @@ class Runner:
 
                 grades_dict: Optional[Dict[str, GradeResult]] = {}
                 submissions_dict: Optional[Dict[str, str]] = {}
-                for key, grader in self.graders.items():  # type: ignore[union-attr]
-                    gr, sub = await grader.grade(sample, trajectory, agent_state=agent_state)
-                    grades_dict[key] = gr
-                    submissions_dict[key] = sub
+
+                # Check if this is a per-turn evaluation (both input and ground_truth are lists)
+                if is_per_turn_evaluation(sample):
+                    # Per-turn evaluation: grade each turn against its corresponding ground_truth
+                    ground_truths = sample.ground_truth  # type: List[str]
+                    num_turns = len(ground_truths)
+
+                    for key, grader in self.graders.items():  # type: ignore[union-attr]
+                        per_turn_grades: List[PerTurnGrade] = []
+
+                        for turn_idx in range(num_turns):
+                            # Create single-turn trajectory for this turn
+                            single_turn_trajectory = [trajectory[turn_idx]] if turn_idx < len(trajectory) else []
+
+                            # Create a modified sample with the turn's ground_truth
+                            turn_sample = Sample(
+                                id=sample.id,
+                                input=sample.input[turn_idx] if isinstance(sample.input, list) else sample.input,
+                                ground_truth=ground_truths[turn_idx],
+                                agent_args=sample.agent_args,
+                                rubric_vars=sample.rubric_vars,
+                                extra_vars=sample.extra_vars,
+                            )
+
+                            # Grade this turn
+                            turn_grade, turn_submission = await grader.grade(
+                                turn_sample, single_turn_trajectory, agent_state=agent_state
+                            )
+
+                            per_turn_grades.append(
+                                PerTurnGrade(
+                                    turn=turn_idx,
+                                    score=turn_grade.score,
+                                    rationale=turn_grade.rationale,
+                                    submission=turn_submission,
+                                    ground_truth=ground_truths[turn_idx],
+                                )
+                            )
+
+                            # Update progress callback with per-turn grading progress
+                            if self.progress_callback:
+                                await self.progress_callback.turn_graded(
+                                    sample_id=sample_id,
+                                    turn_num=turn_idx,
+                                    total_turns=num_turns,
+                                    turn_score=turn_grade.score,
+                                    agent_id=agent_id,
+                                    model_name=model_name,
+                                )
+
+                        # Calculate proportional score (average across turns)
+                        total_score = sum(g.score for g in per_turn_grades)
+                        final_score = total_score / num_turns if num_turns > 0 else 0.0
+
+                        # Combine submissions for display (join all turn submissions)
+                        combined_submission = " | ".join(f"[Turn {g.turn}] {g.submission}" for g in per_turn_grades)
+
+                        grades_dict[key] = GradeResult(
+                            score=final_score,
+                            rationale=None,
+                            per_turn_grades=per_turn_grades,
+                            metadata={
+                                "turns_passed": sum(1 for g in per_turn_grades if g.score >= 1.0),
+                                "turns_total": num_turns,
+                            },
+                        )
+                        submissions_dict[key] = combined_submission
+                else:
+                    # Standard evaluation: grade the full trajectory against single ground_truth
+                    for key, grader in self.graders.items():  # type: ignore[union-attr]
+                        gr, sub = await grader.grade(sample, trajectory, agent_state=agent_state)
+                        grades_dict[key] = gr
+                        submissions_dict[key] = sub
 
                 # use first grader as primary for legacy grade_result/submission
                 first_key = next(iter(grades_dict.keys()))
