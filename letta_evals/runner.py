@@ -366,14 +366,12 @@ class Runner:
 
                 grades_dict: Optional[Dict[str, GradeResult]] = {}
                 submissions_dict: Optional[Dict[str, str]] = {}
-                per_turn_grades_dict: Optional[Dict[str, List[PerTurnGrade]]] = None
 
                 # Check if this is a per-turn evaluation (both input and ground_truth are lists)
                 if is_per_turn_evaluation(sample):
                     # Per-turn evaluation: grade each turn against its corresponding ground_truth
                     ground_truths = sample.ground_truth  # type: List[str]
                     num_turns = len(ground_truths)
-                    per_turn_grades_dict = {}
 
                     for key, grader in self.graders.items():  # type: ignore[union-attr]
                         per_turn_grades: List[PerTurnGrade] = []
@@ -416,9 +414,6 @@ class Runner:
                                     model_name=model_name,
                                 )
 
-                        # Store typed per-turn grades
-                        per_turn_grades_dict[key] = per_turn_grades
-
                         # Calculate proportional score (average across turns)
                         total_score = sum(g.score for g in per_turn_grades)
                         final_score = total_score / num_turns if num_turns > 0 else 0.0
@@ -430,7 +425,8 @@ class Runner:
 
                         grades_dict[key] = GradeResult(
                             score=final_score,
-                            rationale=None,  # Per-turn rationales available in per_turn_grades
+                            rationale=None,
+                            per_turn_grades=per_turn_grades,
                             metadata={
                                 "turns_passed": sum(1 for g in per_turn_grades if g.score >= 1.0),
                                 "turns_total": num_turns,
@@ -472,7 +468,6 @@ class Runner:
                         agent_id=agent_id,
                         grade=grade_result,
                         grades=grades_dict,
-                        per_turn_grades=per_turn_grades_dict,
                         model_name=model_name,
                         agent_usage=agent_usage,
                         cost=cost,
@@ -513,7 +508,6 @@ class Runner:
                     agent_id=agent_id,
                     grade=grade_result,
                     grades=grades_dict,
-                    per_turn_grades=per_turn_grades_dict,
                     model_name=model_name,
                     agent_usage=agent_usage,
                     cost=cost,

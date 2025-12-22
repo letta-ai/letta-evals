@@ -436,20 +436,6 @@ class TargetResult(BaseModel):
     )
 
 
-class GradeResult(BaseModel):
-    """Grading result."""
-
-    score: float = Field(description="Numeric score between 0.0 and 1.0")
-    rationale: Optional[str] = Field(default=None, description="Explanation of the grading decision")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional grading metadata")
-
-    @field_validator("score")
-    def validate_score(cls, v: float) -> float:
-        if v < 0.0 or v > 1.0:
-            raise ValueError(f"Score must be between 0.0 and 1.0, got {v}")
-        return v
-
-
 class PerTurnGrade(BaseModel):
     """Grade result for a single turn in per-turn evaluation."""
 
@@ -458,6 +444,23 @@ class PerTurnGrade(BaseModel):
     rationale: Optional[str] = Field(default=None, description="Explanation for this turn's grade")
     submission: str = Field(description="Extracted submission for this turn")
     ground_truth: str = Field(description="Expected ground truth for this turn")
+
+
+class GradeResult(BaseModel):
+    """Grading result."""
+
+    score: float = Field(description="Numeric score between 0.0 and 1.0")
+    rationale: Optional[str] = Field(default=None, description="Explanation of the grading decision")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional grading metadata")
+    per_turn_grades: Optional[List[PerTurnGrade]] = Field(
+        default=None, description="Per-turn grades for multi-turn evaluation (only populated for per-turn evaluations)"
+    )
+
+    @field_validator("score")
+    def validate_score(cls, v: float) -> float:
+        if v < 0.0 or v > 1.0:
+            raise ValueError(f"Score must be between 0.0 and 1.0, got {v}")
+        return v
 
 
 # Runner models
@@ -545,9 +548,6 @@ class SampleResult(BaseModel):
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
     grade: GradeResult = Field(description="Grading result for this sample")
     grades: Optional[Dict[str, GradeResult]] = Field(default=None, description="Per-metric grading results")
-    per_turn_grades: Optional[Dict[str, List[PerTurnGrade]]] = Field(
-        default=None, description="Per-turn grading results for each metric (only populated for per-turn evaluations)"
-    )
     model_name: Optional[str] = Field(description="Model configuration name used for this sample")
     agent_usage: Optional[List[dict]] = Field(
         default=None, description="Usage statistics emitted by the agent during the run"
