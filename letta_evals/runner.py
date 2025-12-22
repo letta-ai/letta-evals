@@ -45,16 +45,11 @@ from letta_evals.targets.base import AbstractAgentTarget
 from letta_evals.targets.letta_agent import LettaAgentTarget
 from letta_evals.targets.letta_code_target import LettaCodeTarget
 from letta_evals.types import Aggregation, LogicalOp, TargetKind
-from letta_evals.utils import calculate_cost_from_agent_usage, extract_token_counts, load_object
+from letta_evals.utils import calculate_cost_from_agent_usage, extract_token_counts, is_per_turn_evaluation, load_object
 from letta_evals.visualization.base import ProgressCallback
 from letta_evals.visualization.factory import ProgressStyle, create_progress_callback
 
 logger = logging.getLogger(__name__)
-
-
-def _is_per_turn_evaluation(sample: Sample) -> bool:
-    """Check if sample requires per-turn evaluation (both input and ground_truth are lists)."""
-    return isinstance(sample.input, list) and isinstance(sample.ground_truth, list)
 
 
 class Runner:
@@ -372,7 +367,7 @@ class Runner:
                 submissions_dict: Optional[Dict[str, str]] = {}
 
                 # Check if this is a per-turn evaluation (both input and ground_truth are lists)
-                if _is_per_turn_evaluation(sample):
+                if is_per_turn_evaluation(sample):
                     # Per-turn evaluation: grade each turn against its corresponding ground_truth
                     ground_truths = sample.ground_truth  # type: List[str]
                     num_turns = len(ground_truths)
