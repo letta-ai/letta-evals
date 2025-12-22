@@ -395,13 +395,15 @@ class Runner:
                                 turn_sample, single_turn_trajectory, agent_state=agent_state
                             )
 
-                            per_turn_grades.append(PerTurnGrade(
-                                turn=turn_idx,
-                                score=turn_grade.score,
-                                rationale=turn_grade.rationale,
-                                submission=turn_submission,
-                                ground_truth=ground_truths[turn_idx],
-                            ))
+                            per_turn_grades.append(
+                                PerTurnGrade(
+                                    turn=turn_idx,
+                                    score=turn_grade.score,
+                                    rationale=turn_grade.rationale,
+                                    submission=turn_submission,
+                                    ground_truth=ground_truths[turn_idx],
+                                )
+                            )
 
                             # Update progress callback with per-turn grading progress
                             if self.progress_callback:
@@ -419,9 +421,7 @@ class Runner:
                         final_score = total_score / num_turns if num_turns > 0 else 0.0
 
                         # Combine submissions for display (join all turn submissions)
-                        combined_submission = " | ".join(
-                            f"[Turn {g.turn}] {g.submission}" for g in per_turn_grades
-                        )
+                        combined_submission = " | ".join(f"[Turn {g.turn}] {g.submission}" for g in per_turn_grades)
 
                         grades_dict[key] = GradeResult(
                             score=final_score,

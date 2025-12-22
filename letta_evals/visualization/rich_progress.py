@@ -345,7 +345,12 @@ class EvalProgress(ProgressCallback):
         def last_update_key(s: SampleProgress) -> float:
             return s.last_update_ts or s.end_time or s.start_time or 0.0
 
-        active_states = {SampleState.LOADING_AGENT, SampleState.SENDING_MESSAGES, SampleState.GRADING, SampleState.GRADING_TURNS}
+        active_states = {
+            SampleState.LOADING_AGENT,
+            SampleState.SENDING_MESSAGES,
+            SampleState.GRADING,
+            SampleState.GRADING_TURNS,
+        }
         completed_states = {SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR}
 
         # gather all samples
