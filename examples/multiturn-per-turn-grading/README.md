@@ -1,13 +1,13 @@
 # Multi-turn Per-Turn Grading Example
 
-This example demonstrates per-turn evaluation in multi-turn conversations, where each turn is graded against its own ground truth.
+This example demonstrates per-turn evaluation in multi-turn conversations, where each turn is graded independently against its own ground truth.
 
 ## What This Example Shows
 
 - Using per-turn evaluation where each input message has a corresponding ground truth
-- Grading each turn independently using the same extractor and grader
+- Grading each turn independently using multiple graders (tool-based and LLM-based)
 - Calculating proportional scores across turns (e.g., 2/3 turns correct = 0.67 score)
-- Accessing per-turn results in the grade metadata
+- Accessing per-turn results via `GradeResult.per_turn_grades`
 
 ## Key Takeaway
 
@@ -67,6 +67,35 @@ Each sample in `dataset.jsonl` has a multi-turn `input` (list of strings) and a 
 - The lists must have the same length
 - Each turn is graded independently against its corresponding ground truth
 
+### Suite Configuration
+
+This example uses multiple graders to evaluate each turn:
+
+```yaml
+graders:
+  correctness:
+    kind: tool
+    display_name: "Correctness"
+    function: contains
+    extractor: last_assistant
+  quality:
+    kind: model_judge
+    display_name: "Quality"
+    prompt_path: rubric.txt
+    model: gpt-4.1-mini
+    extractor: last_assistant
+gate:
+  kind: weighted_average
+  weights:
+    correctness: 0.6
+    quality: 0.4
+  aggregation: avg_score
+  op: gte
+  value: 0.6
+```
+
+Each grader independently evaluates all turns, producing its own `per_turn_grades`.
+
 ## How Per-Turn Evaluation Works
 
 1. **Detection**: When both `input` and `ground_truth` are lists, per-turn mode is enabled
@@ -76,22 +105,39 @@ Each sample in `dataset.jsonl` has a multi-turn `input` (list of strings) and a 
 
 ## Result Structure
 
-The `GradeResult` includes per-turn details in metadata:
+The `GradeResult` includes per-turn grades as a typed field:
 
 ```python
+from letta_evals.models import GradeResult, PerTurnGrade
+
+# Access via sample_result.grades["grader_key"]
+grade_result = sample_result.grades["correctness"]
+
+# GradeResult structure
 GradeResult(
-    score=0.67,  # 2/3 turns passed
+    score=0.67,  # Average across turns (2/3 passed)
     rationale=None,
+    per_turn_grades=[
+        PerTurnGrade(turn=0, score=1.0, rationale="...", submission="Paris", ground_truth="Paris"),
+        PerTurnGrade(turn=1, score=1.0, rationale="...", submission="Berlin", ground_truth="Berlin"),
+        PerTurnGrade(turn=2, score=0.0, rationale="...", submission="Madrid", ground_truth="Rome"),
+    ],
     metadata={
-        "per_turn_grades": [
-            {"turn": 0, "score": 1.0, "rationale": "...", "submission": "Paris", "ground_truth": "Paris"},
-            {"turn": 1, "score": 1.0, "rationale": "...", "submission": "Berlin", "ground_truth": "Berlin"},
-            {"turn": 2, "score": 0.0, "rationale": "...", "submission": "Madrid", "ground_truth": "Rome"},
-        ],
         "turns_passed": 2,
         "turns_total": 3
     }
 )
+
+# Accessing per-turn grades
+for grade in sample_result.grades["correctness"].per_turn_grades:
+    print(f"Turn {grade.turn}: {grade.score} - {grade.rationale}")
+
+# Multi-grader access
+for grader_key, grade_result in sample_result.grades.items():
+    print(f"\n{grader_key}: {grade_result.score}")
+    if grade_result.per_turn_grades:
+        for g in grade_result.per_turn_grades:
+            print(f"  Turn {g.turn}: {g.score}")
 ```
 
 ## Comparison with Standard Multi-turn Evaluation
