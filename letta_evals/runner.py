@@ -28,6 +28,7 @@ from letta_evals.models import (
     Metrics,
     ModelJudgeGraderSpec,
     ModelMetrics,
+    PerTurnGrade,
     RunnerResult,
     RunStatistics,
     Sample,
@@ -365,15 +366,17 @@ class Runner:
 
                 grades_dict: Optional[Dict[str, GradeResult]] = {}
                 submissions_dict: Optional[Dict[str, str]] = {}
+                per_turn_grades_dict: Optional[Dict[str, List[PerTurnGrade]]] = None
 
                 # Check if this is a per-turn evaluation (both input and ground_truth are lists)
                 if is_per_turn_evaluation(sample):
                     # Per-turn evaluation: grade each turn against its corresponding ground_truth
                     ground_truths = sample.ground_truth  # type: List[str]
                     num_turns = len(ground_truths)
+                    per_turn_grades_dict = {}
 
                     for key, grader in self.graders.items():  # type: ignore[union-attr]
-                        per_turn_grades = []
+                        per_turn_grades: List[PerTurnGrade] = []
 
                         for turn_idx in range(num_turns):
                             # Create single-turn trajectory for this turn
@@ -394,29 +397,42 @@ class Runner:
                                 turn_sample, single_turn_trajectory, agent_state=agent_state
                             )
 
-                            per_turn_grades.append({
-                                "turn": turn_idx,
-                                "score": turn_grade.score,
-                                "rationale": turn_grade.rationale,
-                                "submission": turn_submission,
-                                "ground_truth": ground_truths[turn_idx],
-                            })
+                            per_turn_grades.append(PerTurnGrade(
+                                turn=turn_idx,
+                                score=turn_grade.score,
+                                rationale=turn_grade.rationale,
+                                submission=turn_submission,
+                                ground_truth=ground_truths[turn_idx],
+                            ))
+
+                            # Update progress callback with per-turn grading progress
+                            if self.progress_callback:
+                                await self.progress_callback.turn_graded(
+                                    sample_id=sample_id,
+                                    turn_num=turn_idx,
+                                    total_turns=num_turns,
+                                    turn_score=turn_grade.score,
+                                    agent_id=agent_id,
+                                    model_name=model_name,
+                                )
+
+                        # Store typed per-turn grades
+                        per_turn_grades_dict[key] = per_turn_grades
 
                         # Calculate proportional score (average across turns)
-                        total_score = sum(g["score"] for g in per_turn_grades)
+                        total_score = sum(g.score for g in per_turn_grades)
                         final_score = total_score / num_turns if num_turns > 0 else 0.0
 
                         # Combine submissions for display (join all turn submissions)
                         combined_submission = " | ".join(
-                            f"[Turn {g['turn']}] {g['submission']}" for g in per_turn_grades
+                            f"[Turn {g.turn}] {g.submission}" for g in per_turn_grades
                         )
 
                         grades_dict[key] = GradeResult(
                             score=final_score,
-                            rationale=None,  # Per-turn rationales stored in metadata
+                            rationale=None,  # Per-turn rationales available in per_turn_grades
                             metadata={
-                                "per_turn_grades": per_turn_grades,
-                                "turns_passed": sum(1 for g in per_turn_grades if g["score"] >= 1.0),
+                                "turns_passed": sum(1 for g in per_turn_grades if g.score >= 1.0),
                                 "turns_total": num_turns,
                             },
                         )
@@ -456,6 +472,7 @@ class Runner:
                         agent_id=agent_id,
                         grade=grade_result,
                         grades=grades_dict,
+                        per_turn_grades=per_turn_grades_dict,
                         model_name=model_name,
                         agent_usage=agent_usage,
                         cost=cost,
@@ -496,6 +513,7 @@ class Runner:
                     agent_id=agent_id,
                     grade=grade_result,
                     grades=grades_dict,
+                    per_turn_grades=per_turn_grades_dict,
                     model_name=model_name,
                     agent_usage=agent_usage,
                     cost=cost,

@@ -34,6 +34,7 @@ class SampleState(Enum):
     LOADING_AGENT = "loading"
     SENDING_MESSAGES = "sending"
     GRADING = "grading"
+    GRADING_TURNS = "grading_turns"  # Per-turn grading in progress
     COMPLETED = "completed"
     FAILED = "failed"
     ERROR = "error"
@@ -59,6 +60,10 @@ class SampleProgress:
     # Per-metric live data (for multi-grader runs)
     metric_scores: Optional[Dict[str, float]] = None
     metric_rationales: Optional[Dict[str, str]] = None
+    # Per-turn grading progress
+    turns_graded: int = 0
+    total_turns: int = 0
+    turn_scores: Optional[List[float]] = None
 
 
 class DisplayMode(Enum):
@@ -131,6 +136,7 @@ class EvalProgress(ProgressCallback):
             SampleState.LOADING_AGENT: ("⊙", "yellow"),
             SampleState.SENDING_MESSAGES: ("⚡", "cyan"),
             SampleState.GRADING: ("🔍", "magenta"),
+            SampleState.GRADING_TURNS: ("🔍", "magenta"),
             SampleState.COMPLETED: ("✓", "green"),
             SampleState.FAILED: ("✗", "red"),
             SampleState.ERROR: ("⚠", "red"),
@@ -146,6 +152,11 @@ class EvalProgress(ProgressCallback):
             text = Text()
             text.append(icon)
             text.append(f" sending [{sample.messages_sent}/{sample.total_messages}]")
+            return text
+        elif sample.state == SampleState.GRADING_TURNS and sample.total_turns > 0:
+            text = Text()
+            text.append(icon)
+            text.append(f" grading [{sample.turns_graded}/{sample.total_turns}]")
             return text
         elif sample.state == SampleState.COMPLETED:
             icon = Text("✓", style="green")
@@ -334,7 +345,7 @@ class EvalProgress(ProgressCallback):
         def last_update_key(s: SampleProgress) -> float:
             return s.last_update_ts or s.end_time or s.start_time or 0.0
 
-        active_states = {SampleState.LOADING_AGENT, SampleState.SENDING_MESSAGES, SampleState.GRADING}
+        active_states = {SampleState.LOADING_AGENT, SampleState.SENDING_MESSAGES, SampleState.GRADING, SampleState.GRADING_TURNS}
         completed_states = {SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR}
 
         # gather all samples
@@ -636,6 +647,42 @@ class EvalProgress(ProgressCallback):
 
         await self.update_sample_state(
             sample_id, SampleState.GRADING, agent_id=agent_id, model_name=model_name, from_cache=existing_from_cache
+        )
+
+    async def turn_graded(
+        self,
+        sample_id: int,
+        turn_num: int,
+        total_turns: int,
+        turn_score: float,
+        agent_id: Optional[str] = None,
+        model_name: Optional[str] = None,
+    ):
+        """Update progress for per-turn grading"""
+        key = (sample_id, model_name)
+
+        # Get existing from_cache flag
+        existing_from_cache = False
+        if key in self.samples:
+            existing_from_cache = self.samples[key].from_cache
+        elif model_name is not None and (sample_id, None) in self.samples:
+            existing_from_cache = self.samples[(sample_id, None)].from_cache
+
+        # Initialize sample and turn_scores list BEFORE updating state
+        if key not in self.samples:
+            self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
+        if self.samples[key].turn_scores is None:
+            self.samples[key].turn_scores = []
+        self.samples[key].turn_scores.append(turn_score)
+
+        await self.update_sample_state(
+            sample_id,
+            SampleState.GRADING_TURNS,
+            agent_id=agent_id,
+            model_name=model_name,
+            from_cache=existing_from_cache,
+            turns_graded=turn_num + 1,  # turn_num is 0-indexed
+            total_turns=total_turns,
         )
 
     async def sample_completed(

@@ -61,6 +61,18 @@ class ProgressCallback(ABC):
         """Called when grading of a sample begins."""
         pass
 
+    async def turn_graded(
+        self,
+        sample_id: int,
+        turn_num: int,
+        total_turns: int,
+        turn_score: float,
+        agent_id: Optional[str] = None,
+        model_name: Optional[str] = None,
+    ) -> None:
+        """Called when a single turn is graded in per-turn evaluation mode."""
+        pass
+
     @abstractmethod
     async def sample_completed(
         self,

@@ -450,6 +450,16 @@ class GradeResult(BaseModel):
         return v
 
 
+class PerTurnGrade(BaseModel):
+    """Grade result for a single turn in per-turn evaluation."""
+
+    turn: int = Field(description="Turn index (0-based)")
+    score: float = Field(description="Score for this turn (0.0 to 1.0)")
+    rationale: Optional[str] = Field(default=None, description="Explanation for this turn's grade")
+    submission: str = Field(description="Extracted submission for this turn")
+    ground_truth: str = Field(description="Expected ground truth for this turn")
+
+
 # Runner models
 
 
@@ -535,6 +545,9 @@ class SampleResult(BaseModel):
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
     grade: GradeResult = Field(description="Grading result for this sample")
     grades: Optional[Dict[str, GradeResult]] = Field(default=None, description="Per-metric grading results")
+    per_turn_grades: Optional[Dict[str, List[PerTurnGrade]]] = Field(
+        default=None, description="Per-turn grading results for each metric (only populated for per-turn evaluations)"
+    )
     model_name: Optional[str] = Field(description="Model configuration name used for this sample")
     agent_usage: Optional[List[dict]] = Field(
         default=None, description="Usage statistics emitted by the agent during the run"
