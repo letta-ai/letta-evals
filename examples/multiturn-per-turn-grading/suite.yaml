@@ -1,0 +1,18 @@
+name: multiturn-per-turn-grading-test
+description: Test if agent answers each question correctly in a multi-turn conversation
+dataset: dataset.jsonl
+target:
+  kind: letta_agent
+  agent_file: test-qa-agent.af
+  base_url: http://localhost:8283
+graders:
+  answer_check:
+    kind: tool
+    function: contains
+    extractor: last_assistant
+gate:
+  kind: simple
+  metric_key: answer_check
+  aggregation: avg_score
+  op: gte
+  value: 0.6

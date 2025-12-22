@@ -1,0 +1,5 @@
+{"input": ["What is the capital of France?", "What is the capital of Germany?", "What is the capital of Italy?"], "ground_truth": ["Paris", "Berlin", "Rome"]}
+{"input": ["What is 2 + 2?", "What is 3 * 4?", "What is 10 - 7?"], "ground_truth": ["4", "12", "3"]}
+{"input": ["What color is the sky?", "What color is grass?", "What color is a banana?"], "ground_truth": ["blue", "green", "yellow"]}
+{"input": ["Who wrote Romeo and Juliet?", "Who painted the Mona Lisa?"], "ground_truth": ["Shakespeare", "Leonardo"]}
+{"input": ["What is the largest planet?", "What is the smallest planet?", "What planet is known as the Red Planet?"], "ground_truth": ["Jupiter", "Mercury", "Mars"]}
