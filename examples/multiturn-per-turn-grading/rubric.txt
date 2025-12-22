@@ -1,0 +1,12 @@
+You are evaluating if an AI assistant correctly answered a question.
+
+Question: {{input}}
+Expected Answer: {{ground_truth}}
+Assistant's Response: {{submission}}
+
+Score the response on a scale of 0.0 to 1.0:
+- 1.0: The response contains the correct answer
+- 0.5: The response is partially correct or close to the answer
+- 0.0: The response is incorrect or doesn't answer the question
+
+Provide your score and a brief rationale.

@@ -4,15 +4,28 @@ dataset: dataset.jsonl
 target:
   kind: letta_agent
   agent_file: test-qa-agent.af
-  base_url: http://localhost:8283
+  base_url: https://api.letta.com/
 graders:
-  answer_check:
+  correctness:
     kind: tool
+    display_name: "Correctness"
     function: contains
     extractor: last_assistant
+  quality:
+    kind: model_judge
+    display_name: "Quality"
+    prompt_path: rubric.txt
+    model: gpt-4.1-mini
+    temperature: 0.0
+    provider: openai
+    max_retries: 3
+    timeout: 60.0
+    extractor: last_assistant
 gate:
-  kind: simple
-  metric_key: answer_check
+  kind: weighted_average
+  weights:
+    correctness: 0.6
+    quality: 0.4
   aggregation: avg_score
   op: gte
   value: 0.6
