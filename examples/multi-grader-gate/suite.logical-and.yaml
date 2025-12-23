@@ -4,7 +4,7 @@ dataset: dataset.csv
 target:
   kind: letta_agent
   agent_file: ascii-art-agent.af
-  base_url: http://localhost:8283
+  base_url: https://api.letta.com/
 graders:
   quality:
     kind: model_judge

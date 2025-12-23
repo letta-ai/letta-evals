@@ -4,7 +4,7 @@ dataset: assistant_dataset.csv
 target:
   kind: letta_agent
   agent_file: test-fetch-webpage-simple-agent.af
-  base_url: http://localhost:8283
+  base_url: https://api.letta.com/
 graders:
   contains_check:
     kind: tool
