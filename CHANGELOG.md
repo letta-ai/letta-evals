@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.9.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.8.1...letta-evals-v0.9.0) (2025-12-23)
+
+
+### Features
+
+* Add prompt caching ([#135](https://github.com/letta-ai/letta-evals/issues/135)) ([a1b1988](https://github.com/letta-ai/letta-evals/commit/a1b1988948c28007fc0233950ec72007e5ab8188))
+* Per-turn evaluations for multi-turn conversations ([#149](https://github.com/letta-ai/letta-evals/issues/149)) ([23fad93](https://github.com/letta-ai/letta-evals/commit/23fad936f67fc8e2e07f6dfa2f711f320998add6))
+
+
+### Bug Fixes
+
+* Per-turn evaluation render ([#150](https://github.com/letta-ai/letta-evals/issues/150)) ([a40a253](https://github.com/letta-ai/letta-evals/commit/a40a253e7b85eb84b0a8c0d03142bc2a6b8f328b))
+
+
+### Chores
+
+* Sort eval results by model name and sample ID for consistent ordering ([#148](https://github.com/letta-ai/letta-evals/issues/148)) ([eae891a](https://github.com/letta-ai/letta-evals/commit/eae891a37387480ea78c7e625e865c4b774eab77))
+
 ## [0.8.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.8.0...letta-evals-v0.8.1) (2025-12-18)
 
 
