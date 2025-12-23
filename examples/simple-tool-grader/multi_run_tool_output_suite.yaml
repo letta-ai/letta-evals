@@ -5,7 +5,7 @@ num_runs: 2 # Run this twice
 target:
   kind: letta_agent
   agent_file: test-fetch-webpage-simple-agent.af
-  base_url: http://localhost:8283
+  base_url: https://api.letta.com/
 graders:
   tool_output_check:
     kind: tool

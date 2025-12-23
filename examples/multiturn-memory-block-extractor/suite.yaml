@@ -4,7 +4,7 @@ dataset: dataset.jsonl
 target:
   kind: letta_agent
   agent_file: test-fruit-pref-agent.af
-  base_url: http://localhost:8283
+  base_url: https://api.letta.com/
 graders:
   memory_check:
     kind: tool
