@@ -109,16 +109,17 @@ class SimpleProgress(ProgressCallback):
         self.console.print("[bold]Evaluation Results:[/bold]")
         self.console.print("=" * 50)
 
-        # overall metrics
-        metrics = result.metrics
+        # compute totals from model_metrics
+        model_metrics = result.model_metrics
+        total = sum(m.total for m in model_metrics)
+        total_attempted = sum(m.total_attempted for m in model_metrics)
+
         self.console.print("\n[bold]Overall Metrics:[/bold]")
-        self.console.print(f"  Total samples: {metrics.total}")
-        self.console.print(f"  Total attempted: {metrics.total_attempted}")
-        errors = metrics.total - metrics.total_attempted
-        errors_pct = (errors / metrics.total * 100.0) if metrics.total > 0 else 0.0
-        self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{metrics.total})")
-        self.console.print(f"  Average score (attempted): {metrics.avg_score_attempted:.2f}")
-        self.console.print(f"  Average score (total): {metrics.avg_score_total:.2f}")
+        self.console.print(f"  Total samples: {total}")
+        self.console.print(f"  Total attempted: {total_attempted}")
+        errors = total - total_attempted
+        errors_pct = (errors / total * 100.0) if total > 0 else 0.0
+        self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{total})")
 
         # gate status
         gate = result.config["gate"]

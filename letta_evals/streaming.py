@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple
 
 import anyio
 
-from letta_evals.models import Metrics, RunnerResult, SampleResult
+from letta_evals.models import ModelMetrics, RunnerResult, SampleResult
 
 
 class StreamingWriter:
@@ -13,7 +13,7 @@ class StreamingWriter:
     Record schema per line:
       - header:  {"type": "header", "suite": str, "config": {...}}
       - result:  {"type": "result", "result": SampleResult}
-      - summary: {"type": "summary", "metrics": Metrics, "gates_passed": bool}
+      - summary: {"type": "summary", "model_metrics": [...], "gates_passed": bool}
     """
 
     def __init__(self, output_path: Path, suite_name: str, config: dict):
@@ -32,9 +32,9 @@ class StreamingWriter:
         result_obj = json.loads(result.model_dump_json())
         await self._write_line({"type": "result", "result": result_obj})
 
-    async def write_metrics(self, metrics: Metrics, gates_passed: bool) -> None:
-        metrics_obj = json.loads(metrics.model_dump_json())
-        summary_obj = {"type": "summary", "metrics": metrics_obj, "gates_passed": gates_passed}
+    async def write_model_metrics(self, model_metrics: List[ModelMetrics], gates_passed: bool) -> None:
+        model_metrics_obj = [json.loads(m.model_dump_json()) for m in model_metrics]
+        summary_obj = {"type": "summary", "model_metrics": model_metrics_obj, "gates_passed": gates_passed}
         with open(self.output_path / "summary.json", "w", encoding="utf-8") as f:
             json.dump(summary_obj, f, indent=2)
 
@@ -54,11 +54,11 @@ class StreamingReader:
 
     @staticmethod
     async def to_runner_result(path: Path) -> RunnerResult:
-        def _read() -> Tuple[Optional[str], Optional[dict], List[SampleResult], Optional[Metrics], bool]:
+        def _read() -> Tuple[Optional[str], Optional[dict], List[SampleResult], List[ModelMetrics], bool]:
             _suite: Optional[str] = None
             _config: Optional[dict] = None
             _results: List[SampleResult] = []
-            _metrics: Optional[Metrics] = None
+            _model_metrics: List[ModelMetrics] = []
             _gates: bool = False
 
             with open(path / "header.json", "r", encoding="utf-8") as f:
@@ -68,7 +68,7 @@ class StreamingReader:
 
             with open(path / "summary.json", "r", encoding="utf-8") as f:
                 summary_obj = json.load(f)
-                _metrics = Metrics(**summary_obj.get("metrics"))
+                _model_metrics = [ModelMetrics(**m) for m in summary_obj.get("model_metrics", [])]
                 _gates = bool(summary_obj.get("gates_passed", False))
 
             with open(path / "results.jsonl", "r", encoding="utf-8") as f:
@@ -78,15 +78,15 @@ class StreamingReader:
                         continue
                     rec = json.loads(line)
                     _results.append(SampleResult(**rec["result"]))
-            return _suite, _config, _results, _metrics, _gates
+            return _suite, _config, _results, _model_metrics, _gates
 
-        suite, config, results, metrics, gates_passed = await anyio.to_thread.run_sync(_read)
+        suite, config, results, model_metrics, gates_passed = await anyio.to_thread.run_sync(_read)
 
         if suite is None or config is None:
             raise ValueError("Results JSONL missing header record")
-        if metrics is None:
-            raise ValueError("Results JSONL missing summary record")
 
-        return RunnerResult(suite=suite, config=config, results=results, metrics=metrics, gates_passed=gates_passed)
+        return RunnerResult(
+            suite=suite, config=config, results=results, model_metrics=model_metrics, gates_passed=gates_passed
+        )
 
     # No fallback metrics: summary is required in JSONL results.

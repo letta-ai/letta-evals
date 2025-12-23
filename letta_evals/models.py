@@ -485,11 +485,7 @@ class ModelMetrics(BaseModel):
     model_name: str = Field(description="model configuration name")
     total: int = Field(description="total results (success + error)")
     total_attempted: int = Field(description="total successfully attempted (completed without error)")
-    avg_score_attempted: float = Field(description="average score across attempted results (0.0 to 1.0)")
-    avg_score_total: float = Field(description="average score across all results (0.0 to 1.0)")
-    metrics: Dict[str, float] = Field(
-        default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
-    )
+    by_metric: Dict[str, "MetricAggregate"] = Field(description="per-metric aggregates for this model")
     cost: Optional[CostMetrics] = Field(default=None, description="cost and token usage metrics for this model")
 
 
@@ -503,51 +499,28 @@ class MetricAggregate(BaseModel):
     pass_rate: float = Field(description="average score as percentage")
 
 
-class Metrics(BaseModel):
-    """evaluation metrics."""
-
-    total: int = Field(description="total results (success + error)")
-    total_attempted: int = Field(description="total successfully attempted (completed without error)")
-    avg_score_attempted: float = Field(description="average score across attempted results (0.0 to 1.0)")
-    avg_score_total: float = Field(description="average score across all results (0.0 to 1.0)")
-    per_model: Optional[List[ModelMetrics]] = Field(
-        default=None, description="metrics broken down by model configuration"
-    )
-    by_metric: Optional[Dict[str, MetricAggregate]] = Field(default=None, description="aggregates for each metric key")
-    metrics: Dict[str, float] = Field(
-        default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
-    )
-    cost: Optional[CostMetrics] = Field(default=None, description="cost and token usage metrics across all samples")
-
-
 class RunStatistics(BaseModel):
     """Aggregate statistics across multiple evaluation runs."""
 
     num_runs: int = Field(description="Total number of runs executed")
     runs_passed: int = Field(description="Number of runs that passed the gate")
-    mean_avg_score_attempted: float = Field(description="Mean of avg_score_attempted across all runs")
-    std_avg_score_attempted: float = Field(description="Standard deviation of avg_score_attempted across all runs")
-    mean_avg_score_total: float = Field(description="Mean of avg_score_total across all runs")
-    std_avg_score_total: float = Field(description="Standard deviation of avg_score_total across all runs")
     mean_scores: Dict[str, float] = Field(
         default_factory=dict, description="Mean score for each metric across all runs"
     )
     std_scores: Dict[str, float] = Field(
         default_factory=dict, description="Standard deviation for each metric across all runs"
     )
-    individual_run_metrics: List[Metrics] = Field(description="Metrics from each individual run")
+    runs: List[List[ModelMetrics]] = Field(description="Model metrics from each individual run")
 
 
 class SampleResult(BaseModel):
     """Result for a single sample evaluation."""
 
     sample: Sample = Field(description="The original sample that was evaluated")
-    submission: str = Field(description="Extracted response from the trajectory")
-    submissions: Optional[Dict[str, str]] = Field(default=None, description="Per-metric extracted submissions")
+    submissions: Dict[str, str] = Field(description="Per-grader extracted submissions")
     trajectory: List[List[LettaMessageUnion]] = Field(description="Full conversation trajectory from the agent")
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
-    grade: GradeResult = Field(description="Grading result for this sample")
-    grades: Optional[Dict[str, GradeResult]] = Field(default=None, description="Per-metric grading results")
+    grades: Dict[str, GradeResult] = Field(description="Per-grader grading results")
     model_name: Optional[str] = Field(description="Model configuration name used for this sample")
     agent_usage: Optional[List[dict]] = Field(
         default=None, description="Usage statistics emitted by the agent during the run"
@@ -572,7 +545,7 @@ class RunnerResult(BaseModel):
     suite: str = Field(description="Name of the evaluation suite")
     config: Dict[str, Any] = Field(description="Configuration used for this run (target config, grader config, etc.)")
     results: List[SampleResult] = Field(description="Results for each evaluated sample")
-    metrics: Metrics = Field(description="Aggregate metrics across all samples")
+    model_metrics: List[ModelMetrics] = Field(description="Metrics for each model configuration")
     gates_passed: bool = Field(description="Whether all gate criteria were satisfied")
     run_statistics: Optional[RunStatistics] = Field(
         default=None, description="Aggregate statistics across multiple runs (if num_runs > 1)"

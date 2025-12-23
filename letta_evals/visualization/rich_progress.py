@@ -790,71 +790,53 @@ class EvalProgress(ProgressCallback):
             self.console.print("[dim]Note: Results re-graded from cached trajectories[/dim]")
         self.console.print("=" * 50)
 
-        # overall metrics
-        metrics = result.metrics
+        # compute totals from model_metrics
+        model_metrics = result.model_metrics
+        total = sum(m.total for m in model_metrics)
+        total_attempted = sum(m.total_attempted for m in model_metrics)
+
         self.console.print("\n[bold]Overall Metrics:[/bold]")
-        self.console.print(f"  Total samples: {metrics.total}")
-        self.console.print(f"  Total attempted: {metrics.total_attempted}")
-        errors = metrics.total - metrics.total_attempted
-        errors_pct = (errors / metrics.total * 100.0) if metrics.total > 0 else 0.0
-        self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{metrics.total})")
-        self.console.print(f"  Average score (attempted): {metrics.avg_score_attempted:.2f}")
-        self.console.print(f"  Average score (total): {metrics.avg_score_total:.2f}")
+        self.console.print(f"  Total samples: {total}")
+        self.console.print(f"  Total attempted: {total_attempted}")
+        errors = total - total_attempted
+        errors_pct = (errors / total * 100.0) if total > 0 else 0.0
+        self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{total})")
 
-        # cost and token usage metrics
-        if metrics.cost:
-            self.console.print("\n[bold]Cost and Token Usage:[/bold]")
-            self.console.print(f"  Total cost: ${metrics.cost.total_cost:.4f}")
-            self.console.print(f"  Total prompt tokens: {metrics.cost.total_prompt_tokens:,}")
-            self.console.print(f"  Total completion tokens: {metrics.cost.total_completion_tokens:,}")
-            if metrics.cost.total_cached_input_tokens > 0:
-                self.console.print(f"  Total cached input tokens: {metrics.cost.total_cached_input_tokens:,}")
-            if metrics.cost.total_cache_write_tokens > 0:
-                self.console.print(f"  Total cache write tokens: {metrics.cost.total_cache_write_tokens:,}")
-            if metrics.cost.total_reasoning_tokens > 0:
-                self.console.print(f"  Total reasoning tokens: {metrics.cost.total_reasoning_tokens:,}")
-
-        # per-metric aggregates
-        if hasattr(metrics, "by_metric") and metrics.by_metric:
-            self.console.print("\n[bold]Metrics by Metric:[/bold]")
-            metrics_table = Table()
-            metrics_table.add_column("Metric", style="cyan")
-            metrics_table.add_column("Avg Score (Attempted)", style="white")
-            metrics_table.add_column("Avg Score (Total)", style="white")
-            # build key->label mapping from config
-            label_map = {}
-            if "graders" in result.config and isinstance(result.config["graders"], dict):
-                for key, gspec in result.config["graders"].items():
-                    label_map[key] = gspec.get("display_name") or key
-
-            for key, agg in metrics.by_metric.items():
-                label = label_map.get(key, key)
-                metrics_table.add_row(label, f"{agg.avg_score_attempted:.2f}", f"{agg.avg_score_total:.2f}")
-            self.console.print(metrics_table)
+        # build key->label mapping from config
+        label_map = {}
+        if "graders" in result.config and isinstance(result.config["graders"], dict):
+            for key, gspec in result.config["graders"].items():
+                label_map[key] = gspec.get("display_name") or key
 
         # per-model metrics
-        if metrics.per_model:
+        if model_metrics:
             self.console.print("\n[bold]Per-Model Metrics:[/bold]")
             model_table = Table()
             model_table.add_column("Model", style="cyan")
             model_table.add_column("Samples", style="white")
             model_table.add_column("Attempted", style="white")
-            model_table.add_column("Avg Score (Attempted)", style="white")
-            model_table.add_column("Avg Score (Total)", style="white")
 
-            for model_metrics in metrics.per_model:
-                model_table.add_row(
+            # add columns for each metric
+            metric_keys = list(model_metrics[0].by_metric.keys()) if model_metrics else []
+            for mk in metric_keys:
+                label = label_map.get(mk, mk)
+                model_table.add_column(f"{label}", style="white")
+
+            for model_metrics in model_metrics:
+                row = [
                     model_metrics.model_name,
                     str(model_metrics.total),
                     str(model_metrics.total_attempted),
-                    f"{model_metrics.avg_score_attempted:.2f}",
-                    f"{model_metrics.avg_score_total:.2f}",
-                )
+                ]
+                for mk in metric_keys:
+                    agg = model_metrics.by_metric.get(mk)
+                    row.append(f"{agg.avg_score_attempted:.2f}" if agg else "-")
+                model_table.add_row(*row)
 
             self.console.print(model_table)
 
             # per-model cost and token usage
-            has_cost_data = any(m.cost for m in metrics.per_model)
+            has_cost_data = any(m.cost for m in model_metrics)
             if has_cost_data:
                 self.console.print("\n[bold]Per-Model Cost and Token Usage:[/bold]")
                 cost_table = Table()
@@ -866,7 +848,7 @@ class EvalProgress(ProgressCallback):
                 cost_table.add_column("Cache Write", style="dim white")
                 cost_table.add_column("Reasoning", style="dim white")
 
-                for model_metrics in metrics.per_model:
+                for model_metrics in model_metrics:
                     if model_metrics.cost:
                         cached_str = (
                             f"{model_metrics.cost.total_cached_input_tokens:,}"
