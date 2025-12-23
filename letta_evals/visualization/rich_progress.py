@@ -798,8 +798,6 @@ class EvalProgress(ProgressCallback):
         errors = metrics.total - metrics.total_attempted
         errors_pct = (errors / metrics.total * 100.0) if metrics.total > 0 else 0.0
         self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{metrics.total})")
-        self.console.print(f"  Average score (attempted): {metrics.avg_score_attempted:.2f}")
-        self.console.print(f"  Average score (total): {metrics.avg_score_total:.2f}")
 
         # cost and token usage metrics
         if metrics.cost:
@@ -814,23 +812,11 @@ class EvalProgress(ProgressCallback):
             if metrics.cost.total_reasoning_tokens > 0:
                 self.console.print(f"  Total reasoning tokens: {metrics.cost.total_reasoning_tokens:,}")
 
-        # per-metric aggregates
-        if hasattr(metrics, "by_metric") and metrics.by_metric:
-            self.console.print("\n[bold]Metrics by Metric:[/bold]")
-            metrics_table = Table()
-            metrics_table.add_column("Metric", style="cyan")
-            metrics_table.add_column("Avg Score (Attempted)", style="white")
-            metrics_table.add_column("Avg Score (Total)", style="white")
-            # build key->label mapping from config
-            label_map = {}
-            if "graders" in result.config and isinstance(result.config["graders"], dict):
-                for key, gspec in result.config["graders"].items():
-                    label_map[key] = gspec.get("display_name") or key
-
-            for key, agg in metrics.by_metric.items():
-                label = label_map.get(key, key)
-                metrics_table.add_row(label, f"{agg.avg_score_attempted:.2f}", f"{agg.avg_score_total:.2f}")
-            self.console.print(metrics_table)
+        # build key->label mapping from config
+        label_map = {}
+        if "graders" in result.config and isinstance(result.config["graders"], dict):
+            for key, gspec in result.config["graders"].items():
+                label_map[key] = gspec.get("display_name") or key
 
         # per-model metrics
         if metrics.per_model:
@@ -839,17 +825,23 @@ class EvalProgress(ProgressCallback):
             model_table.add_column("Model", style="cyan")
             model_table.add_column("Samples", style="white")
             model_table.add_column("Attempted", style="white")
-            model_table.add_column("Avg Score (Attempted)", style="white")
-            model_table.add_column("Avg Score (Total)", style="white")
+
+            # add columns for each metric
+            metric_keys = list(metrics.per_model[0].by_metric.keys()) if metrics.per_model else []
+            for mk in metric_keys:
+                label = label_map.get(mk, mk)
+                model_table.add_column(f"{label}", style="white")
 
             for model_metrics in metrics.per_model:
-                model_table.add_row(
+                row = [
                     model_metrics.model_name,
                     str(model_metrics.total),
                     str(model_metrics.total_attempted),
-                    f"{model_metrics.avg_score_attempted:.2f}",
-                    f"{model_metrics.avg_score_total:.2f}",
-                )
+                ]
+                for mk in metric_keys:
+                    agg = model_metrics.by_metric.get(mk)
+                    row.append(f"{agg.avg_score_attempted:.2f}" if agg else "-")
+                model_table.add_row(*row)
 
             self.console.print(model_table)
 

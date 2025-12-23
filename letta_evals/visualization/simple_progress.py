@@ -117,8 +117,6 @@ class SimpleProgress(ProgressCallback):
         errors = metrics.total - metrics.total_attempted
         errors_pct = (errors / metrics.total * 100.0) if metrics.total > 0 else 0.0
         self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{metrics.total})")
-        self.console.print(f"  Average score (attempted): {metrics.avg_score_attempted:.2f}")
-        self.console.print(f"  Average score (total): {metrics.avg_score_total:.2f}")
 
         # gate status
         gate = result.config["gate"]

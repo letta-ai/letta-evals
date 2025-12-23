@@ -283,14 +283,6 @@ def display_aggregate_statistics(run_statistics):
     pass_rate = (stats.runs_passed / stats.num_runs * 100.0) if stats.num_runs > 0 else 0.0
     console.print(f"  Pass rate: {pass_rate:.1f}%")
 
-    console.print("\n[bold]Average Score (Attempted):[/bold]")
-    console.print(f"  Mean: {stats.mean_avg_score_attempted:.4f}")
-    console.print(f"  Std Dev: {stats.std_avg_score_attempted:.4f}")
-
-    console.print("\n[bold]Average Score (Total):[/bold]")
-    console.print(f"  Mean: {stats.mean_avg_score_total:.4f}")
-    console.print(f"  Std Dev: {stats.std_avg_score_total:.4f}")
-
     if stats.mean_scores:
         console.print("\n[bold]Per-Metric Statistics:[/bold]")
         table = Table()

@@ -485,11 +485,7 @@ class ModelMetrics(BaseModel):
     model_name: str = Field(description="model configuration name")
     total: int = Field(description="total results (success + error)")
     total_attempted: int = Field(description="total successfully attempted (completed without error)")
-    avg_score_attempted: float = Field(description="average score across attempted results (0.0 to 1.0)")
-    avg_score_total: float = Field(description="average score across all results (0.0 to 1.0)")
-    metrics: Dict[str, float] = Field(
-        default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
-    )
+    by_metric: Dict[str, "MetricAggregate"] = Field(description="per-metric aggregates for this model")
     cost: Optional[CostMetrics] = Field(default=None, description="cost and token usage metrics for this model")
 
 
@@ -508,15 +504,7 @@ class Metrics(BaseModel):
 
     total: int = Field(description="total results (success + error)")
     total_attempted: int = Field(description="total successfully attempted (completed without error)")
-    avg_score_attempted: float = Field(description="average score across attempted results (0.0 to 1.0)")
-    avg_score_total: float = Field(description="average score across all results (0.0 to 1.0)")
-    per_model: Optional[List[ModelMetrics]] = Field(
-        default=None, description="metrics broken down by model configuration"
-    )
-    by_metric: Optional[Dict[str, MetricAggregate]] = Field(default=None, description="aggregates for each metric key")
-    metrics: Dict[str, float] = Field(
-        default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
-    )
+    per_model: List[ModelMetrics] = Field(description="metrics broken down by model configuration")
     cost: Optional[CostMetrics] = Field(default=None, description="cost and token usage metrics across all samples")
 
 
@@ -525,10 +513,6 @@ class RunStatistics(BaseModel):
 
     num_runs: int = Field(description="Total number of runs executed")
     runs_passed: int = Field(description="Number of runs that passed the gate")
-    mean_avg_score_attempted: float = Field(description="Mean of avg_score_attempted across all runs")
-    std_avg_score_attempted: float = Field(description="Standard deviation of avg_score_attempted across all runs")
-    mean_avg_score_total: float = Field(description="Mean of avg_score_total across all runs")
-    std_avg_score_total: float = Field(description="Standard deviation of avg_score_total across all runs")
     mean_scores: Dict[str, float] = Field(
         default_factory=dict, description="Mean score for each metric across all runs"
     )

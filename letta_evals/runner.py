@@ -658,18 +658,14 @@ class Runner:
 
         - total: success + error (all results)
         - total_attempted: success only (completed without error)
-        - metrics: dict of metric_key -> pass rate percentage
-        - avg_score: mean across all results (including error results)
-        - per_model: same semantics per model (based on gate metric key)
+        - per_model: per-model metrics with by_metric breakdowns
         """
         total = len(self.results)
         if total == 0:
             return Metrics(
                 total=0,
                 total_attempted=0,
-                avg_score_attempted=0.0,
-                avg_score_total=0.0,
-                metrics={},
+                per_model=[],
             )
 
         # success = completed without error; error results have empty trajectory, missing agent_id, or empty submission
@@ -684,30 +680,6 @@ class Runner:
             return True
 
         attempted = sum(1 for r in self.results if is_success(r))
-
-        # compute per-metric aggregates
-        by_metric: Dict[str, MetricAggregate] = {}
-        for metric_key in self.graders.keys():
-            m_scores = [r.grades[metric_key].score for r in self.results if r.grades and metric_key in r.grades]
-            m_avg_attempted = sum(m_scores) / len(m_scores) if m_scores else 0.0
-            m_avg_total = sum(m_scores) / len(self.results) if m_scores else 0.0
-            # pass_rate is just avg score as percentage
-            m_pass_rate = m_avg_attempted * 100.0
-            by_metric[metric_key] = MetricAggregate(
-                avg_score_attempted=m_avg_attempted,
-                avg_score_total=m_avg_total,
-                pass_rate=m_pass_rate,
-            )
-
-        metrics_dict: Dict[str, float] = {}
-        # use first grader for overall metrics
-        first_key = next(iter(self.graders.keys()))
-        for key, agg in by_metric.items():
-            metrics_dict[key] = agg.pass_rate
-
-        agg = by_metric.get(first_key) if first_key in by_metric else None
-        avg_score_attempted = agg.avg_score_attempted if agg else 0.0
-        avg_score_total = agg.avg_score_total if agg else 0.0
 
         # Calculate overall cost and token aggregates
         costs = [r.cost for r in self.results if r.cost is not None]
@@ -740,34 +712,33 @@ class Runner:
                 total_reasoning_tokens=total_reasoning_tokens,
             )
 
-        per_model = None
-        if self.suite.target.model_configs or self.suite.target.model_handles:
-            model_results = defaultdict(list)
-            for result in self.results:
-                model_results[result.model_name].append(result)
+        # Group results by model (handles both single and multi-model cases)
+        model_results = defaultdict(list)
+        for result in self.results:
+            # Use model_name if set, otherwise use "default" for single-model evals
+            model_key = result.model_name or "default"
+            model_results[model_key].append(result)
 
-            per_model = []
+        per_model = []
             for model_name, results in sorted(model_results.items()):
                 model_attempted = sum(1 for r in results if is_success(r))
-                model_metrics_dict: Dict[str, float] = {}
 
-                # use first grader for overall model metrics
-                first_key = next(iter(self.graders.keys()))
-                # calculate avg score for each metric
+                # compute per-metric aggregates for this model
+                model_by_metric: Dict[str, MetricAggregate] = {}
                 for metric_key in self.graders.keys():
                     metric_scores = [
                         r.grades[metric_key].score
                         for r in results
-                        if is_success(r) and r.grades and metric_key in r.grades
+                        if r.grades and metric_key in r.grades
                     ]
-                    model_metrics_dict[metric_key] = (
-                        (sum(metric_scores) / len(metric_scores)) * 100.0 if metric_scores else 0.0
+                    m_avg_attempted = sum(metric_scores) / len(metric_scores) if metric_scores else 0.0
+                    m_avg_total = sum(metric_scores) / len(results) if metric_scores else 0.0
+                    m_pass_rate = m_avg_attempted * 100.0
+                    model_by_metric[metric_key] = MetricAggregate(
+                        avg_score_attempted=m_avg_attempted,
+                        avg_score_total=m_avg_total,
+                        pass_rate=m_pass_rate,
                     )
-
-                model_scores = [r.grades[first_key].score for r in results if r.grades and first_key in r.grades]
-
-                model_avg_attempted = sum(model_scores) / len(model_scores) if model_scores else 0.0
-                model_avg_total = sum(model_scores) / len(results) if model_scores else 0.0
 
                 # Calculate cost and token counts for this model
                 model_costs = [r.cost for r in results if r.cost is not None]
@@ -813,9 +784,7 @@ class Runner:
                         model_name=model_name,
                         total=len(results),
                         total_attempted=model_attempted,
-                        avg_score_attempted=model_avg_attempted,
-                        avg_score_total=model_avg_total,
-                        metrics=model_metrics_dict,
+                        by_metric=model_by_metric,
                         cost=model_cost_metrics,
                     )
                 )
@@ -823,11 +792,7 @@ class Runner:
         return Metrics(
             total=total,
             total_attempted=attempted,
-            avg_score_attempted=avg_score_attempted,
-            avg_score_total=avg_score_total,
             per_model=per_model,
-            by_metric=by_metric if by_metric else None,
-            metrics=metrics_dict,
             cost=cost_metrics,
         )
 
@@ -926,24 +891,17 @@ def _calculate_run_statistics(all_metrics: List[Metrics], runs_passed: int, suit
 
     num_runs = len(all_metrics)
 
-    avg_scores_attempted = [m.avg_score_attempted for m in all_metrics]
-    avg_scores_total = [m.avg_score_total for m in all_metrics]
-
-    mean_avg_score_attempted = statistics.mean(avg_scores_attempted)
-    std_avg_score_attempted = statistics.stdev(avg_scores_attempted) if num_runs > 1 else 0.0
-
-    mean_avg_score_total = statistics.mean(avg_scores_total)
-    std_avg_score_total = statistics.stdev(avg_scores_total) if num_runs > 1 else 0.0
-
     mean_scores: Dict[str, float] = {}
     std_scores: Dict[str, float] = {}
 
     if suite.graders:
         for metric_key in suite.graders.keys():
+            # Collect scores from all models across all runs
             metric_values = []
             for m in all_metrics:
-                if m.by_metric and metric_key in m.by_metric:
-                    metric_values.append(m.by_metric[metric_key].avg_score_attempted)
+                for model_metrics in m.per_model:
+                    if metric_key in model_metrics.by_metric:
+                        metric_values.append(model_metrics.by_metric[metric_key].avg_score_attempted)
 
             if metric_values:
                 mean_scores[metric_key] = statistics.mean(metric_values)
@@ -952,10 +910,6 @@ def _calculate_run_statistics(all_metrics: List[Metrics], runs_passed: int, suit
     return RunStatistics(
         num_runs=num_runs,
         runs_passed=runs_passed,
-        mean_avg_score_attempted=mean_avg_score_attempted,
-        std_avg_score_attempted=std_avg_score_attempted,
-        mean_avg_score_total=mean_avg_score_total,
-        std_avg_score_total=std_avg_score_total,
         mean_scores=mean_scores,
         std_scores=std_scores,
         individual_run_metrics=all_metrics,
