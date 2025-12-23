@@ -42,10 +42,16 @@ async def test_single_suite(request, tmp_path: Path, caplog) -> None:
         letta_base_url="https://api.letta.com/",
     )
 
+    # Show per-model scores
+    model_scores = ", ".join(
+        f"{m.model_name}: {list(m.by_metric.values())[0].avg_score_attempted:.2f}"
+        for m in result.metrics.per_model
+        if m.by_metric
+    )
     logger.info(
         f"\n{'=' * 60}\n"
-        f"Results: {result.metrics.total_attempted}/{result.metrics.total} attempted, "
-        f"avg score: {result.metrics.avg_score_attempted:.2f}\n"
+        f"Results: {result.metrics.total_attempted}/{result.metrics.total} attempted\n"
+        f"Scores: {model_scores}\n"
         f"{'=' * 60}"
     )
 
