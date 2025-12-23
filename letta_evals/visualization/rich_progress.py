@@ -490,18 +490,7 @@ class EvalProgress(ProgressCallback):
                 bar_width = max(10, min(30, max(10, self.console.width // 6)))
                 filled = int(p * bar_width)
                 bar = "▰" * filled + "▱" * (bar_width - filled)
-                if s.turn_scores:
-                    # Aggregate scores across all graders for the average
-                    all_scores: List[Optional[float]] = []
-                    for grader_scores in s.turn_scores.values():
-                        all_scores.extend(grader_scores)
-                    avg = calculate_turn_average(all_scores)
-                    if any(sc is not None for sc in all_scores):
-                        details = f"{bar}  turn {s.turns_graded}/{s.total_turns} (avg: {avg:.2f})"
-                    else:
-                        details = f"{bar}  turn {s.turns_graded}/{s.total_turns}"
-                else:
-                    details = f"{bar}  turn {s.turns_graded}/{s.total_turns}"
+                details = f"{bar}  turn {s.turns_graded}/{s.total_turns}"
             elif s.state == SampleState.LOADING_AGENT:
                 details = "Loading from cache…" if s.from_cache else "Loading agent…"
             elif s.state == SampleState.GRADING:
