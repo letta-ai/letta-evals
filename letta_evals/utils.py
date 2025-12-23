@@ -4,7 +4,13 @@ import sys
 from pathlib import Path
 from typing import Any, List, Optional
 
-from letta_evals.constants import MODEL_COSTS, MODEL_NAME_MAPPING
+from letta_evals.constants import (
+    MODEL_COSTS,
+    MODEL_NAME_MAPPING,
+    TURN_FAIL_SYMBOL,
+    TURN_PASS_SYMBOL,
+    TURN_PENDING_SYMBOL,
+)
 from letta_evals.models import Sample
 
 logger = logging.getLogger(__name__)
@@ -223,3 +229,53 @@ def is_per_turn_evaluation(sample: Sample) -> bool:
         False otherwise (standard evaluation mode)
     """
     return isinstance(sample.input, list) and isinstance(sample.ground_truth, list)
+
+
+def build_turn_symbols(scores: List[Optional[float]], pass_threshold: float = 1.0) -> str:
+    """Build a string of symbols representing turn scores.
+
+    Args:
+        scores: List of turn scores (None for ungraded turns)
+        pass_threshold: Score threshold for pass (default 1.0)
+
+    Returns:
+        Space-separated string of symbols (e.g., "✓ ✓ ✗ …")
+    """
+    symbols = []
+    for score in scores:
+        if score is None:
+            symbols.append(TURN_PENDING_SYMBOL)
+        elif score >= pass_threshold:
+            symbols.append(TURN_PASS_SYMBOL)
+        else:
+            symbols.append(TURN_FAIL_SYMBOL)
+    return " ".join(symbols)
+
+
+def calculate_turn_average(scores: List[Optional[float]]) -> float:
+    """Calculate average of non-None turn scores.
+
+    Args:
+        scores: List of turn scores (None for ungraded turns)
+
+    Returns:
+        Average score, or 0.0 if no graded turns
+    """
+    graded = [sc for sc in scores if sc is not None]
+    return sum(graded) / len(graded) if graded else 0.0
+
+
+def build_turn_summary(scores: List[float], pass_threshold: float = 1.0) -> str:
+    """Build a summary string for completed per-turn evaluation.
+
+    Args:
+        scores: List of turn scores (all graded)
+        pass_threshold: Score threshold for pass (default 1.0)
+
+    Returns:
+        Summary string like "2/3 passed: ✓ ✓ ✗"
+    """
+    turns_passed = sum(1 for sc in scores if sc >= pass_threshold)
+    total_turns = len(scores)
+    symbols = build_turn_symbols(scores, pass_threshold)
+    return f"{turns_passed}/{total_turns} passed: {symbols}"

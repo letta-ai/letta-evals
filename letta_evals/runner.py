@@ -46,7 +46,13 @@ from letta_evals.targets.base import AbstractAgentTarget
 from letta_evals.targets.letta_agent import LettaAgentTarget
 from letta_evals.targets.letta_code_target import LettaCodeTarget
 from letta_evals.types import Aggregation, LogicalOp, TargetKind
-from letta_evals.utils import calculate_cost_from_agent_usage, extract_token_counts, is_per_turn_evaluation, load_object
+from letta_evals.utils import (
+    build_turn_summary,
+    calculate_cost_from_agent_usage,
+    extract_token_counts,
+    is_per_turn_evaluation,
+    load_object,
+)
 from letta_evals.visualization.base import ProgressCallback
 from letta_evals.visualization.factory import ProgressStyle, create_progress_callback
 
@@ -418,13 +424,12 @@ class Runner:
                                 )
 
                         # Calculate proportional score (average across turns)
-                        total_score = sum(g.score for g in per_turn_grades)
-                        final_score = total_score / num_turns if num_turns > 0 else 0.0
-                        turns_passed = sum(1 for g in per_turn_grades if g.score >= 1.0)
+                        turn_scores = [g.score for g in per_turn_grades]
+                        final_score = sum(turn_scores) / num_turns if num_turns > 0 else 0.0
+                        turns_passed = sum(1 for sc in turn_scores if sc >= 1.0)
 
                         # Build summary rationale with turn symbols
-                        turn_symbols = ["✓" if g.score >= 1.0 else "✗" for g in per_turn_grades]
-                        summary_rationale = f"{turns_passed}/{num_turns} passed: {' '.join(turn_symbols)}"
+                        summary_rationale = build_turn_summary(turn_scores)
 
                         # Combine submissions for display (join all turn submissions)
                         combined_submission = " | ".join(f"[Turn {g.turn}] {g.submission}" for g in per_turn_grades)

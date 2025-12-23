@@ -24,6 +24,7 @@ from rich.table import Table
 from rich.text import Text
 
 from letta_evals.types import GraderKind
+from letta_evals.utils import build_turn_symbols, calculate_turn_average
 from letta_evals.visualization.base import ProgressCallback
 
 
@@ -443,18 +444,8 @@ class EvalProgress(ProgressCallback):
                     for mk in metric_keys:
                         grader_scores = s.turn_scores.get(mk)
                         if grader_scores:
-                            graded = [sc for sc in grader_scores if sc is not None]
-                            avg_score = sum(graded) / len(graded) if graded else 0.0
-                            turn_symbols = []
-                            for sc in grader_scores:
-                                if sc is None:
-                                    turn_symbols.append("…")
-                                elif sc >= 1.0:
-                                    turn_symbols.append("✓")
-                                else:
-                                    turn_symbols.append("✗")
-                            score_cell = f"{avg_score:.2f}"
-                            rat = " ".join(turn_symbols)
+                            score_cell = f"{calculate_turn_average(grader_scores):.2f}"
+                            rat = build_turn_symbols(grader_scores)
                         else:
                             score_cell = "-"
                             rat = ""
@@ -463,18 +454,8 @@ class EvalProgress(ProgressCallback):
                     # Single grader mode - use first/default grader
                     first_grader = next(iter(s.turn_scores.values()), None)
                     if first_grader:
-                        graded = [sc for sc in first_grader if sc is not None]
-                        avg_score = sum(graded) / len(graded) if graded else 0.0
-                        turn_symbols = []
-                        for sc in first_grader:
-                            if sc is None:
-                                turn_symbols.append("…")
-                            elif sc >= 1.0:
-                                turn_symbols.append("✓")
-                            else:
-                                turn_symbols.append("✗")
-                        score_cell = f"{avg_score:.2f}"
-                        rat = " ".join(turn_symbols)
+                        score_cell = f"{calculate_turn_average(first_grader):.2f}"
+                        rat = build_turn_symbols(first_grader)
                     else:
                         score_cell = "-"
                         rat = ""
@@ -511,11 +492,11 @@ class EvalProgress(ProgressCallback):
                 bar = "▰" * filled + "▱" * (bar_width - filled)
                 if s.turn_scores:
                     # Aggregate scores across all graders for the average
-                    all_scores = []
+                    all_scores: List[Optional[float]] = []
                     for grader_scores in s.turn_scores.values():
-                        all_scores.extend([sc for sc in grader_scores if sc is not None])
-                    if all_scores:
-                        avg = sum(all_scores) / len(all_scores)
+                        all_scores.extend(grader_scores)
+                    avg = calculate_turn_average(all_scores)
+                    if any(sc is not None for sc in all_scores):
                         details = f"{bar}  turn {s.turns_graded}/{s.total_turns} (avg: {avg:.2f})"
                     else:
                         details = f"{bar}  turn {s.turns_graded}/{s.total_turns}"
