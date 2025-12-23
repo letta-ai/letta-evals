@@ -43,18 +43,16 @@ async def test_single_suite(request, tmp_path: Path, caplog) -> None:
     )
 
     # Show per-model scores
+    # Compute totals from model_metrics
+    total = sum(m.total for m in result.model_metrics)
+    total_attempted = sum(m.total_attempted for m in result.model_metrics)
     model_scores = ", ".join(
         f"{m.model_name}: {list(m.by_metric.values())[0].avg_score_attempted:.2f}"
-        for m in result.metrics.per_model
+        for m in result.model_metrics
         if m.by_metric
     )
-    logger.info(
-        f"\n{'=' * 60}\n"
-        f"Results: {result.metrics.total_attempted}/{result.metrics.total} attempted\n"
-        f"Scores: {model_scores}\n"
-        f"{'=' * 60}"
-    )
+    logger.info(f"\n{'=' * 60}\nResults: {total_attempted}/{total} attempted\nScores: {model_scores}\n{'=' * 60}")
 
     assert result.gates_passed, f"Gate failed for suite: {suite_path}"
-    assert result.metrics.total > 0
+    assert total > 0
     assert output_path.exists()
