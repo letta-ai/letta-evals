@@ -499,14 +499,6 @@ class MetricAggregate(BaseModel):
     pass_rate: float = Field(description="average score as percentage")
 
 
-class Metrics(BaseModel):
-    """evaluation metrics."""
-
-    total: int = Field(description="total results (success + error)")
-    total_attempted: int = Field(description="total successfully attempted (completed without error)")
-    per_model: List[ModelMetrics] = Field(description="metrics broken down by model configuration")
-
-
 class RunStatistics(BaseModel):
     """Aggregate statistics across multiple evaluation runs."""
 
@@ -518,7 +510,7 @@ class RunStatistics(BaseModel):
     std_scores: Dict[str, float] = Field(
         default_factory=dict, description="Standard deviation for each metric across all runs"
     )
-    individual_run_metrics: List[Metrics] = Field(description="Metrics from each individual run")
+    runs: List[List[ModelMetrics]] = Field(description="Model metrics from each individual run")
 
 
 class SampleResult(BaseModel):
@@ -553,7 +545,7 @@ class RunnerResult(BaseModel):
     suite: str = Field(description="Name of the evaluation suite")
     config: Dict[str, Any] = Field(description="Configuration used for this run (target config, grader config, etc.)")
     results: List[SampleResult] = Field(description="Results for each evaluated sample")
-    metrics: Metrics = Field(description="Aggregate metrics across all samples")
+    model_metrics: List[ModelMetrics] = Field(description="Metrics for each model configuration")
     gates_passed: bool = Field(description="Whether all gate criteria were satisfied")
     run_statistics: Optional[RunStatistics] = Field(
         default=None, description="Aggregate statistics across multiple runs (if num_runs > 1)"

@@ -790,14 +790,17 @@ class EvalProgress(ProgressCallback):
             self.console.print("[dim]Note: Results re-graded from cached trajectories[/dim]")
         self.console.print("=" * 50)
 
-        # overall metrics
-        metrics = result.metrics
+        # compute totals from model_metrics
+        model_metrics = result.model_metrics
+        total = sum(m.total for m in model_metrics)
+        total_attempted = sum(m.total_attempted for m in model_metrics)
+
         self.console.print("\n[bold]Overall Metrics:[/bold]")
-        self.console.print(f"  Total samples: {metrics.total}")
-        self.console.print(f"  Total attempted: {metrics.total_attempted}")
-        errors = metrics.total - metrics.total_attempted
-        errors_pct = (errors / metrics.total * 100.0) if metrics.total > 0 else 0.0
-        self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{metrics.total})")
+        self.console.print(f"  Total samples: {total}")
+        self.console.print(f"  Total attempted: {total_attempted}")
+        errors = total - total_attempted
+        errors_pct = (errors / total * 100.0) if total > 0 else 0.0
+        self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{total})")
 
         # build key->label mapping from config
         label_map = {}
@@ -806,7 +809,7 @@ class EvalProgress(ProgressCallback):
                 label_map[key] = gspec.get("display_name") or key
 
         # per-model metrics
-        if metrics.per_model:
+        if model_metrics:
             self.console.print("\n[bold]Per-Model Metrics:[/bold]")
             model_table = Table()
             model_table.add_column("Model", style="cyan")
@@ -814,12 +817,12 @@ class EvalProgress(ProgressCallback):
             model_table.add_column("Attempted", style="white")
 
             # add columns for each metric
-            metric_keys = list(metrics.per_model[0].by_metric.keys()) if metrics.per_model else []
+            metric_keys = list(model_metrics[0].by_metric.keys()) if model_metrics else []
             for mk in metric_keys:
                 label = label_map.get(mk, mk)
                 model_table.add_column(f"{label}", style="white")
 
-            for model_metrics in metrics.per_model:
+            for model_metrics in model_metrics:
                 row = [
                     model_metrics.model_name,
                     str(model_metrics.total),
@@ -833,7 +836,7 @@ class EvalProgress(ProgressCallback):
             self.console.print(model_table)
 
             # per-model cost and token usage
-            has_cost_data = any(m.cost for m in metrics.per_model)
+            has_cost_data = any(m.cost for m in model_metrics)
             if has_cost_data:
                 self.console.print("\n[bold]Per-Model Cost and Token Usage:[/bold]")
                 cost_table = Table()
@@ -845,7 +848,7 @@ class EvalProgress(ProgressCallback):
                 cost_table.add_column("Cache Write", style="dim white")
                 cost_table.add_column("Reasoning", style="dim white")
 
-                for model_metrics in metrics.per_model:
+                for model_metrics in model_metrics:
                     if model_metrics.cost:
                         cached_str = (
                             f"{model_metrics.cost.total_cached_input_tokens:,}"

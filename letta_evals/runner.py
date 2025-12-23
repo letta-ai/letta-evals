@@ -25,7 +25,6 @@ from letta_evals.models import (
     LettaMessageUnion,
     LogicalGateSpec,
     MetricAggregate,
-    Metrics,
     ModelJudgeGraderSpec,
     ModelMetrics,
     PerTurnGrade,
@@ -632,41 +631,35 @@ class Runner:
 
                         tg.start_soon(run_and_append, sample, llm_config)
 
-            metrics = self._calculate_metrics()
-            gates_passed = self._check_gates(metrics)
+            model_metrics = self._calculate_model_metrics()
+            gates_passed = self._check_gates()
 
             # write final metrics if streaming
             if self.stream_writer:
-                await self.stream_writer.write_metrics(metrics, gates_passed)
+                await self.stream_writer.write_model_metrics(model_metrics, gates_passed)
 
             return RunnerResult(
-                suite=self.suite.name, config=config, results=self.results, metrics=metrics, gates_passed=gates_passed
+                suite=self.suite.name,
+                config=config,
+                results=self.results,
+                model_metrics=model_metrics,
+                gates_passed=gates_passed,
             )
         except BaseException:
             # On interruption or errors, write a best-effort summary for a valid JSONL
             try:
-                metrics = self._calculate_metrics()
-                gates_passed = self._check_gates(metrics)
+                model_metrics = self._calculate_model_metrics()
+                gates_passed = self._check_gates()
                 if self.stream_writer:
-                    await self.stream_writer.write_metrics(metrics, gates_passed)
+                    await self.stream_writer.write_model_metrics(model_metrics, gates_passed)
             finally:
                 # Re-raise to preserve original error/interrupt semantics
                 raise
 
-    def _calculate_metrics(self) -> Metrics:
-        """Calculate aggregate metrics from results.
-
-        - total: success + error (all results)
-        - total_attempted: success only (completed without error)
-        - per_model: per-model metrics with by_metric breakdowns
-        """
-        total = len(self.results)
-        if total == 0:
-            return Metrics(
-                total=0,
-                total_attempted=0,
-                per_model=[],
-            )
+    def _calculate_model_metrics(self) -> List[ModelMetrics]:
+        """Calculate per-model metrics from results."""
+        if not self.results:
+            return []
 
         # success = completed without error; error results have empty trajectory, missing agent_id, or empty submission
         def is_success(r: SampleResult) -> bool:
@@ -679,8 +672,6 @@ class Runner:
                     return False
             return True
 
-        attempted = sum(1 for r in self.results if is_success(r))
-
         # Group results by model (handles both single and multi-model cases)
         model_results = defaultdict(list)
         for result in self.results:
@@ -688,7 +679,7 @@ class Runner:
             model_key = result.model_name or "default"
             model_results[model_key].append(result)
 
-        per_model = []
+        model_metrics_list = []
         for model_name, results in sorted(model_results.items()):
             model_attempted = sum(1 for r in results if is_success(r))
 
@@ -740,7 +731,7 @@ class Runner:
                     total_reasoning_tokens=model_total_reasoning_tokens,
                 )
 
-            per_model.append(
+            model_metrics_list.append(
                 ModelMetrics(
                     model_name=model_name,
                     total=len(results),
@@ -750,11 +741,7 @@ class Runner:
                 )
             )
 
-        return Metrics(
-            total=total,
-            total_attempted=attempted,
-            per_model=per_model,
-        )
+        return model_metrics_list
 
     def _compute_aggregation(
         self, metric_key: str, aggregation: Aggregation, pass_threshold: Optional[float] = None
@@ -813,7 +800,7 @@ class Runner:
         else:
             raise ValueError(f"unknown logical operator: {gate.operator}")
 
-    def _check_gates(self, metrics: Metrics) -> bool:
+    def _check_gates(self) -> bool:
         """check if the configured gate passes."""
         gate = self.suite.gate
 
@@ -845,11 +832,13 @@ class Runner:
             raise ValueError(f"unknown gate type: {type(gate)}")
 
 
-def _calculate_run_statistics(all_metrics: List[Metrics], runs_passed: int, suite: SuiteSpec) -> RunStatistics:
+def _calculate_run_statistics(
+    all_model_metrics: List[List[ModelMetrics]], runs_passed: int, suite: SuiteSpec
+) -> RunStatistics:
     """Calculate aggregate statistics across multiple runs."""
     import statistics
 
-    num_runs = len(all_metrics)
+    num_runs = len(all_model_metrics)
 
     mean_scores: Dict[str, float] = {}
     std_scores: Dict[str, float] = {}
@@ -858,8 +847,8 @@ def _calculate_run_statistics(all_metrics: List[Metrics], runs_passed: int, suit
         for metric_key in suite.graders.keys():
             # Collect scores from all models across all runs
             metric_values = []
-            for m in all_metrics:
-                for model_metrics in m.per_model:
+            for run_metrics in all_model_metrics:
+                for model_metrics in run_metrics:
                     if metric_key in model_metrics.by_metric:
                         metric_values.append(model_metrics.by_metric[metric_key].avg_score_attempted)
 
@@ -872,7 +861,7 @@ def _calculate_run_statistics(all_metrics: List[Metrics], runs_passed: int, suit
         runs_passed=runs_passed,
         mean_scores=mean_scores,
         std_scores=std_scores,
-        individual_run_metrics=all_metrics,
+        runs=all_model_metrics,
     )
 
 
@@ -974,7 +963,7 @@ async def run_suite(
 
     if actual_num_runs > 1:
         all_run_results: List[RunnerResult] = []
-        all_metrics: List[Metrics] = []
+        all_model_metrics: List[List[ModelMetrics]] = []
         runs_passed = 0
 
         for run_idx in range(actual_num_runs):
@@ -1002,20 +991,20 @@ async def run_suite(
             try:
                 result = await runner.run()
                 all_run_results.append(result)
-                all_metrics.append(result.metrics)
+                all_model_metrics.append(result.model_metrics)
                 if result.gates_passed:
                     runs_passed += 1
             finally:
                 if progress_cb is not None and run_idx == actual_num_runs - 1:
                     # stop live display first, then show summary
                     progress_cb.stop()
-                    run_statistics = _calculate_run_statistics(all_metrics, runs_passed, suite)
+                    run_statistics = _calculate_run_statistics(all_model_metrics, runs_passed, suite)
                     final_result_temp = all_run_results[-1]
                     final_result_temp.run_statistics = run_statistics
                     final_result_temp.gates_passed = runs_passed > 0
                     await progress_cb.suite_completed(final_result_temp)
 
-        run_statistics = _calculate_run_statistics(all_metrics, runs_passed, suite)
+        run_statistics = _calculate_run_statistics(all_model_metrics, runs_passed, suite)
 
         if output_path:
             await _write_aggregate_statistics(output_path, run_statistics)
