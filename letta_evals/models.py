@@ -542,12 +542,10 @@ class SampleResult(BaseModel):
     """Result for a single sample evaluation."""
 
     sample: Sample = Field(description="The original sample that was evaluated")
-    submission: str = Field(description="Extracted response from the trajectory")
-    submissions: Optional[Dict[str, str]] = Field(default=None, description="Per-metric extracted submissions")
+    submissions: Dict[str, str] = Field(description="Per-grader extracted submissions")
     trajectory: List[List[LettaMessageUnion]] = Field(description="Full conversation trajectory from the agent")
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
-    grade: GradeResult = Field(description="Grading result for this sample")
-    grades: Optional[Dict[str, GradeResult]] = Field(default=None, description="Per-metric grading results")
+    grades: Dict[str, GradeResult] = Field(description="Per-grader grading results")
     model_name: Optional[str] = Field(description="Model configuration name used for this sample")
     agent_usage: Optional[List[dict]] = Field(
         default=None, description="Usage statistics emitted by the agent during the run"

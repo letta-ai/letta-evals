@@ -92,7 +92,7 @@ class Runner:
 
         self.client = AsyncLetta(**client_kwargs)
 
-        self.graders: Optional[Dict[str, Grader]] = None
+        self.graders: Dict[str, Grader] = {}
         self._init_graders()
 
         self.results: List[SampleResult] = []
@@ -184,9 +184,10 @@ class Runner:
 
     def _init_graders(self) -> None:
         """Initialize grader(s) from spec."""
-        if self.suite.graders:
-            self.graders = {}
-            for key, gspec in self.suite.graders.items():
+        if not self.suite.graders:
+            raise ValueError("Suite must define 'graders'")
+
+        for key, gspec in self.suite.graders.items():
                 if isinstance(gspec, ToolGraderSpec):
                     self.graders[key] = ToolGrader(
                         function=gspec.function,
@@ -226,16 +227,12 @@ class Runner:
                         base_dir=gspec.base_dir,
                         rubric_vars=gspec.rubric_vars,
                     )
-                else:
-                    raise ValueError(f"Unknown grader spec type: {type(gspec)}")
-        else:
-            raise ValueError("Suite must define 'graders'")
+            else:
+                raise ValueError(f"Unknown grader spec type: {type(gspec)}")
 
     def _requires_agent_state(self) -> bool:
         """Check if any grader requires agent_state for extraction."""
-        if self.graders:
-            return any(grader.requires_agent_state for grader in self.graders.values())
-        return False
+        return any(grader.requires_agent_state for grader in self.graders.values())
 
     async def _run_setup(self, model_name: Optional[str] = None) -> None:
         """Execute the setup function if specified.
@@ -451,20 +448,17 @@ class Runner:
                         grades_dict[key] = gr
                         submissions_dict[key] = sub
 
-                # use first grader as primary for legacy grade_result/submission
-                first_key = next(iter(grades_dict.keys()))
-                grade_result = grades_dict[first_key]
-                submission = submissions_dict[first_key]
-
                 # Check if graders detected empty trajectory/submission and trigger error callback
+                first_key = next(iter(grades_dict.keys()))
+                first_grade = grades_dict[first_key]
                 if (
-                    grade_result.score == 0.0
-                    and grade_result.rationale
-                    and ("Empty trajectory" in grade_result.rationale or "Empty submission" in grade_result.rationale)
+                    first_grade.score == 0.0
+                    and first_grade.rationale
+                    and ("Empty trajectory" in first_grade.rationale or "Empty submission" in first_grade.rationale)
                 ):
                     if self.progress_callback:
                         await self.progress_callback.sample_error(
-                            sample_id, grade_result.rationale, agent_id=agent_id, model_name=model_name
+                            sample_id, first_grade.rationale, agent_id=agent_id, model_name=model_name
                         )
                     # Extract token counts even for error cases if agent_usage is available
                     cost = calculate_cost_from_agent_usage(model_name, agent_usage) if model_name else None
@@ -473,11 +467,9 @@ class Runner:
                     )
                     return SampleResult(
                         sample=sample,
-                        submission=submission,
                         submissions=submissions_dict,
                         trajectory=trajectory,
                         agent_id=agent_id,
-                        grade=grade_result,
                         grades=grades_dict,
                         model_name=model_name,
                         agent_usage=agent_usage,
@@ -490,18 +482,15 @@ class Runner:
                     )
 
                 if self.progress_callback:
-                    metric_scores = None
-                    metric_rationales = None
-                    if self.graders is not None and grades_dict is not None:
-                        metric_scores = {k: v.score for k, v in grades_dict.items()}
-                        metric_rationales = {k: (v.rationale or "") for k, v in grades_dict.items()}
+                    metric_scores = {k: v.score for k, v in grades_dict.items()}
+                    metric_rationales = {k: (v.rationale or "") for k, v in grades_dict.items()}
                     await self.progress_callback.sample_completed(
                         sample_id,
                         agent_id=agent_id,
-                        score=grade_result.score,
+                        score=first_grade.score,
                         model_name=model_name,
                         metric_scores=metric_scores,
-                        rationale=grade_result.rationale,
+                        rationale=first_grade.rationale,
                         metric_rationales=metric_rationales,
                     )
 
@@ -513,11 +502,9 @@ class Runner:
 
                 return SampleResult(
                     sample=sample,
-                    submission=submission,
                     submissions=submissions_dict,
                     trajectory=trajectory,
                     agent_id=agent_id,
-                    grade=grade_result,
                     grades=grades_dict,
                     model_name=model_name,
                     agent_usage=agent_usage,
@@ -629,12 +616,10 @@ class Runner:
 
                                 error_result = SampleResult(
                                     sample=s,
-                                    submission="",
-                                    submissions=None,
+                                    submissions={"error": ""},
                                     trajectory=[],
                                     agent_id=None,
-                                    grade=GradeResult(score=0.0, rationale=f"Error: {str(e)[:200]}"),
-                                    grades=None,
+                                    grades={"error": GradeResult(score=0.0, rationale=f"Error: {str(e)[:200]}")},
                                     model_name=model_name,
                                     agent_usage=None,
                                     cost=None,
@@ -692,44 +677,37 @@ class Runner:
             if r.agent_id is None or not bool(r.trajectory):
                 return False
             # Exclude empty submissions detected by graders after extraction
-            if r.grade and r.grade.rationale and "Empty submission" in r.grade.rationale:
-                return False
+            if r.grades:
+                first_grade = next(iter(r.grades.values()))
+                if first_grade.rationale and "Empty submission" in first_grade.rationale:
+                    return False
             return True
 
         attempted = sum(1 for r in self.results if is_success(r))
 
-        # compute per-metric aggregates if multiple graders
+        # compute per-metric aggregates
         by_metric: Dict[str, MetricAggregate] = {}
-        if self.graders is not None:
-            for metric_key in self.graders.keys():
-                m_scores = [r.grades[metric_key].score for r in self.results if r.grades and metric_key in r.grades]
-                m_avg_attempted = sum(m_scores) / len(m_scores) if m_scores else 0.0
-                m_avg_total = sum(m_scores) / len(self.results) if m_scores else 0.0
-                # pass_rate is just avg score as percentage
-                m_pass_rate = m_avg_attempted * 100.0
-                by_metric[metric_key] = MetricAggregate(
-                    avg_score_attempted=m_avg_attempted,
-                    avg_score_total=m_avg_total,
-                    pass_rate=m_pass_rate,
-                )
+        for metric_key in self.graders.keys():
+            m_scores = [r.grades[metric_key].score for r in self.results if r.grades and metric_key in r.grades]
+            m_avg_attempted = sum(m_scores) / len(m_scores) if m_scores else 0.0
+            m_avg_total = sum(m_scores) / len(self.results) if m_scores else 0.0
+            # pass_rate is just avg score as percentage
+            m_pass_rate = m_avg_attempted * 100.0
+            by_metric[metric_key] = MetricAggregate(
+                avg_score_attempted=m_avg_attempted,
+                avg_score_total=m_avg_total,
+                pass_rate=m_pass_rate,
+            )
 
         metrics_dict: Dict[str, float] = {}
-        if self.graders is not None:
-            # use first grader for overall metrics
-            first_key = next(iter(self.graders.keys()))
-            for key, agg in by_metric.items():
-                metrics_dict[key] = agg.pass_rate
+        # use first grader for overall metrics
+        first_key = next(iter(self.graders.keys()))
+        for key, agg in by_metric.items():
+            metrics_dict[key] = agg.pass_rate
 
-            agg = by_metric.get(first_key) if first_key in by_metric else None
-            avg_score_attempted = agg.avg_score_attempted if agg else 0.0
-            avg_score_total = agg.avg_score_total if agg else 0.0
-        else:
-            scores = [r.grade.score for r in self.results]
-            avg_score_attempted = sum(scores) / len(scores) if scores else 0.0
-            avg_score_total = sum(scores) / len(self.results) if scores else 0.0
-            # for single grader case, use a default key
-            default_key = "default"
-            metrics_dict[default_key] = avg_score_attempted * 100.0
+        agg = by_metric.get(first_key) if first_key in by_metric else None
+        avg_score_attempted = agg.avg_score_attempted if agg else 0.0
+        avg_score_total = agg.avg_score_total if agg else 0.0
 
         # Calculate overall cost and token aggregates
         costs = [r.cost for r in self.results if r.cost is not None]
@@ -773,27 +751,20 @@ class Runner:
                 model_attempted = sum(1 for r in results if is_success(r))
                 model_metrics_dict: Dict[str, float] = {}
 
-                if self.graders is not None:
-                    # use first grader for overall model metrics
-                    first_key = next(iter(self.graders.keys()))
-                    # calculate avg score for each metric
-                    for metric_key in self.graders.keys():
-                        metric_scores = [
-                            r.grades[metric_key].score
-                            for r in results
-                            if is_success(r) and r.grades and metric_key in r.grades
-                        ]
-                        model_metrics_dict[metric_key] = (
-                            (sum(metric_scores) / len(metric_scores)) * 100.0 if metric_scores else 0.0
-                        )
-
-                    model_scores = [r.grades[first_key].score for r in results if r.grades and first_key in r.grades]
-                else:
-                    model_scores = [r.grade.score for r in results]
-                    default_key = "default"
-                    model_metrics_dict[default_key] = (
-                        (sum(model_scores) / len(model_scores)) * 100.0 if model_scores else 0.0
+                # use first grader for overall model metrics
+                first_key = next(iter(self.graders.keys()))
+                # calculate avg score for each metric
+                for metric_key in self.graders.keys():
+                    metric_scores = [
+                        r.grades[metric_key].score
+                        for r in results
+                        if is_success(r) and r.grades and metric_key in r.grades
+                    ]
+                    model_metrics_dict[metric_key] = (
+                        (sum(metric_scores) / len(metric_scores)) * 100.0 if metric_scores else 0.0
                     )
+
+                model_scores = [r.grades[first_key].score for r in results if r.grades and first_key in r.grades]
 
                 model_avg_attempted = sum(model_scores) / len(model_scores) if model_scores else 0.0
                 model_avg_total = sum(model_scores) / len(results) if model_scores else 0.0
