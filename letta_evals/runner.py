@@ -412,6 +412,7 @@ class Runner:
                                     turn_num=turn_idx,
                                     total_turns=num_turns,
                                     turn_score=turn_grade.score,
+                                    grader_key=key,
                                     agent_id=agent_id,
                                     model_name=model_name,
                                 )
@@ -419,16 +420,21 @@ class Runner:
                         # Calculate proportional score (average across turns)
                         total_score = sum(g.score for g in per_turn_grades)
                         final_score = total_score / num_turns if num_turns > 0 else 0.0
+                        turns_passed = sum(1 for g in per_turn_grades if g.score >= 1.0)
+
+                        # Build summary rationale with turn symbols
+                        turn_symbols = ["✓" if g.score >= 1.0 else "✗" for g in per_turn_grades]
+                        summary_rationale = f"{turns_passed}/{num_turns} passed: {' '.join(turn_symbols)}"
 
                         # Combine submissions for display (join all turn submissions)
                         combined_submission = " | ".join(f"[Turn {g.turn}] {g.submission}" for g in per_turn_grades)
 
                         grades_dict[key] = GradeResult(
                             score=final_score,
-                            rationale=None,
+                            rationale=summary_rationale,
                             per_turn_grades=per_turn_grades,
                             metadata={
-                                "turns_passed": sum(1 for g in per_turn_grades if g.score >= 1.0),
+                                "turns_passed": turns_passed,
                                 "turns_total": num_turns,
                             },
                         )

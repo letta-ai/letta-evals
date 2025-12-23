@@ -63,7 +63,8 @@ class SampleProgress:
     # Per-turn grading progress
     turns_graded: int = 0
     total_turns: int = 0
-    turn_scores: Optional[List[float]] = None
+    # Per-grader turn scores: grader_key -> list of scores (None for ungraded)
+    turn_scores: Optional[Dict[str, List[Optional[float]]]] = None
 
 
 class DisplayMode(Enum):
@@ -434,7 +435,51 @@ class EvalProgress(ProgressCallback):
 
             # Build score/rationale cells
             cells: List[str] = []
-            if self.metric_labels:
+            
+            # Check if we're in per-turn grading mode
+            if s.state == SampleState.GRADING_TURNS and s.turn_scores:
+                if self.metric_labels:
+                    # Show per-grader progress in respective columns
+                    for mk in metric_keys:
+                        grader_scores = s.turn_scores.get(mk)
+                        if grader_scores:
+                            graded = [sc for sc in grader_scores if sc is not None]
+                            avg_score = sum(graded) / len(graded) if graded else 0.0
+                            turn_symbols = []
+                            for sc in grader_scores:
+                                if sc is None:
+                                    turn_symbols.append("…")
+                                elif sc >= 1.0:
+                                    turn_symbols.append("✓")
+                                else:
+                                    turn_symbols.append("✗")
+                            score_cell = f"{avg_score:.2f}"
+                            rat = " ".join(turn_symbols)
+                        else:
+                            score_cell = "-"
+                            rat = ""
+                        cells.extend([score_cell, rat])
+                else:
+                    # Single grader mode - use first/default grader
+                    first_grader = next(iter(s.turn_scores.values()), None)
+                    if first_grader:
+                        graded = [sc for sc in first_grader if sc is not None]
+                        avg_score = sum(graded) / len(graded) if graded else 0.0
+                        turn_symbols = []
+                        for sc in first_grader:
+                            if sc is None:
+                                turn_symbols.append("…")
+                            elif sc >= 1.0:
+                                turn_symbols.append("✓")
+                            else:
+                                turn_symbols.append("✗")
+                        score_cell = f"{avg_score:.2f}"
+                        rat = " ".join(turn_symbols)
+                    else:
+                        score_cell = "-"
+                        rat = ""
+                    cells.extend([score_cell, rat])
+            elif self.metric_labels:
                 for mk in metric_keys:
                     val = None
                     rat = ""
@@ -459,6 +504,23 @@ class EvalProgress(ProgressCallback):
                 filled = int(p * bar_width)
                 bar = "▰" * filled + "▱" * (bar_width - filled)
                 details = f"{bar}  msg {s.messages_sent}/{s.total_messages}"
+            elif s.state == SampleState.GRADING_TURNS and s.total_turns > 0:
+                p = s.turns_graded / s.total_turns
+                bar_width = max(10, min(30, max(10, self.console.width // 6)))
+                filled = int(p * bar_width)
+                bar = "▰" * filled + "▱" * (bar_width - filled)
+                if s.turn_scores:
+                    # Aggregate scores across all graders for the average
+                    all_scores = []
+                    for grader_scores in s.turn_scores.values():
+                        all_scores.extend([sc for sc in grader_scores if sc is not None])
+                    if all_scores:
+                        avg = sum(all_scores) / len(all_scores)
+                        details = f"{bar}  turn {s.turns_graded}/{s.total_turns} (avg: {avg:.2f})"
+                    else:
+                        details = f"{bar}  turn {s.turns_graded}/{s.total_turns}"
+                else:
+                    details = f"{bar}  turn {s.turns_graded}/{s.total_turns}"
             elif s.state == SampleState.LOADING_AGENT:
                 details = "Loading from cache…" if s.from_cache else "Loading agent…"
             elif s.state == SampleState.GRADING:
@@ -661,6 +723,7 @@ class EvalProgress(ProgressCallback):
         turn_num: int,
         total_turns: int,
         turn_score: float,
+        grader_key: Optional[str] = None,
         agent_id: Optional[str] = None,
         model_name: Optional[str] = None,
     ):
@@ -674,12 +737,20 @@ class EvalProgress(ProgressCallback):
         elif model_name is not None and (sample_id, None) in self.samples:
             existing_from_cache = self.samples[(sample_id, None)].from_cache
 
-        # Initialize sample and turn_scores list BEFORE updating state
+        # Initialize sample and turn_scores dict BEFORE updating state
         if key not in self.samples:
             self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
         if self.samples[key].turn_scores is None:
-            self.samples[key].turn_scores = []
-        self.samples[key].turn_scores.append(turn_score)
+            self.samples[key].turn_scores = {}
+        
+        # Initialize this grader's turn scores if needed
+        gk = grader_key or "_default"
+        if gk not in self.samples[key].turn_scores:
+            self.samples[key].turn_scores[gk] = [None] * total_turns
+        
+        # Update score at the turn index for this grader
+        if turn_num < len(self.samples[key].turn_scores[gk]):
+            self.samples[key].turn_scores[gk][turn_num] = turn_score
 
         await self.update_sample_state(
             sample_id,
