@@ -436,7 +436,7 @@ class EvalProgress(ProgressCallback):
 
             # Build score/rationale cells
             cells: List[str] = []
-            
+
             # Check if we're in per-turn grading mode
             if s.state == SampleState.GRADING_TURNS and s.turn_scores:
                 if self.metric_labels:
@@ -723,12 +723,12 @@ class EvalProgress(ProgressCallback):
             self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
         if self.samples[key].turn_scores is None:
             self.samples[key].turn_scores = {}
-        
+
         # Initialize this grader's turn scores if needed
         gk = grader_key or "_default"
         if gk not in self.samples[key].turn_scores:
             self.samples[key].turn_scores[gk] = [None] * total_turns
-        
+
         # Update score at the turn index for this grader
         if turn_num < len(self.samples[key].turn_scores[gk]):
             self.samples[key].turn_scores[gk][turn_num] = turn_score
