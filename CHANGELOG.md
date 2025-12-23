@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.9.0...letta-evals-v0.9.1) (2025-12-23)
+
+
+### Bug Fixes
+
+* Update examples to use cloud by default ([#152](https://github.com/letta-ai/letta-evals/issues/152)) ([b343ceb](https://github.com/letta-ai/letta-evals/commit/b343ceb0701286b54500a5c3673870310b540d13))
+
 ## [0.9.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.8.1...letta-evals-v0.9.0) (2025-12-23)
 
 
