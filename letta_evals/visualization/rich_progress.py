@@ -799,19 +799,6 @@ class EvalProgress(ProgressCallback):
         errors_pct = (errors / metrics.total * 100.0) if metrics.total > 0 else 0.0
         self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{metrics.total})")
 
-        # cost and token usage metrics
-        if metrics.cost:
-            self.console.print("\n[bold]Cost and Token Usage:[/bold]")
-            self.console.print(f"  Total cost: ${metrics.cost.total_cost:.4f}")
-            self.console.print(f"  Total prompt tokens: {metrics.cost.total_prompt_tokens:,}")
-            self.console.print(f"  Total completion tokens: {metrics.cost.total_completion_tokens:,}")
-            if metrics.cost.total_cached_input_tokens > 0:
-                self.console.print(f"  Total cached input tokens: {metrics.cost.total_cached_input_tokens:,}")
-            if metrics.cost.total_cache_write_tokens > 0:
-                self.console.print(f"  Total cache write tokens: {metrics.cost.total_cache_write_tokens:,}")
-            if metrics.cost.total_reasoning_tokens > 0:
-                self.console.print(f"  Total reasoning tokens: {metrics.cost.total_reasoning_tokens:,}")
-
         # build key->label mapping from config
         label_map = {}
         if "graders" in result.config and isinstance(result.config["graders"], dict):

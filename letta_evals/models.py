@@ -505,7 +505,6 @@ class Metrics(BaseModel):
     total: int = Field(description="total results (success + error)")
     total_attempted: int = Field(description="total successfully attempted (completed without error)")
     per_model: List[ModelMetrics] = Field(description="metrics broken down by model configuration")
-    cost: Optional[CostMetrics] = Field(default=None, description="cost and token usage metrics across all samples")
 
 
 class RunStatistics(BaseModel):

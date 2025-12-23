@@ -681,37 +681,6 @@ class Runner:
 
         attempted = sum(1 for r in self.results if is_success(r))
 
-        # Calculate overall cost and token aggregates
-        costs = [r.cost for r in self.results if r.cost is not None]
-        total_cost = sum(costs) if costs else None
-
-        prompt_tokens_list = [r.prompt_tokens for r in self.results if r.prompt_tokens is not None]
-        total_prompt_tokens = sum(prompt_tokens_list) if prompt_tokens_list else 0
-
-        completion_tokens_list = [r.completion_tokens for r in self.results if r.completion_tokens is not None]
-        total_completion_tokens = sum(completion_tokens_list) if completion_tokens_list else 0
-
-        cached_input_tokens_list = [r.cached_input_tokens for r in self.results if r.cached_input_tokens is not None]
-        total_cached_input_tokens = sum(cached_input_tokens_list) if cached_input_tokens_list else 0
-
-        cache_write_tokens_list = [r.cache_write_tokens for r in self.results if r.cache_write_tokens is not None]
-        total_cache_write_tokens = sum(cache_write_tokens_list) if cache_write_tokens_list else 0
-
-        reasoning_tokens_list = [r.reasoning_tokens for r in self.results if r.reasoning_tokens is not None]
-        total_reasoning_tokens = sum(reasoning_tokens_list) if reasoning_tokens_list else 0
-
-        # Create CostMetrics if we have cost data
-        cost_metrics = None
-        if total_cost is not None and total_cost > 0:
-            cost_metrics = CostMetrics(
-                total_cost=total_cost,
-                total_prompt_tokens=total_prompt_tokens,
-                total_completion_tokens=total_completion_tokens,
-                total_cached_input_tokens=total_cached_input_tokens,
-                total_cache_write_tokens=total_cache_write_tokens,
-                total_reasoning_tokens=total_reasoning_tokens,
-            )
-
         # Group results by model (handles both single and multi-model cases)
         model_results = defaultdict(list)
         for result in self.results:
@@ -785,7 +754,6 @@ class Runner:
             total=total,
             total_attempted=attempted,
             per_model=per_model,
-            cost=cost_metrics,
         )
 
     def _compute_aggregation(
