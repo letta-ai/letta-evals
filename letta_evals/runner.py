@@ -188,45 +188,45 @@ class Runner:
             raise ValueError("Suite must define 'graders'")
 
         for key, gspec in self.suite.graders.items():
-                if isinstance(gspec, ToolGraderSpec):
-                    self.graders[key] = ToolGrader(
-                        function=gspec.function,
-                        extractor=gspec.extractor,
-                        extractor_config=gspec.extractor_config,
-                        base_dir=gspec.base_dir,
-                    )
-                elif isinstance(gspec, ModelJudgeGraderSpec):
-                    self.graders[key] = RubricGrader(
-                        prompt=gspec.prompt,
-                        model=gspec.model,
-                        temperature=gspec.temperature,
-                        provider=gspec.provider,
-                        max_retries=gspec.max_retries,
-                        timeout=gspec.timeout,
-                        extractor=gspec.extractor,
-                        extractor_config=gspec.extractor_config,
-                        base_dir=gspec.base_dir,
-                        rubric_vars=gspec.rubric_vars,
-                    )
-                elif isinstance(gspec, LettaJudgeGraderSpec):
-                    # use default agent file if not provided
-                    agent_file = gspec.agent_file
-                    judge_tool_name = gspec.judge_tool_name
-                    if agent_file is None:
-                        agent_file = Path(__file__).parent / "graders/letta-evals-judge-agent.af"
-                        judge_tool_name = "submit_grade"
+            if isinstance(gspec, ToolGraderSpec):
+                self.graders[key] = ToolGrader(
+                    function=gspec.function,
+                    extractor=gspec.extractor,
+                    extractor_config=gspec.extractor_config,
+                    base_dir=gspec.base_dir,
+                )
+            elif isinstance(gspec, ModelJudgeGraderSpec):
+                self.graders[key] = RubricGrader(
+                    prompt=gspec.prompt,
+                    model=gspec.model,
+                    temperature=gspec.temperature,
+                    provider=gspec.provider,
+                    max_retries=gspec.max_retries,
+                    timeout=gspec.timeout,
+                    extractor=gspec.extractor,
+                    extractor_config=gspec.extractor_config,
+                    base_dir=gspec.base_dir,
+                    rubric_vars=gspec.rubric_vars,
+                )
+            elif isinstance(gspec, LettaJudgeGraderSpec):
+                # use default agent file if not provided
+                agent_file = gspec.agent_file
+                judge_tool_name = gspec.judge_tool_name
+                if agent_file is None:
+                    agent_file = Path(__file__).parent / "graders/letta-evals-judge-agent.af"
+                    judge_tool_name = "submit_grade"
 
-                    self.graders[key] = AgentJudgeGrader(
-                        agent_file=agent_file,
-                        prompt=gspec.prompt,
-                        client=self.client,
-                        project_id=self.project_id,
-                        judge_tool_name=judge_tool_name,
-                        extractor=gspec.extractor,
-                        extractor_config=gspec.extractor_config,
-                        base_dir=gspec.base_dir,
-                        rubric_vars=gspec.rubric_vars,
-                    )
+                self.graders[key] = AgentJudgeGrader(
+                    agent_file=agent_file,
+                    prompt=gspec.prompt,
+                    client=self.client,
+                    project_id=self.project_id,
+                    judge_tool_name=judge_tool_name,
+                    extractor=gspec.extractor,
+                    extractor_config=gspec.extractor_config,
+                    base_dir=gspec.base_dir,
+                    rubric_vars=gspec.rubric_vars,
+                )
             else:
                 raise ValueError(f"Unknown grader spec type: {type(gspec)}")
 
@@ -720,74 +720,66 @@ class Runner:
             model_results[model_key].append(result)
 
         per_model = []
-            for model_name, results in sorted(model_results.items()):
-                model_attempted = sum(1 for r in results if is_success(r))
+        for model_name, results in sorted(model_results.items()):
+            model_attempted = sum(1 for r in results if is_success(r))
 
-                # compute per-metric aggregates for this model
-                model_by_metric: Dict[str, MetricAggregate] = {}
-                for metric_key in self.graders.keys():
-                    metric_scores = [
-                        r.grades[metric_key].score
-                        for r in results
-                        if r.grades and metric_key in r.grades
-                    ]
-                    m_avg_attempted = sum(metric_scores) / len(metric_scores) if metric_scores else 0.0
-                    m_avg_total = sum(metric_scores) / len(results) if metric_scores else 0.0
-                    m_pass_rate = m_avg_attempted * 100.0
-                    model_by_metric[metric_key] = MetricAggregate(
-                        avg_score_attempted=m_avg_attempted,
-                        avg_score_total=m_avg_total,
-                        pass_rate=m_pass_rate,
-                    )
-
-                # Calculate cost and token counts for this model
-                model_costs = [r.cost for r in results if r.cost is not None]
-                model_total_cost = sum(model_costs) if model_costs else None
-
-                model_prompt_tokens_list = [r.prompt_tokens for r in results if r.prompt_tokens is not None]
-                model_total_prompt_tokens = sum(model_prompt_tokens_list) if model_prompt_tokens_list else 0
-
-                model_completion_tokens_list = [r.completion_tokens for r in results if r.completion_tokens is not None]
-                model_total_completion_tokens = sum(model_completion_tokens_list) if model_completion_tokens_list else 0
-
-                model_cached_input_tokens_list = [
-                    r.cached_input_tokens for r in results if r.cached_input_tokens is not None
-                ]
-                model_total_cached_input_tokens = (
-                    sum(model_cached_input_tokens_list) if model_cached_input_tokens_list else 0
+            # compute per-metric aggregates for this model
+            model_by_metric: Dict[str, MetricAggregate] = {}
+            for metric_key in self.graders.keys():
+                metric_scores = [r.grades[metric_key].score for r in results if r.grades and metric_key in r.grades]
+                m_avg_attempted = sum(metric_scores) / len(metric_scores) if metric_scores else 0.0
+                m_avg_total = sum(metric_scores) / len(results) if metric_scores else 0.0
+                m_pass_rate = m_avg_attempted * 100.0
+                model_by_metric[metric_key] = MetricAggregate(
+                    avg_score_attempted=m_avg_attempted,
+                    avg_score_total=m_avg_total,
+                    pass_rate=m_pass_rate,
                 )
 
-                model_cache_write_tokens_list = [
-                    r.cache_write_tokens for r in results if r.cache_write_tokens is not None
-                ]
-                model_total_cache_write_tokens = (
-                    sum(model_cache_write_tokens_list) if model_cache_write_tokens_list else 0
+            # Calculate cost and token counts for this model
+            model_costs = [r.cost for r in results if r.cost is not None]
+            model_total_cost = sum(model_costs) if model_costs else None
+
+            model_prompt_tokens_list = [r.prompt_tokens for r in results if r.prompt_tokens is not None]
+            model_total_prompt_tokens = sum(model_prompt_tokens_list) if model_prompt_tokens_list else 0
+
+            model_completion_tokens_list = [r.completion_tokens for r in results if r.completion_tokens is not None]
+            model_total_completion_tokens = sum(model_completion_tokens_list) if model_completion_tokens_list else 0
+
+            model_cached_input_tokens_list = [
+                r.cached_input_tokens for r in results if r.cached_input_tokens is not None
+            ]
+            model_total_cached_input_tokens = (
+                sum(model_cached_input_tokens_list) if model_cached_input_tokens_list else 0
+            )
+
+            model_cache_write_tokens_list = [r.cache_write_tokens for r in results if r.cache_write_tokens is not None]
+            model_total_cache_write_tokens = sum(model_cache_write_tokens_list) if model_cache_write_tokens_list else 0
+
+            model_reasoning_tokens_list = [r.reasoning_tokens for r in results if r.reasoning_tokens is not None]
+            model_total_reasoning_tokens = sum(model_reasoning_tokens_list) if model_reasoning_tokens_list else 0
+
+            # Create CostMetrics for this model if we have cost data
+            model_cost_metrics = None
+            if model_total_cost is not None and model_total_cost > 0:
+                model_cost_metrics = CostMetrics(
+                    total_cost=model_total_cost,
+                    total_prompt_tokens=model_total_prompt_tokens,
+                    total_completion_tokens=model_total_completion_tokens,
+                    total_cached_input_tokens=model_total_cached_input_tokens,
+                    total_cache_write_tokens=model_total_cache_write_tokens,
+                    total_reasoning_tokens=model_total_reasoning_tokens,
                 )
 
-                model_reasoning_tokens_list = [r.reasoning_tokens for r in results if r.reasoning_tokens is not None]
-                model_total_reasoning_tokens = sum(model_reasoning_tokens_list) if model_reasoning_tokens_list else 0
-
-                # Create CostMetrics for this model if we have cost data
-                model_cost_metrics = None
-                if model_total_cost is not None and model_total_cost > 0:
-                    model_cost_metrics = CostMetrics(
-                        total_cost=model_total_cost,
-                        total_prompt_tokens=model_total_prompt_tokens,
-                        total_completion_tokens=model_total_completion_tokens,
-                        total_cached_input_tokens=model_total_cached_input_tokens,
-                        total_cache_write_tokens=model_total_cache_write_tokens,
-                        total_reasoning_tokens=model_total_reasoning_tokens,
-                    )
-
-                per_model.append(
-                    ModelMetrics(
-                        model_name=model_name,
-                        total=len(results),
-                        total_attempted=model_attempted,
-                        by_metric=model_by_metric,
-                        cost=model_cost_metrics,
-                    )
+            per_model.append(
+                ModelMetrics(
+                    model_name=model_name,
+                    total=len(results),
+                    total_attempted=model_attempted,
+                    by_metric=model_by_metric,
+                    cost=model_cost_metrics,
                 )
+            )
 
         return Metrics(
             total=total,
