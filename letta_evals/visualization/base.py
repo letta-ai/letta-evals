@@ -67,6 +67,7 @@ class ProgressCallback(ABC):
         turn_num: int,
         total_turns: int,
         turn_score: float,
+        grader_key: Optional[str] = None,
         agent_id: Optional[str] = None,
         model_name: Optional[str] = None,
     ) -> None:
