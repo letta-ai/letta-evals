@@ -88,6 +88,9 @@ export LETTA_PROJECT_ID=your-project-id
 ```bash
 cd examples/letta-code-simple-edit
 letta-evals run suite.yaml
+
+# Or save results to a directory:
+letta-evals run suite.yaml --output results/
 ```
 
 ## Configuration Details

@@ -7,7 +7,7 @@ max_samples: 3
 
 target:
   kind: letta_code
-  base_url: https://api.letta.com/
+  base_url: http://localhost:8283
   working_dir: sandbox
   timeout: 300
   max_retries: 3
