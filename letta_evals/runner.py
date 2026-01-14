@@ -178,6 +178,7 @@ class Runner:
                 disallowed_tools=self.suite.target.disallowed_tools,
                 timeout=int(self.suite.target.timeout),
                 max_retries=self.suite.target.max_retries,
+                base_url=self.suite.target.base_url,
             )
         else:
             raise ValueError(f"Unknown target kind: {self.suite.target.kind}")

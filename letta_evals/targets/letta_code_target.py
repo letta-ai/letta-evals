@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -26,6 +27,7 @@ class LettaCodeTarget(AbstractAgentTarget):
         disallowed_tools: Optional[list[str]] = None,
         timeout: int = 300,
         max_retries: int = 0,
+        base_url: Optional[str] = None,
     ):
         """Initialize the Letta Code target.
 
@@ -38,6 +40,7 @@ class LettaCodeTarget(AbstractAgentTarget):
             disallowed_tools: List of disallowed tools
             timeout: Command timeout in seconds (default: 300)
             max_retries: Number of retry attempts on failure
+            base_url: Base URL for the Letta server (passed to CLI via env var)
         """
         self.client = client
         self.model_handle = model_handle
@@ -47,6 +50,7 @@ class LettaCodeTarget(AbstractAgentTarget):
         self.disallowed_tools = disallowed_tools
         self.timeout = timeout
         self.max_retries = max_retries
+        self.base_url = base_url
 
     async def run(
         self,
@@ -99,12 +103,20 @@ class LettaCodeTarget(AbstractAgentTarget):
 
                 logger.info(f"Running letta command for sample {sample.id}")
 
+                # Prepare environment variables for the subprocess
+                # Pass base_url to letta CLI if specified
+                env = os.environ.copy()
+                if self.base_url:
+                    env["LETTA_BASE_URL"] = self.base_url
+                    logger.info(f"Setting LETTA_BASE_URL={self.base_url} for letta CLI")
+
                 # run the letta command
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=str(self.working_dir),
+                    env=env,
                 )
 
                 # wait for completion
