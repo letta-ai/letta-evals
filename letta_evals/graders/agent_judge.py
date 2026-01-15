@@ -17,9 +17,10 @@ class AgentJudgeGrader(Grader):
 
     def __init__(
         self,
-        agent_file: Path,
         prompt: str,
         client: AsyncLetta,
+        agent_file: Optional[Path] = None,
+        agent_id: Optional[str] = None,
         project_id: Optional[str] = None,
         judge_tool_name: str = "submit_grade",
         extractor: str = "last_assistant",
@@ -27,7 +28,13 @@ class AgentJudgeGrader(Grader):
         base_dir: Optional[Path] = None,
         rubric_vars: Optional[List[str]] = None,
     ):
+        if not agent_file and not agent_id:
+            raise ValueError("Either agent_file or agent_id must be provided")
+        if agent_file and agent_id:
+            raise ValueError("Cannot provide both agent_file and agent_id")
+        
         self.agent_file = agent_file
+        self.agent_id = agent_id
         self.prompt = prompt
         self.client = client
         self.project_id = project_id
@@ -38,8 +45,9 @@ class AgentJudgeGrader(Grader):
         self.extractor = get_extractor(extractor, extractor_config, base_dir=base_dir)
         self._requires_agent_state = extractor_requires_agent_state(extractor, base_dir=base_dir)
 
-        # validate agent file contains the required tool with correct schema
-        self._validate_agent_file()
+        # validate agent file contains the required tool with correct schema (only if agent_file is provided)
+        if self.agent_file:
+            self._validate_agent_file()
 
     @property
     def requires_agent_state(self) -> bool:
@@ -66,15 +74,19 @@ class AgentJudgeGrader(Grader):
 
         judge_agent_id = None
         try:
-            # load judge agent from .af file
-            with open(self.agent_file, "rb") as f:
-                resp = await self.client.agents.import_file(
-                    file=f, append_copy_suffix=False, override_existing_tools=False, project_id=self.project_id
-                )
-                if len(resp.agent_ids) > 1:
-                    raise RuntimeError(f"Expected single judge agent from .af file, got {len(resp.agent_ids)} agents")
+            if self.agent_id:
+                # Use provided agent_id directly
+                judge_agent_id = self.agent_id
+            else:
+                # load judge agent from .af file
+                with open(self.agent_file, "rb") as f:
+                    resp = await self.client.agents.import_file(
+                        file=f, append_copy_suffix=False, override_existing_tools=False, project_id=self.project_id
+                    )
+                    if len(resp.agent_ids) > 1:
+                        raise RuntimeError(f"Expected single judge agent from .af file, got {len(resp.agent_ids)} agents")
 
-                judge_agent_id = resp.agent_ids[0]
+                    judge_agent_id = resp.agent_ids[0]
 
             # send prompt to judge agent
             stream = await self.client.agents.messages.stream(
@@ -95,17 +107,29 @@ class AgentJudgeGrader(Grader):
             messages_page = await self.client.runs.messages.list(run_id=run_id)
             score, rationale = self._parse_tool_calls(messages_page.items)
 
+            metadata = {"judge_agent_id": judge_agent_id}
+            if self.agent_file:
+                metadata["agent_file"] = str(self.agent_file)
+            if self.agent_id:
+                metadata["agent_id"] = self.agent_id
+
             return GradeResult(
                 score=score,
                 rationale=rationale,
-                metadata={"judge_agent_id": judge_agent_id, "agent_file": str(self.agent_file)},
+                metadata=metadata,
             ), submission
 
         except Exception as e:
+            metadata = {"error": str(e)}
+            if self.agent_file:
+                metadata["agent_file"] = str(self.agent_file)
+            if self.agent_id:
+                metadata["agent_id"] = self.agent_id
+            
             return GradeResult(
                 score=0.0,
                 rationale=f"Error during agent judge grading: {str(e)}",
-                metadata={"error": str(e), "agent_file": str(self.agent_file)},
+                metadata=metadata,
             ), submission
 
     def _validate_agent_file(self) -> None:

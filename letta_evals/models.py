@@ -202,6 +202,7 @@ class LettaJudgeGraderSpec(BaseGraderSpec):
     prompt: Optional[str] = Field(default=None, description="Prompt for letta judge")
     prompt_path: Optional[Path] = Field(default=None, description="Path to file containing prompt")
     agent_file: Optional[Path] = Field(default=None, description="Path to .af agent file to use as judge")
+    agent_id: Optional[str] = Field(default=None, description="Letta Cloud agent ID to use as judge")
     judge_tool_name: str = Field(
         default="submit_grade", description="Name of tool that agent uses to submit score/rationale"
     )
@@ -222,12 +223,19 @@ class LettaJudgeGraderSpec(BaseGraderSpec):
             raise ValueError("Letta judge requires either prompt or prompt_path")
         if self.prompt and self.prompt_path:
             raise ValueError("Letta judge cannot have both prompt and prompt_path")
+        
+        # Ensure either agent_file or agent_id is provided (but not both)
+        if self.agent_file and self.agent_id:
+            raise ValueError("Cannot provide both agent_file and agent_id. Use one or the other.")
+        if not self.agent_file and not self.agent_id:
+            # If neither is provided, use default agent file
+            pass
 
-        # if using default agent (agent_file is None), cannot specify judge_tool_name
-        if self.agent_file is None and self.judge_tool_name != "submit_grade":
+        # if using default agent (agent_file is None and agent_id is None), cannot specify judge_tool_name
+        if self.agent_file is None and self.agent_id is None and self.judge_tool_name != "submit_grade":
             raise ValueError(
-                "Cannot specify judge_tool_name when using default Letta judge (agent_file is None). "
-                "To use a custom judge_tool_name, provide a custom agent_file."
+                "Cannot specify judge_tool_name when using default Letta judge (agent_file and agent_id are None). "
+                "To use a custom judge_tool_name, provide a custom agent_file or agent_id."
             )
 
         # load prompt from file if needed

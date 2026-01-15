@@ -85,11 +85,17 @@ class Runner:
         self.project_id = letta_project_id or self.suite.target.project_id or env_project_id
 
         client_kwargs: dict[str, object] = {"timeout": self.suite.target.timeout}
+        # Set base_url - default to Letta Cloud if not specified
         if base_url:
             client_kwargs["base_url"] = base_url
+        elif api_key:
+            # If using API key but no base_url, assume Letta Cloud
+            client_kwargs["base_url"] = "https://api.letta.com"
+            logger.info(f"Using default Letta Cloud base_url: https://api.letta.com")
         if api_key:
             client_kwargs["api_key"] = api_key
 
+        logger.info(f"Creating AsyncLetta client with base_url={client_kwargs.get('base_url')}, has_api_key={bool(api_key)}")
         self.client = AsyncLetta(**client_kwargs)
 
         self.graders: Optional[Dict[str, Grader]] = None
@@ -209,17 +215,24 @@ class Runner:
                         rubric_vars=gspec.rubric_vars,
                     )
                 elif isinstance(gspec, LettaJudgeGraderSpec):
-                    # use default agent file if not provided
-                    agent_file = gspec.agent_file
+                    # If agent_id is provided, use it directly
+                    # Otherwise, use agent_file (or default agent file if not provided)
+                    agent_file = None
+                    agent_id = gspec.agent_id
                     judge_tool_name = gspec.judge_tool_name
-                    if agent_file is None:
-                        agent_file = Path(__file__).parent / "graders/letta-evals-judge-agent.af"
-                        judge_tool_name = "submit_grade"
+                    
+                    if agent_id is None:
+                        # use default agent file if not provided
+                        agent_file = gspec.agent_file
+                        if agent_file is None:
+                            agent_file = Path(__file__).parent / "graders/letta-evals-judge-agent.af"
+                            judge_tool_name = "submit_grade"
 
                     self.graders[key] = AgentJudgeGrader(
-                        agent_file=agent_file,
                         prompt=gspec.prompt,
                         client=self.client,
+                        agent_file=agent_file,
+                        agent_id=agent_id,
                         project_id=self.project_id,
                         judge_tool_name=judge_tool_name,
                         extractor=gspec.extractor,
