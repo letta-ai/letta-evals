@@ -32,7 +32,7 @@ class AgentJudgeGrader(Grader):
             raise ValueError("Either agent_file or agent_id must be provided")
         if agent_file and agent_id:
             raise ValueError("Cannot provide both agent_file and agent_id")
-        
+
         self.agent_file = agent_file
         self.agent_id = agent_id
         self.prompt = prompt
@@ -84,7 +84,9 @@ class AgentJudgeGrader(Grader):
                         file=f, append_copy_suffix=False, override_existing_tools=False, project_id=self.project_id
                     )
                     if len(resp.agent_ids) > 1:
-                        raise RuntimeError(f"Expected single judge agent from .af file, got {len(resp.agent_ids)} agents")
+                        raise RuntimeError(
+                            f"Expected single judge agent from .af file, got {len(resp.agent_ids)} agents"
+                        )
 
                     judge_agent_id = resp.agent_ids[0]
 
@@ -125,7 +127,7 @@ class AgentJudgeGrader(Grader):
                 metadata["agent_file"] = str(self.agent_file)
             if self.agent_id:
                 metadata["agent_id"] = self.agent_id
-            
+
             return GradeResult(
                 score=0.0,
                 rationale=f"Error during agent judge grading: {str(e)}",

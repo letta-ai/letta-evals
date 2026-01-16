@@ -91,11 +91,13 @@ class Runner:
         elif api_key:
             # If using API key but no base_url, assume Letta Cloud
             client_kwargs["base_url"] = "https://api.letta.com"
-            logger.info(f"Using default Letta Cloud base_url: https://api.letta.com")
+            logger.info("Using default Letta Cloud base_url: https://api.letta.com")
         if api_key:
             client_kwargs["api_key"] = api_key
 
-        logger.info(f"Creating AsyncLetta client with base_url={client_kwargs.get('base_url')}, has_api_key={bool(api_key)}")
+        logger.info(
+            f"Creating AsyncLetta client with base_url={client_kwargs.get('base_url')}, has_api_key={bool(api_key)}"
+        )
         self.client = AsyncLetta(**client_kwargs)
 
         self.graders: Optional[Dict[str, Grader]] = None
@@ -220,7 +222,7 @@ class Runner:
                     agent_file = None
                     agent_id = gspec.agent_id
                     judge_tool_name = gspec.judge_tool_name
-                    
+
                     if agent_id is None:
                         # use default agent file if not provided
                         agent_file = gspec.agent_file

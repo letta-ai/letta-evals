@@ -223,7 +223,7 @@ class LettaJudgeGraderSpec(BaseGraderSpec):
             raise ValueError("Letta judge requires either prompt or prompt_path")
         if self.prompt and self.prompt_path:
             raise ValueError("Letta judge cannot have both prompt and prompt_path")
-        
+
         # Ensure either agent_file or agent_id is provided (but not both)
         if self.agent_file and self.agent_id:
             raise ValueError("Cannot provide both agent_file and agent_id. Use one or the other.")
