@@ -136,6 +136,30 @@ class LettaCodeTargetSpec(BaseTargetSpec):
 
     working_dir: Optional[Path] = Field(default=None, description="Working directory for letta code execution")
     skills_dir: Optional[Path] = Field(default=None, description="Directory containing skills to load")
+
+    # Letta Code agent bootstrap controls (new agent creation)
+    init_blocks: Optional[str] = Field(
+        default=None,
+        description=(
+            "Comma-separated memory blocks to initialize when creating a new agent "
+            "(e.g., 'skills,loaded_skills')."
+        ),
+    )
+    base_tools: Optional[str] = Field(
+        default=None,
+        description=(
+            "Comma-separated base tools to attach when creating a new agent "
+            "(e.g., 'memory,web_search')."
+        ),
+    )
+    toolset: Optional[str] = Field(
+        default=None,
+        description="Force Letta Code toolset (e.g., 'default', 'codex', 'gemini').",
+    )
+
+    # create agent from an AgentFile (.af) template
+    from_af: Optional[Path] = Field(default=None, description="Path to .af agent file to use as template")
+
     allowed_tools: Optional[List[str]] = Field(
         default=None, description="List of allowed tools for letta code (e.g., ['Bash', 'Read'])"
     )
@@ -401,6 +425,12 @@ class SuiteSpec(BaseModel):
                     if not Path(yaml_data["target"]["skills_dir"]).is_absolute():
                         yaml_data["target"]["skills_dir"] = str(
                             (base_dir / yaml_data["target"]["skills_dir"]).resolve()
+                        )
+
+                if "from_af" in yaml_data["target"] and yaml_data["target"]["from_af"]:
+                    if not Path(yaml_data["target"]["from_af"]).is_absolute():
+                        yaml_data["target"]["from_af"] = str(
+                            (base_dir / yaml_data["target"]["from_af"]).resolve()
                         )
 
                 # store base_dir in target for agent_script resolution

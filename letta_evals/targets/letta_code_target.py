@@ -23,8 +23,12 @@ class LettaCodeTarget(AbstractAgentTarget):
         model_handle: str = "anthropic/claude-sonnet-4-5-20250929",
         working_dir: Optional[Path] = None,
         skills_dir: Optional[Path] = None,
+        from_af: Optional[Path] = None,
         allowed_tools: Optional[list[str]] = None,
         disallowed_tools: Optional[list[str]] = None,
+        init_blocks: Optional[str] = None,
+        base_tools: Optional[str] = None,
+        toolset: Optional[str] = None,
         timeout: int = 300,
         max_retries: int = 0,
         base_url: Optional[str] = None,
@@ -46,8 +50,12 @@ class LettaCodeTarget(AbstractAgentTarget):
         self.model_handle = model_handle
         self.working_dir = working_dir or Path.cwd()
         self.skills_dir = skills_dir
+        self.from_af = from_af
         self.allowed_tools = allowed_tools
         self.disallowed_tools = disallowed_tools
+        self.init_blocks = init_blocks
+        self.base_tools = base_tools
+        self.toolset = toolset
         self.timeout = timeout
         self.max_retries = max_retries
         self.base_url = base_url
@@ -77,9 +85,11 @@ class LettaCodeTarget(AbstractAgentTarget):
 
                 # construct the letta-code CLI command (headless JSON output)
                 # NOTE: letta-code CLI flags have changed over time; keep to stable, documented flags.
+                # construct the letta-code CLI command (headless JSON output)
+                # Note: `--from-af` currently works with `--new` (not `--new-agent`).
                 cmd = [
                     "letta",
-                    "--new",
+                    "--new" if self.from_af else "--new-agent",
                     "--yolo",
                     "--output-format",
                     "json",
@@ -87,10 +97,24 @@ class LettaCodeTarget(AbstractAgentTarget):
                     self.model_handle,
                 ]
 
+                # optional toolset override
+                if self.toolset:
+                    cmd.extend(["--toolset", self.toolset])
+
+                # bootstrap controls (only valid when not using --from-af)
+                if not self.from_af:
+                    if self.init_blocks:
+                        cmd.extend(["--init-blocks", self.init_blocks])
+                    if self.base_tools:
+                        cmd.extend(["--base-tools", self.base_tools])
+
+                # start agent from an AgentFile template if provided
+                if self.from_af:
+                    cmd.extend(["--from-af", str(self.from_af)])
+
                 # Use codex system prompt for GPT-style models (matches `letta --help` examples)
                 if "gpt" in self.model_handle:
                     cmd.extend(["--system", "codex"])
-                    cmd.extend(["--init-blocks", "skills,loaded_skills"])
 
                 # add skills directory if specified
                 if self.skills_dir:
@@ -168,12 +192,17 @@ class LettaCodeTarget(AbstractAgentTarget):
                         }
                     )
 
+                final_agent_state = None
+                if retrieve_agent_state:
+                    # Include memory so extractors can inspect post-run blocks
+                    final_agent_state = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=["memory"])
+
                 return TargetResult(
                     trajectory=trajectory,
                     agent_id=agent_id,
                     model_name=self.model_handle,
                     agent_usage=usage_stats if usage_stats else None,
-                    agent_state=None,
+                    agent_state=final_agent_state,
                 )
 
             except Exception as e:
