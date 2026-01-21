@@ -1,0 +1,10 @@
+input,rubric_vars
+"You are starting from a preloaded AgentFile template. Perform a memory cleanup using the defragmenting-memory skill.
+
+Instructions:
+- Do NOT ask questions; make reasonable assumptions.
+- Load the defragmenting-memory skill.
+- Follow its workflow to clean up / defragment your memory blocks.
+- The goal is to make the memory blocks more concise, non-redundant, and well-organized.
+- When finished, briefly confirm completion.
+","{""rubric_memory_defrag"": ""1. The agent loads the defragmenting-memory skill (Skill tool is used to load defragmenting-memory).\n2. The agent performs at least one explicit memory edit/cleanup action (e.g., memory_apply_patch or equivalent memory modification tool calls) consistent with a defrag workflow.\n3. The agent provides a clear completion summary describing what was cleaned up (e.g., which memory blocks were reorganized, duplicates removed, structure improved).\n4. The resulting memory blocks (as shown in the provided memory summary) are plausibly improved: they are organized and concise (e.g., clear bullets/sections) and avoid obvious repeated/duplicative entries.""}"

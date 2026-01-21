@@ -1,0 +1,30 @@
+name: memory-defrag-suite
+description: Evaluate whether an agent can trigger and perform a memory defragmentation / cleanup workflow.
+dataset: data/dataset_defrag.jsonl
+max_samples: 1
+
+target:
+  kind: letta_code
+  base_url: http://0.0.0.0:8283
+  working_dir: output-memory-defrag
+  from_af: "letta-code-defrag-template.af"
+  timeout: 600
+  max_retries: 0
+  model_handles:
+    - anthropic/claude-sonnet-4-5-20250929
+
+graders:
+  memory_defrag:
+    kind: letta_judge
+    display_name: "memory defrag score"
+    prompt_path: rubric_defrag_prompt.txt
+    extractor: custom_extractor.py:defrag_evidence_extractor
+    rubric_vars:
+      - rubric_memory_defrag
+
+gate:
+  kind: simple
+  metric_key: memory_defrag
+  aggregation: avg_score
+  op: gte
+  value: 0.75

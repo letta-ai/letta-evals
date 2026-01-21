@@ -152,7 +152,8 @@ class LettaAgentTarget(AbstractAgentTarget):
 
                 final_agent_state = None
                 if retrieve_agent_state:
-                    final_agent_state = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=[])
+                    # Include memory so extractors can inspect post-run blocks
+                    final_agent_state = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=["memory"])
 
                 return TargetResult(
                     trajectory=trajectory,
