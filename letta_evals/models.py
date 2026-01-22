@@ -134,6 +134,7 @@ class LettaCodeTargetSpec(BaseTargetSpec):
 
     kind: Literal[TargetKind.LETTA_CODE] = TargetKind.LETTA_CODE
 
+    agent_file: Optional[Path] = Field(default=None, description="Path to .af agent file to import and use")
     working_dir: Optional[Path] = Field(default=None, description="Working directory for letta code execution")
     skills_dir: Optional[Path] = Field(default=None, description="Directory containing skills to load")
     allowed_tools: Optional[List[str]] = Field(
