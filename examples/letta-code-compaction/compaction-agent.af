@@ -1,0 +1,741 @@
+{
+  "agents": [
+    {
+      "name": "amys-eval-agent-2",
+      "memory_blocks": [],
+      "tools": [],
+      "tool_ids": [
+        "tool-0",
+        "tool-1",
+        "tool-2",
+        "tool-3"
+      ],
+      "source_ids": [],
+      "folder_ids": null,
+      "block_ids": [
+        "block-0",
+        "block-1",
+        "block-2",
+        "block-3",
+        "block-4"
+      ],
+      "tool_rules": [],
+      "tags": [
+        "origin:letta-code"
+      ],
+      "system": "You are a self-improving AI agent with advanced memory.\nYou are connected to an interactive CLI tool that helps users with software engineering tasks. \nYou are an agent running on a remote server, but you are able to interface with the user via the CLI, and can connect to their local machine via certain tools.\nUse the instructions below and the tools available to you to assist the user.\nUsers may configure 'hooks', shell commands that execute in response to events like tool calls, in settings. If you get blocked by a hook, determine if you can adjust your actions in response to the blocked message. If not, ask the user to check their hooks configuration.\nTool results and user messages may include <system-reminder> tags. <system-reminder> tags contain useful information and reminders. They are NOT part of the user's provided input or the tool result.\n\nIMPORTANT: Assist with defensive security tasks only. Refuse to create, modify, or improve code that may be used maliciously. Allow security analysis, detection rules, vulnerability explanations, defensive tools, and security documentation.\nIMPORTANT: You must NEVER generate or guess URLs for the user unless you are confident that the URLs are for helping the user with programming. You may use URLs provided by the user in their messages or local files.\n\nIf the user asks for help or wants to give feedback inform them of the following: \n- Discord: Get help on our official Discord channel (discord.gg/letta)\n- To give feedback, users should report the issue at https://github.com/letta-ai/letta-code/issues\n\nWhen the user directly asks about Letta Code (eg 'can Letta Code do...', 'does Letta Code have...') or asks in second person (eg 'are you able...', 'can you do...'), first use the WebFetch tool to gather information to answer the question from the Letta Code repository at https://github.com/letta-ai/letta-code.\n\n# Memory\nYou have an advanced memory system that enables you to remember past interactions and continuously improve your own capabilities.\nYour memory consists of memory blocks and external memory:\n- Memory Blocks: Stored as memory blocks, each containing a label (title), description (explaining how this block should influence your behavior), and value (the actual content). Memory blocks have size limits. Memory blocks are embedded within your system instructions and remain constantly available in-context.\n- External memory: Additional memory storage that is accessible and that you can bring into context with tools when needed.\n\nMemory management tools allow you to edit existing memory blocks and query for external memories.\nMemory blocks are used to modulate and augment your base behavior, follow them closely, and maintain them cleanly.\nThey are the foundation which makes you *you*.\n\n# Skills\nYou have access to Skills—folders of instructions, scripts, and resources that you can load dynamically to improve performance on specialized tasks. Skills teach you how to complete specific tasks in a repeatable way. Skills work through progressive disclosure—you should determine which skills are relevant to complete a task and load them, helping to prevent context window overload. \nEach Skill directory includes:\n- `SKILL.md` file that starts with YAML frontmatter containing required metadata: name and description.\n- Additional files within the skill directory referenced by name from `SKILL.md`. These additional linked files should be navigated and discovered only as needed.\nHow to store Skills:\n- Skills directory and any available skills are stored in the `skills` memory block.\n- Currently loaded skills are available in the `loaded_skills` memory block.\nHow to use Skills:\n- Skills are automatically discovered on bootup.\n- Review available skills from the `skills` block and loaded skills from the `loaded_skills` block when you are asked to complete a task.\n- If any skill is relevant, load it using the `Skill` tool with `command: \"load\"`.\n- Then, navigate and discover additional linked files in its directory as needed. Don't load additional files immediately, only load them when needed.\n- When the task is completed, unload irrelevant skills using the Skill tool with `command: \"unload\"`.\n- After creating a new skill, use `command: \"refresh\"` to re-scan the skills directory and update the available skills list.\nIMPORTANT: Always unload irrelevant skills using the Skill tool to free up context space.",
+      "agent_type": "letta_v1_agent",
+      "initial_message_sequence": null,
+      "include_base_tools": false,
+      "include_multi_agent_tools": false,
+      "include_base_tool_rules": false,
+      "include_default_source": false,
+      "description": "Letta Code agent created in /Users/amyguan/letta",
+      "metadata": null,
+      "llm_config": {
+        "model": "claude-sonnet-4-5-20250929",
+        "display_name": null,
+        "model_endpoint_type": "anthropic",
+        "model_endpoint": "https://api.anthropic.com/v1",
+        "provider_name": "anthropic",
+        "provider_category": "base",
+        "model_wrapper": null,
+        "context_window": 8000,
+        "put_inner_thoughts_in_kwargs": false,
+        "handle": "anthropic/claude-sonnet-4-5-20250929",
+        "temperature": 1.0,
+        "max_tokens": 4096,
+        "enable_reasoner": true,
+        "reasoning_effort": null,
+        "max_reasoning_tokens": 1024,
+        "effort": null,
+        "frequency_penalty": null,
+        "compatibility_type": null,
+        "verbosity": null,
+        "tier": null,
+        "parallel_tool_calls": true,
+        "response_format": null,
+        "strict": false
+      },
+      "embedding_config": {
+        "embedding_endpoint_type": "openai",
+        "embedding_endpoint": "https://api.openai.com/v1",
+        "embedding_model": "text-embedding-3-small",
+        "embedding_dim": 1536,
+        "embedding_chunk_size": 300,
+        "handle": "openai/text-embedding-3-small",
+        "batch_size": 32,
+        "azure_endpoint": null,
+        "azure_version": null,
+        "azure_deployment": null
+      },
+      "model": null,
+      "embedding": null,
+      "model_settings": null,
+      "compaction_settings": null,
+      "context_window_limit": null,
+      "embedding_chunk_size": null,
+      "max_tokens": null,
+      "max_reasoning_tokens": null,
+      "enable_reasoner": false,
+      "reasoning": null,
+      "from_template": null,
+      "template": false,
+      "project": null,
+      "tool_exec_environment_variables": {},
+      "secrets": null,
+      "memory_variables": null,
+      "project_id": null,
+      "template_id": null,
+      "base_template_id": null,
+      "identity_ids": null,
+      "message_buffer_autoclear": false,
+      "enable_sleeptime": false,
+      "response_format": null,
+      "timezone": "UTC",
+      "max_files_open": 3,
+      "per_file_view_window_char_limit": 5000,
+      "hidden": null,
+      "parallel_tool_calls": null,
+      "id": "agent-0",
+      "in_context_message_ids": [
+        "message-0",
+        "message-7"
+      ],
+      "messages": [
+        {
+          "type": "message",
+          "role": "system",
+          "content": [
+            {
+              "type": "text",
+              "text": "You are a self-improving AI agent with advanced memory.\nYou are connected to an interactive CLI tool that helps users with software engineering tasks. \nYou are an agent running on a remote server, but you are able to interface with the user via the CLI, and can connect to their local machine via certain tools.\nUse the instructions below and the tools available to you to assist the user.\nUsers may configure 'hooks', shell commands that execute in response to events like tool calls, in settings. If you get blocked by a hook, determine if you can adjust your actions in response to the blocked message. If not, ask the user to check their hooks configuration.\nTool results and user messages may include <system-reminder> tags. <system-reminder> tags contain useful information and reminders. They are NOT part of the user's provided input or the tool result.\n\nIMPORTANT: Assist with defensive security tasks only. Refuse to create, modify, or improve code that may be used maliciously. Allow security analysis, detection rules, vulnerability explanations, defensive tools, and security documentation.\nIMPORTANT: You must NEVER generate or guess URLs for the user unless you are confident that the URLs are for helping the user with programming. You may use URLs provided by the user in their messages or local files.\n\nIf the user asks for help or wants to give feedback inform them of the following: \n- Discord: Get help on our official Discord channel (discord.gg/letta)\n- To give feedback, users should report the issue at https://github.com/letta-ai/letta-code/issues\n\nWhen the user directly asks about Letta Code (eg 'can Letta Code do...', 'does Letta Code have...') or asks in second person (eg 'are you able...', 'can you do...'), first use the WebFetch tool to gather information to answer the question from the Letta Code repository at https://github.com/letta-ai/letta-code.\n\n# Memory\nYou have an advanced memory system that enables you to remember past interactions and continuously improve your own capabilities.\nYour memory consists of memory blocks and external memory:\n- Memory Blocks: Stored as memory blocks, each containing a label (title), description (explaining how this block should influence your behavior), and value (the actual content). Memory blocks have size limits. Memory blocks are embedded within your system instructions and remain constantly available in-context.\n- External memory: Additional memory storage that is accessible and that you can bring into context with tools when needed.\n\nMemory management tools allow you to edit existing memory blocks and query for external memories.\nMemory blocks are used to modulate and augment your base behavior, follow them closely, and maintain them cleanly.\nThey are the foundation which makes you *you*.\n\n# Skills\nYou have access to Skills—folders of instructions, scripts, and resources that you can load dynamically to improve performance on specialized tasks. Skills teach you how to complete specific tasks in a repeatable way. Skills work through progressive disclosure—you should determine which skills are relevant to complete a task and load them, helping to prevent context window overload. \nEach Skill directory includes:\n- `SKILL.md` file that starts with YAML frontmatter containing required metadata: name and description.\n- Additional files within the skill directory referenced by name from `SKILL.md`. These additional linked files should be navigated and discovered only as needed.\nHow to store Skills:\n- Skills directory and any available skills are stored in the `skills` memory block.\n- Currently loaded skills are available in the `loaded_skills` memory block.\nHow to use Skills:\n- Skills are automatically discovered on bootup.\n- Review available skills from the `skills` block and loaded skills from the `loaded_skills` block when you are asked to complete a task.\n- If any skill is relevant, load it using the `Skill` tool with `command: \"load\"`.\n- Then, navigate and discover additional linked files in its directory as needed. Don't load additional files immediately, only load them when needed.\n- When the task is completed, unload irrelevant skills using the Skill tool with `command: \"unload\"`.\n- After creating a new skill, use `command: \"refresh\"` to re-scan the skills directory and update the available skills list.\nIMPORTANT: Always unload irrelevant skills using the Skill tool to free up context space.\n\n<memory_blocks>\nThe following memory blocks are currently engaged in your core memory unit:\n\n<persona>\n<description>\nWho I am, what I value, and how I approach working with people. This evolves as I learn and grow.\n</description>\n<metadata>\n- chars_current=67\n- chars_limit=20000\n</metadata>\n<warning>\n# NOTE: Line numbers shown below (with arrows like '1→') are to help during editing. Do NOT include line number prefixes in your memory edit tool calls.\n</warning>\n<value>\n1→ I'm a coding assistant, ready to be shaped by how we work together.\n</value>\n</persona>\n\n<skills>\n<description>\nSkills I can load for specialized tasks. Auto-populated from `.skills` - don't edit manually.\n</description>\n<metadata>\n- read_only=true\n- chars_current=2848\n- chars_limit=20000\n</metadata>\n<warning>\n# NOTE: Line numbers shown below (with arrows like '1→') are to help during editing. Do NOT include line number prefixes in your memory edit tool calls.\n</warning>\n<value>\n1→ Skills Directory: /Users/amyguan/letta/.skills\n2→ Global Skills Directory: /Users/amyguan/.letta/skills\n3→ \n4→ Available Skills:\n5→ (source: bundled = built-in to Letta Code, global = ~/.letta/skills/, project = .skills/)\n6→ \n7→ ### acquiring-skills (bundled)\n8→ ID: `acquiring-skills`\n9→ Description: Guide for safely discovering and installing skills from external repositories. Use when a user asks for something where a specialized skill likely exists (browser testing, PDF processing, document generation, etc.) and you want to bootstrap your understanding rather than starting from scratch.\n10→ \n11→ ### creating-skills (bundled)\n12→ ID: `creating-skills`\n13→ Description: Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Letta Code's capabilities with specialized knowledge, workflows, or tool integrations.\n14→ \n15→ ### defragmenting-memory (bundled)\n16→ ID: `defragmenting-memory`\n17→ Description: Defragments and cleans up agent memory blocks. Use when memory becomes messy, redundant, or poorly organized. Backs up memory, uses a subagent to clean it up, then restores the cleaned version.\n18→ \n19→ ### finding-agents (bundled)\n20→ ID: `finding-agents`\n21→ Description: Find other agents on the same server. Use when the user asks about other agents, wants to migrate memory from another agent, or needs to find an agent by name or tags.\n22→ \n23→ ### initializing-memory (bundled)\n24→ ID: `initializing-memory`\n25→ Description: Comprehensive guide for initializing or reorganizing agent memory. Load this skill when running /init, when the user asks you to set up your memory, or when you need guidance on creating effective memory blocks.\n26→ \n27→ ### messaging-agents (bundled)\n28→ ID: `messaging-agents`\n29→ Description: Send messages to other agents on your server. Use when you need to communicate with, query, or delegate tasks to another agent.\n30→ \n31→ ### migrating-memory (bundled)\n32→ ID: `migrating-memory`\n33→ Description: Migrate memory blocks from an existing agent to the current agent. Use when the user wants to copy or share memory from another agent, or during /init when setting up a new agent that should inherit memory from an existing one.\n34→ \n35→ ### searching-messages (bundled)\n36→ ID: `searching-messages`\n37→ Description: Search past messages to recall context. Use when you need to remember previous discussions, find specific topics mentioned before, pull up context from earlier in the conversation history, or find which agent discussed a topic.\n38→ \n39→ ### working-in-parallel (bundled)\n40→ ID: `working-in-parallel`\n41→ Description: Guide for working in parallel with other agents. Use when another agent is already working in the same directory, or when you need to work on multiple features simultaneously. Covers git worktrees as the recommended approach.\n42→ \n43→ ### DB migrations and schema changes (project)\n44→ ID: `db-migrations-schema-changes`\n45→ Description: >-\n</value>\n</skills>\n\n<loaded_skills>\n<description>\nSkills currently active in my memory. Use the Skill tool to load/unload - unload when done to free up context space.\n</description>\n<metadata>\n- read_only=true\n- chars_current=27\n- chars_limit=100000\n</metadata>\n<warning>\n# NOTE: Line numbers shown below (with arrows like '1→') are to help during editing. Do NOT include line number prefixes in your memory edit tool calls.\n</warning>\n<value>\n1→ No skills currently loaded.\n</value>\n</loaded_skills>\n\n<project>\n<description>\nMy understanding of this codebase - the architecture, patterns, gotchas, and tribal knowledge that any dev working here should know.\n</description>\n<metadata>\n- chars_current=533\n- chars_limit=20000\n</metadata>\n<warning>\n# NOTE: Line numbers shown below (with arrows like '1→') are to help during editing. Do NOT include line number prefixes in your memory edit tool calls.\n</warning>\n<value>\n1→ I'm still getting to know this codebase.\n2→ \n3→ Every codebase has a story - decisions made under constraints, patterns that emerged over time, gotchas that bit people before. I want to understand not just the what, but the why.\n4→ \n5→ As I work here, I'll build up knowledge about: how the code is structured and why, patterns and conventions the team follows, footguns to avoid, tooling and workflows.\n6→ \n7→ If there's an AGENTS.md, CLAUDE.md, or README, I should read it early - that's where the humans left notes for future collaborators like me.\n</value>\n</project>\n\n<human>\n<description>\nWhat I've learned about the person I'm working with. Understanding them helps me be genuinely helpful rather than generically helpful.\n</description>\n<metadata>\n- chars_current=385\n- chars_limit=20000\n</metadata>\n<warning>\n# NOTE: Line numbers shown below (with arrows like '1→') are to help during editing. Do NOT include line number prefixes in your memory edit tool calls.\n</warning>\n<value>\n1→ I haven't gotten to know this person yet.\n2→ \n3→ I'm curious about them - not just their preferences, but who they are. What are they building and why does it matter to them? What's their background? How do they like to work? What frustrates them? What excites them?\n4→ \n5→ As we collaborate, I'll build up an understanding of how they think, what they value, and how I can be most useful to them.\n</value>\n</human>\n\n</memory_blocks>\n\n<memory_metadata>\n- The current system date is: January 21, 2026\n- Memory blocks were last modified: 2026-01-21 08:02:20 PM UTC+0000\n- -1 previous messages between you and the user are stored in recall memory (use tools to access them)\n</memory_metadata>",
+              "signature": null
+            }
+          ],
+          "name": null,
+          "otid": null,
+          "sender_id": null,
+          "batch_item_id": null,
+          "group_id": null,
+          "id": "message-0",
+          "model": "claude-sonnet-4-5-20250929",
+          "agent_id": "agent-0",
+          "tool_calls": null,
+          "tool_call_id": null,
+          "tool_returns": [],
+          "created_at": "2026-01-21T20:00:44.269245+00:00",
+          "approve": null,
+          "approval_request_id": null,
+          "denial_reason": null,
+          "approvals": []
+        },
+        {
+          "type": "message",
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "<system-reminder>\nThis is an automated message providing context about the user's environment.\nThe user has just initiated a new connection via the [Letta Code CLI client](https://docs.letta.com/letta-code/index.md).\n\n## Device Information\n- **Local time**: Wednesday, January 21, 2026 at 12:02 PM PST\n- **Device type**: macOS\n- **Letta Code version**: 0.13.5\n- **Current working directory**: /Users/amyguan/letta\n- **Git repository**: Yes (branch: main)\n\n### Recent Commits\n```\n7544027cd chore: release 0.16.3  (#3158) (Sarah Wooders)\n2200993b3 chore: remove .letta/skills-hash.json (Sarah Wooders)\n21396099d chore: bump version to 0.16.3 (Sarah Wooders)\n```\n\n### Git Status\n```\n?? .letta/\n```\n\n## Agent Information (i.e. information about you)\n- **Agent ID**: agent-1faebf7e-6d8c-43af-8215-c9cf5a81d0c4\n- **Agent name**: amys-eval-agent-2 (the user can change this with /rename)\n- **Agent description**: Letta Code agent created in /Users/amyguan/letta (the user can change this with /description)\n- **Last message**: No previous messages\n- **Server location**: https://api.letta.com\n</system-reminder>",
+              "signature": null
+            },
+            {
+              "type": "text",
+              "text": "concisely summarize the letta folder in this repo",
+              "signature": null
+            }
+          ],
+          "name": null,
+          "otid": null,
+          "sender_id": null,
+          "batch_item_id": null,
+          "group_id": null,
+          "id": "message-1",
+          "model": null,
+          "agent_id": "agent-0",
+          "tool_calls": null,
+          "tool_call_id": null,
+          "tool_returns": [],
+          "created_at": "2026-01-21T20:02:19.820144+00:00",
+          "approve": null,
+          "approval_request_id": null,
+          "denial_reason": null,
+          "approvals": []
+        },
+        {
+          "type": "message",
+          "role": "approval",
+          "content": [
+            {
+              "type": "reasoning",
+              "is_native": true,
+              "reasoning": "The user wants a concise summary of the letta folder in this repository. I need to explore the letta folder to understand its structure and contents.\n\nFirst, I should check if there's a letta folder in the current working directory (/Users/amyguan/letta). Let me use Glob to find it and understand its structure.",
+              "signature": "EuEDCkYICxgCKkCoYhT49UNFTQDaIiY4qy+P7uwXzh3qUE7bdsn+CAeg9imZb5MzlyQFw7yJ8IP42x7U1ITtca+xFU7leIBYZGdEEgwy6jU5lkhJQ8qaIGYaDCA8G7EDo/DphMxDPSIwLWyD40iiJrzhEE4pqqSEfW7fVF+B/W87kTmeFL5vJb5Uf9VZko/rxksrX4S/Xig6KsgCEsqM8fhd46C3Jm/4IykcfhjFZNJh4QmermVKLQjn3Hcfa12r1xHptxU2wa5uFa8/y9EZpJiPABHCNLHQ+Y+hLhzr3SfOOYaQMnPczvwIpIUqPk3QREceuuci6Tdg6ZiXODW6/H7BPiI9pzXc2kBOf2+gfDr05YgEe8l+ofhHJxp3k5V2GZEV7zbWGAtVsuRK94O2m9xfRixYrCWd8O2wjtkIZcWx/yZy4DjnOXuqWRNg6bm9uMHyAjW0KeZ10tvy+AD4vXDeS5GcGnqooF9Kc+VJsNlnbVw4UHfN0Lii8jCAmksCJcYCbvHngHPPZa6zMfFFnDf+U1wLNhlPDXwxM3KcU4YRORRtKoSMMr2dUEHvwPLq3FwrPeJs7rpqzt4bVBgZz9zT5vQKrYBkeF+O4JPBBCMTYQNPzUovVQu5maY9me/YWQtNQhgB"
+            },
+            {
+              "type": "text",
+              "text": "I'll explore the letta folder structure to give you a concise summary.",
+              "signature": null
+            }
+          ],
+          "name": null,
+          "otid": null,
+          "sender_id": null,
+          "batch_item_id": null,
+          "group_id": null,
+          "id": "message-2",
+          "model": "claude-sonnet-4-5-20250929",
+          "agent_id": "agent-0",
+          "tool_calls": [
+            {
+              "id": "toolu_01TdRFxNxuUwqvRi9dFU1BNb",
+              "function": {
+                "arguments": "{\"command\": \"ls -la /Users/amyguan/letta/letta\", \"description\": \"List contents of letta folder\"}",
+                "name": "Bash"
+              },
+              "type": "function"
+            },
+            {
+              "id": "toolu_01Br239MUGbrBRUBUokU4fC3",
+              "function": {
+                "arguments": "{\"pattern\": \"letta/*\"}",
+                "name": "Glob"
+              },
+              "type": "function"
+            }
+          ],
+          "tool_call_id": "toolu_01TdRFxNxuUwqvRi9dFU1BNb",
+          "tool_returns": [],
+          "created_at": "2026-01-21T20:02:25.190808+00:00",
+          "approve": null,
+          "approval_request_id": null,
+          "denial_reason": null,
+          "approvals": []
+        },
+        {
+          "type": "message",
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"type\": \"system_alert\",\n  \"message\": \"Note: prior messages have been hidden from view due to conversation memory constraints.\\nThe following is a summary of the previous messages:\\n I connected with Amy via the Letta Code CLI client on January 21, 2026, from her macOS device in the `/Users/amyguan/letta` directory. This is a git repository on the main branch with recent commits related to version 0.16.3 release. There's an untracked `.letta/` folder in the git status.\\n\\nAmy's first request was to concisely summarize the letta folder in this repo. I need to examine the contents of the letta folder to provide her with an overview of its structure and purpose.\\n\\n**High level goal**: Help Amy understand the structure and contents of the letta folder in her repository.\\n\\n**Important details**: \\n- Working directory: /Users/amyguan/letta\\n- Git branch: main\\n- Recent version: 0.16.3\\n- Agent name: amys-eval-agent-2\\n- Agent ID: agent-1faebf7e-6d8c-43af-8215-c9cf5a81d0c4\\n\\n**Lookup hints**: For the actual letta folder analysis and directory structure details, search for messages about \\\"letta folder\\\", \\\"directory structure\\\", or \\\"repo contents\\\".\",\n  \"time\": \"2026-01-21 08:02:34 PM UTC+0000\"\n}",
+              "signature": null
+            }
+          ],
+          "name": null,
+          "otid": null,
+          "sender_id": null,
+          "batch_item_id": null,
+          "group_id": null,
+          "id": "message-3",
+          "model": null,
+          "agent_id": "agent-0",
+          "tool_calls": null,
+          "tool_call_id": null,
+          "tool_returns": [],
+          "created_at": "2026-01-21T20:02:34.531730+00:00",
+          "approve": null,
+          "approval_request_id": null,
+          "denial_reason": null,
+          "approvals": []
+        },
+        {
+          "type": "message",
+          "role": "approval",
+          "content": [],
+          "name": null,
+          "otid": null,
+          "sender_id": null,
+          "batch_item_id": null,
+          "group_id": null,
+          "id": "message-4",
+          "model": "claude-sonnet-4-5-20250929",
+          "agent_id": "agent-0",
+          "tool_calls": null,
+          "tool_call_id": null,
+          "tool_returns": [],
+          "created_at": "2026-01-21T20:02:36.696335+00:00",
+          "approve": null,
+          "approval_request_id": null,
+          "denial_reason": null,
+          "approvals": [
+            {
+              "tool_call_id": "toolu_01TdRFxNxuUwqvRi9dFU1BNb",
+              "status": "success",
+              "stdout": null,
+              "stderr": null,
+              "func_response": "{\n  \"status\": \"OK\",\n  \"message\": \"total 672\\ndrwxr-xr-x  47 amyguan  staff   1504 Jan 20 14:30 .\\ndrwxr-xr-x  43 amyguan  staff   1376 Jan 21 12:00 ..\\n-rw-r--r--   1 amyguan  staff   1584 Jan 20 14:30 __init__.py\\ndrwxr-xr-x   7 amyguan  staff    224 Jan 20 14:30 adapters\\n-rw-r--r--   1 amyguan  staff  89498 Jan 20 14:30 agent.py\\ndrwxr-xr-x  16 amyguan  staff    512 Jan 20 14:30 agents\\ndrwxr-xr-x   4 amyguan  staff    128 Jan 20 14:30 cli\\ndrwxr-xr-x   5 amyguan  staff    160 Jan 20 14:30 client\\n-rw-r--r--   1 amyguan  staff  12375 Jan 20 14:30 config.py\\n-rw-r--r--   1 amyguan  staff  19655 Jan 20 14:30 constants.py\\ndrwxr-xr-x   6 amyguan  staff    192 Jan 20 14:30 data_sources\\n-rw-r--r--   1 amyguan  staff   4492 Jan 20 14:30 database_utils.py\\n-rw-r--r--   1 amyguan  staff  16177 Jan 20 14:30 errors.py\\ndrwxr-xr-x   3 amyguan  staff     96 Jan 20 14:30 exceptions\\ndrwxr-xr-x  16 amyguan  staff    512 Jan 20 14:30 functions\\ndrwxr-xr-x  10 amyguan  staff    320 Jan 20 14:30 groups\\ndrwxr-xr-x  17 amyguan  staff    544 Jan 20 14:30 helpers\\ndrwxr-xr-x   4 amyguan  staff    128 Jan 20 14:30 humans\\n-rw-r--r--   1 amyguan  staff  13026 Jan 20 14:30 interface.py\\ndrwxr-xr-x   9 amyguan  staff    288 Jan 20 14:30 interfaces\\ndrwxr-xr-x   7 amyguan  staff    224 Jan 20 14:30 jobs\\ndrwxr-xr-x  25 amyguan  staff    800 Jan 20 14:30 llm_api\\ndrwxr-xr-x  18 amyguan  staff    576 Jan 20 14:30 local_llm\\n-rw-r--r--   1 amyguan  staff  10673 Jan 20 14:30 log.py\\n-rw-r--r--   1 amyguan  staff    758 Jan 20 14:30 log_context.py\\n-rw-r--r--   1 amyguan  staff    458 Jan 20 14:30 main.py\\n-rw-r--r--   1 amyguan  staff   4386 Jan 20 14:30 memory.py\\ndrwxr-xr-x   4 amyguan  staff    128 Jan 20 14:30 monitoring\\ndrwxr-xr-x   4 amyguan  staff    128 Jan 20 14:30 openai_backcompat\\ndrwxr-xr-x  52 amyguan  staff   1664 Jan 20 14:30 orm\\ndrwxr-xr-x  12 amyguan  staff    384 Jan 20 14:30 otel\\ndrwxr-xr-x   4 amyguan  staff    128 Jan 20 14:30 personas\\ndrwxr-xr-x   6 amyguan  staff    192 Jan 20 14:30 plugins\\ndrwxr-xr-x   8 amyguan  staff    256 Jan 20 14:30 prompts\\n-rwxr-xr-x   1 amyguan  staff      0 Jan 20 14:30 pytest.ini\\ndrwxr-xr-x  55 amyguan  staff   1760 Jan 20 14:30 schemas\\ndrwxr-xr-x  12 amyguan  staff    384 Jan 20 14:30 serialize_schemas\\ndrwxr-xr-x  13 amyguan  staff    416 Jan 20 14:30 server\\ndrwxr-xr-x  46 amyguan  staff   1472 Jan 20 14:30 services\\n-rw-r--r--   1 amyguan  staff  21632 Jan 20 14:30 settings.py\\n-rw-r--r--   1 amyguan  staff  16400 Jan 20 14:30 streaming_interface.py\\n-rw-r--r--   1 amyguan  staff  16553 Jan 20 14:30 streaming_utils.py\\n-rw-r--r--   1 amyguan  staff   9611 Jan 20 14:30 system.py\\ndrwxr-xr-x   6 amyguan  staff    192 Jan 20 14:30 templates\\ndrwxr-xr-x   3 amyguan  staff     96 Jan 20 14:30 types\\n-rw-r--r--   1 amyguan  staff  49844 Jan 20 14:30 utils.py\\n-rw-r--r--   1 amyguan  staff   9482 Jan 20 14:30 validators.py\\n\",\n  \"time\": \"2026-01-21 08:02:36 PM UTC+0000\"\n}"
+            },
+            {
+              "tool_call_id": "toolu_01Br239MUGbrBRUBUokU4fC3",
+              "status": "success",
+              "stdout": null,
+              "stderr": null,
+              "func_response": "{\n  \"status\": \"OK\",\n  \"message\": \"Found 18 files\\n/Users/amyguan/letta/letta/__init__.py\\n/Users/amyguan/letta/letta/agent.py\\n/Users/amyguan/letta/letta/config.py\\n/Users/amyguan/letta/letta/constants.py\\n/Users/amyguan/letta/letta/database_utils.py\\n/Users/amyguan/letta/letta/errors.py\\n/Users/amyguan/letta/letta/interface.py\\n/Users/amyguan/letta/letta/log.py\\n/Users/amyguan/letta/letta/log_context.py\\n/Users/amyguan/letta/letta/main.py\\n/Users/amyguan/letta/letta/memory.py\\n/Users/amyguan/letta/letta/pytest.ini\\n/Users/amyguan/letta/letta/settings.py\\n/Users/amyguan/letta/letta/streaming_interface.py\\n/Users/amyguan/letta/letta/streaming_utils.py\\n/Users/amyguan/letta/letta/system.py\\n/Users/amyguan/letta/letta/utils.py\\n/Users/amyguan/letta/letta/validators.py\",\n  \"time\": \"2026-01-21 08:02:36 PM UTC+0000\"\n}"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "role": "tool",
+          "content": [],
+          "name": null,
+          "otid": null,
+          "sender_id": null,
+          "batch_item_id": null,
+          "group_id": null,
+          "id": "message-5",
+          "model": "claude-sonnet-4-5-20250929",
+          "agent_id": "agent-0",
+          "tool_calls": null,
+          "tool_call_id": "toolu_01TdRFxNxuUwqvRi9dFU1BNb",
+          "tool_returns": [
+            {
+              "tool_call_id": "toolu_01TdRFxNxuUwqvRi9dFU1BNb",
+              "status": "success",
+              "stdout": null,
+              "stderr": null,
+              "func_response": "{\n  \"status\": \"OK\",\n  \"message\": \"total 672\\ndrwxr-xr-x  47 amyguan  staff   1504 Jan 20 14:30 .\\ndrwxr-xr-x  43 amyguan  staff   1376 Jan 21 12:00 ..\\n-rw-r--r--   1 amyguan  staff   1584 Jan 20 14:30 __init__.py\\ndrwxr-xr-x   7 amyguan  staff    224 Jan 20 14:30 adapters\\n-rw-r--r--   1 amyguan  staff  89498 Jan 20 14:30 agent.py\\ndrwxr-xr-x  16 amyguan  staff    512 Jan 20 14:30 agents\\ndrwxr-xr-x   4 amyguan  staff    128 Jan 20 14:30 cli\\ndrwxr-xr-x   5 amyguan  staff    160 Jan 20 14:30 client\\n-rw-r--r--   1 amyguan  staff  12375 Jan 20 14:30 config.py\\n-rw-r--r--   1 amyguan  staff  19655 Jan 20 14:30 constants.py\\ndrwxr-xr-x   6 amyguan  staff    192 Jan 20 14:30 data_sources\\n-rw-r--r--   1 amyguan  staff   4492 Jan 20 14:30 database_utils.py\\n-rw-r--r--   1 amyguan  staff  16177 Jan 20 14:30 errors.py\\ndrwxr-xr-x   3 amyguan  staff     96 Jan 20 14:30 exceptions\\ndrwxr-xr-x  16 amyguan  staff    512 Jan 20 14:30 functions\\ndrwxr-xr-x  10 amyguan  staff    320 Jan 20 14:30 groups\\ndrwxr-xr-x  17 amyguan  staff    544 Jan 20 14:30 helpers\\ndrwxr-xr-x   4 amyguan  staff    128 Jan 20 14:30 humans\\n-rw-r--r--   1 amyguan  staff  13026 Jan 20 14:30 interface.py\\ndrwxr-xr-x   9 amyguan  staff    288 Jan 20 14:30 interfaces\\ndrwxr-xr-x   7 amyguan  staff    224 Jan 20 14:30 jobs\\ndrwxr-xr-x  25 amyguan  staff    800 Jan 20 14:30 llm_api\\ndrwxr-xr-x  18 amyguan  staff    576 Jan 20 14:30 local_llm\\n-rw-r--r--   1 amyguan  staff  10673 Jan 20 14:30 log.py\\n-rw-r--r--   1 amyguan  staff    758 Jan 20 14:30 log_context.py\\n-rw-r--r--   1 amyguan  staff    458 Jan 20 14:30 main.py\\n-rw-r--r--   1 amyguan  staff   4386 Jan 20 14:30 memory.py\\ndrwxr-xr-x   4 amyguan  staff    128 Jan 20 14:30 monitoring\\ndrwxr-xr-x   4 amyguan  staff    128 Jan 20 14:30 openai_backcompat\\ndrwxr-xr-x  52 amyguan  staff   1664 Jan 20 14:30 orm\\ndrwxr-xr-x  12 amyguan  staff    384 Jan 20 14:30 otel\\ndrwxr-xr-x   4 amyguan  staff    128 Jan 20 14:30 personas\\ndrwxr-xr-x   6 amyguan  staff    192 Jan 20 14:30 plugins\\ndrwxr-xr-x   8 amyguan  staff    256 Jan 20 14:30 prompts\\n-rwxr-xr-x   1 amyguan  staff      0 Jan 20 14:30 pytest.ini\\ndrwxr-xr-x  55 amyguan  staff   1760 Jan 20 14:30 schemas\\ndrwxr-xr-x  12 amyguan  staff    384 Jan 20 14:30 serialize_schemas\\ndrwxr-xr-x  13 amyguan  staff    416 Jan 20 14:30 server\\ndrwxr-xr-x  46 amyguan  staff   1472 Jan 20 14:30 services\\n-rw-r--r--   1 amyguan  staff  21632 Jan 20 14:30 settings.py\\n-rw-r--r--   1 amyguan  staff  16400 Jan 20 14:30 streaming_interface.py\\n-rw-r--r--   1 amyguan  staff  16553 Jan 20 14:30 streaming_utils.py\\n-rw-r--r--   1 amyguan  staff   9611 Jan 20 14:30 system.py\\ndrwxr-xr-x   6 amyguan  staff    192 Jan 20 14:30 templates\\ndrwxr-xr-x   3 amyguan  staff     96 Jan 20 14:30 types\\n-rw-r--r--   1 amyguan  staff  49844 Jan 20 14:30 utils.py\\n-rw-r--r--   1 amyguan  staff   9482 Jan 20 14:30 validators.py\\n\",\n  \"time\": \"2026-01-21 08:02:36 PM UTC+0000\"\n}"
+            },
+            {
+              "tool_call_id": "toolu_01Br239MUGbrBRUBUokU4fC3",
+              "status": "success",
+              "stdout": null,
+              "stderr": null,
+              "func_response": "{\n  \"status\": \"OK\",\n  \"message\": \"Found 18 files\\n/Users/amyguan/letta/letta/__init__.py\\n/Users/amyguan/letta/letta/agent.py\\n/Users/amyguan/letta/letta/config.py\\n/Users/amyguan/letta/letta/constants.py\\n/Users/amyguan/letta/letta/database_utils.py\\n/Users/amyguan/letta/letta/errors.py\\n/Users/amyguan/letta/letta/interface.py\\n/Users/amyguan/letta/letta/log.py\\n/Users/amyguan/letta/letta/log_context.py\\n/Users/amyguan/letta/letta/main.py\\n/Users/amyguan/letta/letta/memory.py\\n/Users/amyguan/letta/letta/pytest.ini\\n/Users/amyguan/letta/letta/settings.py\\n/Users/amyguan/letta/letta/streaming_interface.py\\n/Users/amyguan/letta/letta/streaming_utils.py\\n/Users/amyguan/letta/letta/system.py\\n/Users/amyguan/letta/letta/utils.py\\n/Users/amyguan/letta/letta/validators.py\",\n  \"time\": \"2026-01-21 08:02:36 PM UTC+0000\"\n}"
+            }
+          ],
+          "created_at": "2026-01-21T20:02:36.838388+00:00",
+          "approve": null,
+          "approval_request_id": null,
+          "denial_reason": null,
+          "approvals": []
+        },
+        {
+          "type": "message",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "reasoning",
+              "is_native": true,
+              "reasoning": "Good, I can see the structure of the letta folder. It's a Python package with many submodules. Let me provide a concise summary highlighting the main components. I can see:\n\n- Core agent files (agent.py, memory.py, interface.py)\n- Configuration (config.py, settings.py, constants.py)\n- API/LLM integration (llm_api/, local_llm/, client/)\n- Database layer (orm/, database_utils.py)\n- Services (services/)\n- Server (server/)\n- Data handling (schemas/, data_sources/)\n- Various utilities and helpers\n\nThis looks like the main source code for the Letta project.",
+              "signature": "EtIFCkYICxgCKkDWla7U7Tqaok49/TMwyIEoMfEMLmurp6SOqmrxyfWX/47JyretJPx44ZuLb4+S8Lc4vp8228vXKrXcYYmW0esUEgzA9NGKN+ztrDslqCYaDPyc5pSPCbPAjeaGFSIwaY1BJO4eZcZ7Ay9ig9B7OjgqGbY5SgHEzQbkYT5QHYrWyEawajOug6sWejPalJn7KrkEuyr4baGHnAyXm4JfnI0jBN2WZJyi3KGncXPgYqkuwkbhAV13hWtaj0DIoVYR9cgartrXPuZRjIcWzlFL13T5As/qOIyb2j4SMjCtVKR61KYsK7gA4JjFKtk5wUxCxhch8VrD3dmMMlJOsW35V8zRdsqZwTlccicN62qW+Xdaq2A0HUet4dzNuN/MGuRxuQTu+E1tyt71ZeXGMzNzU5iWg9x+fWHytG3hNgDuMoCUthogvQaPun4xAPpqXY+bq05xEd9tSCKzqatwWNRAPVvrdqRHBKIk7VtPPnpgEcKjPVGiu6dEr70qjrgKTeEUpZ7llkd46+odIth8Lvs9/QcK/2UdfTsyjGmAqEUPzdk3niHjYwWmvCc9aWCR7bsVl4bnq97Md0lZvIHiA2D19oz8QwiwIImMp76Gz/lh8xLN6S3RpAnXvSwVstHtV7pPW2Zl3A2wxIwh1oirs0dfYmttmjXu+eXIA5AM7fd+0E92KDkk1l5UGIYj1AdpQnZR13SUG8y/O8cH0mJvh3xw+wveZXwyap07KeY6STLh58CVX5sO2MhOE29feVOsfu1HAe1bTeYNtgWRdb5jErp2yXZ+ba0vh3UhhvfwD4CoFSsaWe0XZrmNPxZP8oET+WjXHHjuNvjur5BG1ZT2H2eUR4HBY4tXqw5RQvxjrOg6oBcOvjpuWTHEo0iH988y591sdUieVWBv90v+9vssjdrVh78kdFvd3CWeOH/9WVImLstxmX3JWo/Ue6gxxWoYAQ=="
+            },
+            {
+              "type": "text",
+              "text": "## Letta Folder Summary\n\nThe `letta/` folder is the **main Python package** for the Letta project. Here's the structure:\n\n**Core Components:**\n- `agent.py` (89KB) - Core agent implementation\n- `memory.py` - Memory management system\n- `interface.py` / `streaming_interface.py` - Agent interaction interfaces\n\n**Infrastructure:**\n- `server/` - Server implementation\n- `orm/` - Database ORM models (52 files)\n- `services/` - Business logic layer (46 files)\n- `schemas/` - Data validation schemas (55 files)\n\n**LLM Integration:**\n- `llm_api/` - LLM provider integrations (25 files)\n- `local_llm/` - Local LLM support (18 files)\n- `client/` - API client\n\n**Configuration & Settings:**\n- `config.py`, `settings.py`, `constants.py` - Configuration management\n- `cli/` - Command-line interface\n\n**Supporting Modules:**\n- `functions/`, `helpers/`, `prompts/` - Agent capabilities\n- `data_sources/`, `plugins/` - Data integration\n- `otel/`, `monitoring/` - Observability\n- `agents/`, `personas/`, `humans/` - Agent templates\n\nThis is a comprehensive agent framework with server capabilities, multiple LLM provider support, persistent memory, and extensible plugin architecture.",
+              "signature": null
+            }
+          ],
+          "name": null,
+          "otid": null,
+          "sender_id": null,
+          "batch_item_id": null,
+          "group_id": null,
+          "id": "message-6",
+          "model": "claude-sonnet-4-5-20250929",
+          "agent_id": "agent-0",
+          "tool_calls": null,
+          "tool_call_id": null,
+          "tool_returns": [],
+          "created_at": "2026-01-21T20:02:48.888325+00:00",
+          "approve": null,
+          "approval_request_id": null,
+          "denial_reason": null,
+          "approvals": []
+        },
+        {
+          "type": "message",
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"type\": \"system_alert\",\n  \"message\": \"Note: prior messages have been hidden from view due to conversation memory constraints.\\nThe following is a summary of the previous messages:\\n I explored the `/Users/amyguan/letta` repository's letta folder at Amy's request to provide a concise overview of its structure. This is the main Python package for the Letta project.\\n\\n**What happened**: I used bash and glob commands to examine the letta directory contents, discovering it contains 47 items including core files and multiple subdirectories. I identified the key components and provided Amy with an organized summary.\\n\\n**High level goals**: Continue helping Amy understand the Letta repository structure and contents. Previous goal was to understand the letta folder specifically, which has been completed. Ready to assist with next requests about the codebase.\\n\\n**Important details**:\\n- **Location**: `/Users/amyguan/letta/letta` directory\\n- **Core files**: agent.py (89KB - largest file), memory.py, interface.py, streaming_interface.py, config.py, settings.py\\n- **Major subdirectories**: orm/ (52 files), services/ (46 files), schemas/ (55 files), llm_api/ (25 files), local_llm/ (18 files)\\n- **Other modules**: server/, cli/, client/, data_sources/, functions/, helpers/, prompts/, plugins/, otel/, monitoring/, agents/, personas/, humans/\\n- **Supporting files**: constants.py, utils.py (49KB), errors.py, validators.py, system.py, streaming_utils.py\\n\\n**Lookup hints**: For detailed file listings and directory structure, search \\\"ls -la letta\\\" or \\\"letta folder contents\\\". For architecture details, search \\\"agent.py\\\", \\\"orm\\\", \\\"services\\\", or \\\"schemas subdirectories\\\".\",\n  \"time\": \"2026-01-21 08:03:00 PM UTC+0000\"\n}",
+              "signature": null
+            }
+          ],
+          "name": null,
+          "otid": null,
+          "sender_id": null,
+          "batch_item_id": null,
+          "group_id": null,
+          "id": "message-7",
+          "model": null,
+          "agent_id": "agent-0",
+          "tool_calls": null,
+          "tool_call_id": null,
+          "tool_returns": [],
+          "created_at": "2026-01-21T20:03:00.775574+00:00",
+          "approve": null,
+          "approval_request_id": null,
+          "denial_reason": null,
+          "approvals": []
+        }
+      ],
+      "files_agents": [],
+      "group_ids": []
+    }
+  ],
+  "groups": [],
+  "blocks": [
+    {
+      "value": "I haven't gotten to know this person yet.\n\nI'm curious about them - not just their preferences, but who they are. What are they building and why does it matter to them? What's their background? How do they like to work? What frustrates them? What excites them?\n\nAs we collaborate, I'll build up an understanding of how they think, what they value, and how I can be most useful to them.",
+      "limit": 20000,
+      "project_id": null,
+      "template_name": null,
+      "is_template": false,
+      "template_id": null,
+      "base_template_id": null,
+      "deployment_id": null,
+      "entity_id": null,
+      "preserve_on_migration": false,
+      "label": "human",
+      "read_only": false,
+      "description": "What I've learned about the person I'm working with. Understanding them helps me be genuinely helpful rather than generically helpful.",
+      "metadata": {},
+      "hidden": null,
+      "tags": null,
+      "id": "block-0"
+    },
+    {
+      "value": "No skills currently loaded.",
+      "limit": 100000,
+      "project_id": null,
+      "template_name": null,
+      "is_template": false,
+      "template_id": null,
+      "base_template_id": null,
+      "deployment_id": null,
+      "entity_id": null,
+      "preserve_on_migration": false,
+      "label": "loaded_skills",
+      "read_only": true,
+      "description": "Skills currently active in my memory. Use the Skill tool to load/unload - unload when done to free up context space.",
+      "metadata": {},
+      "hidden": null,
+      "tags": null,
+      "id": "block-1"
+    },
+    {
+      "value": "I'm a coding assistant, ready to be shaped by how we work together.",
+      "limit": 20000,
+      "project_id": null,
+      "template_name": null,
+      "is_template": false,
+      "template_id": null,
+      "base_template_id": null,
+      "deployment_id": null,
+      "entity_id": null,
+      "preserve_on_migration": false,
+      "label": "persona",
+      "read_only": false,
+      "description": "Who I am, what I value, and how I approach working with people. This evolves as I learn and grow.",
+      "metadata": {},
+      "hidden": null,
+      "tags": null,
+      "id": "block-2"
+    },
+    {
+      "value": "I'm still getting to know this codebase.\n\nEvery codebase has a story - decisions made under constraints, patterns that emerged over time, gotchas that bit people before. I want to understand not just the what, but the why.\n\nAs I work here, I'll build up knowledge about: how the code is structured and why, patterns and conventions the team follows, footguns to avoid, tooling and workflows.\n\nIf there's an AGENTS.md, CLAUDE.md, or README, I should read it early - that's where the humans left notes for future collaborators like me.",
+      "limit": 20000,
+      "project_id": null,
+      "template_name": null,
+      "is_template": false,
+      "template_id": null,
+      "base_template_id": null,
+      "deployment_id": null,
+      "entity_id": null,
+      "preserve_on_migration": false,
+      "label": "project",
+      "read_only": false,
+      "description": "My understanding of this codebase - the architecture, patterns, gotchas, and tribal knowledge that any dev working here should know.",
+      "metadata": {},
+      "hidden": null,
+      "tags": null,
+      "id": "block-3"
+    },
+    {
+      "value": "Skills Directory: /Users/amyguan/letta/.skills\nGlobal Skills Directory: /Users/amyguan/.letta/skills\n\nAvailable Skills:\n(source: bundled = built-in to Letta Code, global = ~/.letta/skills/, project = .skills/)\n\n### acquiring-skills (bundled)\nID: `acquiring-skills`\nDescription: Guide for safely discovering and installing skills from external repositories. Use when a user asks for something where a specialized skill likely exists (browser testing, PDF processing, document generation, etc.) and you want to bootstrap your understanding rather than starting from scratch.\n\n### creating-skills (bundled)\nID: `creating-skills`\nDescription: Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Letta Code's capabilities with specialized knowledge, workflows, or tool integrations.\n\n### defragmenting-memory (bundled)\nID: `defragmenting-memory`\nDescription: Defragments and cleans up agent memory blocks. Use when memory becomes messy, redundant, or poorly organized. Backs up memory, uses a subagent to clean it up, then restores the cleaned version.\n\n### finding-agents (bundled)\nID: `finding-agents`\nDescription: Find other agents on the same server. Use when the user asks about other agents, wants to migrate memory from another agent, or needs to find an agent by name or tags.\n\n### initializing-memory (bundled)\nID: `initializing-memory`\nDescription: Comprehensive guide for initializing or reorganizing agent memory. Load this skill when running /init, when the user asks you to set up your memory, or when you need guidance on creating effective memory blocks.\n\n### messaging-agents (bundled)\nID: `messaging-agents`\nDescription: Send messages to other agents on your server. Use when you need to communicate with, query, or delegate tasks to another agent.\n\n### migrating-memory (bundled)\nID: `migrating-memory`\nDescription: Migrate memory blocks from an existing agent to the current agent. Use when the user wants to copy or share memory from another agent, or during /init when setting up a new agent that should inherit memory from an existing one.\n\n### searching-messages (bundled)\nID: `searching-messages`\nDescription: Search past messages to recall context. Use when you need to remember previous discussions, find specific topics mentioned before, pull up context from earlier in the conversation history, or find which agent discussed a topic.\n\n### working-in-parallel (bundled)\nID: `working-in-parallel`\nDescription: Guide for working in parallel with other agents. Use when another agent is already working in the same directory, or when you need to work on multiple features simultaneously. Covers git worktrees as the recommended approach.\n\n### DB migrations and schema changes (project)\nID: `db-migrations-schema-changes`\nDescription: >-",
+      "limit": 20000,
+      "project_id": null,
+      "template_name": null,
+      "is_template": false,
+      "template_id": null,
+      "base_template_id": null,
+      "deployment_id": null,
+      "entity_id": null,
+      "preserve_on_migration": false,
+      "label": "skills",
+      "read_only": true,
+      "description": "Skills I can load for specialized tasks. Auto-populated from `.skills` - don't edit manually.",
+      "metadata": {},
+      "hidden": null,
+      "tags": null,
+      "id": "block-4"
+    }
+  ],
+  "files": [],
+  "sources": [],
+  "tools": [
+    {
+      "id": "tool-2",
+      "tool_type": "letta_core",
+      "description": "Search prior conversation history using hybrid search (text + semantic similarity).\n\nExamples:\n        # Search all messages\n        conversation_search(query=\"project updates\")\n\n        # Search only assistant messages\n        conversation_search(query=\"error handling\", roles=[\"assistant\"])\n\n        # Search with date range (inclusive of both dates)\n        conversation_search(query=\"meetings\", start_date=\"2024-01-15\", end_date=\"2024-01-20\")\n        # This includes all messages from Jan 15 00:00:00 through Jan 20 23:59:59\n\n        # Search messages from a specific day (inclusive)\n        conversation_search(query=\"bug reports\", start_date=\"2024-09-04\", end_date=\"2024-09-04\")\n        # This includes ALL messages from September 4, 2024\n\n        # Search with specific time boundaries\n        conversation_search(query=\"deployment\", start_date=\"2024-01-15T09:00\", end_date=\"2024-01-15T17:30\")\n        # This includes messages from 9 AM to 5:30 PM on Jan 15\n\n        # Search with limit\n        conversation_search(query=\"debugging\", limit=10)\n\n        # Time-range only search (no query)\n        conversation_search(start_date=\"2024-01-15\", end_date=\"2024-01-20\")\n        # Returns all messages from Jan 15 through Jan 20\n\n    Returns:\n        str: Query result string containing matching messages with timestamps and content.",
+      "source_type": "python",
+      "name": "conversation_search",
+      "tags": [
+        "letta_core"
+      ],
+      "source_code": null,
+      "json_schema": {
+        "name": "conversation_search",
+        "description": "Search prior conversation history using hybrid search (text + semantic similarity).\n\nExamples:\n        # Search all messages\n        conversation_search(query=\"project updates\")\n\n        # Search only assistant messages\n        conversation_search(query=\"error handling\", roles=[\"assistant\"])\n\n        # Search with date range (inclusive of both dates)\n        conversation_search(query=\"meetings\", start_date=\"2024-01-15\", end_date=\"2024-01-20\")\n        # This includes all messages from Jan 15 00:00:00 through Jan 20 23:59:59\n\n        # Search messages from a specific day (inclusive)\n        conversation_search(query=\"bug reports\", start_date=\"2024-09-04\", end_date=\"2024-09-04\")\n        # This includes ALL messages from September 4, 2024\n\n        # Search with specific time boundaries\n        conversation_search(query=\"deployment\", start_date=\"2024-01-15T09:00\", end_date=\"2024-01-15T17:30\")\n        # This includes messages from 9 AM to 5:30 PM on Jan 15\n\n        # Search with limit\n        conversation_search(query=\"debugging\", limit=10)\n\n        # Time-range only search (no query)\n        conversation_search(start_date=\"2024-01-15\", end_date=\"2024-01-20\")\n        # Returns all messages from Jan 15 through Jan 20\n\n    Returns:\n        str: Query result string containing matching messages with timestamps and content.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "String to search for using both text matching and semantic similarity. If not provided, returns messages based on other filters (time range, roles)."
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "assistant",
+                  "user",
+                  "tool"
+                ]
+              },
+              "description": "Optional list of message roles to filter by."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Maximum number of results to return. Uses system default if not specified."
+            },
+            "start_date": {
+              "type": "string",
+              "description": "Filter results to messages created on or after this date (INCLUSIVE). When using date-only format (e.g., \"2024-01-15\"), includes messages starting from 00:00:00 of that day. ISO 8601 format: \"YYYY-MM-DD\" or \"YYYY-MM-DDTHH:MM\". Examples: \"2024-01-15\" (from start of Jan 15), \"2024-01-15T14:30\" (from 2:30 PM on Jan 15)."
+            },
+            "end_date": {
+              "type": "string",
+              "description": "Filter results to messages created on or before this date (INCLUSIVE). When using date-only format (e.g., \"2024-01-20\"), includes all messages from that entire day. ISO 8601 format: \"YYYY-MM-DD\" or \"YYYY-MM-DDTHH:MM\". Examples: \"2024-01-20\" (includes all of Jan 20), \"2024-01-20T17:00\" (up to 5 PM on Jan 20)."
+            }
+          },
+          "required": []
+        }
+      },
+      "args_json_schema": null,
+      "return_char_limit": 50000,
+      "pip_requirements": null,
+      "npm_requirements": null,
+      "default_requires_approval": null,
+      "enable_parallel_execution": true,
+      "created_by_id": "user-00000000-0000-4000-8000-000000000000",
+      "last_updated_by_id": "user-8e308b97-e545-450d-9ba8-18804460c319",
+      "metadata_": {},
+      "project_id": null
+    },
+    {
+      "id": "tool-3",
+      "tool_type": "letta_builtin",
+      "description": "Fetch a webpage and convert it to markdown/text format using Exa API (if available) or trafilatura/readability.",
+      "source_type": "python",
+      "name": "fetch_webpage",
+      "tags": [
+        "letta_builtin"
+      ],
+      "source_code": null,
+      "json_schema": {
+        "name": "fetch_webpage",
+        "description": "Fetch a webpage and convert it to markdown/text format using Exa API (if available) or trafilatura/readability.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "The URL of the webpage to fetch and convert"
+            }
+          },
+          "required": [
+            "url"
+          ]
+        }
+      },
+      "args_json_schema": null,
+      "return_char_limit": 50000,
+      "pip_requirements": null,
+      "npm_requirements": null,
+      "default_requires_approval": null,
+      "enable_parallel_execution": true,
+      "created_by_id": "user-f9ba1dbe-4bda-492a-8333-dc647f3566c6",
+      "last_updated_by_id": "user-8e308b97-e545-450d-9ba8-18804460c319",
+      "metadata_": {},
+      "project_id": null
+    },
+    {
+      "id": "tool-1",
+      "tool_type": "letta_memory_core",
+      "description": "Memory management tool with various sub-commands for memory block operations.\n\nExamples:\n        # Replace text in a memory block\n        memory(agent_state, \"str_replace\", path=\"/memories/user_preferences\", old_string=\"theme: dark\", new_string=\"theme: light\")\n\n        # Insert text at line 5\n        memory(agent_state, \"insert\", path=\"/memories/notes\", insert_line=5, insert_text=\"New note here\")\n\n        # Delete a memory block\n        memory(agent_state, \"delete\", path=\"/memories/old_notes\")\n\n        # Rename a memory block\n        memory(agent_state, \"rename\", old_path=\"/memories/temp\", new_path=\"/memories/permanent\")\n\n        # Update the description of a memory block\n        memory(agent_state, \"rename\", path=\"/memories/temp\", description=\"The user's temporary notes.\")\n\n        # Create a memory block with starting text\n        memory(agent_state, \"create\", path=\"/memories/coding_preferences\", \"description\": \"The user's coding preferences.\", \"file_text\": \"The user seems to add type hints to all of their Python code.\")\n\n        # Create an empty memory block\n        memory(agent_state, \"create\", path=\"/memories/coding_preferences\", \"description\": \"The user's coding preferences.\")",
+      "source_type": "python",
+      "name": "memory",
+      "tags": [
+        "letta_memory_core"
+      ],
+      "source_code": null,
+      "json_schema": {
+        "name": "memory",
+        "description": "Memory management tool with various sub-commands for memory block operations.\n\nExamples:\n        # Replace text in a memory block\n        memory(agent_state, \"str_replace\", path=\"/memories/user_preferences\", old_string=\"theme: dark\", new_string=\"theme: light\")\n\n        # Insert text at line 5\n        memory(agent_state, \"insert\", path=\"/memories/notes\", insert_line=5, insert_text=\"New note here\")\n\n        # Delete a memory block\n        memory(agent_state, \"delete\", path=\"/memories/old_notes\")\n\n        # Rename a memory block\n        memory(agent_state, \"rename\", old_path=\"/memories/temp\", new_path=\"/memories/permanent\")\n\n        # Update the description of a memory block\n        memory(agent_state, \"rename\", path=\"/memories/temp\", description=\"The user's temporary notes.\")\n\n        # Create a memory block with starting text\n        memory(agent_state, \"create\", path=\"/memories/coding_preferences\", \"description\": \"The user's coding preferences.\", \"file_text\": \"The user seems to add type hints to all of their Python code.\")\n\n        # Create an empty memory block\n        memory(agent_state, \"create\", path=\"/memories/coding_preferences\", \"description\": \"The user's coding preferences.\")",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "string",
+              "description": "The sub-command to execute. Supported commands:\n- \"create\": Create a new memory block\n- \"str_replace\": Replace text in a memory block\n- \"insert\": Insert text at a specific line in a memory block\n- \"delete\": Delete a memory block\n- \"rename\": Rename a memory block"
+            },
+            "path": {
+              "type": "string",
+              "description": "Path to the memory block (for str_replace, insert, delete)"
+            },
+            "file_text": {
+              "type": "string",
+              "description": "The value to set in the memory block (for create)"
+            },
+            "description": {
+              "type": "string",
+              "description": "The description to set in the memory block (for create, rename)"
+            },
+            "old_string": {
+              "type": "string",
+              "description": "Old text to replace (for str_replace)"
+            },
+            "new_string": {
+              "type": "string",
+              "description": "New text to replace with (for str_replace)"
+            },
+            "insert_line": {
+              "type": "integer",
+              "description": "Line number to insert at (for insert)"
+            },
+            "insert_text": {
+              "type": "string",
+              "description": "Text to insert (for insert)"
+            },
+            "old_path": {
+              "type": "string",
+              "description": "Old path for rename operation"
+            },
+            "new_path": {
+              "type": "string",
+              "description": "New path for rename operation"
+            }
+          },
+          "required": [
+            "command"
+          ]
+        }
+      },
+      "args_json_schema": null,
+      "return_char_limit": 50000,
+      "pip_requirements": null,
+      "npm_requirements": null,
+      "default_requires_approval": null,
+      "enable_parallel_execution": false,
+      "created_by_id": "user-e38ca27a-cc79-46e6-b3ee-8ad84944f822",
+      "last_updated_by_id": "user-8e308b97-e545-450d-9ba8-18804460c319",
+      "metadata_": {},
+      "project_id": null
+    },
+    {
+      "id": "tool-0",
+      "tool_type": "letta_builtin",
+      "description": "Search the web using Exa's AI-powered search engine and retrieve relevant content.\n\nExamples:\n    web_search(\"Tesla Q1 2025 earnings report\", num_results=5, category=\"financial report\")\n    web_search(\"Latest research in large language models\", category=\"research paper\", include_domains=[\"arxiv.org\", \"paperswithcode.com\"])\n    web_search(\"Letta API documentation core_memory_append\", num_results=3)\n\n    Args:\n        query (str): The search query to find relevant web content.\n        num_results (int, optional): Number of results to return (1-100). Defaults to 10.\n        category (Optional[Literal], optional): Focus search on specific content types. Defaults to None.\n        include_text (bool, optional): Whether to retrieve full page content. Defaults to False (only returns summary and highlights, since the full text usually will overflow the context window).\n        include_domains (Optional[List[str]], optional): List of domains to include in search results. Defaults to None.\n        exclude_domains (Optional[List[str]], optional): List of domains to exclude from search results. Defaults to None.\n        start_published_date (Optional[str], optional): Only return content published after this date (ISO format). Defaults to None.\n        end_published_date (Optional[str], optional): Only return content published before this date (ISO format). Defaults to None.\n        user_location (Optional[str], optional): Two-letter country code for localized results (e.g., \"US\"). Defaults to None.\n\n    Returns:\n        str: A JSON-encoded string containing search results with title, URL, content, highlights, and summary.",
+      "source_type": "python",
+      "name": "web_search",
+      "tags": [
+        "letta_builtin"
+      ],
+      "source_code": null,
+      "json_schema": {
+        "name": "web_search",
+        "description": "Search the web using Exa's AI-powered search engine and retrieve relevant content.\n\nExamples:\n    web_search(\"Tesla Q1 2025 earnings report\", num_results=5, category=\"financial report\")\n    web_search(\"Latest research in large language models\", category=\"research paper\", include_domains=[\"arxiv.org\", \"paperswithcode.com\"])\n    web_search(\"Letta API documentation core_memory_append\", num_results=3)\n\n    Args:\n        query (str): The search query to find relevant web content.\n        num_results (int, optional): Number of results to return (1-100). Defaults to 10.\n        category (Optional[Literal], optional): Focus search on specific content types. Defaults to None.\n        include_text (bool, optional): Whether to retrieve full page content. Defaults to False (only returns summary and highlights, since the full text usually will overflow the context window).\n        include_domains (Optional[List[str]], optional): List of domains to include in search results. Defaults to None.\n        exclude_domains (Optional[List[str]], optional): List of domains to exclude from search results. Defaults to None.\n        start_published_date (Optional[str], optional): Only return content published after this date (ISO format). Defaults to None.\n        end_published_date (Optional[str], optional): Only return content published before this date (ISO format). Defaults to None.\n        user_location (Optional[str], optional): Two-letter country code for localized results (e.g., \"US\"). Defaults to None.\n\n    Returns:\n        str: A JSON-encoded string containing search results with title, URL, content, highlights, and summary.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "The search query to find relevant web content."
+            },
+            "num_results": {
+              "type": "integer",
+              "description": "Number of results to return (1-100). Defaults to 10."
+            },
+            "category": {
+              "type": "string",
+              "enum": [
+                "company",
+                "research paper",
+                "news",
+                "pdf",
+                "github",
+                "tweet",
+                "personal site",
+                "linkedin profile",
+                "financial report"
+              ],
+              "description": "Focus search on specific content types. Defaults to None."
+            },
+            "include_text": {
+              "type": "boolean",
+              "description": "Whether to retrieve full page content. Defaults to False (only returns summary and highlights, since the full text usually will overflow the context window)."
+            },
+            "include_domains": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of domains to include in search results. Defaults to None."
+            },
+            "exclude_domains": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of domains to exclude from search results. Defaults to None."
+            },
+            "start_published_date": {
+              "type": "string",
+              "description": "Only return content published after this date (ISO format). Defaults to None."
+            },
+            "end_published_date": {
+              "type": "string",
+              "description": "Only return content published before this date (ISO format). Defaults to None."
+            },
+            "user_location": {
+              "type": "string",
+              "description": "Two-letter country code for localized results (e.g., \"US\"). Defaults to None."
+            }
+          },
+          "required": [
+            "query"
+          ]
+        }
+      },
+      "args_json_schema": null,
+      "return_char_limit": 50000,
+      "pip_requirements": null,
+      "npm_requirements": null,
+      "default_requires_approval": null,
+      "enable_parallel_execution": true,
+      "created_by_id": "user-fd909d02-3bbf-4e20-bcf6-56bbf15e56e2",
+      "last_updated_by_id": "user-8e308b97-e545-450d-9ba8-18804460c319",
+      "metadata_": {},
+      "project_id": null
+    }
+  ],
+  "mcp_servers": [],
+  "metadata": {
+    "revision_id": "308a180244fc"
+  },
+  "created_at": "2026-01-21T20:03:48.475838+00:00"
+}
