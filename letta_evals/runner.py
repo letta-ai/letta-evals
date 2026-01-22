@@ -187,6 +187,7 @@ class Runner:
                 timeout=int(self.suite.target.timeout),
                 max_retries=self.suite.target.max_retries,
                 base_url=self.suite.target.base_url,
+                agent_file=self.suite.target.agent_file,
             )
         else:
             raise ValueError(f"Unknown target kind: {self.suite.target.kind}")
