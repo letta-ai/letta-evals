@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Optional
 
 from letta_client import AsyncLetta
-from letta_client.types import MessageCreateParam
 import httpx
 
 from letta_evals.models import Sample, TargetResult
@@ -66,7 +65,6 @@ class LettaCodeTarget(AbstractAgentTarget):
         """Run the letta CLI command on a sample."""
         attempt = 0
         last_error = None
-        agent_id_to_cleanup = None
 
         while attempt <= self.max_retries:
             try:
@@ -96,12 +94,11 @@ class LettaCodeTarget(AbstractAgentTarget):
                             )
 
                         agent_id = resp.agent_ids[0]
-                        agent_id_to_cleanup = agent_id
                     
                     logger.info(f"Using imported agent {agent_id} with CLI (no history from previous runs)")
 
                 # compact the existing conversation
-                if prompt == "/compact":
+                if not prompt and sample.extra_vars.get("compaction", False): # no input and compaction is true
                     if not agent_id:
                         raise RuntimeError("agent_id is required for /compact operation. Provide agent_file in config.")
                     
@@ -145,17 +142,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                             }
                         )
 
-                    ### TODO: test/debug this part
-                    # if agent_id_to_cleanup:
-                    #     try:
-                    #         await self.client.agents.delete(agent_id=agent_id_to_cleanup)
-                    #         logger.info(f"Cleaned up agent {agent_id_to_cleanup} after failed attempt {attempt}")
-                    #     except Exception as cleanup_error:
-                    #         logger.warning(
-                    #             f"Failed to cleanup agent {agent_id_to_cleanup}: {type(cleanup_error).__name__}: {str(cleanup_error)}"
-                    #         )
-                    
-                    # Return early - don't run CLI command when compacting (TODO: can add ability to do combo of compact and run cli later)
+                    # Return early - don't run CLI command when compacting
                     return TargetResult(
                         trajectory=trajectory,
                         agent_id=agent_id,

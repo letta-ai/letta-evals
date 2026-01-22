@@ -13,9 +13,6 @@ from letta_evals.extractors.utils import (
 )
 from letta_evals.models import AgentState, LettaMessageUnion
 
-import logging
-logger = logging.getLogger(__name__)
-
 
 @extractor
 def last_assistant(trajectory: List[List[LettaMessageUnion]], config: dict) -> str:
@@ -29,7 +26,7 @@ def last_assistant(trajectory: List[List[LettaMessageUnion]], config: dict) -> s
 @extractor
 def last_compaction(trajectory: List[List[LettaMessageUnion]], config: dict) -> str:
     """Extract the last message that contains a system_alert, along with the full conversation history."""
-    # Find the compaction (system_alert)
+    # Find the compaction (last UserMessage with system_alert)
     compaction_text = ""
     messages = get_messages_by_type(trajectory, UserMessage)
     compaction_text = ""
@@ -40,7 +37,6 @@ def last_compaction(trajectory: List[List[LettaMessageUnion]], config: dict) -> 
 
     # Format the full conversation history
     history_parts = []
-    ### TODO: skips ReasoningMessages right now so indexing is off
     for idx, message in enumerate(trajectory[0]):
         if isinstance(message, UserMessage) or isinstance(message, AssistantMessage):
             history_parts.append(f"\n--- Message {idx + 1} ---")
@@ -48,8 +44,7 @@ def last_compaction(trajectory: List[List[LettaMessageUnion]], config: dict) -> 
     
     conversation_history = "\n".join(history_parts)
     
-    # Return both in a formatted way for the LLM judge
-
+    # Return both compaction and original user/assistant conversation history for the LLM judge
     result = f"""## The compaction:
 {compaction_text if compaction_text else "(No compaction found)"}
 
