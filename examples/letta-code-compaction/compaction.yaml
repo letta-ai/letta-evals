@@ -1,0 +1,28 @@
+name: compaction-eval
+description: Test quality of letta-code compaction
+dataset: dataset.jsonl
+
+target:
+  kind: letta_code
+  agent_file: compaction-agent.af
+  # base_url: http://localhost:8283
+  base_url: https://api.letta.com/
+  working_dir: sandbox
+  model_handles:
+    - anthropic/claude-sonnet-4-5-20250929
+
+graders:
+  compaction_accuracy:
+    kind: model_judge
+    display_name: "context window compaction accuracy"
+    prompt_path: accuracy.txt
+    model: claude-haiku-4-5-20251001
+    provider: anthropic
+    extractor: last_compaction
+
+gate:
+  kind: simple
+  metric_key: compaction_accuracy
+  aggregation: avg_score
+  op: gte
+  value: 0
