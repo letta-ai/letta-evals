@@ -34,6 +34,26 @@ def last_compaction(trajectory: List[List[LettaMessageUnion]], config: dict) -> 
         if "system_alert" in messages[index].content:
             compaction_text = flatten_content(messages[index].content)
             break
+    
+    # Return the compaction for the judge
+    result = f"""## The compaction:
+{compaction_text if compaction_text else "(No compaction found)"}
+"""
+
+    return result
+
+
+@extractor
+def last_compaction_and_history(trajectory: List[List[LettaMessageUnion]], config: dict) -> str:
+    """Extract the last message that contains a system_alert, along with the full conversation history."""
+    # Find the compaction (last UserMessage with system_alert)
+    compaction_text = ""
+    messages = get_messages_by_type(trajectory, UserMessage)
+    compaction_text = ""
+    for index in range(len(messages) - 1, -1, -1):
+        if "system_alert" in messages[index].content:
+            compaction_text = flatten_content(messages[index].content)
+            break
 
     # Format the full conversation history
     history_parts = []

@@ -231,6 +231,14 @@ class Runner:
                             agent_file = Path(__file__).parent / "graders/letta-evals-judge-agent.af"
                             judge_tool_name = "submit_grade"
 
+                    # Resolve working_dir relative to base_dir if provided for letta-judge grader (letta_code)
+                    working_dir = None
+                    if gspec.working_dir:
+                        if gspec.base_dir:
+                            working_dir = (gspec.base_dir / gspec.working_dir).resolve()
+                        else:
+                            working_dir = Path(gspec.working_dir).resolve()
+
                     self.graders[key] = AgentJudgeGrader(
                         prompt=gspec.prompt,
                         client=self.client,
@@ -242,6 +250,10 @@ class Runner:
                         extractor_config=gspec.extractor_config,
                         base_dir=gspec.base_dir,
                         rubric_vars=gspec.rubric_vars,
+                        judge_target_kind=gspec.judge_target_kind or "letta_agent",
+                        working_dir=working_dir,
+                        model_handle=gspec.model_handle,
+                        base_url=gspec.base_url or (self.suite.target.base_url if hasattr(self.suite.target, "base_url") else None),
                     )
                 else:
                     raise ValueError(f"Unknown grader spec type: {type(gspec)}")

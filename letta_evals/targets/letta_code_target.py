@@ -80,14 +80,19 @@ class LettaCodeTarget(AbstractAgentTarget):
 
                 # If agent_file is provided, import it first, and get agent_id
                 agent_id = None
-                logger.info(f"Agent file: {self.agent_file}")
-                if self.agent_file:
-                    with open(self.agent_file, "rb") as f:
+                agent_file = self.agent_file or None
+                # override with agent_file provided in sample if given
+                if sample.extra_vars.get("agent_file", False):
+                    agent_file = sample.extra_vars.get("agent_file")
+                logger.info(f"Agent file: {agent_file}")
+
+                if agent_file:
+                    with open(agent_file, "rb") as f:
                         resp = await self.client.agents.import_file(
                             file=f, append_copy_suffix=False, override_existing_tools=False, project_id=project_id
                         )
-                        logger.info(f"resp: {resp}")
-                        logger.info(f"Agent IDs: {resp.agent_ids}")
+                        logger.debug(f"resp: {resp}")
+                        logger.debug(f"Agent IDs: {resp.agent_ids}")
                         if len(resp.agent_ids) > 1:
                             raise RuntimeError(
                                 f"Expected single agent from .af file, got {len(resp.agent_ids)} agents. We don't support multi-agent evals yet."
@@ -95,7 +100,7 @@ class LettaCodeTarget(AbstractAgentTarget):
 
                         agent_id = resp.agent_ids[0]
                     
-                    logger.info(f"Using imported agent {agent_id} with CLI (no history from previous runs)")
+                    logger.debug(f"Using imported agent {agent_id} with CLI (no history from previous runs)")
 
                 # compact the existing conversation
                 if not prompt and sample.extra_vars.get("compaction", False): # no input and compaction is true
@@ -108,14 +113,14 @@ class LettaCodeTarget(AbstractAgentTarget):
                     # Construct the summarize endpoint URL
                     summarize_url = f"{base_url}/v1/agents/{agent_id}/summarize"
                     
-                    logger.info(f"Calling summarize API for agent {agent_id} via HTTP POST to {summarize_url}")
-                    
                     result = {}
                     try:
                         async with httpx.AsyncClient(timeout=self.timeout) as http_client:
                             http_response = await http_client.post(
                                 summarize_url,
-                                headers={"Authorization": f"Bearer {os.getenv('LETTA_API_KEY')}"},
+                                headers={
+                                    "Authorization": f"Bearer {os.getenv('LETTA_API_KEY')}",
+                                },
                             )
                             
                             # Parse response JSON if available
@@ -128,7 +133,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                         logger.warning(f"Error calling summarize API: {e}, continuing to retrieve messages")
                     
                     # Retrieve messages and build result
-                    logger.info(f"Retrieving messages for agent {agent_id}")
+                    logger.debug(f"Retrieving messages for agent {agent_id}")
                     messages_page = await self.client.agents.messages.list(agent_id=agent_id)
                     trajectory = [messages_page.items] if messages_page.items else []
                     

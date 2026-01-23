@@ -210,6 +210,18 @@ class LettaJudgeGraderSpec(BaseGraderSpec):
     rubric_vars: Optional[List[str]] = Field(
         default=None, description="List of required custom variables for prompt substitution"
     )
+    judge_target_kind: Optional[Literal["letta_agent", "letta_code"]] = Field(
+        default="letta_agent", description="Target type for judge execution (letta_agent or letta_code)"
+    )
+    working_dir: Optional[Path] = Field(
+        default=None, description="Working directory for letta-code judge execution (required if judge_target_kind is letta_code)"
+    )
+    model_handle: Optional[str] = Field(
+        default=None, description="Model handle for letta-code judge execution (required if judge_target_kind is letta_code)"
+    )
+    base_url: Optional[str] = Field(
+        default=None, description="Base URL for letta-code judge execution"
+    )
 
     @field_validator("agent_file")
     @classmethod
@@ -238,6 +250,15 @@ class LettaJudgeGraderSpec(BaseGraderSpec):
                 "Cannot specify judge_tool_name when using default Letta judge (agent_file and agent_id are None). "
                 "To use a custom judge_tool_name, provide a custom agent_file or agent_id."
             )
+
+        # Validate letta-code configuration
+        if self.judge_target_kind == "letta_code":
+            if not self.working_dir:
+                raise ValueError("working_dir is required when judge_target_kind is letta_code")
+            if not self.model_handle:
+                raise ValueError("model_handle is required when judge_target_kind is letta_code")
+            if not self.agent_file:
+                raise ValueError("agent_file is required when judge_target_kind is letta_code (agent_id not supported)")
 
         # load prompt from file if needed
         if self.prompt_path:
