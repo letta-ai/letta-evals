@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
+import httpx
 from letta_client import AsyncLetta
 
 from letta_evals.models import Sample, TargetResult
@@ -28,6 +29,7 @@ class LettaCodeTarget(AbstractAgentTarget):
         timeout: int = 300,
         max_retries: int = 0,
         base_url: Optional[str] = None,
+        agent_file: Optional[Path] = None,
     ):
         """Initialize the Letta Code target.
 
@@ -51,6 +53,7 @@ class LettaCodeTarget(AbstractAgentTarget):
         self.timeout = timeout
         self.max_retries = max_retries
         self.base_url = base_url
+        self.agent_file = agent_file
 
     async def run(
         self,
@@ -75,26 +78,118 @@ class LettaCodeTarget(AbstractAgentTarget):
                 prompt = "\n".join(str(inp) for inp in inputs)
                 prompt = prompt.replace("{pwd}", self.working_dir.resolve().as_posix())
 
+                # If agent_file is provided, import it first, and get agent_id
+                agent_id = None
+                agent_file = self.agent_file or None
+                # override with agent_file provided in sample if given
+                if sample.extra_vars.get("agent_file", False):
+                    agent_file = sample.extra_vars.get("agent_file")
+                logger.info(f"Agent file: {agent_file}")
+
+                if agent_file:
+                    with open(agent_file, "rb") as f:
+                        resp = await self.client.agents.import_file(
+                            file=f, append_copy_suffix=False, override_existing_tools=False, project_id=project_id
+                        )
+                        logger.debug(f"resp: {resp}")
+                        logger.debug(f"Agent IDs: {resp.agent_ids}")
+                        if len(resp.agent_ids) > 1:
+                            raise RuntimeError(
+                                f"Expected single agent from .af file, got {len(resp.agent_ids)} agents. We don't support multi-agent evals yet."
+                            )
+
+                        agent_id = resp.agent_ids[0]
+
+                    logger.debug(f"Using imported agent {agent_id} with CLI (no history from previous runs)")
+
+                # compact the existing conversation
+                if not prompt and sample.extra_vars.get("compaction", False):  # no input and compaction is true
+                    if not agent_id:
+                        raise RuntimeError("agent_id is required for /compact operation. Provide agent_file in config.")
+
+                    base_url = self.base_url or "https://api.letta.com"
+                    base_url = base_url.rstrip("/")
+
+                    # Construct the summarize endpoint URL
+                    summarize_url = f"{base_url}/v1/agents/{agent_id}/summarize"
+
+                    result = {}
+                    try:
+                        async with httpx.AsyncClient(timeout=self.timeout) as http_client:
+                            http_response = await http_client.post(
+                                summarize_url,
+                                headers={
+                                    "Authorization": f"Bearer {os.getenv('LETTA_API_KEY')}",
+                                },
+                            )
+
+                            # Parse response JSON if available
+                            try:
+                                result = http_response.json() if http_response.content else {}
+                                logger.info(f"Summarize response: {result}")
+                            except Exception as e:
+                                logger.warning(f"Could not parse summarize response as JSON: {e}")
+                    except Exception as e:
+                        logger.warning(f"Error calling summarize API: {e}, continuing to retrieve messages")
+
+                    # Retrieve messages and build result
+                    logger.debug(f"Retrieving messages for agent {agent_id}")
+                    messages_page = await self.client.agents.messages.list(agent_id=agent_id)
+                    trajectory = [messages_page.items] if messages_page.items else []
+
+                    # Extract usage stats if available
+                    usage_stats = []
+                    if "usage" in result:
+                        usage_stats.append(
+                            {
+                                "input_tokens": result["usage"].get("input_tokens", 0),
+                                "output_tokens": result["usage"].get("output_tokens", 0),
+                            }
+                        )
+
+                    # Return early - don't run CLI command when compacting
+                    return TargetResult(
+                        trajectory=trajectory,
+                        agent_id=agent_id,
+                        model_name=self.model_handle,
+                        agent_usage=usage_stats if usage_stats else None,
+                        agent_state=None,
+                    )
+
                 # construct the letta-code CLI command (headless JSON output)
                 # NOTE: letta-code CLI flags have changed over time; keep to stable, documented flags.
-                cmd = [
-                    "letta",
-                    "--new",
-                    "--yolo",
-                    "--output-format",
-                    "json",
-                    "--model",
-                    self.model_handle,
-                ]
+                if agent_id:
+                    # Use existing agent (imported from .af file)
+                    cmd = [
+                        "letta",
+                        "--agent",
+                        agent_id,
+                        "--yolo",
+                        "--output-format",
+                        "json",
+                        "--model",
+                        self.model_handle,
+                    ]
+                else:
+                    # Create new agent (default behavior)
+                    cmd = [
+                        "letta",
+                        "--new",
+                        "--yolo",
+                        "--output-format",
+                        "json",
+                        "--model",
+                        self.model_handle,
+                    ]
 
-                # Use codex system prompt for GPT-style models (matches `letta --help` examples)
-                if "gpt" in self.model_handle:
-                    cmd.extend(["--system", "codex"])
-                    cmd.extend(["--init-blocks", "skills,loaded_skills"])
+                    # Use codex system prompt for GPT-style models (matches `letta --help` examples)
+                    if "gpt" in self.model_handle:
+                        cmd.extend(["--system", "codex"])
+                        cmd.extend(["--init-blocks", "skills,loaded_skills"])
 
-                # add skills directory if specified
-                if self.skills_dir:
-                    cmd.extend(["--skills", str(self.skills_dir)])
+                    # add skills directory if specified
+                    if self.skills_dir:
+                        cmd.extend(["--skills", str(self.skills_dir)])
 
                 cmd.extend(["-p", prompt])
 

@@ -2,13 +2,14 @@ import re
 from typing import List, Optional
 
 from letta_client.types import ToolReturnMessage
-from letta_client.types.agents import AssistantMessage, ToolCallMessage
+from letta_client.types.agents import AssistantMessage, ToolCallMessage, UserMessage
 
 from letta_evals.decorators import extractor
 from letta_evals.extractors.utils import (
     flatten_content,
     get_assistant_messages,
     get_last_turn_messages,
+    get_messages_by_type,
 )
 from letta_evals.models import AgentState, LettaMessageUnion
 
@@ -20,6 +21,58 @@ def last_assistant(trajectory: List[List[LettaMessageUnion]], config: dict) -> s
     if not messages:
         return ""
     return flatten_content(messages[-1].content)
+
+
+@extractor
+def last_compaction(trajectory: List[List[LettaMessageUnion]], config: dict) -> str:
+    """Extract the last message that contains a system_alert, along with the full conversation history."""
+    # Find the compaction (last UserMessage with system_alert)
+    compaction_text = ""
+    messages = get_messages_by_type(trajectory, UserMessage)
+    compaction_text = ""
+    for index in range(len(messages) - 1, -1, -1):
+        if "system_alert" in messages[index].content:
+            compaction_text = flatten_content(messages[index].content)
+            break
+
+    # Return the compaction for the judge
+    result = f"""## The compaction:
+{compaction_text if compaction_text else "(No compaction found)"}
+"""
+
+    return result
+
+
+@extractor
+def last_compaction_and_history(trajectory: List[List[LettaMessageUnion]], config: dict) -> str:
+    """Extract the last message that contains a system_alert, along with the full conversation history."""
+    # Find the compaction (last UserMessage with system_alert)
+    compaction_text = ""
+    messages = get_messages_by_type(trajectory, UserMessage)
+    compaction_text = ""
+    for index in range(len(messages) - 1, -1, -1):
+        if "system_alert" in messages[index].content:
+            compaction_text = flatten_content(messages[index].content)
+            break
+
+    # Format the full conversation history
+    history_parts = []
+    for idx, message in enumerate(trajectory[0]):
+        if isinstance(message, UserMessage) or isinstance(message, AssistantMessage):
+            history_parts.append(f"\n--- Message {idx + 1} ---")
+            history_parts.append(f"[{type(message).__name__}]: {flatten_content(message.content)}")
+
+    conversation_history = "\n".join(history_parts)
+
+    # Return both compaction and original user/assistant conversation history for the LLM judge
+    result = f"""## The compaction:
+{compaction_text if compaction_text else "(No compaction found)"}
+
+## The original conversation history:
+{conversation_history}
+"""
+
+    return result
 
 
 @extractor
