@@ -253,7 +253,8 @@ class Runner:
                         judge_target_kind=gspec.judge_target_kind or "letta_agent",
                         working_dir=working_dir,
                         model_handle=gspec.model_handle,
-                        base_url=gspec.base_url or (self.suite.target.base_url if hasattr(self.suite.target, "base_url") else None),
+                        base_url=gspec.base_url
+                        or (self.suite.target.base_url if hasattr(self.suite.target, "base_url") else None),
                     )
                 else:
                     raise ValueError(f"Unknown grader spec type: {type(gspec)}")

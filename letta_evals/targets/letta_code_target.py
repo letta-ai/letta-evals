@@ -5,8 +5,8 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from letta_client import AsyncLetta
 import httpx
+from letta_client import AsyncLetta
 
 from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.base import AbstractAgentTarget
@@ -99,20 +99,20 @@ class LettaCodeTarget(AbstractAgentTarget):
                             )
 
                         agent_id = resp.agent_ids[0]
-                    
+
                     logger.debug(f"Using imported agent {agent_id} with CLI (no history from previous runs)")
 
                 # compact the existing conversation
-                if not prompt and sample.extra_vars.get("compaction", False): # no input and compaction is true
+                if not prompt and sample.extra_vars.get("compaction", False):  # no input and compaction is true
                     if not agent_id:
                         raise RuntimeError("agent_id is required for /compact operation. Provide agent_file in config.")
-                    
+
                     base_url = self.base_url or "https://api.letta.com"
                     base_url = base_url.rstrip("/")
-                    
+
                     # Construct the summarize endpoint URL
                     summarize_url = f"{base_url}/v1/agents/{agent_id}/summarize"
-                    
+
                     result = {}
                     try:
                         async with httpx.AsyncClient(timeout=self.timeout) as http_client:
@@ -122,7 +122,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                                     "Authorization": f"Bearer {os.getenv('LETTA_API_KEY')}",
                                 },
                             )
-                            
+
                             # Parse response JSON if available
                             try:
                                 result = http_response.json() if http_response.content else {}
@@ -131,12 +131,12 @@ class LettaCodeTarget(AbstractAgentTarget):
                                 logger.warning(f"Could not parse summarize response as JSON: {e}")
                     except Exception as e:
                         logger.warning(f"Error calling summarize API: {e}, continuing to retrieve messages")
-                    
+
                     # Retrieve messages and build result
                     logger.debug(f"Retrieving messages for agent {agent_id}")
                     messages_page = await self.client.agents.messages.list(agent_id=agent_id)
                     trajectory = [messages_page.items] if messages_page.items else []
-                    
+
                     # Extract usage stats if available
                     usage_stats = []
                     if "usage" in result:

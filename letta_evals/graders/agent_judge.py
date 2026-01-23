@@ -240,10 +240,9 @@ class AgentJudgeGrader(Grader):
 
         raise ValueError(f"No {self.judge_tool_name} tool call found in judge agent response")
 
-
     async def _grade_with_letta_code(self, judge_prompt: str) -> Tuple[float, str, str]:
         """Run judge agent using letta-code CLI for local file access.
-        
+
         Returns:
             Tuple of (score, rationale, judge_agent_id)
         """
@@ -253,9 +252,7 @@ class AgentJudgeGrader(Grader):
                 file=f, append_copy_suffix=False, override_existing_tools=False, project_id=self.project_id
             )
             if len(resp.agent_ids) > 1:
-                raise RuntimeError(
-                    f"Expected single judge agent from .af file, got {len(resp.agent_ids)} agents"
-                )
+                raise RuntimeError(f"Expected single judge agent from .af file, got {len(resp.agent_ids)} agents")
             judge_agent_id = resp.agent_ids[0]
 
         # Construct the letta-code CLI command
@@ -294,7 +291,6 @@ class AgentJudgeGrader(Grader):
             await process.wait()
             raise RuntimeError("Letta-code judge command timed out after 300 seconds")
 
-        stdout_text = stdout.decode() if stdout else ""
         stderr_text = stderr.decode() if stderr else ""
 
         if process.returncode != 0:
@@ -306,8 +302,8 @@ class AgentJudgeGrader(Grader):
         # The letta CLI may output JSON, but we can retrieve messages directly using the agent_id
         # Retrieve messages from the agent's last run
         messages_page = await self.client.agents.messages.list(agent_id=judge_agent_id)
-        
+
         # Parse tool calls to extract score and rationale
         score, rationale = self._parse_tool_calls(messages_page.items)
-        
+
         return score, rationale, judge_agent_id

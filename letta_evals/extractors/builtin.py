@@ -34,7 +34,7 @@ def last_compaction(trajectory: List[List[LettaMessageUnion]], config: dict) -> 
         if "system_alert" in messages[index].content:
             compaction_text = flatten_content(messages[index].content)
             break
-    
+
     # Return the compaction for the judge
     result = f"""## The compaction:
 {compaction_text if compaction_text else "(No compaction found)"}
@@ -61,9 +61,9 @@ def last_compaction_and_history(trajectory: List[List[LettaMessageUnion]], confi
         if isinstance(message, UserMessage) or isinstance(message, AssistantMessage):
             history_parts.append(f"\n--- Message {idx + 1} ---")
             history_parts.append(f"[{type(message).__name__}]: {flatten_content(message.content)}")
-    
+
     conversation_history = "\n".join(history_parts)
-    
+
     # Return both compaction and original user/assistant conversation history for the LLM judge
     result = f"""## The compaction:
 {compaction_text if compaction_text else "(No compaction found)"}

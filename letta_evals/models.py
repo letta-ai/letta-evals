@@ -214,14 +214,14 @@ class LettaJudgeGraderSpec(BaseGraderSpec):
         default="letta_agent", description="Target type for judge execution (letta_agent or letta_code)"
     )
     working_dir: Optional[Path] = Field(
-        default=None, description="Working directory for letta-code judge execution (required if judge_target_kind is letta_code)"
+        default=None,
+        description="Working directory for letta-code judge execution (required if judge_target_kind is letta_code)",
     )
     model_handle: Optional[str] = Field(
-        default=None, description="Model handle for letta-code judge execution (required if judge_target_kind is letta_code)"
+        default=None,
+        description="Model handle for letta-code judge execution (required if judge_target_kind is letta_code)",
     )
-    base_url: Optional[str] = Field(
-        default=None, description="Base URL for letta-code judge execution"
-    )
+    base_url: Optional[str] = Field(default=None, description="Base URL for letta-code judge execution")
 
     @field_validator("agent_file")
     @classmethod
