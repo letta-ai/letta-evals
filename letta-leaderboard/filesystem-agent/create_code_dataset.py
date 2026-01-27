@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 FILESYSTEM_CODE_PROMPT = r"""Answer the following question by reading and analyzing the data files located at:
-{{data_dir}}
+{pwd}/..
 
 The directory contains text files about synthetic people and their records:
 - people.txt: Personal information (name, DOB, email, phone) with person IDs
@@ -37,13 +37,8 @@ Question: {{question}}"""
 def create_dataset():
     """Convert filesystem_cloud.jsonl to filesystem_code.jsonl with prompt wrapping."""
     datasets_dir = Path(__file__).parent / "datasets"
-    files_dir = Path(__file__).parent / "files"
     input_file = datasets_dir / "filesystem_cloud.jsonl"
     output_file = datasets_dir / "filesystem_code.jsonl"
-
-    # Resolve the absolute path to the files directory so the agent
-    # can read files regardless of its working directory.
-    data_dir = files_dir.resolve().as_posix()
 
     count = 0
     with open(input_file, "r") as fin, open(output_file, "w") as fout:
@@ -52,10 +47,10 @@ def create_dataset():
                 continue
             data = json.loads(line)
 
-            # Wrap the question in the coding agent prompt
-            prompt = FILESYSTEM_CODE_PROMPT.replace("{{data_dir}}", data_dir).replace(
-                "{{question}}", data["input"]
-            )
+            # Wrap the question in the coding agent prompt.
+            # {pwd} is resolved at runtime by LettaCodeTarget to the
+            # per-model working directory (e.g. output-code/<model>/).
+            prompt = FILESYSTEM_CODE_PROMPT.replace("{{question}}", data["input"])
 
             # Preserve all original fields, only replace input
             data["input"] = prompt
@@ -64,7 +59,6 @@ def create_dataset():
             count += 1
 
     print(f"Created {output_file} with {count} samples")
-    print(f"Data directory embedded in prompts: {data_dir}")
 
 
 if __name__ == "__main__":

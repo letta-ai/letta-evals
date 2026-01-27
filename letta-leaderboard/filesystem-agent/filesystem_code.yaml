@@ -7,7 +7,7 @@ target:
   kind: letta_code
   base_url: http://localhost:9005  # local
   # base_url: https://api.letta.com/  # cloud
-  working_dir: output-code
+  working_dir: files
   timeout: 300
   max_retries: 1
   model_handles:
