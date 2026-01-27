@@ -1,12 +1,68 @@
 """
-
-Setup script to create agent with filesystem access for answering questions about structured data files.
+Setup script to upload data files and create an agent with filesystem access for answering questions about structured data files.
 """
 
-from letta_client import AsyncLetta
+from pathlib import Path
 
-from letta_evals.decorators import agent_factory
+from letta_client import AsyncLetta
+from letta_evals.decorators import agent_factory, suite_setup
 from letta_evals.models import Sample
+
+
+@suite_setup
+async def prepare_evaluation(client: AsyncLetta) -> None:
+    """
+    Set up the evaluation environment for filesystem tests.
+
+    This function prepares the environment by creating a folder with data files
+    that will be attached to agents during evaluation.
+
+    Args:
+        client: The AsyncLetta client
+    """
+    # Verify dataset files exist
+    files_dir = Path(__file__).parent / "files"
+
+    if not files_dir.exists():
+        raise RuntimeError(f"Files directory not found: {files_dir}")
+
+    # Create a folder with all the data files
+    folder_name = "filesystem_data"
+    folders_page = await client.folders.list()
+
+    # delete the folder if it exists
+    for folder in folders_page.items:
+        if folder.name == folder_name:
+            await client.folders.delete(folder_id=folder.id)
+            print(f"Deleted folder: {folder.id}")
+            break
+
+    # Create the folder
+    folder = await client.folders.create(name=folder_name, embedding="openai/text-embedding-3-small")
+    print(f"Created folder: {folder.id}")
+
+    # Upload all data files to the folder
+    data_files = [
+        "people.txt",
+        "vehicles.txt",
+        "pets.txt",
+        "bank_accounts.txt",
+        "credit_cards.txt",
+        "addresses.txt",
+        "employments.txt",
+        "internet_accounts.txt",
+        "insurance_policies.txt",
+        "medical_records.txt",
+    ]
+
+    for filename in data_files:
+        file_path = files_dir / filename
+        if file_path.exists():
+            with open(file_path, "rb") as f:
+                await client.folders.files.upload(folder_id=folder.id, file=f)
+            print(f"Uploaded {filename} to folder")
+        else:
+            print(f"Warning: {filename} not found in dataset directory")
 
 
 @agent_factory
