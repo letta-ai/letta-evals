@@ -19,12 +19,13 @@ from prompts import FILESYSTEM_CODE_PROMPT
 def create_dataset():
     """Convert filesystem.jsonl to filesystem_code.jsonl with prompt wrapping."""
     datasets_dir = Path(__file__).parent / "datasets"
+    files_dir = Path(__file__).parent / "files"
     input_file = datasets_dir / "filesystem.jsonl"
     output_file = datasets_dir / "filesystem_code.jsonl"
 
-    # Resolve the absolute path to the datasets directory so the agent
+    # Resolve the absolute path to the files directory so the agent
     # can read files regardless of its working directory.
-    data_dir = datasets_dir.resolve().as_posix()
+    data_dir = files_dir.resolve().as_posix()
 
     count = 0
     with open(input_file, "r") as fin, open(output_file, "w") as fout:

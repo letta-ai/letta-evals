@@ -21,10 +21,10 @@ async def prepare_evaluation(client: AsyncLetta) -> None:
         client: The AsyncLetta client
     """
     # Verify dataset files exist
-    dataset_dir = Path(__file__).parent / "datasets"
+    files_dir = Path(__file__).parent / "files"
 
-    if not dataset_dir.exists():
-        raise RuntimeError(f"Dataset directory not found: {dataset_dir}")
+    if not files_dir.exists():
+        raise RuntimeError(f"Files directory not found: {files_dir}")
 
     # Create a folder with all the data files
     folder_name = "filesystem_data"
@@ -56,7 +56,7 @@ async def prepare_evaluation(client: AsyncLetta) -> None:
     ]
 
     for filename in data_files:
-        file_path = dataset_dir / filename
+        file_path = files_dir / filename
         if file_path.exists():
             with open(file_path, "rb") as f:
                 await client.folders.files.upload(folder_id=folder.id, file=f)
