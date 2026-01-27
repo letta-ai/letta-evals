@@ -22,6 +22,7 @@ class LettaCodeTarget(AbstractAgentTarget):
         client: AsyncLetta,
         model_handle: str = "anthropic/claude-sonnet-4-5-20250929",
         working_dir: Optional[Path] = None,
+        sandbox: bool = True,
         skills_dir: Optional[Path] = None,
         allowed_tools: Optional[list[str]] = None,
         disallowed_tools: Optional[list[str]] = None,
@@ -35,6 +36,8 @@ class LettaCodeTarget(AbstractAgentTarget):
             client: AsyncLetta client for retrieving messages after CLI execution
             model_handle: Model handle to use with letta code
             working_dir: Working directory for letta command execution
+            sandbox: If True, create a per-model subdirectory under working_dir
+                for isolated execution. If False, use working_dir directly.
             skills_dir: Directory containing skills to load
             allowed_tools: List of allowed tools (e.g., ["Bash", "Read"])
             disallowed_tools: List of disallowed tools
@@ -44,13 +47,21 @@ class LettaCodeTarget(AbstractAgentTarget):
         """
         self.client = client
         self.model_handle = model_handle
-        self.working_dir = working_dir or Path.cwd()
         self.skills_dir = skills_dir
         self.allowed_tools = allowed_tools
         self.disallowed_tools = disallowed_tools
         self.timeout = timeout
         self.max_retries = max_retries
         self.base_url = base_url
+
+        # Resolve the working directory, optionally creating a per-model sandbox
+        base_dir = working_dir or Path.cwd()
+        if sandbox:
+            model_name = model_handle.split("/")[-1]
+            self.working_dir = base_dir / model_name
+        else:
+            self.working_dir = base_dir
+        self.working_dir.mkdir(parents=True, exist_ok=True)
 
     async def run(
         self,

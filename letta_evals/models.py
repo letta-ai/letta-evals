@@ -135,6 +135,9 @@ class LettaCodeTargetSpec(BaseTargetSpec):
     kind: Literal[TargetKind.LETTA_CODE] = TargetKind.LETTA_CODE
 
     working_dir: Optional[Path] = Field(default=None, description="Working directory for letta code execution")
+    sandbox: bool = Field(
+        default=True, description="Create a per-model subdirectory under working_dir for isolated sandbox execution."
+    )
     skills_dir: Optional[Path] = Field(default=None, description="Directory containing skills to load")
     allowed_tools: Optional[List[str]] = Field(
         default=None, description="List of allowed tools for letta code (e.g., ['Bash', 'Read'])"
