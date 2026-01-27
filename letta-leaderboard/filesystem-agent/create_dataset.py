@@ -20,7 +20,7 @@ def create_dataset():
     """Convert filesystem.jsonl to filesystem_code.jsonl with prompt wrapping."""
     datasets_dir = Path(__file__).parent / "datasets"
     files_dir = Path(__file__).parent / "files"
-    input_file = datasets_dir / "filesystem.jsonl"
+    input_file = datasets_dir / "filesystem_cloud.jsonl"
     output_file = datasets_dir / "filesystem_code.jsonl"
 
     # Resolve the absolute path to the files directory so the agent
