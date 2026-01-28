@@ -490,7 +490,6 @@ class UsageMetrics(BaseModel):
     total_reasoning_tokens: int = Field(default=0, description="total number of reasoning/thinking tokens generated")
 
 
-
 class ModelMetrics(BaseModel):
     """metrics for a specific model configuration."""
 
@@ -502,7 +501,9 @@ class ModelMetrics(BaseModel):
     metrics: Dict[str, float] = Field(
         default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
     )
-    usage_metrics: Optional[UsageMetrics] = Field(default=None, description="token usage and cost metrics for this model")
+    usage_metrics: Optional[UsageMetrics] = Field(
+        default=None, description="token usage and cost metrics for this model"
+    )
 
 
 class MetricAggregate(BaseModel):

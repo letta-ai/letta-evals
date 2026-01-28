@@ -19,7 +19,6 @@ from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
 from letta_evals.models import (
     AgentState,
-    UsageMetrics,
     GradeResult,
     LettaJudgeGraderSpec,
     LettaMessageUnion,
@@ -37,6 +36,7 @@ from letta_evals.models import (
     SimpleGateSpec,
     SuiteSpec,
     ToolGraderSpec,
+    UsageMetrics,
     WeightedAverageGateSpec,
     _compare,
     normalize_weights,
