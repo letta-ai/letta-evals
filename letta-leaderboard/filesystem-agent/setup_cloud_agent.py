@@ -5,6 +5,7 @@ Setup script to upload data files and create an agent with filesystem access for
 from pathlib import Path
 
 from letta_client import AsyncLetta
+
 from letta_evals.decorators import agent_factory, suite_setup
 from letta_evals.models import Sample
 

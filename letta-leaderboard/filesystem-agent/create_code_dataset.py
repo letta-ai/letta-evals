@@ -13,7 +13,6 @@ Usage:
 import json
 from pathlib import Path
 
-
 FILESYSTEM_CODE_PROMPT = r"""Answer the following question by reading and analyzing the data files located at:
 {pwd}
 
