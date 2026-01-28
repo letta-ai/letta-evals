@@ -169,13 +169,17 @@ class LettaCodeTarget(AbstractAgentTarget):
                 # wrap messages in a single turn
                 trajectory = [messages_page.items] if messages_page.items else []
 
-                # extract usage stats if available
+                # CLI returns {prompt_tokens, completion_tokens, total_tokens}.
+                # Wrap in the same format as LettaAgentTarget so
+                # extract_token_counts() can process them uniformly.
                 usage_stats = []
                 if "usage" in result:
                     usage_stats.append(
                         {
-                            "input_tokens": result["usage"].get("input_tokens", 0),
-                            "output_tokens": result["usage"].get("output_tokens", 0),
+                            "message_type": "usage_statistics",
+                            "prompt_tokens": result["usage"].get("prompt_tokens", 0),
+                            "completion_tokens": result["usage"].get("completion_tokens", 0),
+                            "total_tokens": result["usage"].get("total_tokens", 0),
                         }
                     )
 
