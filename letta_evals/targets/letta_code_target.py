@@ -90,7 +90,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                 # NOTE: letta-code CLI flags have changed over time; keep to stable, documented flags.
                 cmd = [
                     "letta",
-                    "--new",
+                    "--new-agent",
                     "--yolo",
                     "--output-format",
                     "json",
