@@ -1,4 +1,4 @@
-name: filesystem-code-test
+name: filesystem-code
 description: Test if a Letta Code agent can correctly retrieve and analyze information from local filesystem data files
 dataset: datasets/filesystem_code.jsonl
 num_runs: 2

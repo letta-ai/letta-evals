@@ -1,4 +1,4 @@
-name: filesystem-cloud-test
+name: filesystem-cloud
 description: Test if agent can correctly retrieve and analyze information from filesystem data files
 dataset: datasets/filesystem_cloud.jsonl
 setup_script: setup_cloud_agent.py:prepare_evaluation
