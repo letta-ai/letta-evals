@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 FILESYSTEM_CODE_PROMPT = r"""Answer the following question by reading and analyzing the data files located at:
-{pwd}/..
+{pwd}
 
 The directory contains text files about synthetic people and their records:
 - people.txt: Personal information (name, DOB, email, phone) with person IDs
@@ -48,8 +48,7 @@ def create_dataset():
             data = json.loads(line)
 
             # Wrap the question in the coding agent prompt.
-            # {pwd} is resolved at runtime by LettaCodeTarget to the
-            # per-model working directory (e.g. output-code/<model>/).
+            # {pwd} is resolved at runtime by LettaCodeTarget to the working directory.
             prompt = FILESYSTEM_CODE_PROMPT.replace("{{question}}", data["input"])
 
             # Preserve all original fields, only replace input
