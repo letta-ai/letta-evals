@@ -19,7 +19,6 @@ from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
 from letta_evals.models import (
     AgentState,
-    CostMetrics,
     GradeResult,
     LettaJudgeGraderSpec,
     LettaMessageUnion,
@@ -37,6 +36,7 @@ from letta_evals.models import (
     SimpleGateSpec,
     SuiteSpec,
     ToolGraderSpec,
+    UsageMetrics,
     WeightedAverageGateSpec,
     _compare,
     normalize_weights,
@@ -171,16 +171,11 @@ class Runner:
             if not model_handle:
                 raise ValueError("LettaCodeTarget requires a model_handle (string), but got None")
 
-            # create sandbox working directory for the model
-            model_name = model_handle.split("/")[-1]
-            working_dir = self.suite.target.working_dir / model_name
-            if not working_dir.exists():
-                working_dir.mkdir(parents=True, exist_ok=True)
-
             return LettaCodeTarget(
                 client=self.client,
                 model_handle=model_handle,
-                working_dir=working_dir,
+                working_dir=self.suite.target.working_dir,
+                sandbox=self.suite.target.sandbox,
                 skills_dir=self.suite.target.skills_dir,
                 allowed_tools=self.suite.target.allowed_tools,
                 disallowed_tools=self.suite.target.disallowed_tools,
@@ -766,13 +761,13 @@ class Runner:
         reasoning_tokens_list = [r.reasoning_tokens for r in self.results if r.reasoning_tokens is not None]
         total_reasoning_tokens = sum(reasoning_tokens_list) if reasoning_tokens_list else 0
 
-        # Create CostMetrics if we have cost data
-        cost_metrics = None
-        if total_cost is not None and total_cost > 0:
-            cost_metrics = CostMetrics(
-                total_cost=total_cost,
+        # Create UsageMetrics if we have any token or cost data
+        usage_metrics = None
+        if total_prompt_tokens > 0 or total_completion_tokens > 0 or (total_cost is not None and total_cost > 0):
+            usage_metrics = UsageMetrics(
                 total_prompt_tokens=total_prompt_tokens,
                 total_completion_tokens=total_completion_tokens,
+                total_cost=total_cost if total_cost and total_cost > 0 else None,
                 total_cached_input_tokens=total_cached_input_tokens,
                 total_cache_write_tokens=total_cache_write_tokens,
                 total_reasoning_tokens=total_reasoning_tokens,
@@ -841,13 +836,17 @@ class Runner:
                 model_reasoning_tokens_list = [r.reasoning_tokens for r in results if r.reasoning_tokens is not None]
                 model_total_reasoning_tokens = sum(model_reasoning_tokens_list) if model_reasoning_tokens_list else 0
 
-                # Create CostMetrics for this model if we have cost data
-                model_cost_metrics = None
-                if model_total_cost is not None and model_total_cost > 0:
-                    model_cost_metrics = CostMetrics(
-                        total_cost=model_total_cost,
+                # Create UsageMetrics for this model if we have any token or cost data
+                model_usage_metrics = None
+                if (
+                    model_total_prompt_tokens > 0
+                    or model_total_completion_tokens > 0
+                    or (model_total_cost is not None and model_total_cost > 0)
+                ):
+                    model_usage_metrics = UsageMetrics(
                         total_prompt_tokens=model_total_prompt_tokens,
                         total_completion_tokens=model_total_completion_tokens,
+                        total_cost=model_total_cost if model_total_cost and model_total_cost > 0 else None,
                         total_cached_input_tokens=model_total_cached_input_tokens,
                         total_cache_write_tokens=model_total_cache_write_tokens,
                         total_reasoning_tokens=model_total_reasoning_tokens,
@@ -861,7 +860,7 @@ class Runner:
                         avg_score_attempted=model_avg_attempted,
                         avg_score_total=model_avg_total,
                         metrics=model_metrics_dict,
-                        cost=model_cost_metrics,
+                        usage_metrics=model_usage_metrics,
                     )
                 )
 
@@ -873,7 +872,7 @@ class Runner:
             per_model=per_model,
             by_metric=by_metric if by_metric else None,
             metrics=metrics_dict,
-            cost=cost_metrics,
+            usage_metrics=usage_metrics,
         )
 
     def _compute_aggregation(

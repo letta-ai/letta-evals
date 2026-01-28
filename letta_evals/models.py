@@ -135,6 +135,9 @@ class LettaCodeTargetSpec(BaseTargetSpec):
     kind: Literal[TargetKind.LETTA_CODE] = TargetKind.LETTA_CODE
 
     working_dir: Optional[Path] = Field(default=None, description="Working directory for letta code execution")
+    sandbox: bool = Field(
+        default=True, description="Create a per-model subdirectory under working_dir for isolated sandbox execution."
+    )
     skills_dir: Optional[Path] = Field(default=None, description="Directory containing skills to load")
     allowed_tools: Optional[List[str]] = Field(
         default=None, description="List of allowed tools for letta code (e.g., ['Bash', 'Read'])"
@@ -474,12 +477,12 @@ class GradeResult(BaseModel):
 # Runner models
 
 
-class CostMetrics(BaseModel):
-    """Cost and token usage metrics."""
+class UsageMetrics(BaseModel):
+    """Token usage and cost metrics."""
 
-    total_cost: float = Field(description="total cost in dollars")
-    total_prompt_tokens: int = Field(description="total number of prompt tokens")
-    total_completion_tokens: int = Field(description="total number of completion tokens")
+    total_prompt_tokens: int = Field(default=0, description="total number of prompt tokens")
+    total_completion_tokens: int = Field(default=0, description="total number of completion tokens")
+    total_cost: Optional[float] = Field(default=None, description="total cost in dollars")
     total_cached_input_tokens: int = Field(
         default=0, description="total number of cached input tokens served from cache"
     )
@@ -498,7 +501,9 @@ class ModelMetrics(BaseModel):
     metrics: Dict[str, float] = Field(
         default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
     )
-    cost: Optional[CostMetrics] = Field(default=None, description="cost and token usage metrics for this model")
+    usage_metrics: Optional[UsageMetrics] = Field(
+        default=None, description="token usage and cost metrics for this model"
+    )
 
 
 class MetricAggregate(BaseModel):
@@ -525,7 +530,9 @@ class Metrics(BaseModel):
     metrics: Dict[str, float] = Field(
         default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
     )
-    cost: Optional[CostMetrics] = Field(default=None, description="cost and token usage metrics across all samples")
+    usage_metrics: Optional[UsageMetrics] = Field(
+        default=None, description="token usage and cost metrics across all samples"
+    )
 
 
 class RunStatistics(BaseModel):

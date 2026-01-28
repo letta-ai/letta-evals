@@ -109,15 +109,38 @@ MODEL_COSTS = {
 }
 
 
+# Explicit aliases for model handles that can't be resolved by stripping
+# provider prefixes or date suffixes (e.g. compute-tier suffixes, shorthand names).
+# Key: canonical MODEL_COSTS key, Value: list of aliases that map to it.
+MODEL_ALIASES = {
+    "openai/gpt-5.2-2025-12-11": ["gpt-5.2-medium", "gpt-5.2-high", "gpt-5.2-xhigh"],
+    "openai/gpt-5.1-2025-11-13": ["gpt-5.1-medium"],
+    "openai/gpt-5.1-codex": ["gpt-5.1-codex-medium", "gpt-5.1-codex-max-medium"],
+    "openai/gpt-5.1-codex-mini": ["gpt-5.1-codex-mini-medium"],
+    "openai/gpt-5-2025-08-07": ["gpt-5-medium"],
+    "openai/gpt-5-mini-2025-08-07": ["gpt-5-mini-medium"],
+    "openai/gpt-5-nano-2025-08-07": ["gpt-5-nano-medium"],
+    "z-ai/glm-4.6": ["glm-4.6"],
+    "moonshotai/kimi-k2-0905": ["kimi-k2"],
+    "deepseek/deepseek-chat-v3.1": ["deepseek-chat-v3.1"],
+    "deepseek/deepseek-reasoner": ["deepseek-reasoner"],
+    "deepseek/deepseek-chat": ["deepseek-chat"],
+    "mistralai/mistral-large-2512": ["mistral-large-3"],
+    "google_ai/gemini-3-pro-preview": ["gemini-3-pro"],
+    "google_ai/gemini-3-flash-preview": ["gemini-3-flash"],
+}
+
+
 # Build reverse mapping: strip provider prefix and date suffix from MODEL_COSTS keys
 # This allows matching "gpt-4.1-mini" to "openai/gpt-4.1-mini-2025-04-14"
 def _build_model_name_mapping() -> dict:
     """
     Build a mapping from base model names to full MODEL_COSTS keys.
 
-    Examples:
-        "gpt-4.1-mini" -> "openai/gpt-4.1-mini-2025-04-14"
-        "claude-sonnet-4-5" -> "anthropic/claude-sonnet-4-5-20250929"
+    Combines three sources:
+    1. Strip provider prefix: "gpt-4.1-mini-2025-04-14" -> "openai/gpt-4.1-mini-2025-04-14"
+    2. Strip date suffix: "gpt-4.1-mini" -> "openai/gpt-4.1-mini-2025-04-14"
+    3. Explicit aliases from MODEL_ALIASES (compute tiers, shorthand names)
     """
     import re
 
@@ -140,6 +163,11 @@ def _build_model_name_mapping() -> dict:
         base_name = date_pattern.sub("", model_part)
         if base_name != model_part:  # Had a date suffix
             mapping[base_name] = full_key
+
+    # Add explicit aliases
+    for canonical, aliases in MODEL_ALIASES.items():
+        for alias in aliases:
+            mapping[alias] = canonical
 
     return mapping
 
