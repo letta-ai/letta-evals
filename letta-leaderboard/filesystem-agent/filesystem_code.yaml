@@ -1,0 +1,55 @@
+name: filesystem-code
+description: Test if a Letta Code agent can correctly retrieve and analyze information from local filesystem data files
+dataset: datasets/filesystem_code.jsonl
+num_runs: 2
+
+target:
+  kind: letta_code
+  base_url: http://localhost:9005  # local
+  # base_url: https://api.letta.com/  # cloud
+  working_dir: files
+  sandbox: false
+  timeout: 300
+  max_retries: 1
+  model_handles:
+    - anthropic/claude-opus-4-5-20251101
+    - anthropic/claude-sonnet-4-5-20250929
+    - anthropic/claude-haiku-4-5-20251001
+    - anthropic/claude-opus-4-1-20250805
+    - gpt-5.2-medium
+    - gpt-5.2-high
+    - gpt-5.2-xhigh
+    - gpt-5.1-medium
+    - gpt-5.1-codex-medium
+    - gpt-5.1-codex-mini-medium
+    - gpt-5-medium
+    - gpt-5-mini-medium
+    - gpt-5-nano-medium
+    - gpt-4.1
+    - gpt-4.1-mini
+    - gpt-4.1-nano
+    - glm-4.6
+    - minimax-m2
+    - kimi-k2
+    - deepseek-chat-v3.1
+    - gemini-3-pro
+    - gemini-3-flash
+    - deepseek-reasoner
+    - deepseek-chat
+    - mistral-large-3
+
+graders:
+  rubric_check:
+    kind: model_judge
+    prompt_path: rubric.txt
+    model: gpt-5-mini
+    temperature: 0.0
+    provider: openai
+    extractor: last_assistant
+
+gate:
+  kind: simple
+  metric_key: rubric_check
+  aggregation: avg_score
+  op: gte
+  value: 0.70  # Require 70% accuracy

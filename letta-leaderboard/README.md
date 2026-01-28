@@ -28,10 +28,16 @@ target:
 ```
 
 3. Run the evaluation suite:
-Filesystem Suite:
+Filesystem (Cloud) Suite:
 ```bash
-letta-evals run letta-leaderboard/filesystem-agent/filesystem.yaml \
-  --output letta-leaderboard/filesystem-agent/results/{provider}-{model-name}
+letta-evals run letta-leaderboard/filesystem-agent/filesystem_cloud.yaml \
+  --output letta-leaderboard/filesystem-agent/code-results/{provider}-{model-name}
+```
+
+Filesystem (Code) Suite:
+```bash
+letta-evals run letta-leaderboard/filesystem-agent/filesystem_code.yaml \
+  --output letta-leaderboard/filesystem-agent/code-results/{provider}-{model-name}
 ```
 
 Skills Suite:
