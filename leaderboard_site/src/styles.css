@@ -97,7 +97,8 @@ th {
 
 @media (prefers-color-scheme: dark) {
   .model-icon,
-  .letta-logo {
+  .letta-logo,
+  .provider-option-icon {
     filter: invert(1) brightness(1);
   }
 }
@@ -120,8 +121,94 @@ body {
   transition: border-color 0.2s ease;
 }
 
-.no-js .search-bar {
+.no-js .search-bar,
+.no-js .provider-dropdown {
   display: none;
+}
+
+.filter-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  align-items: stretch;
+}
+
+.filter-row .search-bar {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.provider-dropdown {
+  position: relative;
+}
+
+.provider-dropdown-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  min-width: 11rem;
+  white-space: nowrap;
+}
+
+.provider-dropdown-toggle:hover {
+  border-color: var(--text-color);
+}
+
+.provider-dropdown.open .provider-dropdown-toggle {
+  border-color: var(--text-color);
+}
+
+.provider-dropdown-label {
+  flex: 1;
+  text-align: left;
+}
+
+.provider-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 100%;
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  z-index: 100;
+  padding: 0.25rem 0;
+}
+
+.provider-dropdown.open .provider-dropdown-menu {
+  display: block;
+}
+
+.provider-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+  white-space: nowrap;
+}
+
+.provider-option:hover {
+  background-color: rgba(128, 128, 128, 0.1);
+}
+
+.provider-option input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.provider-option-icon {
+  width: 1rem;
+  height: 1rem;
 }
 
 .search-bar:focus {
@@ -150,12 +237,34 @@ body {
   height: 0;
 }
 
+.rank-column-header {
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.rank-cell {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+  opacity: 0.6;
+}
+
 .chart-row {
   display: grid;
-  grid-template-columns: 20rem minmax(300px, 600px);
+  grid-template-columns: 2rem 20rem minmax(300px, 600px);
   gap: 1rem;
   align-items: center;
-  margin-bottom: 1rem;
+  padding: 0.5rem 0.25rem;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.15s ease;
+}
+
+.chart-row:last-child {
+  border-bottom: none;
+}
+
+.chart-row:hover {
+  background-color: rgba(128, 128, 128, 0.08);
 }
 
 .chart-label {
@@ -283,7 +392,7 @@ body {
 
 .multi-metric-header {
   display: grid;
-  grid-template-columns: 24rem 1fr;
+  grid-template-columns: 2rem 24rem 1fr;
   gap: 1rem;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
@@ -404,10 +513,20 @@ body {
 
 .multi-metric-row {
   display: grid;
-  grid-template-columns: 24rem 1fr;
+  grid-template-columns: 2rem 24rem 1fr;
   gap: 1rem;
-  margin-bottom: 1rem;
+  padding: 0.5rem 0.25rem;
   align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.15s ease;
+}
+
+.multi-metric-row:last-child {
+  border-bottom: none;
+}
+
+.multi-metric-row:hover {
+  background-color: rgba(128, 128, 128, 0.08);
 }
 
 .model-info {
@@ -437,7 +556,7 @@ body {
 @media (max-width: 1200px) {
   .multi-metric-header,
   .multi-metric-row {
-    grid-template-columns: 14rem 1fr;
+    grid-template-columns: 2rem 14rem 1fr;
   }
 
   .metrics-columns-header,
@@ -481,7 +600,7 @@ body {
 /* Single metric header styles */
 .single-metric-header {
   display: grid;
-  grid-template-columns: 20rem minmax(300px, 600px);
+  grid-template-columns: 2rem 20rem minmax(300px, 600px);
   gap: 1rem;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
@@ -508,7 +627,7 @@ body {
   }
 
   .chart-row {
-    grid-template-columns: 14rem 1fr;
+    grid-template-columns: 2rem 14rem 1fr;
   }
 }
 
@@ -518,7 +637,7 @@ body {
   }
 
   .chart-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: 2rem 1fr;
     gap: 0.5rem;
   }
 

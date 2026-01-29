@@ -68,7 +68,34 @@
 
     {%- for benchmark in leaderboards -%}
     <div class="chart-container tab-content{% if forloop.first %} active{% endif %}" data-content="{{ benchmark[0] }}">
-        <input type="text" class="search-bar" placeholder="Search models..." data-search="{{ benchmark[0] }}">
+        <div class="filter-row">
+            <input type="text" class="search-bar" placeholder="Search models..." data-search="{{ benchmark[0] }}">
+            <div class="provider-dropdown" data-filter="{{ benchmark[0] }}">
+                <button class="provider-dropdown-toggle" type="button">
+                    <span class="provider-dropdown-label">All providers</span>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 5L6 8L9 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <div class="provider-dropdown-menu">
+                    {%- assign providers = "" -%}
+                    {%- assign leaderboard_entries = benchmark[1] -%}
+                    {%- for entry in leaderboard_entries -%}
+                        {%- assign provider = entry.model | split: "/" | first -%}
+                        {%- unless providers contains provider -%}
+                            {%- if providers != "" -%}{%- assign providers = providers | append: "|" -%}{%- endif -%}
+                            {%- assign providers = providers | append: provider -%}
+                        {%- endunless -%}
+                    {%- endfor -%}
+                    {%- assign provider_list = providers | split: "|" | sort -%}
+                    {%- for provider in provider_list -%}
+                    <label class="provider-option">
+                        <input type="checkbox" value="{{ provider }}" checked>
+                        <img src="./icons/{{ provider }}.svg" alt="{{ provider }}" class="provider-option-icon">
+                        <span>{{ provider }}</span>
+                    </label>
+                    {%- endfor -%}
+                </div>
+            </div>
+        </div>
 
         <div class="chart-container--inner">
             {%- assign leaderboard_data = benchmark[1] -%}
@@ -108,29 +135,93 @@
             });
         });
 
-        // Search functionality for each leaderboard
-        const searchInputs = document.querySelectorAll('.search-bar');
+        // Filter and search functionality
+        function applyFilters(container) {
+            const searchInput = container.querySelector('.search-bar');
+            const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+            const dropdown = container.querySelector('.provider-dropdown');
+            const checkedProviders = new Set();
 
-        searchInputs.forEach(searchInput => {
-            const benchmarkName = searchInput.getAttribute('data-search');
-            const container = document.querySelector(`[data-content="${benchmarkName}"]`);
-
-            if (container) {
-                const chartRows = container.querySelectorAll('.chart-row, .multi-metric-row');
-
-                searchInput.addEventListener('input', (e) => {
-                    const searchTerm = e.target.value.toLowerCase();
-
-                    chartRows.forEach(row => {
-                        const modelName = row.getAttribute('data-model').toLowerCase();
-                        if (modelName.includes(searchTerm)) {
-                            row.style.display = 'grid';
-                        } else {
-                            row.style.display = 'none';
-                        }
-                    });
+            if (dropdown) {
+                dropdown.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                    checkedProviders.add(cb.value);
                 });
             }
+
+            const totalCheckboxes = dropdown ? dropdown.querySelectorAll('input[type="checkbox"]').length : 0;
+            const allSelected = checkedProviders.size === totalCheckboxes;
+
+            const chartRows = container.querySelectorAll('.chart-row, .multi-metric-row');
+            let visibleRank = 0;
+
+            chartRows.forEach(row => {
+                const modelName = row.getAttribute('data-model');
+                const provider = modelName.split('/')[0];
+                const matchesSearch = modelName.toLowerCase().includes(searchTerm);
+                const matchesFilter = allSelected || checkedProviders.has(provider);
+
+                if (matchesSearch && matchesFilter) {
+                    row.style.display = 'grid';
+                    visibleRank++;
+                    const rankCell = row.querySelector('.rank-cell');
+                    if (rankCell) rankCell.textContent = visibleRank;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            // Update dropdown label
+            if (dropdown) {
+                const label = dropdown.querySelector('.provider-dropdown-label');
+                if (allSelected || checkedProviders.size === 0) {
+                    label.textContent = 'All providers';
+                } else if (checkedProviders.size === 1) {
+                    label.textContent = [...checkedProviders][0];
+                } else {
+                    label.textContent = `${checkedProviders.size} providers`;
+                }
+            }
+        }
+
+        // Provider dropdown toggle
+        document.querySelectorAll('.provider-dropdown-toggle').forEach(toggle => {
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const dropdown = toggle.closest('.provider-dropdown');
+                // Close other open dropdowns
+                document.querySelectorAll('.provider-dropdown.open').forEach(d => {
+                    if (d !== dropdown) d.classList.remove('open');
+                });
+                dropdown.classList.toggle('open');
+            });
+        });
+
+        // Checkbox change triggers filter
+        document.querySelectorAll('.provider-dropdown input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', () => {
+                const container = cb.closest('.tab-content');
+                applyFilters(container);
+            });
+        });
+
+        // Close dropdown on outside click
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.provider-dropdown.open').forEach(d => {
+                d.classList.remove('open');
+            });
+        });
+
+        // Prevent dropdown menu clicks from closing it
+        document.querySelectorAll('.provider-dropdown-menu').forEach(menu => {
+            menu.addEventListener('click', (e) => e.stopPropagation());
+        });
+
+        // Search functionality
+        document.querySelectorAll('.search-bar').forEach(searchInput => {
+            searchInput.addEventListener('input', () => {
+                const container = searchInput.closest('.tab-content');
+                applyFilters(container);
+            });
         });
     </script>
 </body>
