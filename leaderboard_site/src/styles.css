@@ -167,7 +167,17 @@ body {
   grid-template-columns: 2rem 20rem minmax(300px, 600px);
   gap: 1rem;
   align-items: center;
-  margin-bottom: 1rem;
+  padding: 0.5rem 0.25rem;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.15s ease;
+}
+
+.chart-row:last-child {
+  border-bottom: none;
+}
+
+.chart-row:hover {
+  background-color: rgba(128, 128, 128, 0.08);
 }
 
 .chart-label {
@@ -418,8 +428,18 @@ body {
   display: grid;
   grid-template-columns: 2rem 24rem 1fr;
   gap: 1rem;
-  margin-bottom: 1rem;
+  padding: 0.5rem 0.25rem;
   align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.15s ease;
+}
+
+.multi-metric-row:last-child {
+  border-bottom: none;
+}
+
+.multi-metric-row:hover {
+  background-color: rgba(128, 128, 128, 0.08);
 }
 
 .model-info {
