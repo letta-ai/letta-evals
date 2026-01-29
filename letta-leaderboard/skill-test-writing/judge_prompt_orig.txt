@@ -1,0 +1,112 @@
+You are evaluating the quality of a test case for measuring whether an LLM needs specialized knowledge (a "skill") to succeed.
+
+## Background
+
+A "skill" is a document that provides an LLM with specialized knowledge about a domain (APIs, tools, workflows, gotchas). We create test cases to measure whether having such knowledge actually helps.
+
+A GOOD test case:
+- Tests **general domain knowledge** that practitioners in that field would know
+- Has a robust grader that accepts all valid solutions
+- Represents a capability that matters in real-world use
+
+A BAD test case:
+- Tests **skill-specific trivia** (magic field names, arbitrary conventions only in that skill doc)
+- Has a fragile grader that rejects valid alternative approaches
+- Could only be solved by memorizing the specific skill document
+
+## Trivia vs Useful Knowledge
+
+This is subtle. The key question: "Is this testing knowledge that helps practitioners use this tool/domain effectively?"
+
+**TRIVIA (bad):**
+- Exact script names from a specific codebase (e.g., "thumbnail.py", "rearrange.py", "unpack.py") when the concept doesn't require knowing that name
+- Arbitrary numeric values that could be any number (e.g., "rebuild every 30 minutes" when 20 or 45 would be equally valid)
+- Specific dataset identifiers (e.g., "cais/mmlu") when testing dataset handling concepts
+
+**USEFUL KNOWLEDGE (good):**
+- Tool-specific workflows that practitioners need to know (e.g., "how to export HF datasets to JSONL" - this IS the domain knowledge)
+- Best practices even if "obvious" to experts (e.g., "use headless mode for CI automation" - still worth testing)
+- Naming conventions and rules for a system (e.g., "agents must be lowercase with hyphens, 3-50 chars" - practitioners need this)
+- Common patterns and syntax for tools (e.g., command flags, API patterns)
+- Gotchas that bite practitioners repeatedly
+
+**Key distinction:**
+- If the skill is about Tool X, then "how to use Tool X" IS valid domain knowledge, not trivia
+- Testing conventions/rules that practitioners must follow is useful, not trivia
+- "Most models would know this" is NOT a reason to score low - reinforcing good practices matters
+
+## Skill Context
+
+The test case is for the **{skill_name}** skill (directory: `{skill_dir}`).
+
+Files in this skill:
+```
+{skill_file_tree}
+```
+
+## Test Case to Evaluate
+
+The agent's submission follows this prompt. It contains:
+- The test prompt (what the model is asked)
+- The grader configuration
+- Optionally grader code (grader.py)
+
+---
+
+## Your Task
+
+First, reason through each dimension carefully. Then provide scores.
+
+### Dimensions to Evaluate
+
+**1. Non-Obviousness (1-10)**
+Does this test knowledge that practitioners genuinely need but models often lack?
+
+Apply the trivia test from above: "Could you change the specific names/numbers and still test the same underlying knowledge?"
+
+Score guide:
+- 10: Tests a genuine domain gotcha - a concept/pattern that transfers across tools and contexts
+- 7: Tests useful domain knowledge that practitioners learn; specific details are incidental to the core concept
+- 4: Tests something that COULD be general knowledge but the test is overly focused on specific strings/names
+- 1: Tests pure trivia - the specific script name, magic number, or exact string IS the test, not the underlying concept
+
+**2. Clarity (1-10)**
+Is the grader robust? Does it accept all valid solutions?
+
+CRITICAL: Score LOW (1-3) if ANY of these apply:
+- **Fragile pattern matching**: Grader uses regex/string matching that could reject valid solutions or accept wrong ones
+- **Single-path grader**: Only accepts one specific approach when multiple valid solutions exist (e.g., only accepts openpyxl when xlsxwriter also works)
+- **Missing environment**: Test requires files, servers, or setup that aren't provided
+- **Unrunnable**: Test asks to "run" code but execution would fail
+
+Score guide:
+- 10: Grader tests the actual capability, accepts all valid approaches
+- 7: Grader is mostly robust, minor edge cases possible
+- 4: Grader has significant brittleness or specificity issues
+- 1: Grader is fundamentally flawed - pattern matching that rejects valid solutions
+
+**3. Realism (1-10)**
+Would a practitioner actually encounter this task?
+- 10: Common task that practitioners frequently encounter
+- 7: Realistic scenario that comes up in actual work
+- 4: Plausible but somewhat contrived
+- 1: Artificial scenario designed to test the skill, not a real need
+
+## Response Format
+
+First write your reasoning for each dimension (2-3 sentences each). Then output a JSON block with your scores.
+
+**Scoring instructions:**
+1. Score each dimension 1-10 (clip to this range)
+2. Compute the average: (non_obviousness + clarity + realism) / 3
+3. Normalize to 0-1: score = (average - 1) / 9
+
+```json
+{{
+  "reasoning": "<your overall assessment in 2-3 sentences>",
+  "non_obviousness": <1-10>,
+  "clarity": <1-10>,
+  "realism": <1-10>,
+  "score": <0.0-1.0, computed as (avg - 1) / 9>
+}}
+```

@@ -1,0 +1,37 @@
+name: skill-test-writing
+description: Evaluate if agent can write high-quality test cases for skills
+dataset: data/dataset.jsonl
+
+target:
+  kind: letta_code
+  base_url: https://api.letta.com/
+  working_dir: output
+  sandbox: true
+  skills_dir: .skills
+  timeout: 600
+  max_retries: 1
+  max_concurrent: 30
+  model_handles:
+    - anthropic/claude-haiku-4-5-20251001
+    - anthropic/claude-sonnet-4-5-20250929
+
+max_samples: 5
+
+graders:
+  test_quality:
+    kind: model_judge
+    display_name: "test quality score"
+    prompt_path: judge_prompt.txt
+    model: claude-sonnet-4-5-20250929
+    temperature: 0.0
+    provider: anthropic
+    max_retries: 3
+    timeout: 120.0
+    extractor: custom_extractor.py:test_files_extractor
+
+gate:
+  kind: simple
+  metric_key: test_quality
+  aggregation: avg_score
+  op: gte
+  value: 0.6

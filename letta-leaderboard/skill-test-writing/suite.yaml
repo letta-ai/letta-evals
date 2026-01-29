@@ -1,0 +1,63 @@
+name: skill-test-writing
+description: Evaluate if agent can write high-quality test cases for skills
+dataset: data/dataset.jsonl
+setup_script: setup.py:prepare_evaluation
+
+target:
+  kind: letta_code
+  base_url: https://api.letta.com/
+  working_dir: output
+  sandbox: true
+  skills_dir: .skills
+  timeout: 600
+  max_retries: 1
+  model_handles:
+    - anthropic/claude-opus-4-5-20251101
+    - anthropic/claude-sonnet-4-5-20250929
+    - anthropic/claude-haiku-4-5-20251001
+    - anthropic/claude-opus-4-1-20250805
+    - gpt-5.2-medium
+    - gpt-5.2-high
+    - gpt-5.2-xhigh
+    - gpt-5.1-codex-max-medium
+    - gpt-5.1-medium
+    - gpt-5.1-codex-medium
+    - gpt-5.1-codex-mini-medium
+    - gpt-5-medium
+    - gpt-5-mini-medium
+    - gpt-5-nano-medium
+    - gpt-4.1
+    - gpt-4.1-mini
+    - gpt-4.1-nano
+    - glm-4.6
+    - minimax-m2
+    - kimi-k2
+    - deepseek-chat-v3.1
+    - gemini-3-pro
+    - gemini-3-flash
+    - deepseek-reasoner
+    - deepseek-chat
+    - mistral-large-3
+
+graders:
+  test_quality:
+    kind: model_judge
+    display_name: "test quality score"
+    prompt_path: judge_prompt_orig.txt
+    model: claude-sonnet-4-5-20250929
+    temperature: 0.0
+    provider: anthropic
+    max_retries: 3
+    timeout: 120.0
+    extractor: custom_extractor.py:test_files_extractor
+    rubric_vars:
+      - skill_name
+      - skill_dir
+      - skill_file_tree
+
+gate:
+  kind: simple
+  metric_key: test_quality
+  aggregation: avg_score
+  op: gte
+  value: 0.6
