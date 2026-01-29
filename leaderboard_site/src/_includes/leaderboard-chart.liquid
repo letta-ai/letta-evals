@@ -36,6 +36,7 @@
 
     {%- comment -%} Metric headers - close inner container and reopen after header {%- endcomment -%}
     </div><div class="multi-metric-header">
+        <div class="rank-column-header">#</div>
         <div class="model-column-header">Model</div>
         <div class="metrics-columns-header">
             {%- for metric_key in metric_keys -%}
@@ -63,6 +64,7 @@
 
     {%- for entry in sorted_by_score -%}
     <div class="multi-metric-row" data-model="{{ entry.model }}">
+        <div class="rank-cell">{{ forloop.index }}</div>
         <div class="model-info">
             {%- assign provider = entry.model | split: "/" | first -%}
             <img src="./icons/{{ provider }}.svg" alt="{{ provider }}" class="model-icon">
@@ -109,6 +111,7 @@
     {%- comment -%} Single metric header - close inner container and reopen after header {%- endcomment -%}
     {%- assign single_metric_key = metric_keys[0] -%}
     </div><div class="single-metric-header">
+        <div class="rank-column-header">#</div>
         <div class="model-column-header">Model</div>
         <div class="metric-column-header-single">
             <span class="metric-name">
@@ -132,6 +135,7 @@
 
     {%- for entry in sorted_by_score -%}
     <div class="chart-row" data-model="{{ entry.model }}">
+        <div class="rank-cell">{{ forloop.index }}</div>
         <div class="chart-label">
             {%- assign provider = entry.model | split: "/" | first -%}
             <img src="./icons/{{ provider }}.svg" alt="{{ provider }}" class="model-icon">

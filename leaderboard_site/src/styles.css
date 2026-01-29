@@ -150,9 +150,21 @@ body {
   height: 0;
 }
 
+.rank-column-header {
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.rank-cell {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+  opacity: 0.6;
+}
+
 .chart-row {
   display: grid;
-  grid-template-columns: 20rem minmax(300px, 600px);
+  grid-template-columns: 2rem 20rem minmax(300px, 600px);
   gap: 1rem;
   align-items: center;
   margin-bottom: 1rem;
@@ -283,7 +295,7 @@ body {
 
 .multi-metric-header {
   display: grid;
-  grid-template-columns: 24rem 1fr;
+  grid-template-columns: 2rem 24rem 1fr;
   gap: 1rem;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
@@ -404,7 +416,7 @@ body {
 
 .multi-metric-row {
   display: grid;
-  grid-template-columns: 24rem 1fr;
+  grid-template-columns: 2rem 24rem 1fr;
   gap: 1rem;
   margin-bottom: 1rem;
   align-items: center;
@@ -437,7 +449,7 @@ body {
 @media (max-width: 1200px) {
   .multi-metric-header,
   .multi-metric-row {
-    grid-template-columns: 14rem 1fr;
+    grid-template-columns: 2rem 14rem 1fr;
   }
 
   .metrics-columns-header,
@@ -481,7 +493,7 @@ body {
 /* Single metric header styles */
 .single-metric-header {
   display: grid;
-  grid-template-columns: 20rem minmax(300px, 600px);
+  grid-template-columns: 2rem 20rem minmax(300px, 600px);
   gap: 1rem;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
@@ -508,7 +520,7 @@ body {
   }
 
   .chart-row {
-    grid-template-columns: 14rem 1fr;
+    grid-template-columns: 2rem 14rem 1fr;
   }
 }
 
@@ -518,7 +530,7 @@ body {
   }
 
   .chart-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: 2rem 1fr;
     gap: 0.5rem;
   }
 
