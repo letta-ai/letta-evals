@@ -1,0 +1,6 @@
+parsed/
+results/
+data/
+.letta/
+reference_tests_results.json
+__pycache__/
