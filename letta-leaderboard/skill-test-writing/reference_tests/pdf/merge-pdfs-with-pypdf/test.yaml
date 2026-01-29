@@ -1,0 +1,65 @@
+name: merge-pdfs-with-pypdf
+skills:
+- pdf
+prompt: 'Write Python code to merge all PDF files in a directory called "input_pdfs/"
+
+  into a single PDF file called "merged.pdf". The files should be merged
+
+  in alphabetical order by filename.
+
+
+  Just give me the Python code.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response provides correct Python code for merging
+    PDF files using the modern pypdf library.
+
+
+    The correct approach uses:
+
+    - Modern pypdf (NOT the deprecated PyPDF2)
+
+    - PdfWriter for creating the output
+
+    - PdfReader for reading input files
+
+    - add_page() to add pages to the writer
+
+    - write() to save the output
+
+    - sorted() to ensure alphabetical order
+
+
+    Score 1.0 if:
+
+    - Uses modern pypdf (import pypdf or from pypdf import)
+
+    - Uses PdfWriter and PdfReader correctly
+
+    - Uses add_page() to add pages
+
+    - Writes output with .write()
+
+    - Sorts files alphabetically
+
+
+    Score 0.5 if:
+
+    - Uses pypdf correctly but missing alphabetical sorting
+
+    - Has the right components but incomplete implementation
+
+
+    Score 0.0 if:
+
+    - Uses deprecated PyPDF2 instead of modern pypdf
+
+    - Doesn''t use the correct pattern (PdfWriter/PdfReader/add_page)
+
+    - Fundamentally wrong approach
+
+    '
+  extractor: last_assistant

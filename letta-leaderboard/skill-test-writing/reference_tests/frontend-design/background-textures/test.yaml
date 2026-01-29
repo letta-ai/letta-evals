@@ -1,0 +1,53 @@
+name: background-textures
+skills:
+- frontend-design
+prompt: 'Create an HTML page for a vintage record store called "Vinyl Dreams".
+
+  Include a header, hero section, and a featured albums section.
+
+
+  Add visual depth through background textures, gradients, or patterns
+
+  rather than flat solid colors.
+
+
+  Just give me the HTML with inline CSS.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether this HTML response creates visual depth through background
+    textures, gradients, and patterns for a vintage record store page.
+
+
+    Key aspects to evaluate:
+
+    1. Does it use gradients (linear-gradient, radial-gradient, conic-gradient)?
+
+    2. Does it use layered or multiple gradients?
+
+    3. Does it use overlay techniques (::before, ::after pseudo-elements)?
+
+    4. Does it use shadows (box-shadow, text-shadow) for depth?
+
+    5. Does it use textures, patterns, or SVG backgrounds?
+
+    6. Does it use advanced effects (backdrop-filter, mix-blend-mode)?
+
+
+    Score 1.0 if: Uses 3+ depth techniques (gradients, layered backgrounds, shadows,
+    overlays, patterns).
+
+    Score 0.8 if: Uses gradients with 2+ additional depth techniques.
+
+    Score 0.6 if: Uses gradients with shadows for some depth.
+
+    Score 0.4 if: Only uses basic gradients.
+
+    Score 0.2 if: Only has shadows but no gradients.
+
+    Score 0.0 if: Only flat solid colors with no depth techniques.
+
+    '
+  extractor: last_assistant

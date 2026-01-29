@@ -1,0 +1,19 @@
+name: networkidle-before-inspection
+skills:
+  - webapp-testing
+prompt: |
+  I'm trying to scrape a React app with Playwright but page.content() returns empty divs. What's wrong?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should identify the common SPA/React gotcha:
+
+    1. Must wait for JavaScript to execute and render content
+    2. Use page.wait_for_load_state('networkidle') before inspecting DOM
+    3. page.goto() returns when HTML loads, not when JS finishes rendering
+
+    Score 0 if doesn't mention waiting for JS/networkidle.
+    Score 0.5 if mentions waiting but not specifically networkidle or load state.
+    Score 1 if clearly recommends wait_for_load_state('networkidle') before DOM inspection.

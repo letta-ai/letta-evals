@@ -1,0 +1,19 @@
+name: config-vs-split-terminology
+skills:
+  - hugging-face-datasets
+prompt: |
+  What's the difference between a config and a split in HuggingFace datasets?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should distinguish configs from splits:
+
+    1. Config (subset): Different versions of the dataset (e.g., different languages, task variants)
+    2. Split: Train/test/validation partitions within a config
+    3. URL format: hf://datasets/repo@~parquet/{config}/{split}/*.parquet
+
+    Score 0 if confuses configs and splits.
+    Score 0.5 if explains one but not both.
+    Score 1 if clearly distinguishes: config = dataset variant, split = train/test partition.

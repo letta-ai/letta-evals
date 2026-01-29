@@ -1,0 +1,20 @@
+name: html2pptx-workflow-order
+skills:
+  - pptx
+prompt: |
+  I want to create a new PowerPoint presentation from scratch. What's the workflow using html2pptx?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should describe the html2pptx workflow:
+
+    1. First READ html2pptx.md completely (mandatory)
+    2. Create HTML files for each slide with proper dimensions
+    3. Run JavaScript with html2pptx.js library to convert and save
+    4. Visual validation with thumbnail.py
+
+    Score 0 if doesn't mention html2pptx workflow or reading the documentation.
+    Score 0.5 if mentions html2pptx but missing key steps.
+    Score 1 if shows complete workflow: read docs -> create HTML -> convert with JS -> validate.

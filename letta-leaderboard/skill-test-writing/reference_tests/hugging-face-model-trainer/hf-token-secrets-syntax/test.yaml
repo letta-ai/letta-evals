@@ -1,0 +1,35 @@
+name: hf-token-secrets-syntax
+skills:
+- hugging-face-model-trainer
+prompt: 'I''m submitting a training job using hf_jobs() and need to pass my HF_TOKEN
+  for
+
+  Hub authentication. What''s the exact syntax for the secrets parameter? Do I
+
+  pass the actual token value or use some kind of reference?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'You are evaluating whether the response correctly explains the secrets
+    syntax for hf_jobs().
+
+
+    The correct approach is to use the `$HF_TOKEN` syntax (e.g., `secrets={"HF_TOKEN":
+    "$HF_TOKEN"}`), which references the token without exposing it directly. You should
+    NOT paste the actual token value directly.
+
+
+    Score 1.0 if: The response shows the `$HF_TOKEN` reference syntax and explains
+    that this references the token value (rather than pasting the literal token).
+
+    Score 0.5 if: The response shows the `$HF_TOKEN` syntax but doesn''t explain the
+    reference mechanism, OR mentions the secrets parameter correctly without showing
+    the exact syntax.
+
+    Score 0.0 if: The response suggests pasting the actual token value directly, or
+    does not mention the secrets parameter, or gives incorrect syntax.
+
+    '
+  extractor: last_assistant

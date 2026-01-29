@@ -1,0 +1,19 @@
+name: year-format-as-text
+skills:
+  - xlsx
+prompt: |
+  In my financial model, years like 2024 are displaying as "2,024" with a comma. How do I fix this?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain year formatting in Excel:
+
+    1. Excel applies number formatting by default, adding thousands separator
+    2. Format years as text strings, not numbers
+    3. Use text format or write as string ("2024" not 2024)
+
+    Score 0 if doesn't identify the number formatting issue.
+    Score 0.5 if explains the issue but unclear solution.
+    Score 1 if recommends formatting years as text to avoid comma.

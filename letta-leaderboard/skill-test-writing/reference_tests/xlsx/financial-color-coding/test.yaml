@@ -1,0 +1,63 @@
+name: financial-color-coding
+skills:
+- xlsx
+prompt: 'Create a financial model Excel file called dcf_model.xlsx with proper
+
+  industry-standard formatting. Include:
+
+
+  - Row 1: Headers (Year 2024, 2025, 2026)
+
+  - Row 2: Revenue (input value: 1000000 in 2024, formula for 2025/2026 based on growth
+  rate)
+
+  - Row 3: Growth Rate (input assumption: 10%)
+
+  - Row 4: EBITDA Margin (input assumption: 25%)
+
+  - Row 5: EBITDA (calculated from Revenue * Margin)
+
+
+  Apply appropriate color formatting to distinguish between input cells and
+
+  formula cells according to financial modeling best practices.
+
+
+  Write the Python code to create this file.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly implements financial model color
+    coding conventions.
+
+
+    The response should demonstrate understanding that in professional financial models:
+
+    - Input cells (hardcoded values, assumptions) should be colored BLUE
+
+    - Formula cells (calculations) should be BLACK or default color
+
+    - The code should use openpyxl''s Font styling to apply colors
+
+    - The spreadsheet should contain actual Excel formulas (e.g., =B2*B3) not just
+    static values
+
+
+    Score 1.0 if: Uses blue font for input cells, includes proper Excel formulas,
+    uses openpyxl Font styling, and mentions/applies the industry convention for distinguishing
+    inputs from calculations.
+
+    Score 0.8 if: Uses blue for inputs, includes formulas, and uses Font styling,
+    but doesn''t explain the convention.
+
+    Score 0.6 if: Uses Font styling with some color awareness and has formulas, but
+    may not correctly identify which cells are inputs vs formulas.
+
+    Score 0.2 if: Has formulas in the model but no meaningful color coding.
+
+    Score 0.0 if: No formulas and no color coding - just creates static values.
+
+    '
+  extractor: last_assistant

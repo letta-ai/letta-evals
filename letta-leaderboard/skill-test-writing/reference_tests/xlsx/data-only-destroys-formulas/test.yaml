@@ -1,0 +1,43 @@
+name: data-only-destroys-formulas
+skills:
+- xlsx
+prompt: 'I want to read the calculated values from an Excel file using openpyxl.
+
+  I know I can use data_only=True to get calculated values instead of formulas.
+
+
+  Are there any risks or warnings I should know about when using data_only=True?
+
+  What happens if I modify and save the file after opening with data_only=True?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly warns about the critical pitfall
+    of using data_only=True in openpyxl.
+
+
+    The key issue is: When you open an Excel file with data_only=True and then save
+    it, the formulas are permanently destroyed and replaced with their last calculated
+    values. This is a destructive operation that cannot be undone.
+
+
+    Score 1.0 if: Clearly explains that formulas will be lost/destroyed/replaced when
+    saving after using data_only=True. The connection between saving and formula loss
+    must be explicit.
+
+    Score 0.8 if: Warns about formula loss but doesn''t clearly tie it to the save
+    operation.
+
+    Score 0.5 if: Mentions data_only context with warning language about saving, but
+    doesn''t explicitly state that formulas are lost.
+
+    Score 0.3 if: Has general warning language about saving but doesn''t specifically
+    address formula destruction.
+
+    Score 0.0 if: Does not warn about any risks or the response is misleading about
+    what happens.
+
+    '
+  extractor: last_assistant

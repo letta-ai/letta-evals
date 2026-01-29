@@ -1,0 +1,19 @@
+name: password-protection-owner-vs-user
+skills:
+  - pdf
+prompt: |
+  What's the difference between user password and owner password when encrypting a PDF?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain the two password types:
+
+    1. User password: Required to open/view the PDF
+    2. Owner password: Required to modify permissions (print, edit, copy)
+    3. pypdf's encrypt() takes both: encrypt("userpassword", "ownerpassword")
+
+    Score 0 if doesn't distinguish between the two types.
+    Score 0.5 if explains one but not both.
+    Score 1 if clearly explains both passwords and their different purposes.

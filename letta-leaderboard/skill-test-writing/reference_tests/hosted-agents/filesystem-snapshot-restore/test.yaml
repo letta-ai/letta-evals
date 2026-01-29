@@ -1,0 +1,19 @@
+name: filesystem-snapshot-restore
+skills:
+  - hosted-agents
+prompt: |
+  How can I make follow-up prompts in the same session start instantly without re-running setup?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain snapshot and restore:
+
+    1. Take filesystem snapshots at key points (after setup, after agent changes)
+    2. Restore from snapshot for follow-up prompts instead of re-running setup
+    3. Key snapshot points: base image, after agent makes changes, before sandbox exit
+
+    Score 0 if suggests re-running setup each time.
+    Score 0.5 if mentions caching but not filesystem snapshots.
+    Score 1 if describes taking and restoring filesystem snapshots.

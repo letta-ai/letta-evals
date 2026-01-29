@@ -1,0 +1,19 @@
+name: console-log-capture
+skills:
+  - webapp-testing
+prompt: |
+  How do I capture JavaScript console errors during Playwright automation for debugging?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain console log capture in Playwright:
+
+    1. Use page.on('console', callback) to capture console messages
+    2. Register listener BEFORE navigating to the page
+    3. Can filter by message type (error, warning, log)
+
+    Score 0 if doesn't mention page.on('console').
+    Score 0.5 if mentions console capture but incomplete setup.
+    Score 1 if explains page.on('console', ...) and emphasizes registering before navigation.

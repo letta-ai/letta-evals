@@ -1,0 +1,39 @@
+name: timeout-defaults
+skills:
+- hook-development
+prompt: 'What are the default timeout values for Claude Code hooks? Is there a difference
+
+  between command hooks and prompt hooks?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains timeout defaults for Claude
+    Code hooks.
+
+
+    Key timeout values:
+
+    - Command hooks (bash/script execution): 60 seconds default
+
+    - Prompt hooks (LLM-based): 30 seconds default (faster since they''re typically
+    simpler)
+
+    - The timeouts can be configured/overridden
+
+
+    Score 1.0 if: Response correctly identifies both timeout values - command hooks
+    at 60 seconds AND prompt hooks at 30 seconds
+
+
+    Score 0.5 if: Response correctly identifies one timeout value with appropriate
+    context (e.g., mentioning that different hook types have different timeouts, or
+    that timeouts are configurable)
+
+
+    Score 0.0 if: Response does not provide specific timeout values, or provides incorrect
+    values without the correct ones
+
+    '
+  extractor: last_assistant

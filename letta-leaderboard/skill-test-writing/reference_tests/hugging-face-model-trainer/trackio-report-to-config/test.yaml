@@ -1,0 +1,36 @@
+name: trackio-report-to-config
+skills:
+- hugging-face-model-trainer
+prompt: 'I''ve added trackio to my dependencies but I''m not seeing any metrics in
+  the
+
+  Trackio dashboard. How do I configure the TRL trainer to report metrics to
+
+  Trackio?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'You are evaluating whether the response correctly explains how to configure
+    TRL to report metrics to Trackio.
+
+
+    The key configuration is setting `report_to="trackio"` in the training config
+    (SFTConfig, DPOConfig, TrainingArguments, etc.). Optionally, `run_name` can be
+    used to identify the run in the dashboard.
+
+
+    Score 1.0 if: The response shows the exact syntax `report_to="trackio"` (or equivalent
+    with single quotes) AND mentions either run_name for identification or which config
+    class to use.
+
+    Score 0.5 if: The response mentions the `report_to` parameter and that it should
+    be set to trackio, but doesn''t show the exact syntax or provide additional context
+    about config classes.
+
+    Score 0.0 if: The response does not mention the `report_to` parameter, or suggests
+    an incorrect configuration method.
+
+    '
+  extractor: last_assistant

@@ -1,0 +1,25 @@
+name: hooks-json-format
+skills:
+- hook-development
+prompt: 'How do I configure hooks for a Claude Code plugin? What file do I create
+  and
+
+  what is its structure?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: "Evaluate whether the response correctly explains how to configure hooks\
+    \ for Claude Code plugins.\n\nKey concepts:\n- The configuration file is hooks/hooks.json\
+    \ (or just hooks.json in the hooks directory)\n- The file contains a \"hooks\"\
+    \ array\n- Each hook entry has fields like:\n  - \"type\": The event type (e.g.,\
+    \ PreToolUse, PostToolUse)\n  - \"matcher\": Pattern to match tools/events\n \
+    \ - \"command\" or \"prompt\": The hook implementation\n\nScore 1.0 if: Response\
+    \ identifies the correct file path (hooks.json or hooks/hooks.json) AND shows\
+    \ the JSON structure with the hooks array AND includes at least 2 of the key fields\
+    \ (type, matcher, command/prompt)\n\nScore 0.5 if: Response identifies the correct\
+    \ file AND shows either the hooks array structure OR the key fields, with some\
+    \ JSON example\n\nScore 0.0 if: Response does not identify hooks.json as the configuration\
+    \ file, or provides a fundamentally incorrect structure\n"
+  extractor: last_assistant

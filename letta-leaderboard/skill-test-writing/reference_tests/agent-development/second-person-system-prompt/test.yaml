@@ -1,0 +1,42 @@
+name: second-person-system-prompt
+skills:
+- agent-development
+prompt: 'What person (first, second, or third) should be used when writing
+
+  the system prompt (markdown body) for an agent? Give an example.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly identifies second person as the
+    appropriate voice for agent system prompts.
+
+
+    The correct answer is SECOND PERSON because system prompts address/instruct the
+    agent directly.
+
+
+    A good response should:
+
+    1. Explicitly state "second person" as the correct choice
+
+    2. Provide examples using "you" (e.g., "You are...", "You will...", "Your role
+    is...")
+
+    3. Explain WHY second person is correct (you''re addressing/instructing the agent
+    directly)
+
+
+    Score 1.0 if: Correctly identifies second person AND provides "you"-based examples
+    AND explains the reasoning (addressing the agent directly)
+
+    Score 0.5 if: Correctly identifies second person with examples but lacks clear
+    reasoning, OR shows good "you"-based examples without explicitly naming "second
+    person"
+
+    Score 0.0 if: Recommends first or third person, or doesn''t answer the question
+    about which person to use
+
+    '
+  extractor: last_assistant

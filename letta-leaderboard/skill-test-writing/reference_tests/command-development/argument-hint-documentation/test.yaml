@@ -1,0 +1,37 @@
+name: argument-hint-documentation
+skills:
+- command-development
+prompt: 'My command takes a filename and a priority level. How do I document these
+
+  expected arguments so users see them in the help output?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response demonstrates knowledge of the argument-hint
+    frontmatter for documenting command arguments.
+
+
+    The response should:
+
+    1. Mention the argument-hint frontmatter field
+
+    2. Show bracket notation for arguments (e.g., [filename] [priority])
+
+    3. Show it in frontmatter context (between --- delimiters)
+
+    4. Explain this appears in help output
+
+
+    Score 1.0 if: Response shows argument-hint in frontmatter with bracket notation
+    (like [filename] [priority]) and mentions it appears in help
+
+    Score 0.5 if: Response mentions argument-hint but doesn''t show complete bracket
+    notation or frontmatter context
+
+    Score 0.0 if: Response doesn''t mention argument-hint or gives an incorrect method
+    for documenting arguments
+
+    '
+  extractor: last_assistant

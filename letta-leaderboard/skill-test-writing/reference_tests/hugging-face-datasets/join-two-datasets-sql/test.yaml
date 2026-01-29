@@ -1,0 +1,19 @@
+name: join-two-datasets-sql
+skills:
+  - hugging-face-datasets
+prompt: |
+  How do I join data from two different HuggingFace datasets using sql_manager.py?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain the raw SQL command for joins:
+
+    1. Use the "raw" command with full hf:// paths
+    2. Syntax: 'hf://datasets/repo1@~parquet/config/split/*.parquet' a JOIN 'hf://...' b
+    3. Need to use raw SQL, not the simplified query command
+
+    Score 0 if says joins aren't supported.
+    Score 0.5 if mentions SQL joins but not the hf:// path syntax.
+    Score 1 if shows using raw command with full hf:// paths for both datasets.

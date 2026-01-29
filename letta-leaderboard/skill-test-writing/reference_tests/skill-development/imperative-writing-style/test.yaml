@@ -1,0 +1,49 @@
+name: imperative-writing-style
+skills:
+- skill-development
+prompt: 'Write the "Process" section for a code-review skill that guides reviewing
+
+  pull requests. Include 4-5 steps.
+
+
+  Use the correct writing style for Claude Code skills.
+
+
+  Just give me the Process section.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response uses the correct writing style for Claude
+    Code skills.
+
+
+    Claude Code skills should use IMPERATIVE/INFINITIVE form ("Check the code", "Review
+    changes")
+
+    and avoid SECOND-PERSON language ("You should check", "You need to review").
+
+
+    Check for:
+
+    1. Does the response avoid second-person patterns like "you should", "you need
+    to", "you can", "you must"?
+
+    2. Does the response use imperative verbs at the start of steps (check, review,
+    analyze, verify, ensure, examine, etc.)?
+
+    3. Does the response include numbered steps (at least 4-5 as requested)?
+
+
+    Score 1.0 if: No second-person language, uses imperative form for most steps,
+    has numbered steps
+
+    Score 0.5 if: Minimal second-person usage (1-2 instances), some imperative verbs
+    present
+
+    Score 0.0 if: Heavy use of second-person language throughout, or no clear process
+    steps
+
+    '
+  extractor: last_assistant

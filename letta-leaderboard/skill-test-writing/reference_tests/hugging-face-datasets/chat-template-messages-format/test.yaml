@@ -1,0 +1,19 @@
+name: chat-template-messages-format
+skills:
+  - hugging-face-datasets
+prompt: |
+  What format should the "messages" column have for a chat dataset compatible with TRL SFT training?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain chat/messages format:
+
+    1. List of message dictionaries with "role" and "content" keys
+    2. Roles: "user", "assistant", (optionally "system", "tool")
+    3. Example: [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+
+    Score 0 if doesn't describe the messages structure.
+    Score 0.5 if mentions messages but incomplete format.
+    Score 1 if shows complete format: list of dicts with role and content keys.

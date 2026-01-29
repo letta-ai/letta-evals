@@ -1,0 +1,58 @@
+name: extract-table-to-csv
+skills:
+- pdf
+prompt: 'Write Python code to extract all tables from a PDF file called "report.pdf"
+
+  and save them as CSV files. Each table should be saved to a separate file
+
+  named "table_1.csv", "table_2.csv", etc.
+
+
+  The code should handle multiple pages and multiple tables per page.
+
+
+  Just give me the Python code.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response provides correct Python code for extracting
+    tables from a PDF and saving them as CSV files.
+
+
+    The correct approach is to use pdfplumber with its extract_tables() method, which
+    is specifically designed for table extraction from PDFs.
+
+
+    Score 1.0 if:
+
+    - Uses pdfplumber library
+
+    - Uses extract_tables() method
+
+    - Iterates over pages (using .pages or similar)
+
+    - Writes output to CSV (using csv module or pandas to_csv)
+
+    - Uses numbered output filenames (table_1.csv, table_2.csv, etc.)
+
+
+    Score 0.5 if:
+
+    - Uses pdfplumber with extract_tables() but missing page iteration, CSV output,
+    or proper numbered filenames
+
+    - Has the right library and method but incomplete implementation
+
+
+    Score 0.0 if:
+
+    - Doesn''t use pdfplumber (other libraries like pypdf don''t have good table extraction)
+
+    - Doesn''t use extract_tables() method
+
+    - Fundamentally wrong approach
+
+    '
+  extractor: last_assistant

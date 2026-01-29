@@ -1,0 +1,51 @@
+name: production-ready-code
+skills:
+- frontend-design
+prompt: 'Create an HTML notification toast component that appears in the bottom-right
+
+  corner of the screen. It should have an icon, message text, and close button.
+
+
+  Make it production-ready with proper accessibility, animations, and responsive design.
+
+
+  Just give me the HTML with inline CSS and minimal JavaScript.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether this HTML response creates a production-ready notification
+    toast component with proper accessibility, animations, and functionality.
+
+
+    Key aspects to evaluate:
+
+    1. Accessibility: Does it use ARIA attributes (aria-label, aria-live, role)?
+
+    2. Positioning: Is it fixed positioned in the bottom-right corner?
+
+    3. Animation: Does it have transitions or keyframe animations (for enter/exit)?
+
+    4. Functionality: Does it have a close button with onclick handler?
+
+    5. Z-index: Is it properly layered above other content?
+
+
+    Score 1.0 if: Has 2+ accessibility features (aria, role), proper fixed positioning
+    with bottom/right, close button with JavaScript, 2+ animation techniques (transitions,
+    keyframes, opacity).
+
+    Score 0.8 if: Has proper positioning, close functionality, some animation, and
+    at least one accessibility feature.
+
+    Score 0.6 if: Has proper positioning and close functionality with animation.
+
+    Score 0.4 if: Has fixed positioning and close button but minimal polish.
+
+    Score 0.2 if: Has fixed positioning but no close functionality.
+
+    Score 0.0 if: Not properly positioned as a toast component.
+
+    '
+  extractor: last_assistant

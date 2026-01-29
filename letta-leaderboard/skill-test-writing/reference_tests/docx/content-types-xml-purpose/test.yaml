@@ -1,0 +1,19 @@
+name: content-types-xml-purpose
+skills:
+  - docx
+prompt: |
+  What is [Content_Types].xml in a DOCX file and when do I need to modify it?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain [Content_Types].xml:
+
+    1. It's a manifest file that declares MIME types for all parts in the package
+    2. Must be updated when adding NEW file types (like images, embedded objects)
+    3. Not needed for editing existing text content
+
+    Score 0 if doesn't know what it is or gives wrong information.
+    Score 0.5 if general understanding but misses when to modify.
+    Score 1 if explains it's a content type manifest and correctly identifies when modification is needed.

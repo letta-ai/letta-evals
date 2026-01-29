@@ -1,0 +1,44 @@
+name: validation-patterns
+skills:
+- command-development
+prompt: 'Write a command called "deploy-prod" that validates the environment
+
+  argument is one of: dev, staging, or prod. If the argument is invalid,
+
+  show an error message instead of deploying.
+
+
+  Show the command with validation logic.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response provides a command with proper argument validation.
+
+
+    The response should:
+
+    1. Include validation logic to check the environment argument
+
+    2. List all three valid environments: dev, staging, and prod
+
+    3. Show how to access the argument (using $1 or similar)
+
+    4. Include error handling for invalid arguments
+
+    5. Use conditional logic (if statements or similar)
+
+
+    Score 1.0 if: Response shows validation logic that checks for all three environments
+    (dev, staging, prod), uses argument syntax ($1), and includes error handling for
+    invalid input
+
+    Score 0.5 if: Response shows validation concept with most environments listed
+    but missing argument syntax or complete error handling
+
+    Score 0.0 if: Response doesn''t include validation logic or misses the core requirement
+    of checking environment values
+
+    '
+  extractor: last_assistant

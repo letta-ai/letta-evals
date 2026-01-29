@@ -1,0 +1,19 @@
+name: styles-vs-direct-formatting
+skills:
+  - docx
+prompt: |
+  In DOCX XML, what's the difference between applying formatting through styles.xml vs directly in the paragraph?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain the distinction:
+
+    1. styles.xml defines reusable named styles (Heading1, Normal, etc.)
+    2. Direct formatting (rPr, pPr) in document.xml overrides styles
+    3. Best practice: use styles for consistency, direct formatting for exceptions
+
+    Score 0 if doesn't distinguish between the two approaches.
+    Score 0.5 if explains one but not the relationship between them.
+    Score 1 if explains both and that direct formatting overrides styles.

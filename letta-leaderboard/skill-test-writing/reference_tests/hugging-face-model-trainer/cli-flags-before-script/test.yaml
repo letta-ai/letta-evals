@@ -1,0 +1,39 @@
+name: cli-flags-before-script
+skills:
+- hugging-face-model-trainer
+prompt: 'I''m trying to run a training job using the hf jobs CLI. I have this command
+  but
+
+  it''s not working:
+
+
+  hf jobs uv run "https://example.com/train.py" --flavor a10g-large --timeout 2h
+
+
+  What''s wrong with the syntax?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'You are evaluating whether the response correctly identifies the CLI syntax
+    error.
+
+
+    The issue is that CLI flags (like --flavor and --timeout) must come BEFORE the
+    script URL, not after it. The script URL should be the last positional argument.
+    Flags placed after the script URL will be ignored or cause errors.
+
+
+    Score 1.0 if: The response clearly explains that flags must come before the script
+    URL and shows or implies the correct command structure.
+
+    Score 0.5 if: The response mentions that the script URL should be last, or explains
+    that the flags will be ignored/won''t work, but doesn''t clearly state the "flags
+    before script" rule.
+
+    Score 0.0 if: The response does not identify the flag ordering issue, or gives
+    incorrect advice about the syntax problem.
+
+    '
+  extractor: last_assistant

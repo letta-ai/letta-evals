@@ -1,0 +1,45 @@
+name: security-input-validation
+skills:
+- hook-development
+prompt: 'Write a bash hook script that validates Bash tool commands and blocks
+
+  any command containing "rm -rf" or path traversal patterns like "..".
+
+
+  Give me the complete bash script.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response provides a complete, secure bash hook script
+    for input validation.
+
+
+    Required elements for a complete hook script:
+
+    - Shebang line (#!/bin/bash or #!/usr/bin/env bash)
+
+    - Reads input from stdin (hooks receive JSON via stdin)
+
+    - Checks for dangerous patterns: "rm -rf" and ".." path traversal
+
+    - Uses exit code 2 to block dangerous commands
+
+    - Ideally uses jq for JSON parsing and quotes variables properly
+
+
+    Score 1.0 if: Response provides a complete bash script with shebang, reads from
+    stdin, checks for at least one dangerous pattern (rm -rf OR path traversal), AND
+    uses exit code 2 to block
+
+
+    Score 0.5 if: Response checks for the dangerous patterns (rm -rf or ..) AND indicates
+    how to block/deny (exit 2 or JSON deny output), even if script structure is incomplete
+
+
+    Score 0.0 if: Response does not check for the requested dangerous patterns, or
+    does not provide a mechanism to block dangerous commands
+
+    '
+  extractor: last_assistant

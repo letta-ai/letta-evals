@@ -1,0 +1,41 @@
+name: tool-restriction
+skills:
+- agent-development
+prompt: 'How do I restrict which tools a Claude Code agent can use? What are some
+  common
+
+  tool sets for different agent types?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains how to restrict agent
+    tools in Claude Code.
+
+
+    A good response should cover:
+
+    1. The "tools" field in frontmatter controls which tools the agent can use
+
+    2. Tools are specified as an array/list
+
+    3. The principle of least privilege - only give agents the tools they need
+
+    4. Common tools: Read, Write, Grep, Glob, Bash, Edit, etc.
+
+    5. Common patterns: read-only agents (just Read, Grep, Glob), testing agents,
+    full access agents
+
+
+    Score 1.0 if: Explains the tools field AND discusses least privilege/restriction
+    principle AND mentions 2+ specific tools or tool patterns
+
+    Score 0.5 if: Explains the tools field with examples OR discusses restriction
+    concepts without full details
+
+    Score 0.0 if: Doesn''t explain how to restrict tools via the tools field, or gives
+    incorrect information
+
+    '
+  extractor: last_assistant

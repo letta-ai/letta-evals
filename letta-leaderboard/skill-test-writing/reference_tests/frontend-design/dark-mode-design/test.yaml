@@ -1,0 +1,50 @@
+name: dark-mode-design
+skills:
+- frontend-design
+prompt: 'Create an HTML settings page for a mobile app with toggles, dropdowns,
+
+  and action buttons.
+
+
+  Design it with a dark theme that feels intentional and polished,
+
+  not just inverted colors.
+
+
+  Just give me the HTML with inline CSS.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether this HTML response creates an intentional, polished dark
+    theme design rather than just inverted colors.
+
+
+    Key aspects to evaluate:
+
+    1. Does it use dark backgrounds (dark grays like #1a, #1f, #2d rather than pure
+    black #000)?
+
+    2. Does it have light/white text for proper contrast?
+
+    3. Does it use subtle borders (low-opacity or dark-toned rather than harsh)?
+
+    4. Does it have appropriate accent colors that work well on dark backgrounds?
+
+    5. Does it use CSS variables for consistent theming?
+
+
+    Score 1.0 if: Has dark backgrounds (preferably near-black, not pure black), 3+
+    good dark mode practices (light text, subtle borders, accent colors, CSS variables).
+
+    Score 0.8 if: Has dark backgrounds with 2+ good practices.
+
+    Score 0.6 if: Has dark backgrounds with light text but could be more polished.
+
+    Score 0.4 if: Has dark backgrounds but minimal refinement.
+
+    Score 0.0 if: Not a dark theme or uses light backgrounds.
+
+    '
+  extractor: last_assistant

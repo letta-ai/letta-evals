@@ -1,0 +1,42 @@
+name: required-frontmatter
+skills:
+- agent-development
+prompt: 'What fields are required in a Claude Code agent''s frontmatter? Which fields
+
+  are optional?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly identifies required vs optional
+    frontmatter fields for Claude Code agents.
+
+
+    Required fields are:
+
+    - name: the agent identifier
+
+    - description: what the agent does and when to use it
+
+    - model: which LLM model to use
+
+    - color: visual identifier color
+
+
+    Optional fields include:
+
+    - tools: list of allowed tools (defaults to all tools if omitted)
+
+
+    Score 1.0 if: Correctly identifies all 4 required fields (name, description, model,
+    color) AND mentions that tools is optional or has a default
+
+    Score 0.5 if: Identifies at least 3 required fields AND distinguishes between
+    required and optional, but may be missing one field or detail
+
+    Score 0.0 if: Identifies fewer than 2 required fields or doesn''t distinguish
+    between required and optional fields
+
+    '
+  extractor: last_assistant

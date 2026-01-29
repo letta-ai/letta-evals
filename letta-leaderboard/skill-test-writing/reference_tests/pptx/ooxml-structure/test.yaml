@@ -1,0 +1,45 @@
+name: ooxml-structure
+skills:
+- pptx
+prompt: 'What is the internal file structure of a .pptx file? Where are individual
+  slides
+
+  stored and where are speaker notes?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains the internal structure
+    of PPTX files.
+
+
+    Key facts about PPTX structure:
+
+    - PPTX files are ZIP archives containing XML files
+
+    - Individual slides are stored in ppt/slides/ (e.g., slide1.xml, slide2.xml)
+
+    - Speaker notes are stored in ppt/notesSlides/ (e.g., notesSlide1.xml)
+
+    - Other important directories include ppt/theme/, ppt/media/, ppt/slideLayouts/,
+    ppt/slideMasters/
+
+
+    Score 1.0 if: Response explains it''s a ZIP archive containing XML, correctly
+    identifies the slides location (ppt/slides), AND correctly identifies the notes
+    location (ppt/notesSlides or similar)
+
+    Score 0.8 if: Response correctly identifies both the slides and notes locations
+    but doesn''t mention ZIP/XML format
+
+    Score 0.6 if: Response correctly identifies the slides location OR explains the
+    ZIP+XML format with some directory knowledge
+
+    Score 0.4 if: Response demonstrates basic understanding (ZIP or XML format) but
+    lacks specific path knowledge
+
+    Score 0.0 if: Response does not demonstrate understanding of OOXML/PPTX structure
+
+    '
+  extractor: last_assistant

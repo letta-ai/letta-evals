@@ -1,0 +1,34 @@
+name: skill-directory-structure
+skills:
+- skill-development
+prompt: 'I want to create a new skill called "data-analysis". What directory structure
+
+  should I create and what''s the minimum file I need?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains the skill directory structure.
+
+
+    The correct answer is:
+
+    1. Create a directory with the skill name (e.g., data-analysis/ or skills/data-analysis/)
+
+    2. The MINIMUM required file is SKILL.md - this is the only file that must exist
+
+    3. Optional directories include: references/, scripts/, examples/, assets/
+
+
+    Score 1.0 if: Identifies SKILL.md as the required minimum file, shows the directory
+    structure clearly, indicates that only SKILL.md is required
+
+    Score 0.5 if: Mentions SKILL.md and shows directory structure, but doesn''t clarify
+    it''s the minimum requirement
+
+    Score 0.0 if: Doesn''t mention SKILL.md as required, or suggests other files are
+    mandatory
+
+    '
+  extractor: last_assistant

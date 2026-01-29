@@ -1,0 +1,44 @@
+name: avoid-second-person
+skills:
+- skill-development
+prompt: 'Rewrite this skill instruction to follow Claude Code skill writing guidelines:
+
+
+  "You should first read the configuration file. Then you need to validate
+
+  the input. After that, you can use the API to submit the request."
+
+
+  Just give me the rewritten version.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the rewritten skill instruction follows Claude Code writing
+    guidelines.
+
+
+    The original text uses second-person language ("You should", "You need to", "You
+    can").
+
+    A correct rewrite should:
+
+    1. Remove all second-person pronouns and constructions
+
+    2. Use imperative/infinitive form instead ("Read the configuration file", "Validate
+    the input")
+
+    3. Preserve the original meaning and sequence of actions (read config, validate
+    input, use API/submit)
+
+
+    Score 1.0 if: No second-person language, uses imperative form, preserves all three
+    actions (read, validate, submit/API)
+
+    Score 0.5 if: Mostly removes second-person (1-2 remaining), preserves the actions
+
+    Score 0.0 if: Still uses heavy second-person language, or loses the original meaning
+
+    '
+  extractor: last_assistant

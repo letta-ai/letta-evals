@@ -1,0 +1,51 @@
+name: color-theme-distinctiveness
+skills:
+- frontend-design
+prompt: 'Create an HTML page for a productivity dashboard with a sidebar navigation
+
+  and main content area showing task cards.
+
+
+  Make the color scheme distinctive and memorable - avoid generic purple
+
+  gradients on white backgrounds.
+
+
+  Just give me the HTML with inline CSS.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether this HTML response demonstrates a distinctive, memorable
+    color scheme for a productivity dashboard, avoiding generic "AI slop" aesthetics.
+
+
+    Key aspects to evaluate:
+
+    1. Does it avoid the cliche purple gradient on white background combination?
+
+    2. Does it use CSS variables (custom properties with --) for color management?
+
+    3. Does it have a cohesive color palette with multiple coordinated colors?
+
+    4. Are the color choices intentional and distinctive rather than generic defaults?
+
+
+    Score 1.0 if: Uses CSS variables for theming (3+ color variables), avoids purple
+    gradient on white, demonstrates thoughtful color variety with a cohesive palette.
+
+    Score 0.8 if: Uses gradients and accent colors creatively without CSS variables,
+    avoids the generic purple/white combo.
+
+    Score 0.6 if: Has good color variety (5+ distinct colors) but may lack CSS variables
+    or sophisticated theming.
+
+    Score 0.4 if: Shows some effort with colors but falls into generic patterns.
+
+    Score 0.2 if: Uses the generic purple gradient on white background combination.
+
+    Score 0.0 if: Minimal color styling or completely generic approach.
+
+    '
+  extractor: last_assistant

@@ -1,0 +1,34 @@
+name: scripts-vs-references
+skills:
+- skill-development
+prompt: 'What''s the difference between putting something in scripts/ vs references/
+
+  in my skill directory? When would I use each?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains the difference between
+    scripts/ and references/ directories.
+
+
+    The correct distinction is:
+
+    1. scripts/ - Contains EXECUTABLE code (Python, Bash, etc.) that Claude can run
+    as tools/utilities
+
+    2. references/ - Contains DOCUMENTATION/INFORMATION (markdown files, guides) that
+    Claude reads for context
+
+
+    Score 1.0 if: Correctly explains scripts/ is for executable code (mentions Python/Bash/running/executing)
+    AND references/ is for documentation/information to read, with examples
+
+    Score 0.5 if: Gets the basic distinction right but lacks clear examples or explanation
+
+    Score 0.0 if: Confuses the two directories, or doesn''t explain the key difference
+    (executable vs readable)
+
+    '
+  extractor: last_assistant

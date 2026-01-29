@@ -1,0 +1,19 @@
+name: server-not-ready-race-condition
+skills:
+  - webapp-testing
+prompt: |
+  My Playwright test fails with "connection refused" even though I started the server. What's happening?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should identify the server startup race condition:
+
+    1. Server startup is async - takes time to bind to port
+    2. Test runs before server is ready to accept connections
+    3. Need to wait for server to be ready (port check, health endpoint, or helper script)
+
+    Score 0 if doesn't identify timing/race condition issue.
+    Score 0.5 if mentions timing but no concrete solution.
+    Score 1 if explains the race condition and suggests waiting for server readiness.

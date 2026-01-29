@@ -1,0 +1,20 @@
+name: follow-up-message-queue
+skills:
+  - hosted-agents
+prompt: |
+  Users send messages while the agent is still processing. Should I interrupt the current work or queue the messages?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should discuss the queue vs insert tradeoff:
+
+    1. Queue approach: Messages wait until current prompt completes
+    2. Insert approach: Messages processed immediately
+    3. Queueing is simpler, lets users send thoughts on next steps while agent works
+    4. Should also build mechanism to stop agent mid-execution when needed
+
+    Score 0 if doesn't address the design decision.
+    Score 0.5 if mentions one approach without tradeoffs.
+    Score 1 if discusses both approaches and recommends queueing with stop mechanism.

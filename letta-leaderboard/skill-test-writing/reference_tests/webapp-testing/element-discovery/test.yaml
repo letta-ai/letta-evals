@@ -1,0 +1,69 @@
+name: element-discovery
+skills:
+- webapp-testing
+prompt: 'I have a dynamic web page at fixtures/dynamic_app.html that:
+
+  - Loads a list of items via JavaScript after page load (simulated delay)
+
+  - Each item has a "Delete" button that appears dynamically
+
+  - The page has a search input that filters items
+
+
+  Write a Playwright script that:
+
+  1. Opens the page using file:// URL
+
+  2. Waits for the page to fully load (including dynamic content)
+
+  3. Discovers and counts all "Delete" buttons on the page
+
+  4. Discovers the search input field
+
+  5. Prints the count of delete buttons found
+
+
+  The script should print "PASS: Found N delete buttons" where N should be 3.
+
+  Print "FAIL" if element discovery doesn''t work correctly.
+
+
+  Important: The page loads content dynamically with JavaScript, so you MUST
+
+  wait for the network to be idle before inspecting elements.
+
+
+  Run the script and show me the output.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response demonstrates correct handling of dynamic
+    element discovery in Playwright.
+
+
+    The critical insight is that when a page loads content dynamically via JavaScript,
+    you must wait for the content to be ready before inspecting elements. The recommended
+    approach is using "networkidle" wait state or explicit wait_for_selector.
+
+
+    Score 1.0 if: Output shows "PASS" with exactly 3 delete buttons found AND the
+    script uses networkidle wait strategy
+
+    Score 0.8 if: Output shows the correct count (3 buttons) with some valid wait
+    strategy (networkidle or wait_for_selector)
+
+    Score 0.5 if: Script uses networkidle pattern and proper locator patterns but
+    gets wrong count (timing issue)
+
+    Score 0.2 if: Script finds 0 buttons (didn''t wait properly for dynamic content)
+
+    Score 0.1 if: Response includes Playwright code but doesn''t execute or show results
+
+    Score 0.0 if: No Playwright code or completely incorrect approach
+
+    '
+  extractor: last_assistant
+fixtures:
+- dynamic_app.html

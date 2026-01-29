@@ -1,0 +1,70 @@
+name: image-registry-pattern
+skills:
+- hosted-agents
+prompt: 'I''m building a hosted coding agent system where users expect near-instant
+  session starts.
+
+  The development environment requires cloning a large monorepo, installing dependencies,
+
+  and running build steps.
+
+
+  Design an image registry pattern to minimize session startup time. Specifically:
+
+  1. What should the image build cadence be?
+
+  2. What should each pre-built image contain?
+
+  3. How do you handle the time gap between image build and session start?
+
+
+  Be specific and practical.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response provides a complete image registry pattern
+    for fast session startup.
+
+
+    A good response should address all three questions:
+
+    1. Build cadence: Regular interval (e.g., every 30 minutes or similar periodic
+    schedule)
+
+    2. Image contents: Pre-cloned repository, installed dependencies, populated build
+    caches
+
+    3. Time gap handling: Fast git sync/pull at session start to get latest changes
+
+
+    Score each component (0.2 points each, total 1.0):
+
+    - Build cadence: Mentions regular/periodic/scheduled builds with a specific interval
+
+    - Repository: Mentions pre-cloning the repo into the image
+
+    - Dependencies: Mentions installing dependencies (npm, pip, packages) at build
+    time
+
+    - Build/caches: Mentions running builds or populating caches at image creation
+
+    - Sync strategy: Mentions git sync/pull/fetch at session start to handle the time
+    gap
+
+
+    Score 1.0 if: All 5 components addressed
+
+    Score 0.8 if: 4 components addressed
+
+    Score 0.6 if: 3 components addressed
+
+    Score 0.4 if: 2 components addressed
+
+    Score 0.2 if: 1 component addressed
+
+    Score 0.0 if: None addressed or response misses the core concept
+
+    '
+  extractor: last_assistant

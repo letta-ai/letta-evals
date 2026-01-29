@@ -1,0 +1,37 @@
+name: pretooluse-blocking
+skills:
+- hook-development
+prompt: 'How can I use a PreToolUse hook to block dangerous tool calls in Claude Code?
+
+  What should the hook output to prevent a tool from running?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains how to block tool calls
+    using PreToolUse hooks.
+
+
+    Key blocking mechanisms:
+
+    - Exit code 2: Returning exit code 2 from the hook script blocks the tool call
+
+    - JSON output with permissionDecision: "deny" or "block" to prevent execution
+
+    - Stderr can be used to provide an error message explaining why the tool was blocked
+
+
+    Score 1.0 if: Response explains that exit code 2 blocks the tool AND mentions
+    either stderr for error messages OR JSON with permissionDecision deny/block
+
+
+    Score 0.5 if: Response explains exit code 2 with explanation of blocking mechanism,
+    OR explains the JSON deny approach with explanation of how it prevents execution
+
+
+    Score 0.0 if: Response does not explain either the exit code 2 method or the JSON
+    deny method for blocking tool calls
+
+    '
+  extractor: last_assistant

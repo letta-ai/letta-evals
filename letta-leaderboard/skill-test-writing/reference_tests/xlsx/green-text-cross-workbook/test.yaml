@@ -1,0 +1,61 @@
+name: green-text-cross-workbook
+skills:
+- xlsx
+prompt: 'I''m building a financial model with multiple worksheets. What color coding
+
+  conventions should I use to distinguish between different types of cell content?
+
+
+  Specifically, how should I visually indicate:
+
+  - Hardcoded input values that users can change
+
+  - Formulas and calculations
+
+  - Links that pull data from other worksheets in the same workbook
+
+  - External links to other files
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly describes the industry-standard
+    financial modeling color conventions.
+
+
+    The four standard colors in professional financial models are:
+
+    - BLUE = hardcoded inputs/assumptions (values users can change)
+
+    - BLACK = formulas and calculations
+
+    - GREEN = cross-worksheet links (references to other sheets within the same workbook)
+
+    - RED = external links (references to other files)
+
+
+    The GREEN for cross-worksheet links is the key differentiator - this is the most
+    obscure convention and demonstrates deep knowledge.
+
+
+    Score 1.0 if: Correctly identifies all four color conventions (blue for inputs,
+    black for formulas, green for same-workbook cross-sheet links, red for external
+    file links).
+
+    Score 0.9 if: Gets three conventions correct INCLUDING the green for cross-worksheet
+    links.
+
+    Score 0.7 if: Gets three conventions correct but misses or misattributes the green
+    cross-worksheet convention, OR gets two correct including green.
+
+    Score 0.5 if: Correctly identifies green for cross-worksheet links but misses
+    other conventions, OR gets two conventions correct without green.
+
+    Score 0.2 if: Gets only one convention correct and misses the green cross-worksheet
+    rule.
+
+    Score 0.0 if: Does not correctly identify any of the color conventions.
+
+    '
+  extractor: last_assistant

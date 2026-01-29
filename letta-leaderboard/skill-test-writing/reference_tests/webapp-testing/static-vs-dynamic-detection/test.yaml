@@ -1,0 +1,19 @@
+name: static-vs-dynamic-detection
+skills:
+  - webapp-testing
+prompt: |
+  How do I determine if a web page is static HTML or a dynamic JavaScript app before writing automation?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain how to distinguish static vs dynamic:
+
+    1. Static: Can read HTML file directly to find selectors
+    2. Dynamic: Content rendered by JavaScript, need browser execution
+    3. Check for: JS framework indicators, empty content in source, API calls on load
+
+    Score 0 if doesn't explain how to tell the difference.
+    Score 0.5 if mentions the distinction but no concrete detection method.
+    Score 1 if explains how to detect (check source vs rendered, look for framework indicators).

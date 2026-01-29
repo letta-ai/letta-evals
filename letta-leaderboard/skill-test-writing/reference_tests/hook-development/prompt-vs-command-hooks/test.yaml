@@ -1,0 +1,58 @@
+name: prompt-vs-command-hooks
+skills:
+- hook-development
+prompt: 'I want to create a hook that checks if code being written follows our
+
+  team''s coding standards. The check requires understanding context and
+
+  making nuanced decisions.
+
+
+  Should I use a prompt-based hook or a command hook? Explain why.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly recommends prompt-based hooks for
+    context-aware, nuanced decisions.
+
+
+    The user''s task (checking coding standards with nuanced decisions) is well-suited
+    for prompt hooks because:
+
+    - Prompt hooks use an LLM for context-aware reasoning
+
+    - They can handle nuanced, flexible decisions
+
+    - They understand natural language and edge cases
+
+    - They can reason about code quality and style
+
+
+    Command hooks are better for:
+
+    - Deterministic, fast checks
+
+    - Simple exact-match rules
+
+    - File system operations
+
+    - Quick validation without LLM overhead
+
+
+    Score 1.0 if: Response recommends prompt-based hooks AND provides at least 2 good
+    reasons (context-aware, nuanced, flexible, reasoning, understands edge cases,
+    LLM-based) AND contrasts with when command hooks are appropriate (deterministic,
+    fast, simple)
+
+
+    Score 0.5 if: Response recommends prompt-based hooks with at least 1 relevant
+    reason for why they''re better suited for this task
+
+
+    Score 0.0 if: Response recommends command hooks for this task, or does not make
+    a clear recommendation, or provides no reasoning
+
+    '
+  extractor: last_assistant

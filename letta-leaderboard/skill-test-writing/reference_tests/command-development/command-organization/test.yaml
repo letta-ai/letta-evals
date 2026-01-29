@@ -1,0 +1,43 @@
+name: command-organization
+skills:
+- command-development
+prompt: 'I have 20 commands for a project covering CI/CD, git workflows, and
+
+  documentation tasks. Should I put them all in a flat directory or
+
+  organize them in subdirectories?
+
+
+  How should I structure the .claude/commands/ directory?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response demonstrates understanding of command organization
+    for large command sets in Claude Code.
+
+
+    The response should:
+
+    1. Recommend using subdirectories/namespacing/grouping for 20+ commands (not a
+    flat structure)
+
+    2. Show a directory structure example (using paths with / or tree characters)
+
+    3. Mention logical groupings like CI/CD, git, and documentation categories
+
+    4. Explain benefits of organization (easier to find, logical grouping, maintainability)
+
+
+    Score 1.0 if: Response recommends subdirectories/namespacing, shows a concrete
+    directory structure example, and explains benefits of organized structure
+
+    Score 0.5 if: Response recommends subdirectories but lacks a concrete structure
+    example or detailed reasoning
+
+    Score 0.0 if: Response recommends flat structure, doesn''t address organization,
+    or gives irrelevant advice
+
+    '
+  extractor: last_assistant

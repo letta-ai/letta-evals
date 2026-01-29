@@ -1,0 +1,19 @@
+name: assumptions-separate-cells
+skills:
+  - xlsx
+prompt: |
+  In a financial model, should I put a growth rate directly in formulas like =B5*1.05 or use a separate cell?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should recommend separate assumption cells:
+
+    1. Place assumptions (growth rates, margins) in separate labeled cells
+    2. Reference those cells in formulas: =B5*(1+$B$6) not =B5*1.05
+    3. Benefits: easier to update, transparent assumptions, scenario analysis
+
+    Score 0 if says hardcoding in formulas is fine.
+    Score 0.5 if mentions both approaches without clear recommendation.
+    Score 1 if strongly recommends separate assumption cells over hardcoded values.

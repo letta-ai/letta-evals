@@ -1,0 +1,19 @@
+name: rasterize-gradients-icons
+skills:
+  - pptx
+prompt: |
+  I want to use gradients and icons in my html2pptx slides. How should I handle them?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain the rasterization requirement:
+
+    1. CRITICAL: Rasterize gradients and icons as PNG images FIRST using Sharp
+    2. Then reference the PNG images in HTML
+    3. Don't use CSS gradients or SVG icons directly
+
+    Score 0 if suggests using CSS gradients or SVG directly.
+    Score 0.5 if mentions images but not the Sharp rasterization step.
+    Score 1 if explains must rasterize to PNG first, then reference in HTML.

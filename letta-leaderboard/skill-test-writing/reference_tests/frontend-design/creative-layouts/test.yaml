@@ -1,0 +1,52 @@
+name: creative-layouts
+skills:
+- frontend-design
+prompt: 'Create an HTML portfolio page for a photographer.
+
+  Include a grid of photos with the photographer''s name and bio.
+
+
+  Use creative, unexpected layout choices - asymmetry, overlapping elements,
+
+  or grid-breaking design rather than a standard symmetric grid.
+
+
+  Just give me the HTML with inline CSS.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether this HTML response demonstrates creative, unexpected layout
+    choices for a photographer portfolio rather than a standard symmetric grid.
+
+
+    Key aspects to evaluate:
+
+    1. Does it use CSS Grid or Flexbox for layout?
+
+    2. Does it have asymmetric or varied element sizing (grid span, different column
+    widths)?
+
+    3. Does it use overlapping elements (position: absolute with z-index)?
+
+    4. Does it use creative positioning (negative margins, transform: translate)?
+
+    5. Does it break the standard grid pattern in interesting ways?
+
+
+    Score 1.0 if: Uses 2+ creative layout techniques (grid spans with varied sizes,
+    overlapping elements with z-index, negative margins, or transform positioning)
+    combined with Grid or Flexbox.
+
+    Score 0.8 if: Uses at least one creative technique with CSS Grid.
+
+    Score 0.5 if: Uses CSS Grid with proper grid-template and gap but maintains a
+    standard symmetric layout.
+
+    Score 0.3 if: Uses basic Grid or Flexbox without creative variation.
+
+    Score 0.0 if: No modern layout techniques (no Grid or Flexbox).
+
+    '
+  extractor: last_assistant

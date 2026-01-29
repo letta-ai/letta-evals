@@ -1,0 +1,39 @@
+name: disable-model-invocation
+skills:
+- command-development
+prompt: 'I have a destructive command (like deleting files) that should only be run
+
+  when a user explicitly types it. How do I prevent Claude from invoking
+
+  this command programmatically?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response demonstrates knowledge of the disable-model-invocation
+    frontmatter for preventing programmatic command invocation.
+
+
+    The response should:
+
+    1. Mention the disable-model-invocation frontmatter field
+
+    2. Show it set to true
+
+    3. Show it in frontmatter context (between --- delimiters)
+
+    4. Explain that this prevents Claude from invoking the command programmatically
+
+
+    Score 1.0 if: Response shows disable-model-invocation: true in frontmatter and
+    explains it prevents programmatic invocation
+
+    Score 0.5 if: Response mentions disable-model-invocation but doesn''t show complete
+    frontmatter syntax or clear explanation
+
+    Score 0.0 if: Response doesn''t mention disable-model-invocation or gives an incorrect
+    solution
+
+    '
+  extractor: last_assistant

@@ -1,0 +1,35 @@
+name: model-selection
+skills:
+- command-development
+prompt: 'I have a simple formatting command that doesn''t need much intelligence.
+
+  How do I make it use a faster, cheaper model instead of the default?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response demonstrates knowledge of the model frontmatter
+    field for selecting which model runs a command.
+
+
+    The response should:
+
+    1. Mention the model: frontmatter field
+
+    2. Recommend Haiku as a faster/cheaper option for simple tasks
+
+    3. Show it in frontmatter context (between --- delimiters)
+
+
+    Score 1.0 if: Response shows the model: field in frontmatter and recommends Haiku
+    (or similar fast/cheap model) for simple tasks
+
+    Score 0.5 if: Response mentions the model field but doesn''t specifically recommend
+    a faster/cheaper model like Haiku
+
+    Score 0.0 if: Response doesn''t mention the model frontmatter field or gives an
+    incorrect method for model selection
+
+    '
+  extractor: last_assistant

@@ -1,0 +1,32 @@
+name: frontmatter-required-fields
+skills:
+- skill-development
+prompt: 'What fields are required in a SKILL.md frontmatter? What are they used for?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly identifies the required SKILL.md
+    frontmatter fields.
+
+
+    The required fields are:
+
+    1. name - The skill''s identifier
+
+    2. description - Explains when the skill should be triggered/activated (this is
+    how Claude knows when to load it)
+
+
+    Score 1.0 if: Mentions both name and description as required, AND explains that
+    description is used for triggering/activation
+
+    Score 0.5 if: Mentions both name and description, but doesn''t clearly explain
+    their purposes
+
+    Score 0.0 if: Missing one of the required fields, or doesn''t identify the key
+    fields correctly
+
+    '
+  extractor: last_assistant

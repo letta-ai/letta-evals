@@ -1,0 +1,42 @@
+name: triggering-conditions
+skills:
+- agent-development
+prompt: 'How does Claude decide when to use a specific agent? How should I write the
+
+  description to ensure my agent triggers at the right time?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains how agent triggering works
+    and how to write effective descriptions.
+
+
+    Key points:
+
+    1. The description field determines when Claude triggers/selects an agent
+
+    2. Descriptions should include "Use this agent when..." or similar triggering
+    phrases
+
+    3. Concrete examples in the description help Claude match user requests
+
+    4. Different phrasings/variations help cover more cases
+
+    5. Optionally: explaining when NOT to use the agent helps avoid false triggers
+
+
+    Score 1.0 if: Explains that description determines triggering AND recommends concrete
+    examples/use cases AND mentions "use this agent when" format or similar explicit
+    trigger phrases
+
+    Score 0.5 if: Explains description''s role in triggering with some practical advice,
+    but missing clear guidance on format OR mentions examples without connecting to
+    triggering mechanism
+
+    Score 0.0 if: Doesn''t explain that the description field drives agent selection,
+    or gives incorrect information about triggering
+
+    '
+  extractor: last_assistant

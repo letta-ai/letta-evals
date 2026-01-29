@@ -1,0 +1,19 @@
+name: self-spawning-agent-tools
+skills:
+  - hosted-agents
+prompt: |
+  I want agents to be able to spawn sub-agents for parallel work. What tools should I provide?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should describe self-spawning tools:
+
+    1. Tool to start a new session with specified parameters
+    2. Tool to check status of any session (check-in capability)
+    3. Allow main agent to continue work while sub-sessions run in parallel
+
+    Score 0 if says agents shouldn't spawn other agents.
+    Score 0.5 if mentions spawning but not the required tools.
+    Score 1 if describes both spawn and status-check tools for self-spawning agents.

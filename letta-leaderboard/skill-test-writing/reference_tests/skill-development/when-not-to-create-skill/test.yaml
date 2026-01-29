@@ -1,0 +1,20 @@
+name: when-not-to-create-skill
+skills:
+  - skill-development
+prompt: |
+  When should I NOT create a skill? What are signs that a skill isn't justified?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should identify cases where skills aren't warranted:
+
+    1. One-off tasks that won't be repeated
+    2. Simple tasks that don't require specialized knowledge
+    3. Tasks where general model knowledge is sufficient
+    4. When the overhead of maintaining a skill exceeds the benefit
+
+    Score 0 if says always create skills or doesn't address when NOT to.
+    Score 0.5 if mentions one reason but incomplete analysis.
+    Score 1 if identifies multiple cases where skills aren't justified (repetition, complexity, maintenance).

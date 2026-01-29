@@ -1,0 +1,47 @@
+name: financial-negative-parentheses
+skills:
+- xlsx
+prompt: 'I''m building a financial model in Excel. How should I format negative numbers
+
+  according to finance industry standards? What number format string should I use
+
+  for currency values that might be negative?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly recommends the finance industry
+    standard for displaying negative numbers.
+
+
+    In professional financial models, negative numbers should be displayed in PARENTHESES,
+    not with a minus sign. For example, a loss of $500 should appear as ($500) not
+    -$500.
+
+
+    The ideal Excel number format string uses a semicolon-separated format where the
+    second section (negative numbers) uses parentheses, such as: $#,##0;($#,##0) or
+    similar patterns.
+
+
+    Score 1.0 if: Provides a correct Excel format string that uses parentheses for
+    the negative section (e.g., $#,##0;($#,##0) or similar).
+
+    Score 0.9 if: Recommends parentheses for negatives and mentions this is the industry/accounting
+    standard, but doesn''t provide the exact format string.
+
+    Score 0.8 if: Recommends parentheses and contrasts with the minus sign approach,
+    showing understanding of why parentheses are preferred.
+
+    Score 0.6 if: Recommends parentheses for negative numbers but doesn''t connect
+    it to industry standards or explain why.
+
+    Score 0.2 if: Mentions financial/accounting conventions but doesn''t specifically
+    recommend parentheses.
+
+    Score 0.0 if: Recommends minus signs or doesn''t address the formatting question
+    meaningfully.
+
+    '
+  extractor: last_assistant

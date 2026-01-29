@@ -1,0 +1,40 @@
+name: color-assignment
+skills:
+- agent-development
+prompt: 'What color options are available for Claude Code agents? Are there guidelines
+
+  for when to use each color?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly describes Claude Code agent color
+    options and usage guidelines.
+
+
+    The available colors are: blue, cyan, green, yellow, magenta, red
+
+
+    Guidelines suggest using colors to:
+
+    - Visually distinguish different agent types
+
+    - Match color semantics to agent purpose (e.g., red for security/critical, yellow
+    for caution, green for analysis)
+
+    - Maintain consistency across similar agents
+
+
+    Score 1.0 if: Lists at least 4 of the 6 colors AND provides meaningful guidelines
+    for when to use different colors (semantic associations or visual identification
+    purposes)
+
+    Score 0.5 if: Lists at least 4 colors without guidelines, OR lists 2-3 colors
+    with good context about their purpose
+
+    Score 0.0 if: Lists fewer than 2 colors or doesn''t address the color options
+    question
+
+    '
+  extractor: last_assistant

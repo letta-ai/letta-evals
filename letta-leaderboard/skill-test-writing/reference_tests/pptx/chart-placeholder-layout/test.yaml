@@ -1,0 +1,19 @@
+name: chart-placeholder-layout
+skills:
+  - pptx
+prompt: |
+  In html2pptx, how should I layout a slide with both text content and a chart?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain proper chart/text layouts:
+
+    1. Use two-column layout (preferred): header spanning full width, text in one column, chart in other
+    2. Or full-slide layout for maximum chart readability
+    3. NEVER vertically stack chart below text - causes poor readability
+
+    Score 0 if suggests stacking chart below text.
+    Score 0.5 if mentions layout but unclear on preferred approach.
+    Score 1 if recommends two-column or full-slide, explicitly warns against vertical stacking.

@@ -1,0 +1,52 @@
+name: example-quality
+skills:
+- skill-development
+prompt: 'Write a usage example for a "git-workflow" skill that shows how to create
+
+  a feature branch, make commits, and open a PR.
+
+
+  The example should go in the examples/ directory.
+
+
+  Give me the example file content.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response provides a complete, runnable git workflow
+    example.
+
+
+    A quality skill example should:
+
+    1. Cover the complete workflow: branch creation, commits, push, and PR creation
+
+    2. Use proper code block formatting (```bash or ```sh)
+
+    3. Include helpful comments explaining each step
+
+
+    Check for these git operations:
+
+    - Branch creation: git checkout -b or git switch -c
+
+    - Making commits: git commit
+
+    - Pushing: git push
+
+    - Opening PR: gh pr create or equivalent
+
+
+    Score 1.0 if: Complete workflow (4+ git operations), formatted in code blocks,
+    includes explanatory comments
+
+    Score 0.5 if: Most git operations present (3+), proper formatting, but may lack
+    comments
+
+    Score 0.0 if: Missing multiple key operations, no code formatting, or not a usable
+    example
+
+    '
+  extractor: last_assistant

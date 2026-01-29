@@ -1,0 +1,44 @@
+name: 30-min-image-rebuild-cadence
+skills:
+- hosted-agents
+prompt: 'For a hosted agent system, how often should I rebuild environment images
+  to
+
+  balance freshness with startup speed?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response demonstrates understanding of image rebuild
+    cadence for hosted agent systems.
+
+
+    The key insight is that pre-built images should be rebuilt on a regular cadence
+    (around 30 minutes is optimal) to balance:
+
+    - Freshness: keeping images reasonably up-to-date with latest code
+
+    - Startup speed: syncing from a recent image is much faster than building from
+    scratch
+
+
+    Score 1.0 if: Response recommends approximately 30-minute rebuild cadence AND
+    explains the rationale (regular/periodic rebuilds enable fast sync at session
+    start)
+
+    Score 0.8 if: Response recommends 30-minute cadence but explanation is incomplete,
+    OR correctly explains pre-building images with regular cadence without the specific
+    timing
+
+    Score 0.6 if: Response understands pre-building images on a schedule but misses
+    the specific timing or the sync-speed benefit
+
+    Score 0.4 if: Response mentions 30-minute cadence OR pre-building concept but
+    lacks context about why
+
+    Score 0.0 if: Response does not address image rebuild cadence or pre-building
+    strategy
+
+    '
+  extractor: last_assistant

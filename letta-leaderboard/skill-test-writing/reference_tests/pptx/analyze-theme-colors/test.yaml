@@ -1,0 +1,49 @@
+name: analyze-theme-colors
+skills:
+- pptx
+prompt: 'I need to analyze the color scheme of an existing PowerPoint presentation.
+
+  The presentation has been unpacked to a directory.
+
+
+  1. What file path contains the theme color definitions?
+
+  2. What XML element defines the color scheme?
+
+  3. What XML element would I look for to find the accent colors?
+
+
+  Give me the file path and both XML element names.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly identifies the OOXML theme color
+    locations in PowerPoint files.
+
+
+    The response should demonstrate knowledge of:
+
+    1. Theme file location: The theme colors are stored in ppt/theme/theme1.xml (or
+    similar path under ppt/theme/)
+
+    2. Color scheme element: The a:clrScheme XML element defines the color scheme
+
+    3. Accent color elements: Accent colors use elements like a:accent1, a:accent2,
+    etc.
+
+
+    Score 1.0 if: Response correctly identifies all three: the theme file path (ppt/theme/),
+    the clrScheme element, AND the accent elements
+
+    Score 0.7 if: Response correctly identifies the theme path and one of the XML
+    elements (either clrScheme or accent elements)
+
+    Score 0.4 if: Response correctly identifies only the theme file path OR only the
+    XML elements
+
+    Score 0.0 if: Response does not demonstrate knowledge of OOXML theme structure
+
+    '
+  extractor: last_assistant

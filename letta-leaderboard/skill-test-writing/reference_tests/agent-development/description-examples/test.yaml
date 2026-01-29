@@ -1,0 +1,39 @@
+name: description-examples
+skills:
+- agent-development
+prompt: 'How should I write the description field for a Claude Code agent? What format
+
+  should examples use?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly describes how to write agent description
+    fields and example formats.
+
+
+    A good response should explain:
+
+    1. The description should include triggering conditions ("Use this agent when...")
+
+    2. Examples should use <example> tags
+
+    3. Examples can include <commentary> tags to explain the example
+
+    4. Examples typically show user/assistant interactions or context
+
+    5. Multiple examples (2-4) help with triggering accuracy
+
+
+    Score 1.0 if: Mentions <example> tags AND discusses commentary/explanation of
+    examples AND covers triggering conditions ("when to use")
+
+    Score 0.5 if: Mentions <example> tags with some context about usage OR discusses
+    triggering conditions with multiple examples concept
+
+    Score 0.0 if: Doesn''t mention the example tag format or triggering conditions,
+    gives generic advice not specific to Claude Code agents
+
+    '
+  extractor: last_assistant

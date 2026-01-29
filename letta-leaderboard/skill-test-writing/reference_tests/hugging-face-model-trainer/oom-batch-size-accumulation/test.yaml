@@ -1,0 +1,20 @@
+name: oom-batch-size-accumulation
+skills:
+  - hugging-face-model-trainer
+prompt: |
+  My training job crashes with Out of Memory (OOM) error. How do I fix it while keeping the same effective batch size?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain batch size and gradient accumulation:
+
+    1. Reduce per_device_train_batch_size (try 1)
+    2. Increase gradient_accumulation_steps to compensate
+    3. Effective batch = per_device_batch_size × gradient_accumulation_steps
+    4. Also enable gradient_checkpointing=True
+
+    Score 0 if only suggests reducing batch size without accumulation.
+    Score 0.5 if mentions both but doesn't explain effective batch calculation.
+    Score 1 if explains the tradeoff and how to maintain effective batch size.

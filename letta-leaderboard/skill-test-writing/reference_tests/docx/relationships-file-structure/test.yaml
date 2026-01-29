@@ -1,0 +1,19 @@
+name: relationships-file-structure
+skills:
+  - docx
+prompt: |
+  I'm adding an image to a DOCX file. Where do I define the relationship between document.xml and the image file?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should identify the relationships file location:
+
+    1. Relationships are in _rels/ subdirectories
+    2. For document.xml, use word/_rels/document.xml.rels
+    3. Each relationship has an Id (like rId1) used to reference from the document
+
+    Score 0 if doesn't mention _rels directory or .rels files.
+    Score 0.5 if mentions relationships but wrong location.
+    Score 1 if correctly identifies word/_rels/document.xml.rels as the location.

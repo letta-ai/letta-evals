@@ -1,0 +1,34 @@
+name: file-reference-at-syntax
+skills:
+- command-development
+prompt: 'In my Claude Code command, I want to include the contents of a specific file
+
+  so Claude can read it. How do I reference a file in my command template?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response demonstrates knowledge of the @ syntax for
+    file references in Claude Code commands.
+
+
+    The response should:
+
+    1. Show the @ syntax for referencing files (e.g., @path/to/file, @$1, @package.json)
+
+    2. Explain that the file contents are included/injected into the command
+
+    3. Ideally show a concrete example
+
+
+    Score 1.0 if: Response shows the @ syntax with a concrete example (like @$1, @src/file.ts,
+    @package.json) and explains that file contents are included
+
+    Score 0.5 if: Response mentions @ syntax but lacks a clear example or explanation
+    of content inclusion
+
+    Score 0.0 if: Response doesn''t show the @ syntax for file references
+
+    '
+  extractor: last_assistant

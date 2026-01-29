@@ -1,0 +1,20 @@
+name: reconnaissance-then-action-pattern
+skills:
+  - webapp-testing
+prompt: |
+  I don't know the selectors for a dynamic web app. How should I approach automating it with Playwright?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should describe the reconnaissance-then-action pattern:
+
+    1. First navigate and wait for networkidle
+    2. Then inspect rendered DOM (screenshot, page.content(), locator.all())
+    3. Identify selectors from the actual rendered state
+    4. Only then execute actions with discovered selectors
+
+    Score 0 if suggests guessing selectors or reading source code only.
+    Score 0.5 if mentions inspection but not the full workflow.
+    Score 1 if describes: navigate -> wait -> inspect rendered state -> identify selectors -> act.

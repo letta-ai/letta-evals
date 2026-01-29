@@ -1,0 +1,44 @@
+name: thumbnail-script-usage
+skills:
+- pptx
+prompt: 'How do I create a visual grid of thumbnails from a PowerPoint file for quick
+
+  review? What tool should I use and what options are available?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains how to create thumbnail
+    grids from PowerPoint files.
+
+
+    The ideal solution involves:
+
+    - Using thumbnail.py script from the pptx skill
+
+    - The script supports options like --cols to control grid layout
+
+    - Output is typically JPG images arranged in a grid
+
+
+    Alternative acceptable approaches:
+
+    - Using LibreOffice (soffice) to convert to PDF, then pdftoppm to create images
+
+
+    Score 1.0 if: Response recommends thumbnail.py AND explains grid/column options
+
+    Score 0.8 if: Response recommends thumbnail.py but doesn''t explain the options
+    in detail
+
+    Score 0.6 if: Response suggests a valid alternative workflow (like soffice + pdftoppm)
+
+    Score 0.4 if: Response mentions relevant concepts (grids, image export, LibreOffice)
+    but lacks a complete solution
+
+    Score 0.0 if: Response does not provide a practical approach for creating thumbnail
+    grids
+
+    '
+  extractor: last_assistant

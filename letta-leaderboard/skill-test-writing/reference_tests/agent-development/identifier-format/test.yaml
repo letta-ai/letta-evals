@@ -1,0 +1,48 @@
+name: identifier-format
+skills:
+- agent-development
+prompt: 'What are the rules for naming a Claude Code agent? What characters are allowed
+
+  and what are the length requirements?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly describes Claude Code agent naming
+    rules.
+
+
+    The correct naming rules are:
+
+    - Must be lowercase
+
+    - Hyphens are allowed (for word separation)
+
+    - Length: 3-50 characters
+
+    - Must start and end with alphanumeric characters
+
+    - No underscores
+
+
+    A good response should cover these key points:
+
+    1. Lowercase requirement
+
+    2. Hyphens allowed for word separation
+
+    3. Length constraints (3-50 characters)
+
+
+    Score 1.0 if: Mentions lowercase requirement AND hyphens allowed AND length constraints
+    (3-50 or similar specific numbers)
+
+    Score 0.5 if: Mentions lowercase AND hyphens but missing length details, OR has
+    most rules with minor inaccuracies
+
+    Score 0.0 if: Missing key rules (doesn''t mention lowercase or hyphen conventions),
+    or gives incorrect information
+
+    '
+  extractor: last_assistant

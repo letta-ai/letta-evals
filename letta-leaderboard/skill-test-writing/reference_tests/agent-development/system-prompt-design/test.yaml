@@ -1,0 +1,46 @@
+name: system-prompt-design
+skills:
+- agent-development
+prompt: 'Write the system prompt (markdown body) for a "bug-hunter" agent that
+
+  finds bugs in code. Include responsibilities, process steps, and output format.
+
+
+  Just give me the markdown content that goes after the frontmatter.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response provides a well-structured system prompt
+    for a bug-hunting agent.
+
+
+    A good system prompt should:
+
+    1. Use second person voice ("You are...", "You will...", "Your task...")
+
+    2. Include a responsibilities/role section
+
+    3. Include process steps or workflow (ideally numbered)
+
+    4. Include output format specification
+
+    5. Be structured with headers (## or **bold**)
+
+    6. Be relevant to bug hunting (mention bugs, errors, issues, vulnerabilities,
+    etc.)
+
+
+    Score 1.0 if: Uses second person voice AND has at least 3 of: responsibilities
+    section, process/steps, output format, quality standards. Should be well-structured
+    with headers.
+
+    Score 0.5 if: Has reasonable structure with 2+ sections but may use wrong voice
+    (first/third person) OR is missing key sections
+
+    Score 0.0 if: Response lacks structure, doesn''t address bug hunting, or is just
+    a brief description rather than an actual system prompt
+
+    '
+  extractor: last_assistant

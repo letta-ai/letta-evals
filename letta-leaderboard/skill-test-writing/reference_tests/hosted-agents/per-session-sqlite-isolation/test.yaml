@@ -1,0 +1,44 @@
+name: per-session-sqlite-isolation
+skills:
+- hosted-agents
+prompt: 'For a hosted agent system with hundreds of concurrent sessions, how should
+  I
+
+  handle per-session state storage to prevent cross-session interference?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response demonstrates understanding of per-session
+    state isolation for hosted agent systems.
+
+
+    The key insight is that each session should have its own SQLite database (or similar
+    isolated storage) so that:
+
+    - No session can impact another session''s state or performance
+
+    - Sessions can scale to hundreds concurrently without contention
+
+    - State is completely isolated between sessions
+
+
+    Score 1.0 if: Response recommends per-session SQLite (or equivalent isolated file-based
+    storage) AND explains the isolation benefit (no cross-session interference)
+
+    Score 0.8 if: Response recommends per-session storage with isolation, even without
+    specifically mentioning SQLite, OR mentions SQLite per-session without fully explaining
+    isolation benefits
+
+    Score 0.6 if: Response understands isolation is needed for concurrent sessions
+    but solution is less specific
+
+    Score 0.4 if: Response mentions isolation or per-session storage but lacks detail
+    on implementation or benefits
+
+    Score 0.0 if: Response does not address session isolation or suggests shared storage
+    that could cause interference
+
+    '
+  extractor: last_assistant

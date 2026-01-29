@@ -1,0 +1,19 @@
+name: namespace-preservation
+skills:
+  - docx
+prompt: |
+  When editing DOCX XML, I'm getting errors about undefined namespace prefixes like w:, r:, etc. What's happening?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain XML namespace handling in OOXML:
+
+    1. Namespaces must be declared in the root element (xmlns:w, xmlns:r, etc.)
+    2. Common namespaces: w = main wordprocessingML, r = relationships, etc.
+    3. When editing, must preserve namespace declarations from original file
+
+    Score 0 if doesn't explain namespace declarations.
+    Score 0.5 if mentions namespaces but incomplete explanation.
+    Score 1 if explains namespace prefixes must be declared and should be preserved from original.

@@ -1,0 +1,46 @@
+name: pdfplumber-vs-pypdf-tables
+skills:
+- pdf
+prompt: 'I need to extract tabular data from a PDF file that contains financial statements
+
+  with multiple tables. Which Python library should I use for extracting tables
+
+  from PDFs, and what method should I call?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly recommends pdfplumber for extracting
+    tables from PDFs.
+
+
+    Key insight: pdfplumber is the correct library for table extraction because it
+    has the extract_tables() method. pypdf/PyPDF2 are for PDF manipulation (merge,
+    split, etc.) but NOT for table extraction.
+
+
+    Score 1.0 if:
+
+    - Recommends pdfplumber as the library for table extraction
+
+    - Mentions extract_tables() or extract_table() method
+
+
+    Score 0.5 if:
+
+    - Recommends pdfplumber but doesn''t mention the specific method, OR
+
+    - Mentions extract_tables() but not in the context of pdfplumber
+
+
+    Score 0.0 if:
+
+    - Recommends pypdf or PyPDF2 for table extraction (incorrect - these are for merging/splitting)
+
+    - Doesn''t mention pdfplumber or extract_tables
+
+    - Recommends an inappropriate library for this task
+
+    '
+  extractor: last_assistant

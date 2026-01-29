@@ -1,0 +1,19 @@
+name: with-server-help-first
+skills:
+  - webapp-testing
+prompt: |
+  There's a with_server.py script available. Should I read its source code to understand how to use it?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should recommend checking --help before reading source:
+
+    1. Run the script with --help first to see usage
+    2. Don't read source code until you've tried the black-box interface
+    3. Large scripts can pollute context window unnecessarily
+
+    Score 0 if recommends reading source first or doesn't mention --help.
+    Score 0.5 if mentions --help but doesn't emphasize trying it before reading.
+    Score 1 if clearly states: run --help first, only read source if absolutely necessary.

@@ -1,0 +1,36 @@
+name: trigger-description-format
+skills:
+- skill-development
+prompt: 'How should I write the description field in my skill''s frontmatter so that
+
+  Claude knows when to activate the skill? Can you show me the format?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains the skill description/trigger
+    format.
+
+
+    The description field in SKILL.md frontmatter should:
+
+    1. Be written in THIRD PERSON (e.g., "This skill should be used when..." not "You
+    should use this when...")
+
+    2. Include specific trigger phrases that users might say (e.g., "when the user
+    asks to create", "configure", etc.)
+
+    3. Be specific and concrete about when the skill activates
+
+
+    Score 1.0 if: Explains third-person format, shows trigger phrase patterns (like
+    "when the user..."), provides concrete examples
+
+    Score 0.5 if: Shows trigger patterns or third-person format, but not both clearly
+    demonstrated
+
+    Score 0.0 if: Doesn''t explain the trigger format, or gives incorrect guidance
+
+    '
+  extractor: last_assistant

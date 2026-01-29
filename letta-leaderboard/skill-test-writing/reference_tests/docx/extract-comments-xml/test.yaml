@@ -1,0 +1,45 @@
+name: extract-comments-xml
+skills:
+- docx
+prompt: 'Where are document comments stored in the OOXML structure of a .docx file?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains where comments are stored
+    in the OOXML structure of a .docx file.
+
+
+    The correct answer is:
+
+    - Comments are stored in word/comments.xml within the .docx (ZIP) archive
+
+    - The main document (document.xml) references comments via IDs (using elements
+    like w:comment)
+
+    - Understanding this requires knowledge that .docx is an OOXML (ZIP-based) format
+
+
+    Score 1.0 if: Response correctly identifies comments.xml (or word/comments.xml)
+    as the location AND explains how comments are referenced from document.xml using
+    comment IDs or w:comment elements.
+
+
+    Score 0.8 if: Response correctly identifies comments.xml as the location AND shows
+    understanding of OOXML structure (ZIP-based format, unpacking, etc.).
+
+
+    Score 0.6 if: Response correctly identifies comments.xml as the location for storing
+    comments.
+
+
+    Score 0.4 if: Response demonstrates general understanding of OOXML/XML structure
+    in relation to comments but doesn''t pinpoint comments.xml specifically.
+
+
+    Score 0.0 if: Response does not demonstrate understanding of where comments are
+    stored in OOXML structure.
+
+    '
+  extractor: last_assistant

@@ -1,0 +1,41 @@
+name: matcher-syntax
+skills:
+- hook-development
+prompt: 'In Claude Code hooks, how do I write a matcher to match multiple tools? What
+  about
+
+  matching all tools or using regex patterns?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains matcher syntax for Claude
+    Code hooks.
+
+
+    Key matcher patterns:
+
+    - Pipe (|) to match multiple tools: e.g., "Bash|Write|Edit" matches any of those
+    tools
+
+    - Asterisk (*) as wildcard to match all tools
+
+    - Regex patterns may be supported for more complex matching
+
+    - Examples might include: "Bash|Write", "Read|Edit", "mcp__*" for MCP tools
+
+
+    Score 1.0 if: Response correctly explains both the pipe syntax for multiple tools
+    AND the asterisk/wildcard for all tools, with concrete examples (e.g., "Bash|Write")
+
+
+    Score 0.5 if: Response correctly explains either the pipe syntax OR the wildcard
+    syntax, with examples or mention of regex pattern support
+
+
+    Score 0.0 if: Response does not explain any of the specific matcher syntax patterns
+    (pipe, asterisk, regex), or provides incorrect syntax
+
+    '
+  extractor: last_assistant

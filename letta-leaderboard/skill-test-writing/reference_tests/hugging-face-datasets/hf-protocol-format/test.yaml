@@ -1,0 +1,44 @@
+name: hf-protocol-format
+skills:
+- hugging-face-datasets
+prompt: 'What is the format of the hf:// protocol path used by DuckDB to access Hugging
+  Face
+
+  datasets? What are the components?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains the hf:// protocol format
+    for accessing Hugging Face datasets in DuckDB.
+
+
+    The correct format is: hf://datasets/{owner}/{dataset}@~parquet/{config}/{split}/*.parquet
+
+
+    Key components the response should cover:
+
+    1. The hf:// protocol prefix
+
+    2. The @~parquet revision suffix for parquet file access
+
+    3. The path structure including config and split directories
+
+
+    Score 1.0 if: Response explains hf:// prefix, @~parquet revision, AND the path
+    structure (config/split components).
+
+    Score 0.8 if: Response shows hf:// with either a concrete example path or @~parquet,
+    demonstrating practical knowledge.
+
+    Score 0.6 if: Response shows hf:// with datasets path component or config awareness,
+    but incomplete.
+
+    Score 0.4 if: Response mentions hf:// protocol exists OR knows about parquet format
+    requirement.
+
+    Score 0.0 if: Response does not demonstrate knowledge of the hf:// protocol format.
+
+    '
+  extractor: last_assistant

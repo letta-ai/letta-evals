@@ -1,0 +1,19 @@
+name: zero-display-as-dash
+skills:
+  - xlsx
+prompt: |
+  In financial models, zeros should display as "-" instead of "0" or "$0". How do I achieve this in Excel?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain custom number formatting:
+
+    1. Use custom number format with four sections: positive;negative;zero;text
+    2. Format like: $#,##0;($#,##0);- or #,##0;(#,##0);-
+    3. The third section controls zero display
+
+    Score 0 if doesn't mention custom number formats.
+    Score 0.5 if mentions formatting but not the specific syntax.
+    Score 1 if shows the correct format syntax with "-" for zeros.

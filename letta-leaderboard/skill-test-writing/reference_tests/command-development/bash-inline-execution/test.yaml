@@ -1,0 +1,36 @@
+name: bash-inline-execution
+skills:
+- command-development
+prompt: 'I want my command to dynamically include the output of `git diff --name-only`
+
+  so Claude can see which files changed. How do I execute bash and include
+
+  its output in my command?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response demonstrates knowledge of inline bash execution
+    syntax in Claude Code commands.
+
+
+    The response should:
+
+    1. Show the !` (exclamation-backtick) syntax for inline bash execution
+
+    2. Demonstrate with the git example or similar command
+
+    3. Explain that the command output is dynamically included
+
+
+    Score 1.0 if: Response shows the !` syntax (exclamation mark followed by backtick)
+    with a git or similar example
+
+    Score 0.5 if: Response explains dynamic execution concept but doesn''t clearly
+    show the !` syntax
+
+    Score 0.0 if: Response doesn''t show the !` syntax for inline bash execution
+
+    '
+  extractor: last_assistant

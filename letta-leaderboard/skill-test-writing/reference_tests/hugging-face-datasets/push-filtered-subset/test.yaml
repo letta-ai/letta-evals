@@ -1,0 +1,41 @@
+name: push-filtered-subset
+skills:
+- hugging-face-datasets
+prompt: 'How do I filter a Hugging Face dataset using SQL and push the results to
+  a new
+
+  dataset repository?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains how to filter and push
+    a Hugging Face dataset subset.
+
+
+    The response should demonstrate knowledge of:
+
+    1. The --push-to flag for pushing to a new repository
+
+    2. SQL query usage (--sql flag or SELECT statement)
+
+    3. WHERE clause for filtering the data
+
+
+    Score 1.0 if: Response shows --push-to flag with SQL query AND WHERE clause for
+    filtering, demonstrating the complete filter-and-push workflow.
+
+    Score 0.8 if: Response shows --push-to with SQL query or command usage, but doesn''t
+    explicitly show filtering.
+
+    Score 0.6 if: Response shows --push-to with sql_manager.py but incomplete query
+    details.
+
+    Score 0.4 if: Response mentions --push-to flag OR shows query/transform with SQL.
+
+    Score 0.0 if: Response does not demonstrate knowledge of the push workflow for
+    filtered datasets.
+
+    '
+  extractor: last_assistant

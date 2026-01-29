@@ -1,0 +1,42 @@
+name: replace-py-auto-clear
+skills:
+- pptx
+prompt: 'When using replace.py to update PowerPoint text, what happens to shapes that
+
+  aren''t included in the replacement JSON?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains the auto-clearing behavior
+    of replace.py.
+
+
+    Key behavior:
+
+    - Shapes NOT included in the replacement JSON are automatically cleared/emptied
+
+    - This is the default behavior - all text shapes get blanked unless explicitly
+    given content
+
+    - The replacement works based on the inventory structure (slide-X/shape-X)
+
+    - Only shapes with "paragraphs" entries in the JSON retain their content
+
+
+    Score 1.0 if: Response correctly explains that shapes are automatically cleared/emptied
+    AND mentions this is the default/automatic behavior AND connects it to the inventory/paragraphs
+    structure
+
+    Score 0.8 if: Response explains the auto-clear behavior and mentions it''s automatic/default
+
+    Score 0.6 if: Response explains clearing behavior with some context about paragraphs
+
+    Score 0.4 if: Response mentions clearing or automatic behavior but lacks complete
+    explanation
+
+    Score 0.0 if: Response does not demonstrate understanding of the auto-clear behavior
+
+    '
+  extractor: last_assistant

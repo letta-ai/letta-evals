@@ -1,0 +1,38 @@
+name: multi-server-integration
+skills:
+- webapp-testing
+prompt: 'For integration testing, I need to run both a Python backend API server and
+  a
+
+  Node.js frontend dev server together. How do I set this up with Playwright?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response demonstrates knowledge of multi-server integration
+    testing with Playwright.
+
+
+    The key pattern is using a with_server.py helper script that can orchestrate multiple
+    servers (e.g., Python backend + Node.js frontend) for integration testing. The
+    script handles starting both servers, waiting for them to be ready, and running
+    Playwright tests.
+
+
+    Score 1.0 if: Response mentions with_server.py AND shows multiple --server flags
+    AND addresses both Python backend and Node.js/npm frontend servers
+
+    Score 0.8 if: Response uses with_server.py and addresses running multiple servers
+    or both server types
+
+    Score 0.6 if: Response mentions with_server.py with directory changes or port
+    configuration
+
+    Score 0.4 if: Response mentions with_server.py OR shows understanding of running
+    both server types together
+
+    Score 0.0 if: Response doesn''t address the multi-server orchestration pattern
+
+    '
+  extractor: last_assistant

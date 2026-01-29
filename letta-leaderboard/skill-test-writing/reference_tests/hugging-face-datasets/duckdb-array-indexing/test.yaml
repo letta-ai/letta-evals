@@ -1,0 +1,40 @@
+name: duckdb-array-indexing
+skills:
+- hugging-face-datasets
+prompt: 'I''m using sql_manager.py to query a Hugging Face dataset that has an array
+  column
+
+  called "choices". I want to get the first element. In my SQL query, should I use
+
+  choices[0] or choices[1]? Is DuckDB 0-indexed or 1-indexed for arrays?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly identifies DuckDB''s array indexing
+    convention.
+
+
+    The correct answer is that DuckDB uses 0-based indexing for arrays, so choices[0]
+    gets the first element. This is different from PostgreSQL''s 1-based indexing.
+
+
+    Score 1.0 if: Response correctly states DuckDB uses 0-based indexing (choices[0]
+    for first element) and mentions DuckDB specifically.
+
+    Score 0.8 if: Response correctly identifies 0-based indexing but doesn''t explicitly
+    mention DuckDB.
+
+    Score 0.3 if: Response discusses DuckDB array handling but gives ambiguous or
+    incomplete information about indexing.
+
+    Score 0.0 if: Response incorrectly claims DuckDB uses 1-based indexing, or fails
+    to address the indexing question.
+
+
+    IMPORTANT: The correct answer is 0-based indexing (choices[0] for first element).
+    Any response claiming 1-based indexing is WRONG and should receive 0.0.
+
+    '
+  extractor: last_assistant

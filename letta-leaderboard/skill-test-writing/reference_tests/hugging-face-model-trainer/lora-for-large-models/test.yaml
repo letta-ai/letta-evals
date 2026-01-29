@@ -1,0 +1,19 @@
+name: lora-for-large-models
+skills:
+  - hugging-face-model-trainer
+prompt: |
+  I want to fine-tune a 13B parameter model. What approach should I use to avoid running out of GPU memory?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should recommend LoRA/PEFT for large models:
+
+    1. Use LoRA (Low-Rank Adaptation) for models >7B parameters
+    2. LoRA trains only adapter layers, dramatically reduces memory
+    3. Also: gradient checkpointing, reduced batch size, larger GPU
+
+    Score 0 if suggests full fine-tuning without mentioning memory concerns.
+    Score 0.5 if mentions memory but not LoRA specifically.
+    Score 1 if recommends LoRA/PEFT for large model training.

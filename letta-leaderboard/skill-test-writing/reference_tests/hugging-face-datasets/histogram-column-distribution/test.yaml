@@ -1,0 +1,19 @@
+name: histogram-column-distribution
+skills:
+  - hugging-face-datasets
+prompt: |
+  I want to see the distribution of values in a column before filtering a HuggingFace dataset. How do I do this with sql_manager.py?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain the histogram command:
+
+    1. Use the histogram command: sql_manager.py histogram --dataset ... --column ...
+    2. Shows value counts/distribution for a column
+    3. Can also use "unique" for distinct values
+
+    Score 0 if doesn't mention histogram command.
+    Score 0.5 if explains SQL GROUP BY but not the dedicated command.
+    Score 1 if shows sql_manager.py histogram command for distribution analysis.

@@ -1,0 +1,45 @@
+name: avoid-generic-fonts
+skills:
+- frontend-design
+prompt: 'Create an HTML blog post page with a title, author info, publication date,
+
+  and body text with multiple paragraphs.
+
+
+  Make the typography beautiful and avoid generic system fonts.
+
+
+  Just give me the HTML with inline CSS.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether this HTML response avoids generic system fonts and uses
+    beautiful, intentional typography for a blog post.
+
+
+    Key aspects to evaluate:
+
+    1. Does it avoid generic fonts as the primary font choice? Generic fonts to avoid:
+    Inter, Arial, Roboto, system-ui, -apple-system, sans-serif, Helvetica
+
+    2. Does it load custom fonts from an external source (Google Fonts, Adobe Fonts,
+    etc.)?
+
+    3. Does it have font-family declarations that specify named fonts?
+
+
+    Score 1.0 if: Loads external fonts (Google Fonts via link or @import) and does
+    NOT use generic system fonts as the primary font.
+
+    Score 0.5 if: Has font-family declarations but doesn''t load external fonts (or
+    uses generic fonts without external alternatives).
+
+    Score 0.3 if: Has some styling but no meaningful typography choices.
+
+    Score 0.0 if: Uses generic system fonts (Inter, Arial, Roboto, system-ui, Helvetica,
+    sans-serif) as the primary font.
+
+    '
+  extractor: last_assistant

@@ -1,0 +1,19 @@
+name: predictive-warmup-typing
+skills:
+  - hosted-agents
+prompt: |
+  How can I reduce the time users wait for their sandbox to be ready?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain predictive warm-up:
+
+    1. Start warming the sandbox as soon as user begins typing (not when they submit)
+    2. Clone latest changes and run setup in parallel with user composing prompt
+    3. Sandbox can be ready before user finishes typing
+
+    Score 0 if only suggests faster hardware or caching.
+    Score 0.5 if mentions pre-warming but not triggered by typing.
+    Score 1 if describes predictive warm-up starting when user begins typing.

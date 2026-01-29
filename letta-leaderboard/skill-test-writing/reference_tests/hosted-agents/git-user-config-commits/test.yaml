@@ -1,0 +1,19 @@
+name: git-user-config-commits
+skills:
+  - hosted-agents
+prompt: |
+  In a background agent that commits code, how should I set the git author for commits?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain proper git attribution:
+
+    1. Update git config user.name and user.email when committing
+    2. Use the PROMPTING USER's identity, not the app/service identity
+    3. Generate GitHub app installation tokens for clone, but attribute commits to user
+
+    Score 0 if suggests using a generic service account for all commits.
+    Score 0.5 if mentions setting git config but not user attribution.
+    Score 1 if explains commits should be attributed to the prompting user, not the app.

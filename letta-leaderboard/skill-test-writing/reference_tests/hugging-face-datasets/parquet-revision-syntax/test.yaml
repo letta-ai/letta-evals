@@ -1,0 +1,19 @@
+name: parquet-revision-syntax
+skills:
+  - hugging-face-datasets
+prompt: |
+  What does @~parquet mean in the hf:// dataset path?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain the parquet revision:
+
+    1. @~parquet is a special revision that provides auto-converted Parquet files
+    2. Works for any dataset format (JSON, CSV, etc.) - automatically converted
+    3. Enables DuckDB SQL queries on datasets that aren't natively Parquet
+
+    Score 0 if doesn't explain what @~parquet does.
+    Score 0.5 if mentions Parquet but not the auto-conversion feature.
+    Score 1 if explains @~parquet provides auto-converted Parquet for any dataset format.

@@ -1,0 +1,45 @@
+name: merged-prs-primary-metric
+skills:
+- hosted-agents
+prompt: 'I''m building dashboards to track the success of my hosted agent system.
+  What
+
+  should be the primary metric I track to measure whether the system is providing
+
+  real value?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response identifies the correct primary success metric
+    for a hosted coding agent system.
+
+
+    The key insight is that "merged PRs" (or equivalently: merged pull requests, code
+    that ships to production) is the primary metric because:
+
+    - It measures actual value delivered (code that made it through review and was
+    merged)
+
+    - Session count or usage alone doesn''t indicate whether work was valuable
+
+    - A coding agent''s ultimate purpose is to help ship code
+
+
+    Score 1.0 if: Response identifies merged PRs/pull requests as the primary metric
+    AND explains why it''s the key measure of value
+
+    Score 0.8 if: Response identifies merged PRs as important but doesn''t emphasize
+    it as THE primary metric, or lacks full explanation
+
+    Score 0.4 if: Response discusses relevant metrics (approval rate, time to first
+    PR, etc.) without identifying merged PRs as primary
+
+    Score 0.2 if: Response focuses on wrong metrics (session count, usage count) as
+    primary without mentioning outcome-based metrics
+
+    Score 0.0 if: Response does not address meaningful success metrics
+
+    '
+  extractor: last_assistant

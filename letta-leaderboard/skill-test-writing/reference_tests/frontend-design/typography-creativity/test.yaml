@@ -1,0 +1,48 @@
+name: typography-creativity
+skills:
+- frontend-design
+prompt: 'Create an HTML landing page for a coffee shop called "Midnight Roasters".
+
+  The page should have a hero section with the shop name and a tagline.
+
+
+  Focus on making the typography distinctive and memorable.
+
+  Just give me the HTML with inline CSS.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether this HTML response demonstrates creative, distinctive
+    typography choices for a coffee shop landing page.
+
+
+    Key aspects to evaluate:
+
+    1. Does it avoid generic system fonts (Inter, Roboto, Arial, system-ui, sans-serif,
+    Helvetica)?
+
+    2. Does it use custom fonts from Google Fonts or similar external font sources?
+
+    3. Does it demonstrate font pairing (different fonts for headings vs body text)?
+
+    4. Are the font choices appropriate for a coffee shop brand (memorable, with character)?
+
+
+    Score 1.0 if: Uses creative/distinctive fonts (like Playfair, Montserrat, Lora,
+    Merriweather, Pacifico, etc.), loads them from external sources, demonstrates
+    font pairing with 2+ font-family declarations, and avoids generic system fonts
+    entirely.
+
+    Score 0.8 if: Uses creative fonts loaded from Google Fonts, but may still include
+    generic fonts as fallbacks.
+
+    Score 0.5 if: Loads external fonts but the choices are not particularly distinctive.
+
+    Score 0.2 if: Has font-family declarations but only uses generic system fonts.
+
+    Score 0.0 if: No meaningful typography styling or only default browser fonts.
+
+    '
+  extractor: last_assistant

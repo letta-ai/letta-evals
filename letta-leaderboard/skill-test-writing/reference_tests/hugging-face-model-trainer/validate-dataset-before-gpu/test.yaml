@@ -1,0 +1,20 @@
+name: validate-dataset-before-gpu
+skills:
+  - hugging-face-model-trainer
+prompt: |
+  I'm about to launch a DPO training job on HF Jobs. Should I validate the dataset format first?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should strongly recommend dataset validation:
+
+    1. ALWAYS validate unknown datasets before GPU training
+    2. 50%+ of training failures are format mismatches
+    3. DPO is especially strict (requires prompt, chosen, rejected columns)
+    4. Validation on CPU costs ~$0.01, failed GPU jobs cost $1-10
+
+    Score 0 if says validation is optional or unnecessary.
+    Score 0.5 if mentions validation but not the importance for DPO.
+    Score 1 if emphasizes validation is critical, especially for DPO format requirements.

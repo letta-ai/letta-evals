@@ -1,0 +1,19 @@
+name: recalc-required-after-openpyxl
+skills:
+  - xlsx
+prompt: |
+  I created an Excel file with openpyxl containing formulas, but when I open it the formula cells show 0 or are blank. What's happening?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain the openpyxl formula recalculation issue:
+
+    1. openpyxl writes formulas as strings but does NOT calculate values
+    2. Excel recalculates when opened, but other tools may not
+    3. Need to use recalc.py script or LibreOffice to calculate values
+
+    Score 0 if doesn't identify that openpyxl doesn't calculate formulas.
+    Score 0.5 if explains the issue but no solution.
+    Score 1 if explains openpyxl limitation and recommends recalc/LibreOffice.

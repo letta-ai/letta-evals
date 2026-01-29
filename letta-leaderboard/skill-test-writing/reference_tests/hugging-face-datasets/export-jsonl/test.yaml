@@ -1,0 +1,41 @@
+name: export-jsonl
+skills:
+- hugging-face-datasets
+prompt: 'How do I export query results from a Hugging Face dataset to a local JSONL
+  file?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains how to export Hugging
+    Face dataset query results to a JSONL file.
+
+
+    The response should demonstrate knowledge of:
+
+    1. The export command for outputting data
+
+    2. The --format jsonl flag or .jsonl file extension
+
+    3. The --output flag to specify the destination file
+
+
+    Score 1.0 if: Response shows the export command with JSONL format specification
+    (--format jsonl or .jsonl extension) AND the --output flag for specifying the
+    output file.
+
+    Score 0.8 if: Response shows export with JSONL format but missing the --output
+    flag.
+
+    Score 0.6 if: Response shows export command with sql_manager.py but incomplete
+    format specification.
+
+    Score 0.4 if: Response mentions export command OR shows awareness of JSONL output
+    capability.
+
+    Score 0.0 if: Response does not demonstrate knowledge of the export workflow for
+    JSONL files.
+
+    '
+  extractor: last_assistant

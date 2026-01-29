@@ -1,0 +1,19 @@
+name: formula-errors-ref-div0
+skills:
+  - xlsx
+prompt: |
+  My Excel model has #REF! and #DIV/0! errors. What are common causes and how do I prevent them?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain common Excel formula errors:
+
+    1. #REF! = invalid cell reference (deleted rows/columns, wrong range)
+    2. #DIV/0! = division by zero (check denominator before dividing)
+    3. Prevention: validate ranges, use IFERROR, check denominators
+
+    Score 0 if doesn't explain the meaning of these errors.
+    Score 0.5 if explains meaning but no prevention strategies.
+    Score 1 if explains both errors and how to prevent them.

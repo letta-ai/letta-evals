@@ -1,0 +1,19 @@
+name: ephemeral-environment-hub-push
+skills:
+  - hugging-face-model-trainer
+prompt: |
+  My HF Jobs training completed successfully but I can't find the model anywhere. What happened?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain the ephemeral environment issue:
+
+    1. Jobs environment is TEMPORARY - all files deleted when job ends
+    2. MUST enable push_to_hub=True and set hub_model_id
+    3. MUST pass secrets={"HF_TOKEN": "$HF_TOKEN"} for authentication
+
+    Score 0 if doesn't identify the ephemeral environment issue.
+    Score 0.5 if mentions Hub push but incomplete setup.
+    Score 1 if explains environment is ephemeral and all required settings for Hub push.

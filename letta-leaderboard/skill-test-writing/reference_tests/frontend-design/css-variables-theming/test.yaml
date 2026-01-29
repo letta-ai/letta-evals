@@ -1,0 +1,42 @@
+name: css-variables-theming
+skills:
+- frontend-design
+prompt: 'How should I manage colors and theming consistently across a frontend design?
+
+  What technique ensures cohesive aesthetics?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether this response demonstrates knowledge of CSS variables
+    (custom properties) for managing consistent theming in frontend design.
+
+
+    Key aspects to evaluate:
+
+    1. Does it mention CSS variables, CSS custom properties, or the -- syntax?
+
+    2. Does it mention :root for defining global variables?
+
+    3. Does it explain the benefit of consistency/cohesion/centralization?
+
+    4. Does it discuss theming, color schemes, palettes, or design systems?
+
+    5. Does it show example syntax with -- and var()?
+
+
+    Score 1.0 if: Mentions CSS variables/custom properties AND explains how they enable
+    consistent/cohesive theming.
+
+    Score 0.8 if: Mentions CSS variables AND discusses theming or design systems.
+
+    Score 0.6 if: Mentions CSS variables and shows example syntax.
+
+    Score 0.4 if: Mentions CSS variables OR discusses theming with consistency concepts
+    (without mentioning variables).
+
+    Score 0.0 if: Does not mention CSS variables or meaningful theming techniques.
+
+    '
+  extractor: last_assistant

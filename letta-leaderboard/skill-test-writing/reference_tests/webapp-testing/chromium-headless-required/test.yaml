@@ -1,0 +1,41 @@
+name: chromium-headless-required
+skills:
+- webapp-testing
+prompt: 'I''m writing a Playwright automation script to test a web app. When I call
+
+  browser = p.chromium.launch(), what mode should I use - headed or headless?
+
+  Is there a standard recommendation for this testing toolkit?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly advises using headless mode for
+    Playwright Chromium automation.
+
+
+    The response should demonstrate understanding that headless=True is the recommended
+    default for automated testing because:
+
+    - It works in CI/CD environments without a display
+
+    - It''s faster and uses fewer resources
+
+    - It''s the standard for server-side automation
+
+
+    Score 1.0 if: Response explicitly recommends headless=True AND shows correct code
+    syntax (e.g., .launch(headless=True)) AND explains why headless is preferred
+
+    Score 0.7 if: Response recommends headless mode but lacks either the code example
+    or the explanation
+
+    Score 0.4 if: Response mentions Chromium and automation concepts but doesn''t
+    clearly recommend headless mode
+
+    Score 0.0 if: Response recommends headed mode (headless=False) as the default,
+    or fails to address the question
+
+    '
+  extractor: last_assistant

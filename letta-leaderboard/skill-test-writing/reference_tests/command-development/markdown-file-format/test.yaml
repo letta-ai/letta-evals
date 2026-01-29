@@ -1,0 +1,35 @@
+name: markdown-file-format
+skills:
+- command-development
+prompt: 'I want to create a custom command for my Claude Code project.
+
+  What file format should I use and where should I put the file?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly identifies the file format and
+    location for Claude Code custom commands.
+
+
+    The response should:
+
+    1. State that commands use Markdown format (.md files)
+
+    2. Specify the correct directory: .claude/commands/
+
+    3. Mention the .md file extension
+
+
+    Score 1.0 if: Response correctly states commands are Markdown files (.md) stored
+    in .claude/commands/ directory
+
+    Score 0.5 if: Response mentions either the Markdown format or the correct directory,
+    but not both clearly
+
+    Score 0.0 if: Response gives incorrect format (not Markdown) or wrong directory
+    location
+
+    '
+  extractor: last_assistant

@@ -1,0 +1,35 @@
+name: agents-directory
+skills:
+- agent-development
+prompt: 'Where should agent files be placed in a Claude Code plugin? What file format
+
+  should they use?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly describes where agent files should
+    be placed and their format.
+
+
+    The correct answers are:
+
+    1. Agent files go in the "agents/" directory within the plugin
+
+    2. Agent files use Markdown format (.md extension)
+
+    3. Agents are auto-discovered from this directory
+
+
+    Score 1.0 if: Specifies the agents/ directory AND mentions Markdown/.md format
+    AND mentions auto-discovery or that agents are automatically loaded
+
+    Score 0.5 if: Specifies agents/ directory AND Markdown format but doesn''t mention
+    auto-discovery, OR gets most details right with minor gaps
+
+    Score 0.0 if: Doesn''t mention the agents/ directory or gives wrong location/format
+    information
+
+    '
+  extractor: last_assistant

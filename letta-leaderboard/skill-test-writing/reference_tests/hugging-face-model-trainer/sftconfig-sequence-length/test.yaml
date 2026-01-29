@@ -1,0 +1,37 @@
+name: sftconfig-sequence-length
+skills:
+- hugging-face-model-trainer
+prompt: 'In TRL''s SFTConfig, I want to limit the tokenized sequence length to 512
+  tokens.
+
+
+  What is the exact parameter name to use? Note: there''s a common mistake where
+
+  people use the wrong parameter name and get a TypeError.
+
+
+  Give me just the parameter name (like "parameter_name"), nothing else.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'You are evaluating whether the response correctly identifies the TRL SFTConfig
+    parameter for limiting sequence length.
+
+
+    The correct parameter is `max_length`. A common mistake is using `max_seq_length`,
+    which does not exist in TRL config classes and causes a TypeError.
+
+
+    Score 1.0 if: The response gives `max_length` as the answer without mentioning
+    `max_seq_length` as a valid option.
+
+    Score 0.5 if: The response mentions both `max_length` and `max_seq_length` (hedging
+    between correct and incorrect).
+
+    Score 0.0 if: The response gives `max_seq_length` as the answer, or gives neither,
+    or gives some other incorrect parameter name.
+
+    '
+  extractor: last_assistant

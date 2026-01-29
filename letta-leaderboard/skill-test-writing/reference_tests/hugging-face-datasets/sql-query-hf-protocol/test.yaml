@@ -1,0 +1,42 @@
+name: sql-query-hf-protocol
+skills:
+- hugging-face-datasets
+prompt: 'Write a DuckDB SQL query that I can run locally to count the number of rows
+
+  in the "nutrition" subject from the cais/mmlu dataset on Hugging Face.
+
+
+  Just give me the SQL query, nothing else.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response provides a correct DuckDB SQL query to count
+    nutrition rows from the cais/mmlu dataset.
+
+
+    A correct query must have ALL of these elements:
+
+    1. Uses hf:// protocol to access Hugging Face data
+
+    2. Includes @~parquet (or @parquet) revision for parquet file access
+
+    3. References the cais/mmlu dataset
+
+    4. Uses COUNT() function
+
+    5. Filters for "nutrition" subject
+
+
+    Score 1.0 if: Query has hf:// protocol, @~parquet revision, cais/mmlu dataset,
+    COUNT function, AND nutrition filter.
+
+    Score 0.5 if: Query uses hf:// protocol with @~parquet but is missing some other
+    elements (wrong dataset, no count, or no filter).
+
+    Score 0.0 if: Query does not use hf:// protocol with @~parquet, or is fundamentally
+    incorrect for DuckDB + Hugging Face access.
+
+    '
+  extractor: last_assistant

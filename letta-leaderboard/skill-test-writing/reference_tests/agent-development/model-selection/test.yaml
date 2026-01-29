@@ -1,0 +1,48 @@
+name: model-selection
+skills:
+- agent-development
+prompt: 'I''m creating an agent that does quick code formatting checks.
+
+  It doesn''t need complex reasoning, just simple pattern matching.
+
+
+  Which model should I use in the agent configuration and why?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly advises on model selection for
+    a simple agent task.
+
+
+    The question asks which model to use for an agent that does quick code formatting
+    checks
+
+    (simple pattern matching, no complex reasoning needed).
+
+
+    A good response should:
+
+    1. Recommend a lightweight/fast model like Haiku or suggest using "inherit" for
+    simple tasks
+
+    2. Explain WHY this choice is appropriate (fast, efficient, cheap, simple tasks
+    don''t need heavy models)
+
+    3. Optionally contrast with when you''d use more capable models (Sonnet/Opus for
+    complex reasoning)
+
+
+    Score 1.0 if: Response recommends Haiku or inherit AND provides solid reasoning
+    about why lightweight models suit simple tasks (mentions 2+ reasons like: fast,
+    quick, simple, cheap, efficient, lightweight)
+
+    Score 0.5 if: Response recommends an appropriate model (Haiku/inherit) but with
+    minimal reasoning, OR discusses model tradeoffs without a clear recommendation
+
+    Score 0.0 if: Response recommends using a heavy model for this simple task without
+    justification, or doesn''t address model selection at all
+
+    '
+  extractor: last_assistant

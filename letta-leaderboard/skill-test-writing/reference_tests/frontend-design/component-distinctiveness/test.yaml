@@ -1,0 +1,45 @@
+name: component-distinctiveness
+skills:
+- frontend-design
+prompt: 'What fonts should I avoid when creating a distinctive frontend design? What
+  makes
+
+  a design feel like generic "AI slop"?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether this response demonstrates understanding of what makes
+    designs feel generic ("AI slop") and what fonts to avoid for distinctive design.
+
+
+    Key aspects to evaluate:
+
+    1. Does it mention specific generic fonts to avoid (Inter, Roboto, Arial, system
+    fonts)?
+
+    2. Does it understand the concept of "AI slop" or generic/cookie-cutter design?
+
+    3. Does it mention the purple gradient cliche?
+
+    4. Does it discuss how to make designs distinctive, unique, or memorable?
+
+    5. Does it mention avoiding cliches or overused patterns?
+
+
+    Score 1.0 if: Names 2+ specific generic fonts to avoid AND explains the AI slop
+    concept (generic, predictable, cookie-cutter design patterns).
+
+    Score 0.8 if: Names 2+ generic fonts AND discusses avoiding cliches or creating
+    distinctive design.
+
+    Score 0.6 if: Understands AI slop concept AND discusses distinctive or creative
+    design.
+
+    Score 0.4 if: Mentions at least one generic font OR understands the AI slop concept.
+
+    Score 0.0 if: Does not address fonts to avoid or generic design patterns.
+
+    '
+  extractor: last_assistant

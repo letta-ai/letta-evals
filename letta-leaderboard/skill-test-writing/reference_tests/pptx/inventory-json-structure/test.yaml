@@ -1,0 +1,43 @@
+name: inventory-json-structure
+skills:
+- pptx
+prompt: 'What does the inventory JSON look like when extracting text from a PowerPoint?
+
+  How are slides and shapes identified?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains the inventory JSON structure
+    for PowerPoint text extraction.
+
+
+    Key aspects of the inventory JSON format:
+
+    - Slides are identified with keys like "slide-0", "slide-1", etc. (0-indexed)
+
+    - Shapes within slides use keys like "shape-0", "shape-1", etc.
+
+    - Each shape has a "paragraphs" array containing the text content
+
+    - Shapes may include placeholder_type (TITLE, BODY, SUBTITLE, etc.)
+
+    - Position properties (left, top, width, height) may be included
+
+
+    Score 1.0 if: Response correctly explains both slide naming (slide-0, slide-1)
+    AND shape naming (shape-0, shape-1) conventions with JSON structure context
+
+    Score 0.8 if: Response explains the naming conventions and shows JSON structure
+
+    Score 0.6 if: Response explains one naming convention with additional context
+    (paragraphs or placeholders)
+
+    Score 0.4 if: Response mentions slide/shape naming OR placeholder types but lacks
+    complete structure
+
+    Score 0.0 if: Response does not demonstrate knowledge of the inventory JSON format
+
+    '
+  extractor: last_assistant

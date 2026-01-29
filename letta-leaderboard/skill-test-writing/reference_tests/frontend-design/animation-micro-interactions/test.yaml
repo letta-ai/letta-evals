@@ -1,0 +1,50 @@
+name: animation-micro-interactions
+skills:
+- frontend-design
+prompt: 'Create an HTML page with a set of 3 feature cards that users can hover over.
+
+  Each card should have an icon, title, and description.
+
+
+  Add creative animations and micro-interactions to make the experience delightful.
+
+
+  Just give me the HTML with inline CSS.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether this HTML response demonstrates creative animations and
+    micro-interactions for hover cards.
+
+
+    Key aspects to evaluate:
+
+    1. Does it use CSS transitions or @keyframes animations?
+
+    2. Does it have hover states (:hover) with visual feedback?
+
+    3. Does it use transforms (scale, translate, rotate) for effects?
+
+    4. Does it include multiple animation effects (opacity, shadows, transforms)?
+
+    5. Does it use proper timing functions (ease, cubic-bezier)?
+
+
+    Score 1.0 if: Has @keyframes animations, hover states, 3+ different animation
+    effects (scale, translate, rotate, opacity, box-shadow), and proper timing functions.
+
+    Score 0.8 if: Good transitions with hover states and 2+ animation effects.
+
+    Score 0.6 if: Basic hover with transform and transition.
+
+    Score 0.4 if: Has hover states but minimal animation (just basic transition or
+    transform).
+
+    Score 0.2 if: Only has simple transitions with no hover interactivity.
+
+    Score 0.0 if: No animations or transitions at all.
+
+    '
+  extractor: last_assistant

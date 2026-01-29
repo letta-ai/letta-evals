@@ -1,0 +1,49 @@
+name: hook-event-types
+skills:
+- hook-development
+prompt: 'What hook events are available in Claude Code? When does each one fire?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly identifies the available hook events
+    in Claude Code.
+
+
+    Core hook events (most important):
+
+    - PreToolUse: Fires before a tool is executed
+
+    - PostToolUse: Fires after a tool completes
+
+    - Stop: Fires when the agent stops/completes
+
+    - UserPromptSubmit: Fires when the user submits a prompt
+
+    - SessionStart: Fires when a session begins
+
+
+    Additional events:
+
+    - SessionEnd: Fires when a session ends
+
+    - Notification: For notification events
+
+    - SubAgent: Related to subagent operations
+
+
+    Score 1.0 if: Response correctly identifies 4 or more of the core events (PreToolUse,
+    PostToolUse, Stop, UserPromptSubmit, SessionStart) AND explains when they fire
+    (before/after/when they trigger)
+
+
+    Score 0.5 if: Response correctly identifies 2-3 core events, or identifies multiple
+    events with some timing explanation
+
+
+    Score 0.0 if: Response identifies fewer than 2 hook events, or provides mostly
+    incorrect/fabricated event names
+
+    '
+  extractor: last_assistant

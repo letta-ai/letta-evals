@@ -1,0 +1,36 @@
+name: file-url-static-html
+skills:
+- webapp-testing
+prompt: 'I have a static HTML file at /path/to/test.html that I want to automate with
+
+  Playwright. Do I need to start a web server, or can I navigate directly to the
+
+  file? What URL format should I use?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains how to use Playwright
+    with local static HTML files.
+
+
+    The key insight is that for static HTML files, you can use the file:// protocol
+    directly without starting a web server. This is simpler and appropriate for testing
+    standalone HTML files.
+
+
+    Score 1.0 if: Response explains that no server is needed AND shows the file://
+    URL format AND includes a code example with page.goto() using file://
+
+    Score 0.7 if: Response correctly mentions file:// protocol and that no server
+    is needed, but lacks a complete code example
+
+    Score 0.4 if: Response mentions that you can work with local/static HTML files
+    but doesn''t clearly explain the file:// protocol
+
+    Score 0.0 if: Response incorrectly says a server is required, or fails to mention
+    the file:// approach
+
+    '
+  extractor: last_assistant

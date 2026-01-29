@@ -1,0 +1,48 @@
+name: json-output-fields
+skills:
+- hook-development
+prompt: 'When a Claude Code hook outputs JSON, what fields are available? Give examples
+
+  of how a hook might use JSON output to communicate with the agent.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains the JSON output fields
+    available to Claude Code hooks.
+
+
+    Key JSON output fields:
+
+    - decision / permissionDecision: Whether to allow, deny, or block an action
+
+    - systemMessage: A message to inject into the conversation
+
+    - reason: An explanation for the decision
+
+    - modifiedTool: Ability to modify the tool call parameters
+
+
+    Usage examples might include:
+
+    - Blocking a dangerous operation with a deny decision
+
+    - Injecting feedback or context via systemMessage
+
+    - Modifying tool parameters before execution
+
+
+    Score 1.0 if: Response identifies at least 2 of the key JSON output fields (decision/permissionDecision,
+    systemMessage, reason, modifiedTool) AND provides a JSON example showing the structure
+
+
+    Score 0.5 if: Response identifies at least 1 key field AND either shows JSON structure
+    OR explains how to use it (inject messages, block operations, modify tools)
+
+
+    Score 0.0 if: Response does not identify any of the specific JSON output fields,
+    or provides only generic JSON advice without hook-specific fields
+
+    '
+  extractor: last_assistant

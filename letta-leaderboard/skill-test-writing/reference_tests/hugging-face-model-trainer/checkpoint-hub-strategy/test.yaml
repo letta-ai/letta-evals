@@ -1,0 +1,19 @@
+name: checkpoint-hub-strategy
+skills:
+  - hugging-face-model-trainer
+prompt: |
+  My long training job might timeout before completion. How can I avoid losing all progress?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain checkpoint saving strategy:
+
+    1. Use save_strategy="steps" with save_steps to create checkpoints
+    2. Enable hub_strategy="every_save" to push checkpoints to Hub
+    3. This preserves progress even if job times out
+
+    Score 0 if only suggests increasing timeout without checkpointing.
+    Score 0.5 if mentions checkpoints but not pushing to Hub.
+    Score 1 if explains both saving checkpoints and hub_strategy for persistence.

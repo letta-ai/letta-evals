@@ -1,0 +1,19 @@
+name: paragraph-vs-run-formatting
+skills:
+  - docx
+prompt: |
+  In DOCX, when do I use pPr (paragraph properties) vs rPr (run properties) for formatting?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain the scope of each:
+
+    1. pPr = paragraph-level: alignment, spacing, indentation, bullets
+    2. rPr = run/character-level: bold, italic, font size, color
+    3. A paragraph can have multiple runs with different rPr
+
+    Score 0 if confuses the two or doesn't explain the difference.
+    Score 0.5 if partially correct but missing key distinction.
+    Score 1 if correctly explains pPr is paragraph-level, rPr is character/run-level.

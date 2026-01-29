@@ -1,0 +1,38 @@
+name: resource-pointers
+skills:
+- skill-development
+prompt: 'I have a references/ directory with detailed documentation files. How do
+  I
+
+  make sure Claude knows these files exist and can find them when needed?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response explains how to reference supporting files
+    from SKILL.md.
+
+
+    The correct approach is:
+
+    1. List or mention the reference files in SKILL.md itself
+
+    2. Use the path format references/filename.md
+
+    3. Optionally include a "Resources" or "Additional Resources" section
+
+    4. Briefly describe what each file contains so Claude knows when to consult it
+
+
+    Score 1.0 if: Explains referencing files in SKILL.md, shows proper path format
+    (references/), and suggests describing file contents or organizing in a section
+
+    Score 0.5 if: Mentions referencing in SKILL.md and shows path format, but lacks
+    guidance on organization
+
+    Score 0.0 if: Doesn''t explain how to make references discoverable, or gives incorrect
+    approach
+
+    '
+  extractor: last_assistant

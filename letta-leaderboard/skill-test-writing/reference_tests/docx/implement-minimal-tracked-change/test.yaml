@@ -1,0 +1,49 @@
+name: implement-minimal-tracked-change
+skills:
+- docx
+prompt: 'When implementing a tracked change that replaces "30 days" with "60 days"
+  in a
+
+  sentence, should I mark the entire sentence as deleted and inserted, or just the
+
+  number?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response demonstrates correct understanding of minimal
+    edit principles for tracked changes in Word documents.
+
+
+    The correct answer is to make minimal, precise edits - only mark what actually
+    changes:
+
+    - Only mark "30" as deleted and "60" as inserted
+
+    - Keep unchanged text (like "days" and the rest of the sentence) unmarked
+
+    - This makes reviews easier and maintains document integrity
+
+
+    Score 1.0 if: Response clearly explains the minimal edit principle (only mark
+    what changed) AND emphasizes preserving/keeping unchanged text unchanged.
+
+
+    Score 0.8 if: Response explains the minimal edit principle AND provides reasoning
+    about why (easier review, professional practice, or RSID preservation).
+
+
+    Score 0.6 if: Response understands the minimal edit principle AND uses the specific
+    example (showing 30/60) to illustrate.
+
+
+    Score 0.4 if: Response understands either the minimal edit principle OR the importance
+    of preserving unchanged text, but doesn''t connect both concepts.
+
+
+    Score 0.0 if: Response suggests replacing the entire sentence or does not demonstrate
+    understanding of minimal edit principles for tracked changes.
+
+    '
+  extractor: last_assistant

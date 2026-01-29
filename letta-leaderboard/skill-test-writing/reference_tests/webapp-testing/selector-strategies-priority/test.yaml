@@ -1,0 +1,19 @@
+name: selector-strategies-priority
+skills:
+  - webapp-testing
+prompt: |
+  What selector strategies should I prefer in Playwright for reliable tests?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should recommend stable selector strategies:
+
+    1. Prefer: text=, role=, data-testid, IDs
+    2. Avoid: fragile class names, deeply nested CSS, nth-child
+    3. Use descriptive selectors that survive UI refactoring
+
+    Score 0 if suggests any selector is fine or recommends fragile approaches.
+    Score 0.5 if mentions some strategies but no clear priority.
+    Score 1 if recommends stable selectors (text, role, testid) over fragile ones (classes, structure).

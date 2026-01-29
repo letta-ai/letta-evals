@@ -1,0 +1,43 @@
+name: template-rearrange
+skills:
+- pptx
+prompt: 'How do I reorder, duplicate, or remove slides from a PowerPoint template
+
+  programmatically? What script should I use?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains how to programmatically
+    rearrange slides in PowerPoint.
+
+
+    The ideal solution involves:
+
+    - Using rearrange.py script from the pptx skill
+
+    - Understanding that slides are referenced by 0-based indices
+
+    - Duplicating slides by repeating the same index (e.g., "0,0,1,2" duplicates slide
+    0)
+
+    - Removing slides by omitting their indices from the list
+
+
+    Score 1.0 if: Response recommends rearrange.py AND explains the index-based system
+    for reordering/duplicating
+
+    Score 0.8 if: Response recommends rearrange.py with basic usage but incomplete
+    index explanation
+
+    Score 0.6 if: Response recommends rearrange.py OR provides a working scripting
+    approach with index understanding
+
+    Score 0.4 if: Response demonstrates understanding of programmatic slide manipulation
+    concepts (duplicate, remove, indices)
+
+    Score 0.0 if: Response does not provide a practical programmatic approach
+
+    '
+  extractor: last_assistant

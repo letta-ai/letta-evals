@@ -1,0 +1,58 @@
+name: qpdf-merge-syntax
+skills:
+- pdf
+prompt: 'I want to merge multiple PDF files using the qpdf command-line tool.
+
+  What is the exact command syntax to merge file1.pdf and file2.pdf into merged.pdf?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response provides the correct qpdf command syntax
+    for merging PDFs.
+
+
+    The correct syntax is:
+
+    qpdf --empty --pages file1.pdf file2.pdf -- merged.pdf
+
+
+    Key components:
+
+    - --empty: Start with an empty PDF
+
+    - --pages: Specify input files to merge
+
+    - --: Separator before the output filename
+
+    - Output filename at the end
+
+
+    Score 1.0 if:
+
+    - Shows the complete correct syntax with --empty, --pages, the -- separator, and
+    proper file ordering
+
+    - The command would actually work when run
+
+
+    Score 0.5 if:
+
+    - Has --empty and --pages but missing the -- separator, OR
+
+    - Has most components but minor syntax issues
+
+
+    Score 0.0 if:
+
+    - Missing --empty flag
+
+    - Missing --pages flag
+
+    - Fundamentally incorrect qpdf syntax
+
+    - Suggests a completely different command/tool
+
+    '
+  extractor: last_assistant

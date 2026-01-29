@@ -1,0 +1,20 @@
+name: pack-unpack-workflow-order
+skills:
+  - docx
+prompt: |
+  What's the correct workflow for editing OOXML files? I have unpack.py, validate.py, and pack.py scripts.
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should describe the correct OOXML editing workflow in order:
+
+    1. unpack.py first - extract the OOXML to a directory
+    2. Edit XML files
+    3. validate.py - check for errors (should happen after edits)
+    4. pack.py last - repackage into final file
+
+    Score 0 if order is wrong or missing steps.
+    Score 0.5 if general understanding but unclear sequencing.
+    Score 1 if clearly explains: unpack -> edit -> validate -> pack.

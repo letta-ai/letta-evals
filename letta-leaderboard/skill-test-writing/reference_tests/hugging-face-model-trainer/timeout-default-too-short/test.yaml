@@ -1,0 +1,19 @@
+name: timeout-default-too-short
+skills:
+  - hugging-face-model-trainer
+prompt: |
+  My HF Jobs training job keeps getting killed after 30 minutes. What's happening?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should identify the timeout issue:
+
+    1. Default timeout is 30 minutes - too short for real training
+    2. Must explicitly set longer timeout (1-2 hours minimum)
+    3. Add 20-30% buffer to estimated training time
+
+    Score 0 if doesn't identify timeout as the issue.
+    Score 0.5 if mentions timeout but not that default is too short.
+    Score 1 if identifies default 30min timeout is insufficient and recommends 1-2 hours.

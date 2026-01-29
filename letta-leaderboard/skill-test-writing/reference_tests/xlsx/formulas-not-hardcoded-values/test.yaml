@@ -1,0 +1,19 @@
+name: formulas-not-hardcoded-values
+skills:
+  - xlsx
+prompt: |
+  I'm generating an Excel file from Python data. Should I calculate totals in Python and write the result, or write Excel formulas?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should strongly recommend Excel formulas over hardcoded values:
+
+    1. Write formulas (=SUM(A1:A10)) not calculated Python values
+    2. Formulas make spreadsheet dynamic - updates when source data changes
+    3. Hardcoded values are static and can't be recalculated
+
+    Score 0 if recommends hardcoding Python-calculated values.
+    Score 0.5 if says either approach works.
+    Score 1 if clearly recommends formulas over hardcoded values for dynamic spreadsheets.

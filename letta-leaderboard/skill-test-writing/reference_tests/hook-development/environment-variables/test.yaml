@@ -1,0 +1,42 @@
+name: environment-variables
+skills:
+- hook-development
+prompt: 'What environment variables are available to Claude Code hooks? How would
+  I use
+
+  them in a hook script?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains the environment variables
+    available to Claude Code hooks.
+
+
+    Key concepts that should be covered:
+
+    - CLAUDE_PLUGIN_ROOT: The path to the plugin directory where the hook is defined
+
+    - CLAUDE_ENV_FILE: The path to an environment file for configuration
+
+    - How to access these variables in a script (e.g., $CLAUDE_PLUGIN_ROOT in bash,
+    os.environ/getenv in Python)
+
+    - Hooks also receive data via stdin (JSON input with tool/event information)
+
+
+    Score 1.0 if: Response correctly identifies both CLAUDE_PLUGIN_ROOT and CLAUDE_ENV_FILE
+    environment variables AND demonstrates how to use them in a script (e.g., shows
+    $VAR syntax, os.environ, or getenv)
+
+
+    Score 0.5 if: Response identifies at least one of the environment variables correctly
+    AND either shows usage syntax OR explains their purpose (plugin path, configuration)
+
+
+    Score 0.0 if: Response does not identify either specific environment variable,
+    or provides incorrect/fabricated variable names without the correct ones
+
+    '
+  extractor: last_assistant

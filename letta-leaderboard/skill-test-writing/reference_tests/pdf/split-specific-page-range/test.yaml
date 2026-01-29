@@ -1,0 +1,19 @@
+name: split-specific-page-range
+skills:
+  - pdf
+prompt: |
+  How do I extract pages 5-10 from a PDF into a new file using qpdf command line?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should show qpdf page extraction syntax:
+
+    1. Use --pages flag with page range
+    2. Syntax: qpdf input.pdf --pages . 5-10 -- output.pdf
+    3. The "." refers to the input file
+
+    Score 0 if wrong syntax or wrong tool.
+    Score 0.5 if correct tool but syntax errors.
+    Score 1 if shows correct qpdf --pages syntax with range.

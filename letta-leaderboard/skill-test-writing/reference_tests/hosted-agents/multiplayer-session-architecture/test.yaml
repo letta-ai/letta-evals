@@ -1,0 +1,78 @@
+name: multiplayer-session-architecture
+skills:
+- hosted-agents
+prompt: 'We want to add multiplayer support to our hosted coding agent so multiple
+  team
+
+  members can collaborate in the same session. Use cases include:
+
+  - Teaching non-engineers to use AI coding tools
+
+  - Live PR review where changes are made in real-time
+
+  - Collaborative debugging sessions
+
+
+  Design the architecture for multiplayer support. Address:
+
+  1. Data model changes needed
+
+  2. How to handle authorship attribution for commits
+
+  3. How users join and share sessions
+
+
+  Be specific about implementation requirements.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response provides a complete multiplayer architecture
+    design for hosted coding agents.
+
+
+    Key architectural components to address:
+
+    1. Data model: Sessions should not be tied to a single user/author; need to support
+    multiple participants
+
+    2. Authorship: Track which user sent each prompt; attribute commits to the actual
+    prompting user
+
+    3. Synchronization: Real-time updates across all connected clients (websockets,
+    broadcast, etc.)
+
+    4. Session sharing: Mechanism for users to join (shareable links, invites, etc.)
+
+    5. Per-prompt context: Pass user identity with each prompt for proper attribution
+
+
+    Score each component:
+
+    - Multi-user data model (0.2): Decoupling sessions from single author
+
+    - Authorship attribution (0.25): Tracking who prompted what, attributing commits
+    correctly
+
+    - Real-time sync (0.2): Keeping all clients updated (websockets, broadcast, etc.)
+
+    - Session sharing (0.2): Links or invites to join sessions
+
+    - Per-prompt identity (0.15): Passing user context with each prompt
+
+
+    Score 1.0 if: All 5 components addressed comprehensively
+
+    Score 0.8 if: 4 components addressed or all 5 with less detail
+
+    Score 0.6 if: 3 components addressed well
+
+    Score 0.4 if: 2 components addressed
+
+    Score 0.2 if: 1 component addressed
+
+    Score 0.0 if: Response misses core multiplayer architecture concepts
+
+    '
+  extractor: last_assistant

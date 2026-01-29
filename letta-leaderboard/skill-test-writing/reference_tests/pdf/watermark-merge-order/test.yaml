@@ -1,0 +1,19 @@
+name: watermark-merge-order
+skills:
+  - pdf
+prompt: |
+  I'm adding a watermark to a PDF but it's covering the text. How do I put the watermark behind the content?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain merge order for watermarks:
+
+    1. Use merge_page() with the watermark as the under layer
+    2. Call page.merge_page(watermark) - watermark goes under existing content
+    3. Alternatively, create watermark with transparency
+
+    Score 0 if doesn't address layer order.
+    Score 0.5 if mentions merge but unclear on order.
+    Score 1 if explains merge_page puts the argument under the caller page content.

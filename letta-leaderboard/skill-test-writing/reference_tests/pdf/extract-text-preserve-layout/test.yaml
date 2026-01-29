@@ -1,0 +1,62 @@
+name: extract-text-preserve-layout
+skills:
+- pdf
+prompt: 'I have a PDF with a two-column layout (like a research paper or newspaper).
+
+  Write Python code to extract the text from "document.pdf" while preserving
+
+  the original layout and column structure as much as possible.
+
+
+  Save the extracted text to "output.txt".
+
+
+  Just give me the Python code.
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response provides correct Python code for extracting
+    text from a PDF while preserving layout (especially multi-column layouts).
+
+
+    The best approaches for layout-preserving extraction are:
+
+    1. pdfplumber with extract_text() - iterates over pages, good layout awareness
+
+    2. pdftotext command-line tool with -layout flag
+
+    3. pypdfium2 - alternative with layout support
+
+
+    Using plain pypdf is NOT ideal because it has poor layout preservation.
+
+
+    Score 1.0 if:
+
+    - Uses pdfplumber with extract_text() AND iterates over pages AND writes to file,
+    OR
+
+    - Uses pdftotext with the -layout flag, OR
+
+    - Uses pypdfium2 with file output
+
+
+    Score 0.5 if:
+
+    - Uses pdfplumber with extract_text() but missing page iteration or file output
+
+    - Uses a layout-aware library but implementation is incomplete
+
+
+    Score 0.0 if:
+
+    - Uses pypdf/PyPDF2 only (poor layout preservation)
+
+    - Doesn''t use any PDF library
+
+    - Fundamentally wrong approach
+
+    '
+  extractor: last_assistant

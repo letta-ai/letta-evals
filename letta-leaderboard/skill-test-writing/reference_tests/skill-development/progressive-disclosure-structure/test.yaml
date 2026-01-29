@@ -1,0 +1,40 @@
+name: progressive-disclosure-structure
+skills:
+- skill-development
+prompt: 'I''m writing a skill with about 8000 words of content. Should I put it all
+  in
+
+  SKILL.md or split it up? If I split it, what goes where?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains the progressive disclosure
+    principle for skill organization.
+
+
+    For a large skill (8000 words), the correct approach is:
+
+    1. Keep SKILL.md lean (ideally 1500-2000 words, max 3000-5000)
+
+    2. Move detailed/advanced content to references/ directory
+
+    3. SKILL.md should contain core instructions; references/ holds patterns, detailed
+    guides, etc.
+
+    4. This approach optimizes context window usage - SKILL.md loads on trigger, references
+    load on demand
+
+
+    Score 1.0 if: Recommends splitting, mentions references/ directory, explains what
+    goes where (core vs detailed), mentions keeping SKILL.md lean/concise
+
+    Score 0.5 if: Recommends splitting and mentions references/, but lacks clear guidance
+    on organization
+
+    Score 0.0 if: Suggests putting everything in SKILL.md, or doesn''t mention the
+    references/ directory
+
+    '
+  extractor: last_assistant

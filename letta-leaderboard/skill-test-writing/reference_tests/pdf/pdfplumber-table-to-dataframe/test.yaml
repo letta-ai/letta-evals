@@ -1,0 +1,19 @@
+name: pdfplumber-table-to-dataframe
+skills:
+  - pdf
+prompt: |
+  I extracted a table from PDF using pdfplumber.extract_tables(). How do I convert it to a pandas DataFrame properly?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain the conversion:
+
+    1. extract_tables() returns list of lists (rows)
+    2. First row is usually headers: df = pd.DataFrame(table[1:], columns=table[0])
+    3. Check for empty tables before conversion
+
+    Score 0 if doesn't show the DataFrame conversion.
+    Score 0.5 if shows conversion but misses header handling.
+    Score 1 if shows using first row as columns: table[0] for headers, table[1:] for data.

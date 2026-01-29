@@ -1,0 +1,20 @@
+name: validate-after-every-edit
+skills:
+  - docx
+prompt: |
+  I'm editing a DOCX file by modifying the XML directly. When should I run the validate.py script?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should emphasize that validation must happen AFTER EACH individual edit, not just at the end.
+
+    Key points that indicate understanding:
+    1. Validate immediately after each edit, not batch validation at the end
+    2. Fix validation errors before proceeding to next edit
+    3. This prevents cascading errors that are hard to debug
+
+    Score 0 if suggests validating only at the end or periodically.
+    Score 0.5 if mentions validation but unclear on timing.
+    Score 1 if clearly states validate after EACH edit and fix before continuing.

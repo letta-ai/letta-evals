@@ -1,0 +1,40 @@
+name: markitdown-text-extraction
+skills:
+- pptx
+prompt: 'How do I quickly extract just the text content from a PowerPoint presentation
+
+  without dealing with XML?
+
+  '
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: 'Evaluate whether the response correctly explains how to extract text from
+    PowerPoint without XML parsing.
+
+
+    The ideal solution involves:
+
+    - Using the markitdown tool/library
+
+    - Can be run as: python -m markitdown file.pptx
+
+    - Converts PowerPoint content to Markdown format
+
+    - Quick and simple approach that avoids XML parsing
+
+
+    Score 1.0 if: Response recommends markitdown AND shows command syntax (e.g., python
+    -m markitdown or markitdown CLI)
+
+    Score 0.8 if: Response recommends markitdown and mentions markdown conversion
+
+    Score 0.6 if: Response mentions markitdown or the python module approach
+
+    Score 0.4 if: Response suggests markdown conversion with a quick/simple approach
+    but doesn''t specifically mention markitdown
+
+    Score 0.0 if: Response does not provide a practical non-XML text extraction method
+
+    '
+  extractor: last_assistant

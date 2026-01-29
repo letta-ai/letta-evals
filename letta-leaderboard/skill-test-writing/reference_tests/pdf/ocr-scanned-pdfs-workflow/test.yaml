@@ -1,0 +1,19 @@
+name: ocr-scanned-pdfs-workflow
+skills:
+  - pdf
+prompt: |
+  I'm trying to extract text from a scanned PDF but pypdf returns empty strings. What's happening?
+timeout: 120
+
+grader:
+  kind: letta_judge
+  prompt: |
+    The response should explain scanned PDF limitations:
+
+    1. Scanned PDFs contain images, not text - pypdf can't extract
+    2. Need OCR (Optical Character Recognition) approach
+    3. Workflow: convert PDF to images (pdf2image), then OCR with pytesseract
+
+    Score 0 if doesn't identify the scanned PDF issue.
+    Score 0.5 if mentions OCR but not the conversion workflow.
+    Score 1 if explains images not text, and recommends pdf2image + pytesseract workflow.
