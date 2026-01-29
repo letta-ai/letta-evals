@@ -97,7 +97,8 @@ th {
 
 @media (prefers-color-scheme: dark) {
   .model-icon,
-  .letta-logo {
+  .letta-logo,
+  .filter-icon {
     filter: invert(1) brightness(1);
   }
 }
@@ -120,8 +121,44 @@ body {
   transition: border-color 0.2s ease;
 }
 
-.no-js .search-bar {
+.no-js .search-bar,
+.no-js .filter-bar {
   display: none;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  border: 1px solid var(--border-color);
+  background: none;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  opacity: 0.4;
+}
+
+.filter-chip.active {
+  opacity: 1;
+  border-color: var(--text-color);
+}
+
+.filter-chip:hover {
+  opacity: 0.8;
+}
+
+.filter-icon {
+  width: 1rem;
+  height: 1rem;
 }
 
 .search-bar:focus {

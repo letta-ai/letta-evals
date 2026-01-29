@@ -68,6 +68,25 @@
 
     {%- for benchmark in leaderboards -%}
     <div class="chart-container tab-content{% if forloop.first %} active{% endif %}" data-content="{{ benchmark[0] }}">
+        <div class="filter-bar" data-filter="{{ benchmark[0] }}">
+            {%- comment -%} Extract unique providers from model names {%- endcomment -%}
+            {%- assign providers = "" -%}
+            {%- assign leaderboard_entries = benchmark[1] -%}
+            {%- for entry in leaderboard_entries -%}
+                {%- assign provider = entry.model | split: "/" | first -%}
+                {%- unless providers contains provider -%}
+                    {%- if providers != "" -%}{%- assign providers = providers | append: "|" -%}{%- endif -%}
+                    {%- assign providers = providers | append: provider -%}
+                {%- endunless -%}
+            {%- endfor -%}
+            {%- assign provider_list = providers | split: "|" | sort -%}
+            {%- for provider in provider_list -%}
+            <button class="filter-chip active" data-provider="{{ provider }}">
+                <img src="./icons/{{ provider }}.svg" alt="{{ provider }}" class="filter-icon">
+                {{ provider }}
+            </button>
+            {%- endfor -%}
+        </div>
         <input type="text" class="search-bar" placeholder="Search models..." data-search="{{ benchmark[0] }}">
 
         <div class="chart-container--inner">
@@ -108,29 +127,57 @@
             });
         });
 
-        // Search functionality for each leaderboard
-        const searchInputs = document.querySelectorAll('.search-bar');
+        // Filter and search functionality
+        function applyFilters(container) {
+            const benchmarkName = container.getAttribute('data-content');
+            const searchInput = container.querySelector('.search-bar');
+            const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+            const filterBar = container.querySelector('.filter-bar');
+            const activeProviders = new Set();
 
-        searchInputs.forEach(searchInput => {
-            const benchmarkName = searchInput.getAttribute('data-search');
-            const container = document.querySelector(`[data-content="${benchmarkName}"]`);
-
-            if (container) {
-                const chartRows = container.querySelectorAll('.chart-row, .multi-metric-row');
-
-                searchInput.addEventListener('input', (e) => {
-                    const searchTerm = e.target.value.toLowerCase();
-
-                    chartRows.forEach(row => {
-                        const modelName = row.getAttribute('data-model').toLowerCase();
-                        if (modelName.includes(searchTerm)) {
-                            row.style.display = 'grid';
-                        } else {
-                            row.style.display = 'none';
-                        }
-                    });
+            if (filterBar) {
+                filterBar.querySelectorAll('.filter-chip.active').forEach(chip => {
+                    activeProviders.add(chip.getAttribute('data-provider'));
                 });
             }
+
+            const chartRows = container.querySelectorAll('.chart-row, .multi-metric-row');
+            let visibleRank = 0;
+
+            chartRows.forEach(row => {
+                const modelName = row.getAttribute('data-model');
+                const provider = modelName.split('/')[0];
+                const matchesSearch = modelName.toLowerCase().includes(searchTerm);
+                const matchesFilter = activeProviders.size === 0 || activeProviders.has(provider);
+
+                if (matchesSearch && matchesFilter) {
+                    row.style.display = 'grid';
+                    visibleRank++;
+                    const rankCell = row.querySelector('.rank-cell');
+                    if (rankCell) rankCell.textContent = visibleRank;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        // Provider filter chips
+        document.querySelectorAll('.filter-bar').forEach(filterBar => {
+            filterBar.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    chip.classList.toggle('active');
+                    const container = chip.closest('.tab-content');
+                    applyFilters(container);
+                });
+            });
+        });
+
+        // Search functionality
+        document.querySelectorAll('.search-bar').forEach(searchInput => {
+            searchInput.addEventListener('input', () => {
+                const container = searchInput.closest('.tab-content');
+                applyFilters(container);
+            });
         });
     </script>
 </body>
