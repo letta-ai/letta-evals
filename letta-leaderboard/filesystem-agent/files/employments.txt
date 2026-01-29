@@ -321,7 +321,7 @@ currency: USD
 ### emp-0041 (owner: pers-0036)
 employment_id: emp-0041
 employer: Benson-Murphy
-job_title: Copy
+job_title: Copywriter
 start_date: 2023-12-07
 salary: 215939.54
 currency: USD
@@ -1897,7 +1897,7 @@ currency: USD
 ### emp-0238 (owner: pers-0228)
 employment_id: emp-0238
 employer: Palmer and Sons
-job_title: Land
+job_title: Land surveyor
 start_date: 2022-02-09
 salary: 142914.47
 currency: USD
@@ -1929,7 +1929,7 @@ currency: USD
 ### emp-0242 (owner: pers-0233)
 employment_id: emp-0242
 employer: Mcpherson, Robertson and Hayes
-job_title: Make
+job_title: Make-up artist
 start_date: 2025-05-19
 salary: 53432.35
 currency: USD
@@ -3057,7 +3057,7 @@ currency: USD
 ### emp-0383 (owner: pers-0359)
 employment_id: emp-0383
 employer: Rowe Inc
-job_title: Make
+job_title: Make-up artist
 start_date: 2021-03-30
 salary: 172814.01
 currency: USD
@@ -3521,7 +3521,7 @@ currency: USD
 ### emp-0441 (owner: pers-0414)
 employment_id: emp-0441
 employer: Fowler and Sons
-job_title: Land
+job_title: Land surveyor
 start_date: 2022-03-23
 salary: 204456.53
 currency: USD
