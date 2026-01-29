@@ -34,6 +34,10 @@ MODEL_COSTS = {
         "prompt_tokens": 0.5,
         "completion_tokens": 3,
     },
+    "openai/gpt-5.2-codex": {
+        "prompt_tokens": 1.75,
+        "completion_tokens": 14,
+    },
     "openai/gpt-5.2-2025-12-11": {
         "prompt_tokens": 1.75,
         "completion_tokens": 14,
@@ -106,32 +110,30 @@ MODEL_COSTS = {
         "prompt_tokens": 0.5,
         "completion_tokens": 1.5,
     },
+    "minimax/minimax-m2.1": {
+        "prompt_tokens": 0.5,
+        "completion_tokens": 1.5,
+    },
+    "z-ai/glm-4.7": {
+        "prompt_tokens": 0.6,
+        "completion_tokens": 2.2,
+    },
 }
 
 
 # Explicit aliases for model handles that can't be resolved by stripping
-# provider prefixes or date suffixes (e.g. compute-tier suffixes, shorthand names).
+# provider prefixes, date suffixes, or effort level suffixes.
 # Key: canonical MODEL_COSTS key, Value: list of aliases that map to it.
 MODEL_ALIASES = {
-    "openai/gpt-5.2-2025-12-11": ["gpt-5.2-medium", "gpt-5.2-high", "gpt-5.2-xhigh"],
-    "openai/gpt-5.1-2025-11-13": ["gpt-5.1-medium"],
-    "openai/gpt-5.1-codex": ["gpt-5.1-codex-medium", "gpt-5.1-codex-max-medium"],
-    "openai/gpt-5.1-codex-mini": ["gpt-5.1-codex-mini-medium"],
-    "openai/gpt-5-2025-08-07": ["gpt-5-medium"],
-    "openai/gpt-5-mini-2025-08-07": ["gpt-5-mini-medium"],
-    "openai/gpt-5-nano-2025-08-07": ["gpt-5-nano-medium"],
-    "z-ai/glm-4.6": ["glm-4.6"],
+    "openai/gpt-5.1-codex": ["gpt-5.1-codex-max-medium"],
     "moonshotai/kimi-k2-0905": ["kimi-k2"],
-    "deepseek/deepseek-chat-v3.1": ["deepseek-chat-v3.1"],
-    "deepseek/deepseek-reasoner": ["deepseek-reasoner"],
-    "deepseek/deepseek-chat": ["deepseek-chat"],
     "mistralai/mistral-large-2512": ["mistral-large-3"],
-    "google_ai/gemini-3-pro-preview": ["gemini-3-pro"],
+    "google_ai/gemini-3-pro-preview": ["gemini-3-pro", "gemini-3"],
     "google_ai/gemini-3-flash-preview": ["gemini-3-flash"],
 }
 
 
-# Build reverse mapping: strip provider prefix and date suffix from MODEL_COSTS keys
+# Build reverse mapping: strip provider prefix, date suffix, and effort level suffix from MODEL_COSTS keys
 # This allows matching "gpt-4.1-mini" to "openai/gpt-4.1-mini-2025-04-14"
 def _build_model_name_mapping() -> dict:
     """
@@ -140,7 +142,10 @@ def _build_model_name_mapping() -> dict:
     Combines three sources:
     1. Strip provider prefix: "gpt-4.1-mini-2025-04-14" -> "openai/gpt-4.1-mini-2025-04-14"
     2. Strip date suffix: "gpt-4.1-mini" -> "openai/gpt-4.1-mini-2025-04-14"
-    3. Explicit aliases from MODEL_ALIASES (compute tiers, shorthand names)
+    3. Explicit aliases from MODEL_ALIASES (shorthand names)
+
+    Note: Effort-level suffixes (-low, -medium, -high, -xhigh, -max) are
+    stripped at lookup time in resolve_model_name(), not stored here.
     """
     import re
 

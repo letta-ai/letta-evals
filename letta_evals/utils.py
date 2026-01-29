@@ -1,5 +1,6 @@
 import importlib.util
 import logging
+import re
 import sys
 from pathlib import Path
 from typing import Any, List, Optional
@@ -11,6 +12,9 @@ from letta_evals.constants import (
     TURN_PASS_SYMBOL,
     TURN_PENDING_SYMBOL,
 )
+
+# Pattern to match reasoning effort suffixes
+_EFFORT_PATTERN = re.compile(r"-(low|medium|high|xhigh|max)$")
 from letta_evals.models import Sample
 
 logger = logging.getLogger(__name__)
@@ -88,6 +92,11 @@ def normalize_model_name(model_name: str) -> str:
         prefixed = f"openai/{model_name}"
         if prefixed in MODEL_COSTS:
             return prefixed
+
+    # Strip effort-level suffix (e.g. "gpt-5.2-high" -> "gpt-5.2") and retry
+    stripped = _EFFORT_PATTERN.sub("", model_name)
+    if stripped != model_name:
+        return normalize_model_name(stripped)
 
     # No match found
     return model_name
