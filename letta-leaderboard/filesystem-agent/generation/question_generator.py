@@ -11,10 +11,11 @@ This script runs an AI agent that generates difficult questions by:
 import argparse
 import json
 import os
+import random
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 from anthropic import Anthropic
@@ -85,10 +86,27 @@ class QuestionGeneratorAgent:
             rubric=rubric_content,
         )
 
+        # Load question type prompt files
+        self.type_prompts = {}
+        prompts_dir = Path(__file__).parent / "prompts"
+        for md_file in prompts_dir.glob("*.md"):
+            type_name = md_file.stem  # e.g. "aggregation" from "aggregation.md"
+            with open(md_file, "r") as f:
+                self.type_prompts[type_name] = f.read()
+
+        # Load question type distribution from config
+        full_config_path = Path(__file__).parent / "config.yaml"
+        with open(full_config_path, "r") as f:
+            full_config = yaml.safe_load(f)
+        self.question_type_distribution = full_config.get("generation", {}).get("question_types", {})
+
         # Optional: Print database stats to show they're loaded
         total_rows = sum(stats["row_count"] for stats in db_overview["statistics"].values())
         print(
             f"{Colors.DIM}Database loaded: {len(db_overview['statistics'])} tables, {total_rows:,} total rows{Colors.ENDC}"
+        )
+        print(
+            f"{Colors.DIM}Question types loaded: {list(self.type_prompts.keys())}{Colors.ENDC}"
         )
 
         # Track token usage
@@ -357,8 +375,31 @@ Keep it brief but informative. This summary will help continue the conversation.
             )
         print(f"Saved conversation trace to {trace_path}")
 
+    def _build_type_schedule(self, num_questions: int) -> List[str]:
+        """Build a schedule of question types based on the configured distribution."""
+        schedule = []
+        for type_name, pct in self.question_type_distribution.items():
+            count = round(num_questions * pct)
+            schedule.extend([type_name] * count)
+
+        # Pad or trim to exact count
+        while len(schedule) < num_questions:
+            # Add the most common type
+            most_common = max(self.question_type_distribution, key=self.question_type_distribution.get)
+            schedule.append(most_common)
+        schedule = schedule[:num_questions]
+
+        # Shuffle to avoid generating all of one type in a row
+        random.shuffle(schedule)
+        return schedule
+
     def generate_single_question(
-        self, question_number: int, total: int, existing_questions: List[Dict[str, str]], max_iterations: int = 100
+        self,
+        question_number: int,
+        total: int,
+        existing_questions: List[Dict[str, str]],
+        max_iterations: int = 100,
+        question_type: Optional[str] = None,
     ) -> Tuple[bool, List[Dict[str, Any]]]:
         """Generate a single question with fresh conversation."""
 
@@ -368,17 +409,31 @@ Keep it brief but informative. This summary will help continue the conversation.
         # Build user message with context about existing questions
         existing_summary = self._format_existing_questions(existing_questions)
 
+        # Build type-specific instruction
+        type_instruction = ""
+        if question_type and question_type in self.type_prompts:
+            type_instruction = (
+                f"\n\n**REQUIRED QUESTION TYPE: {question_type}**\n\n"
+                f"Follow these type-specific instructions:\n\n"
+                f"{self.type_prompts[question_type]}\n\n"
+                f"You MUST generate a question of this exact type. Do not deviate.\n"
+            )
+        elif question_type:
+            type_instruction = f"\n\n**REQUIRED QUESTION TYPE: {question_type}**\n"
+
         messages = [
             {
                 "role": "user",
                 "content": f"Generate question #{question_number}.\n\n"
                 f"{existing_summary}\n\n"
-                f"Your task: Create ONE challenging question that requires ~3-4 file lookups and is COMPLETELY DIFFERENT from the above.\n\n"
+                f"Your task: Create ONE challenging question that requires 3-5 file lookups and is COMPLETELY DIFFERENT from the above."
+                f"{type_instruction}\n\n"
                 f"Key requirements:\n"
                 f"1. Start by exploring different tables/attributes than recent questions\n"
-                f"2. Verify exactly ONE correct answer exists\n"
-                f"3. Mix up answer types: try counts, comparisons, names, dates, etc.\n"
-                f"4. Avoid patterns you see repeated above\n\n"
+                f"2. Verify exactly ONE correct answer exists (use verification_query)\n"
+                f"3. The answer must be a CONCRETE value (name, number, date) — never 'None' or 'does not own'\n"
+                f"4. If asking about a pet or job, verify the person has exactly 1 of that type\n"
+                f"5. Minimum 3 files required\n\n"
                 f"EXPLORATION STRATEGY: Run multiple SQL queries in parallel to explore efficiently!\n"
                 f"Example: Check different tables, test various conditions, explore relationships simultaneously.\n\n"
                 f"When you find a great question with a unique answer, call register_question ALONE (this ends the session).",
@@ -532,6 +587,7 @@ Keep it brief but informative. This summary will help continue the conversation.
                             tool_input["difficulty"],
                             tool_input["question_type"],
                             tool_input["required_files"],
+                            tool_input.get("verification_query", ""),
                         )
                         if result["success"]:
                             question_registered = True
@@ -628,6 +684,7 @@ Keep it brief but informative. This summary will help continue the conversation.
                             tool_input["difficulty"],
                             tool_input["question_type"],
                             tool_input["required_files"],
+                            tool_input.get("verification_query", ""),
                         )
 
                         if result["success"]:
@@ -650,29 +707,48 @@ Keep it brief but informative. This summary will help continue the conversation.
 
         return question_registered, conversation_trace
 
-    def generate_questions(self, num_questions: int = 10):
+    def generate_questions(self, num_questions: int = 10, question_type: Optional[str] = None):
         """Generate questions using the agent - one at a time with fresh context."""
         session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         all_conversations = []
+
+        # Build type schedule
+        if question_type:
+            # All questions of the same type
+            type_schedule = [question_type] * num_questions
+        else:
+            type_schedule = self._build_type_schedule(num_questions)
 
         print(f"\n{Colors.HEADER}Starting question generation with {self.model}{Colors.ENDC}")
         print(f"Target: {num_questions} questions")
         print(f"Output directory: {self.output_path.parent}")
         print(f"Questions file: {self.output_path.name}")
+        if question_type:
+            print(f"Question type: {question_type} (all questions)")
+        else:
+            # Print schedule summary
+            from collections import Counter
+            type_counts = Counter(type_schedule)
+            print(f"Type distribution: {dict(type_counts)}")
         self._print_separator("=")
 
         for question_num in range(num_questions):
             # Get all existing questions for context
             existing_questions = self.get_existing_questions()
+            current_type = type_schedule[question_num]
 
-            print(f"\n{Colors.BOLD}Generating question {question_num + 1}/{num_questions}{Colors.ENDC}")
+            print(f"\n{Colors.BOLD}Generating question {question_num + 1}/{num_questions} [{current_type}]{Colors.ENDC}")
             print(f"   {Colors.DIM}Existing questions in corpus: {len(existing_questions)}{Colors.ENDC}")
             self._print_separator()
 
             # Generate one question with fresh context
             max_iterations = self.config.get("max_iterations_per_question", 20)
             success, conversation = self.generate_single_question(
-                question_num + 1, num_questions, existing_questions, max_iterations=max_iterations
+                question_num + 1,
+                num_questions,
+                existing_questions,
+                max_iterations=max_iterations,
+                question_type=current_type,
             )
 
             # Store conversation
@@ -735,6 +811,17 @@ def main():
     )
     parser.add_argument("--model", type=str, default="claude-sonnet-4-20250514", help="Claude model to use")
     parser.add_argument(
+        "--question-type",
+        type=str,
+        default=None,
+        choices=[
+            "multi_hop_chain", "aggregation", "set_intersection", "negation",
+            "comparison_tiebreak", "multi_entity_comparison", "cross_file_counting",
+            "temporal_reasoning",
+        ],
+        help="Generate all questions of this specific type (default: use distribution from config)",
+    )
+    parser.add_argument(
         "--append",
         action="store_true",
         default=True,
@@ -792,7 +879,7 @@ def main():
         print(f"Questions file: {output_path.name}")
         print(f"Target: {args.num_questions} questions\n")
 
-        agent.generate_questions(args.num_questions)
+        agent.generate_questions(args.num_questions, question_type=args.question_type)
 
     except Exception as e:
         print(f"{Colors.RED}Fatal error during initialization: {e}{Colors.ENDC}")

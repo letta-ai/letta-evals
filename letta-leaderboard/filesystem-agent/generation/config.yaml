@@ -17,10 +17,16 @@ generation:
   seed: 42
   
   # Question type distribution (must sum to 1.0)
+  # Each type has a corresponding prompt file in prompts/{type_name}.md
   question_types:
-    single_hop_pct: 0.0 # TODO: These are way too easy
-    multi_hop_pct: 0.5
-    comparison_pct: 0.5
+    multi_hop_chain: 0.20       # 3-4 files — follow references across files
+    aggregation: 0.15           # 3-5 files — total balance, sum records
+    set_intersection: 0.15      # 4-5 files — person matching X AND Y AND Z
+    negation: 0.10              # 3-4 files — who does NOT own X
+    comparison_tiebreak: 0.15   # 4-5 files — highest Y, if tied oldest
+    multi_entity_comparison: 0.10  # 4-5 files — between person A and B
+    cross_file_counting: 0.10   # 4-5 files — total financial products
+    temporal_reasoning: 0.05    # 3-4 files — date comparisons
 
 # Data generation defaults
 data_generation:
@@ -80,8 +86,8 @@ agent_question_generator:
   messages_to_keep_on_trim: 6  # Keep last N messages when trimming
   
   # Question quality requirements
-  min_sql_queries_per_question: 2  # Minimum number of SQL queries required
-  max_sql_queries_per_question: 4  # Maximum to keep it focused
+  min_sql_queries_per_question: 3  # Minimum number of SQL queries required
+  max_sql_queries_per_question: 6  # Maximum to keep it focused
   require_natural_language: true    # Questions must sound conversational
 
 # Agent question evaluator configuration  
