@@ -82,6 +82,27 @@ class RubricGrader(Grader):
         """Whether this grader's extractor requires agent_state."""
         return self._requires_agent_state
 
+    def _parse_first_json(self, text: str) -> dict:
+        """Parse only the first complete JSON object from text.
+
+        Handles cases where model outputs valid JSON followed by extra text.
+        Uses incremental parsing to handle strings containing braces correctly.
+        """
+        start = text.find("{")
+        if start == -1:
+            return json.loads(text)
+
+        # Try parsing progressively longer substrings
+        for end in range(start + 1, len(text) + 1):
+            if text[end - 1] == "}":
+                try:
+                    return json.loads(text[start:end])
+                except json.JSONDecodeError:
+                    continue
+
+        # Fallback to parsing entire text
+        return json.loads(text)
+
     async def grade(
         self, sample: Sample, trajectory: List[List[LettaMessageUnion]], agent_state: Optional[AgentState] = None
     ) -> Tuple[GradeResult, str]:
@@ -138,7 +159,8 @@ class RubricGrader(Grader):
                     if hasattr(block, "text"):
                         response_text += block.text
 
-                result_json = json.loads(response_text)
+                # Parse only the first complete JSON object (model may add extra text after)
+                result_json = self._parse_first_json(response_text)
                 usage = {
                     "input_tokens": response.usage.input_tokens,
                     "output_tokens": response.usage.output_tokens,
@@ -148,11 +170,18 @@ class RubricGrader(Grader):
             else:
                 raise ValueError(f"Unsupported provider: {self.provider}")
 
-            score = result_json.get("score")
-            if score is None:
-                raise ValueError("Model did not return a score")
+            # Compute score from dimension scores if present, else use "score" field
+            dimension_keys = ["non_obviousness", "clarity", "realism"]
+            if all(k in result_json for k in dimension_keys):
+                dims = [max(1, min(10, float(result_json[k]))) for k in dimension_keys]
+                avg = sum(dims) / len(dims)
+                score = (avg - 1) / 9  # normalize 1-10 to 0-1
+            else:
+                score = result_json.get("score")
+                if score is None:
+                    raise ValueError("Model did not return a score or dimension scores")
+                score = float(score)
 
-            score = float(score)
             score = max(0.0, min(1.0, score))
 
             return GradeResult(

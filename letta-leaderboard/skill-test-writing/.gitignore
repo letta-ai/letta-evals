@@ -4,3 +4,6 @@ data/
 .letta/
 reference_tests_results.json
 __pycache__/
+*.af
+!judge-agent-sonnet.af
+downloaded_agents_project_new/

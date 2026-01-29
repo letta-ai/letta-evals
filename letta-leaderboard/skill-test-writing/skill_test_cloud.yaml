@@ -1,0 +1,57 @@
+name: skill-test-writing-cloud
+description: Evaluate if agent can write high-quality test cases for skills (cloud agents)
+dataset: data/dataset.jsonl
+
+target:
+  kind: letta_agent
+  base_url: https://api.letta.com/
+  agent_script: setup_cloud_agent.py:setup_agent
+  model_configs:
+    # Anthropic
+    - claude-4-5-opus
+    - claude-4-5-sonnet
+    - claude-4-5-haiku
+    - claude-4-1-opus
+    # OpenAI
+    - openai-gpt-5.2-medium
+    - openai-gpt-5.2-high
+    - openai-gpt-5.2-xhigh
+    - openai-gpt-5.1
+    - openai-gpt-5.1-codex
+    - openai-gpt-5.1-codex-mini
+    - openai-gpt-5
+    - openai-gpt-5-mini
+    - openai-gpt-5-nano
+    - openai-gpt-4.1
+    - openai-gpt-4.1-mini
+    - openai-gpt-4.1-nano
+    # Google
+    - gemini-3-pro
+    - gemini-3-flash
+    # Other providers
+    - deepseek-reasoner
+    - deepseek-chat
+    - openrouter-kimi-k2-0905
+    - openrouter-deepseek-v3.1
+    - openrouter-glm-4.6
+    - openrouter-minimax-m2
+    - openrouter-mistral-large-3
+    - together-gpt-oss-120b
+    - together-gpt-oss-20b
+
+graders:
+  test_quality:
+    kind: model_judge
+    display_name: "test quality score"
+    model: claude-sonnet-4-5-20250929
+    temperature: 0.0
+    provider: anthropic
+    prompt_path: judge_prompt.md
+    extractor: last_assistant
+
+gate:
+  kind: simple
+  metric_key: test_quality
+  aggregation: avg_score
+  op: gte
+  value: 0.6

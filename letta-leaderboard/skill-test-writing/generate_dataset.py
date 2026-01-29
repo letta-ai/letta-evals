@@ -66,17 +66,21 @@ If you need programmatic grading, also create a `grader.py` file with a function
 
 ## Your Output
 
-1. Create a DIRECTORY for your test case (e.g., `/tmp/my-skill-test/`)
-2. Inside that directory, create:
-   - `test.yaml` (required) - your test configuration
-   - `grader.py` (optional) - for programmatic grading
-3. Output JSON with the DIRECTORY path (not a file path):
+Output your test.yaml content directly in a YAML code block:
 
-```json
-{{"sandbox_path": "/tmp/my-skill-test"}}
+```yaml
+name: descriptive-kebab-case-name
+skills:
+  - {skill_name}
+prompt: |
+  Your test prompt here...
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: |
+    Scoring criteria...
+  extractor: last_assistant
 ```
-
-IMPORTANT: The sandbox_path must be a DIRECTORY containing your test files, not a path to a single file.
 """
 
 
