@@ -12,10 +12,10 @@ from letta_evals.constants import (
     TURN_PASS_SYMBOL,
     TURN_PENDING_SYMBOL,
 )
+from letta_evals.models import Sample
 
 # Pattern to match reasoning effort suffixes
 _EFFORT_PATTERN = re.compile(r"-(low|medium|high|xhigh|max)$")
-from letta_evals.models import Sample
 
 logger = logging.getLogger(__name__)
 
