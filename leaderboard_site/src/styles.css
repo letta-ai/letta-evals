@@ -98,7 +98,7 @@ th {
 @media (prefers-color-scheme: dark) {
   .model-icon,
   .letta-logo,
-  .filter-icon {
+  .provider-option-icon {
     filter: invert(1) brightness(1);
   }
 }
@@ -122,41 +122,91 @@ body {
 }
 
 .no-js .search-bar,
-.no-js .filter-bar {
+.no-js .provider-dropdown {
   display: none;
 }
 
-.filter-bar {
+.filter-row {
   display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.75rem;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  align-items: stretch;
 }
 
-.filter-chip {
-  display: inline-flex;
+.filter-row .search-bar {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.provider-dropdown {
+  position: relative;
+}
+
+.provider-dropdown-toggle {
+  display: flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8125rem;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
   border: 1px solid var(--border-color);
-  background: none;
+  background-color: var(--bg-color);
   color: var(--text-color);
   cursor: pointer;
-  transition: all 0.15s ease;
-  opacity: 0.4;
+  transition: border-color 0.2s ease;
+  min-width: 11rem;
+  white-space: nowrap;
 }
 
-.filter-chip.active {
-  opacity: 1;
+.provider-dropdown-toggle:hover {
   border-color: var(--text-color);
 }
 
-.filter-chip:hover {
-  opacity: 0.8;
+.provider-dropdown.open .provider-dropdown-toggle {
+  border-color: var(--text-color);
 }
 
-.filter-icon {
+.provider-dropdown-label {
+  flex: 1;
+  text-align: left;
+}
+
+.provider-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 100%;
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  z-index: 100;
+  padding: 0.25rem 0;
+}
+
+.provider-dropdown.open .provider-dropdown-menu {
+  display: block;
+}
+
+.provider-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+  white-space: nowrap;
+}
+
+.provider-option:hover {
+  background-color: rgba(128, 128, 128, 0.1);
+}
+
+.provider-option input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.provider-option-icon {
   width: 1rem;
   height: 1rem;
 }
