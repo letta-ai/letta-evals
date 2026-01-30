@@ -55,8 +55,11 @@ class ParallelMixin:
 
         max_name_len = max(len(name) for name in type_counts)
 
+        # Fixed render height: one line per type + blank + total = N+2 lines
+        render_height = len(type_counts) + 2
+
         def _render_progress():
-            """Render all progress bars to stdout."""
+            """Render all progress bars to stdout (fixed height, overwrites in place)."""
             lines = []
             for qtype in type_counts:
                 tp = type_progress[qtype]
@@ -83,14 +86,15 @@ class ParallelMixin:
                 lines.append(f"  {color}{name_padded}  {bar}  {ok}/{total}{fail_str}{Colors.ENDC}")
 
             total_done = progress["success"] + progress["failed"]
-            lines.append(f"\n  Total: {total_done}/{num_questions} ({progress['success']} ok, {progress['failed']} failed)")
+            lines.append("")  # blank line
+            lines.append(f"  Total: {total_done}/{num_questions} ({progress['success']} ok, {progress['failed']} failed)")
 
+            # Move cursor up by render_height, clear to end of screen, print
             output = "\n".join(lines)
-            print(f"\033[{len(lines) + 1}A\033[J{output}", flush=True)
+            print(f"\033[{render_height}A\033[J{output}", flush=True)
 
-        # Print initial empty progress bars
-        num_lines = len(type_counts) + 2
-        print("\n" * num_lines, flush=True)
+        # Print initial blank lines to reserve space, then render
+        print("\n" * (render_height - 1), flush=True)
         _render_progress()
 
         def _generate_type_batch(qtype: str, count: int) -> Dict[str, int]:
