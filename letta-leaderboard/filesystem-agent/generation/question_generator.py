@@ -595,7 +595,7 @@ def main():
         default=Path(__file__).parent / "data" / "generated_questions",
         help="Output directory for generated questions (will create timestamped subdirectory)",
     )
-    parser.add_argument("--model", type=str, default="claude-sonnet-4-20250514", help="Claude model to use")
+    parser.add_argument("--model", type=str, default=None, help="Claude model to use (default: from config.yaml)")
     parser.add_argument(
         "--question-type",
         type=str,
