@@ -1,21 +1,12 @@
 # Configuration for Letta File Benchmark
 
-# Agent configuration
+# Agent configuration (used by setup_cloud_agent.py)
 agent:
   max_files_open: 5
   per_file_view_window_char_limit: 12000
-  embedding_chunk_size: 512
-
-# File upload configuration
-upload:
-  timeout_seconds: 30
 
 # Question generation configuration
 generation:
-  temperature: 0.8
-  max_concurrent: 5
-  seed: 42
-  
   # Question type distribution (must sum to 1.0)
   # Each type has a corresponding prompt file in prompts/{type_name}.md
   question_types:
@@ -28,76 +19,30 @@ generation:
     cross_file_counting: 0.10   # 4-5 files — total financial products
     temporal_reasoning: 0.05    # 3-4 files — date comparisons
 
-# Data generation defaults
-data_generation:
-  num_people: 100
-  max_per_person:
-    addresses: 2
-    accounts: 3
-    employments: 1
-    credit_cards: 2
-    vehicles: 1
-    pets: 1
-    net_accounts: 2
-    insurances: 1
-    medical_records: 1
-  
-  # Constraints
-  age_range:
-    min: 18
-    max: 90
-  
-  password_length: 12
-  seed: 0
-
-# Utility configuration
-utils:
-  max_uniqueness_attempts: 100
-  json_indent: 2
-
 # Agent question generator configuration
 agent_question_generator:
-  # Claude's context window limits
-  max_context_tokens: 150000  # Conservative limit for Claude Sonnet
-  trim_threshold: 140000      # Start trimming when we hit this
-  
+  # Context window management
+  trim_threshold: 140000      # Start trimming when we hit this many input tokens
+
   # Model configuration
-  default_model: "claude-sonnet-4-20250514"
-  
-  # Token usage display
+  default_model: "claude-opus-4-5-20251101"
+
+  # Token usage
   max_tokens_per_response: 4096
-  
+
   # Generation parameters
-  max_iterations_per_question: 50  # Increased to allow more exploration
+  max_iterations_per_question: 50
   force_registration_on_max_iterations: true
-  
-  # LLM summarization settings
+
+  # LLM summarization settings (for context trimming)
   summary_max_tokens: 500
   summary_temperature: 0.3
-  summary_max_conversation_items: 30  # Max conversation items to include in summary
-  
+  summary_max_conversation_items: 30
+
   # Display settings
   separator_length: 80
-  truncate_sql_display_length: 100
   truncate_result_rows: 3
   truncate_result_string_length: 200
-  
-  # Session settings
-  messages_to_keep_on_trim: 6  # Keep last N messages when trimming
-  
-  # Question quality requirements
-  min_sql_queries_per_question: 3  # Minimum number of SQL queries required
-  max_sql_queries_per_question: 6  # Maximum to keep it focused
-  require_natural_language: true    # Questions must sound conversational
 
-# Agent question evaluator configuration  
-agent_question_evaluator:
-  # Model configuration
-  default_model: "claude-sonnet-4-20250514"
-  
-  # Evaluation settings
-  max_concurrent_evaluations: 5      # Number of questions to evaluate in parallel
-  evaluation_prompt_style: "analytical"  # Style of evaluation: "analytical" or "conversational"
-  
-  # Token limits
-  max_tokens_per_evaluation: 2048    # Max tokens for each evaluation response
+  # Session settings
+  messages_to_keep_on_trim: 6
