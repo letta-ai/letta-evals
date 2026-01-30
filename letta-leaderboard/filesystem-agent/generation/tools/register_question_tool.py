@@ -43,14 +43,14 @@ REGISTER_QUESTION_TOOL_DICT = {
                 "type": "string",
                 "description": "The reasoning process that led to the answer. This should be a thorough justification/explanation of the steps taken to arrive at the answer.",
             },
-            "difficulty": {
-                "type": "string",
-                "description": "The difficulty of the question from the following options: easy, medium, hard",
-            },
             # question types generated using GPT-5
             "question_type": {
                 "type": "string",
-                "description": "The type of question from the following options: factual (direct retrieval), compositional (multi-hop), comparision (relative evaluation), logical (counting, math, filtering), explanatory (why/how)",
+                "description": "The type of question. Must be one of: multi_hop_chain, aggregation, set_intersection, negation, comparison_tiebreak, multi_entity_comparison, cross_file_counting, temporal_reasoning",
+            },
+            "verification_query": {
+                "type": "string",
+                "description": "A single SQL query that returns exactly 1 row containing the answer value. Used to verify uniqueness. Example: SELECT full_name FROM people WHERE person_id = 'pers-0042'",
             },
             "required_files": {
                 "type": "array",
@@ -63,12 +63,49 @@ REGISTER_QUESTION_TOOL_DICT = {
             "sql_queries",
             "answer",
             "answer_reasoning",
-            "difficulty",
             "question_type",
             "required_files",
+            "verification_query",
         ],
     },
 }
+
+
+def compute_difficulty(question_type: str, required_files: List[str], sql_queries: List[Dict[str, str]]) -> str:
+    """Derive difficulty from objective signals instead of LLM self-report.
+
+    Scoring:
+      - Files: 3 → 0pts, 4 → 1pt, 5+ → 2pts
+      - SQL queries: 3 → 0pts, 4 → 1pt, 5+ → 2pts
+      - Hard question types: +1pt
+        (negation, comparison_tiebreak, multi_entity_comparison, temporal_reasoning)
+
+    Total: 0-1 → easy, 2-3 → medium, 4+ → hard
+    """
+    score = 0
+
+    num_files = len(required_files)
+    if num_files == 4:
+        score += 1
+    elif num_files >= 5:
+        score += 2
+
+    num_queries = len(sql_queries)
+    if num_queries == 4:
+        score += 1
+    elif num_queries >= 5:
+        score += 2
+
+    hard_types = {"negation", "comparison_tiebreak", "multi_entity_comparison", "temporal_reasoning"}
+    if question_type in hard_types:
+        score += 1
+
+    if score <= 1:
+        return "easy"
+    elif score <= 3:
+        return "medium"
+    else:
+        return "hard"
 
 
 class RegisterQuestionTool:
@@ -87,9 +124,9 @@ class RegisterQuestionTool:
         sql_queries: List[Dict[str, str]],
         answer: str,
         answer_reasoning: str,
-        difficulty: str,
         question_type: str,
         required_files: List[str],
+        verification_query: str = "",
     ) -> Dict[str, Any]:
         """
         Register a new question by executing multiple SQL queries and storing results.
@@ -99,18 +136,81 @@ class RegisterQuestionTool:
             sql_queries: List of dicts with 'description' and 'query' for each SQL query
             answer: The direct natural language answer based on query results
             answer_reasoning: The reasoning process that led to the answer
-            difficulty: The difficulty of the question from the following options: easy, medium, hard
             question_type: The type of question
             required_files: The files that are required to answer the question from the list of available files
+            verification_query: A single SQL query that returns exactly 1 row with the answer
 
         Returns:
             Dictionary with registration status and the answer
         """
+        # --- Guardrails ---
+
+        # Check minimum files
+        if len(required_files) < 3:
+            return {
+                "success": False,
+                "error": f"Question must require at least 3 files, got {len(required_files)}: {required_files}. "
+                "Make the question harder by involving more files.",
+            }
+
+        # Check minimum SQL queries
+        if len(sql_queries) < 3:
+            return {
+                "success": False,
+                "error": f"Must provide at least 3 SQL queries showing the reasoning chain, got {len(sql_queries)}. "
+                "Add more queries to demonstrate the multi-step reasoning.",
+            }
+
+        # Check answer is not a negation/absence
+        negation_phrases = [
+            "does not own", "do not own", "doesn't own", "don't own",
+            "no record", "no pets", "no vehicles", "no bank", "no credit",
+            "no insurance", "not found", "none",
+        ]
+        answer_lower = answer.lower().strip()
+        if any(phrase in answer_lower for phrase in negation_phrases):
+            return {
+                "success": False,
+                "error": f"Answer must be a concrete value, not a negation/absence: '{answer}'. "
+                "Rephrase the question so the answer is a name, number, or date.",
+            }
+
+        # Check valid question type
+        valid_types = [
+            "multi_hop_chain", "aggregation", "set_intersection", "negation",
+            "comparison_tiebreak", "multi_entity_comparison", "cross_file_counting",
+            "temporal_reasoning",
+        ]
+        if question_type not in valid_types:
+            return {
+                "success": False,
+                "error": f"Invalid question_type '{question_type}'. Must be one of: {valid_types}",
+            }
+
         try:
             # Execute all SQL queries and collect results
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
+
+            # --- Verification query check ---
+            if verification_query:
+                try:
+                    cursor.execute(verification_query)
+                    verification_rows = cursor.fetchall()
+                    if len(verification_rows) != 1:
+                        conn.close()
+                        return {
+                            "success": False,
+                            "error": f"Verification query returned {len(verification_rows)} rows, expected exactly 1. "
+                            "The answer is not unique — refine the question conditions.",
+                        }
+                except Exception as e:
+                    conn.close()
+                    return {
+                        "success": False,
+                        "error": f"Verification query failed: {str(e)}. Fix the query and try again.",
+                    }
 
             query_results = []
             for query_info in sql_queries:
@@ -139,6 +239,9 @@ class RegisterQuestionTool:
             conn.close()
 
             self.registered_count += 1
+
+            # Compute difficulty from objective signals
+            difficulty = compute_difficulty(question_type, required_files, sql_queries)
 
             # Store question, answer and query results
             question_data = {

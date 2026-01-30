@@ -1,53 +1,73 @@
-## QUALITY RUBRIC FOR GREP/OPEN_FILES BENCHMARK
+## QUALITY RUBRIC FOR FILE NAVIGATION BENCHMARK
 
-### 1. COMPLEXITY BALANCE
-- **Too Simple (REJECT)**: 
-  - Single file lookups
-  - Questions that can be answered with one grep command
+### 1. COMPLEXITY TIERS
+
+- **Too Easy (REJECT)**:
+  - 1-2 file lookups
+  - Can be solved with 1-2 grep commands
+  - Simple "find person by X, look up Y" chains
   - Example: "What is the name of person with ID pers-0001?"
+  - Example: "What pet does the person with plate XYZ own?" (just 2 hops)
 
-- **Too Complex (REJECT)**: 
-  - Requires counting/aggregating across multiple files
-  - Needs complex filtering that grep cannot handle (e.g., "exactly 4 accounts")
-  - Requires joining data from 3+ different files
-  - Example: "Among people who have both exactly 4 internet accounts and exactly 6 bank accounts..."
+- **Medium (ACCEPT)**:
+  - 3 file lookups with a clear chain
+  - Requires at least one non-trivial step (filtering, comparing within a small group)
+  - Example: "What job does the person with the earliest expiring Visa card have?"
+  - Example: "Among the 4 employees at X Corp, who owns the most vehicles?"
 
-- **Just Right (ACCEPT)**: 
-  - Requires searching 2-4 files (mostly 2-3)
-  - Starts with a very specific, unique identifier
-  - Clear path but needs careful execution
-  - Example: "What type of pet does the person with bank account ending in 1234 own?"
+- **Hard (ACCEPT, PREFERRED)**:
+  - 4-5 file lookups
+  - Requires reasoning: aggregation, comparison, set intersection, negation, or temporal logic
+  - Example: "What is the total bank balance of the person who owns plate XYZ and has a Mastercard?"
+  - Example: "Among people with O+ blood who own dogs, who has the highest salary? If tied, who is oldest?"
+  - Example: "Between the owner of plate ABC and the person with SSN ending 789, who has more pets?"
 
-### 2. GREP-ABILITY & COUNTING
-- **Not Feasible (REJECT)**: 
-  - Requires counting across hundreds of records
-  - Needs to check every person in the database (1000+ people)
-  - Complex aggregations across multiple large files
-  - Example: "Among all 1000 people, who has exactly 4 internet accounts?"
+### 2. ANSWER QUALITY
 
-- **Feasible (ACCEPT)**: 
-  - Counting within a small group (5-15 people) after filtering
-  - Requires 2-3 steps of narrowing down candidates
-  - Clear starting point with specific identifier
-  - Example: "Among the 5 employees at TechStartup Inc, who owns the most pets?"
+- **REJECT if answer is**:
+  - A negation: "does not own", "None", "no record found"
+  - Ambiguous: person has multiple matching records (2 dogs, 2 jobs)
+  - A list without clear ordering: "Dog and Cat" (which one?)
 
-### 3. CHALLENGING BUT FAIR PATTERNS
-Accept questions that:
-- Require 2-4 file lookups (occasionally up to 4, but mostly 2-3)
-- Have a clear starting point with unique identifier
-- Need careful execution but not excessive complexity
-- Example: "How many credit cards does the owner of vehicle with plate 'XYZ-789' have?"
+- **ACCEPT if answer is**:
+  - A specific name: "John Smith"
+  - A specific number: "$145,315.33", "4 vehicles", "3"
+  - A specific date: "2025-06-19"
+  - A specific identifier: "prg-64550245"
 
-Reject questions that:
-- Are trivial one-hop lookups
-- Require impossible aggregations across many files
-- Need complex mathematical operations
-- Example: "What is the name of person with ID pers-0001?" (too easy)
-- Example: "Total balance of all accounts owned by dog owners" (too hard)
+### 3. GREP-ABILITY
+
+- **Not Feasible (REJECT)**:
+  - Requires scanning ALL 500 people
+  - Needs exact counting across hundreds of records
+  - Complex math that grep cannot approximate
+  - Example: "What is the average bank balance across all people?"
+
+- **Feasible (ACCEPT)**:
+  - Starts with a specific identifier or small group (3-15 people)
+  - Each step narrows candidates using grep-able patterns
+  - Counting within a group of 3-10 records
+  - Example: "Among the 5 employees at X Corp, who has the most credit cards?"
+
+### 4. AMBIGUITY CHECK
+
+- **REJECT if**:
+  - Question asks about "the dog" but person has multiple dogs
+  - Question asks about "the job title" but person has 2 jobs
+  - Multiple people could be the correct answer
+  - The filtering conditions don't narrow to exactly 1 person
+
+- **ACCEPT if**:
+  - Question specifies which record: "the oldest vehicle", "the highest-balance account"
+  - Person has exactly 1 of the asked-about record type
+  - Exactly 1 person satisfies all conditions
 
 ### 5. EVALUATION APPROACH
+
 For each question:
 1. Read the question, SQL queries, and answer carefully
-2. Assess against each rubric criterion
-3. Consider if this tests meaningful file-searching abilities
-4. Make a decision and provide clear reasoning
+2. Verify the answer is unique (exactly 1 correct answer)
+3. Check ambiguity (no multi-record confusion)
+4. Verify minimum 3 files are required
+5. Assess difficulty tier (prefer Hard over Medium)
+6. Ensure the answer is a concrete value, not a negation
