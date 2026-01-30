@@ -794,6 +794,98 @@ Keep it brief but informative. This summary will help continue the conversation.
         self._print_separator("=")
 
 
+    def generate_questions_parallel(
+        self, num_questions: int = 10, num_workers: int = 4, question_type: Optional[str] = None
+    ):
+        """Generate questions with parallel workers, one worker per question type.
+
+        Each worker handles all questions for a single type sequentially,
+        so it can see its own previous questions and avoid duplicates.
+        Different types run in parallel since they won't collide.
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        # Build per-type counts
+        if question_type:
+            type_counts = {question_type: num_questions}
+        else:
+            type_counts = {}
+            for type_name, pct in self.question_type_distribution.items():
+                count = round(num_questions * pct)
+                if count > 0:
+                    type_counts[type_name] = count
+            # Adjust to hit exact total
+            total = sum(type_counts.values())
+            if total < num_questions:
+                most_common = max(self.question_type_distribution, key=self.question_type_distribution.get)
+                type_counts[most_common] = type_counts.get(most_common, 0) + (num_questions - total)
+            elif total > num_questions:
+                most_common = max(type_counts, key=type_counts.get)
+                type_counts[most_common] -= (total - num_questions)
+
+        print(f"\n{Colors.HEADER}Starting PARALLEL question generation with {self.model}{Colors.ENDC}")
+        print(f"Target: {num_questions} questions across {len(type_counts)} type workers")
+        print(f"Output: {self.output_path}")
+        for tname, tcount in type_counts.items():
+            print(f"  {tname}: {tcount} questions")
+        self._print_separator("=")
+
+        # Each worker generates all questions for one type, sequentially
+        def _generate_type_batch(qtype: str, count: int) -> Dict[str, int]:
+            """Generate `count` questions of `qtype` sequentially."""
+            batch_results = {"success": 0, "failed": 0}
+            max_iterations = self.config.get("max_iterations_per_question", 20)
+
+            for i in range(count):
+                existing_questions = self.get_existing_questions()
+                success, _ = self.generate_single_question(
+                    i + 1, count, existing_questions,
+                    max_iterations=max_iterations, question_type=qtype,
+                )
+                if success:
+                    batch_results["success"] += 1
+                    print(
+                        f"{Colors.GREEN}[{qtype}] {batch_results['success']}/{count} generated{Colors.ENDC}"
+                    )
+                else:
+                    batch_results["failed"] += 1
+                    print(
+                        f"{Colors.RED}[{qtype}] question {i+1}/{count} failed{Colors.ENDC}"
+                    )
+            return batch_results
+
+        # Launch one worker per type, capped at num_workers
+        all_results = {"success": 0, "failed": 0}
+        with ThreadPoolExecutor(max_workers=min(num_workers, len(type_counts))) as executor:
+            futures = {}
+            for qtype, count in type_counts.items():
+                future = executor.submit(_generate_type_batch, qtype, count)
+                futures[future] = qtype
+
+            for future in as_completed(futures):
+                qtype = futures[future]
+                try:
+                    batch = future.result()
+                    all_results["success"] += batch["success"]
+                    all_results["failed"] += batch["failed"]
+                    print(
+                        f"{Colors.CYAN}[{qtype}] batch done: "
+                        f"{batch['success']} succeeded, {batch['failed']} failed{Colors.ENDC}"
+                    )
+                except Exception as e:
+                    all_results["failed"] += type_counts[qtype]
+                    print(f"{Colors.RED}[{qtype}] batch error: {e}{Colors.ENDC}")
+
+        self._print_separator("=")
+        print(f"\n{Colors.HEADER}Parallel generation complete!{Colors.ENDC}")
+        print(f"  Succeeded: {all_results['success']}/{num_questions}")
+        print(f"  Failed: {all_results['failed']}/{num_questions}")
+        print(
+            f"  {Colors.DIM}Total tokens: {self.total_tokens['input']:,} in, {self.total_tokens['output']:,} out{Colors.ENDC}"
+        )
+        self._print_separator("=")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate questions using AI agent")
     parser.add_argument("--num-questions", type=int, default=10, help="Number of questions to generate")
@@ -820,6 +912,12 @@ def main():
             "temporal_reasoning",
         ],
         help="Generate all questions of this specific type (default: use distribution from config)",
+    )
+    parser.add_argument(
+        "--parallel",
+        type=int,
+        default=1,
+        help="Number of parallel workers for question generation (default: 1, sequential)",
     )
     parser.add_argument(
         "--append",
@@ -879,7 +977,14 @@ def main():
         print(f"Questions file: {output_path.name}")
         print(f"Target: {args.num_questions} questions\n")
 
-        agent.generate_questions(args.num_questions, question_type=args.question_type)
+        if args.parallel > 1:
+            agent.generate_questions_parallel(
+                args.num_questions,
+                num_workers=args.parallel,
+                question_type=args.question_type,
+            )
+        else:
+            agent.generate_questions(args.num_questions, question_type=args.question_type)
 
     except Exception as e:
         print(f"{Colors.RED}Fatal error during initialization: {e}{Colors.ENDC}")
