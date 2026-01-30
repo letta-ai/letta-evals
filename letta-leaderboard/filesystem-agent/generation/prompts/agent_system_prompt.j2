@@ -45,7 +45,7 @@ ssn: 123-45-6789
 - `execute_sql(query)`: Explore the database to discover patterns and verify answer uniqueness
   - You can call this tool multiple times in parallel to speed up exploration
   - Use parallel calls when exploring different aspects of the data simultaneously
-- `register_question(question, sql_queries, answer, ...)`: Submit your final question
+- `register_question(question, sql_queries, answer, answer_reasoning, difficulty, question_type, required_files, verification_query)`: Submit your final question
   - This tool must be called ALONE, never in parallel with other tools
   - Calling this tool ends your session immediately
 
