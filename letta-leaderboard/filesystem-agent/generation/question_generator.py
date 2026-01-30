@@ -12,6 +12,7 @@ import argparse
 import json
 import os
 import random
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -41,9 +42,10 @@ class Colors:
 
 
 class QuestionGeneratorAgent:
-    def __init__(self, db_path: Path, output_path: Path, model: str = None, config: Dict[str, Any] = None):
+    def __init__(self, db_path: Path, output_path: Path, model: str = None, config: Dict[str, Any] = None, quiet: bool = False):
         self.db_path = db_path
         self.output_path = output_path
+        self.quiet = quiet
 
         # Load config if not provided
         if config is None:
@@ -53,7 +55,7 @@ class QuestionGeneratorAgent:
                 config = full_config.get("agent_question_generator", {})
 
         self.config = config
-        self.model = model or config.get("default_model", "claude-sonnet-4-20250514")
+        self.model = model or config.get("default_model", "claude-opus-4-5-20251101")
 
         # Initialize tools
         self.sql_tool = SQLExecuteTool(db_path)
@@ -114,12 +116,16 @@ class QuestionGeneratorAgent:
 
     def _print_separator(self, char: str = "─", length: int = None):
         """Print a separator line."""
+        if self.quiet:
+            return
         if length is None:
             length = self.config.get("separator_length", 80)
         print(f"{Colors.DIM}{char * length}{Colors.ENDC}")
 
     def _print_tool_call(self, tool_name: str, tool_input: Dict[str, Any]):
         """Print tool call information."""
+        if self.quiet:
+            return
         print(f"\n{Colors.CYAN}Tool: {tool_name}{Colors.ENDC}")
         if tool_name == "execute_sql":
             # Format SQL query nicely
@@ -142,6 +148,8 @@ class QuestionGeneratorAgent:
 
     def _print_tool_result(self, tool_name: str, result: Dict[str, Any]):
         """Print tool result information."""
+        if self.quiet:
+            return
         if tool_name == "execute_sql":
             if result["success"]:
                 # Format result based on type
@@ -172,6 +180,8 @@ class QuestionGeneratorAgent:
 
     def _print_progress(self, question_num: int, total: int, iteration: int, max_iterations: int):
         """Print progress information."""
+        if self.quiet:
+            return
         print(f"\n{Colors.BLUE}Question {question_num}/{total} | Iteration {iteration}/{max_iterations}{Colors.ENDC}")
 
     def _print_token_usage(self, usage, session_tokens=None):
@@ -184,9 +194,10 @@ class QuestionGeneratorAgent:
             if session_tokens:
                 session_tokens["input"] += input_tokens
                 session_tokens["output"] += output_tokens
-                print(
-                    f"   Tokens: {input_tokens} in, {output_tokens} out (Session: {session_tokens['input']:,} in, {session_tokens['output']:,} out)"
-                )
+                if not self.quiet:
+                    print(
+                        f"   Tokens: {input_tokens} in, {output_tokens} out (Session: {session_tokens['input']:,} in, {session_tokens['output']:,} out)"
+                    )
 
             self.total_tokens["input"] += input_tokens
             self.total_tokens["output"] += output_tokens
@@ -830,6 +841,13 @@ Keep it brief but informative. This summary will help continue the conversation.
             print(f"  {tname}: {tcount} questions")
         self._print_separator("=")
 
+        # Suppress verbose output in parallel mode
+        self.quiet = True
+
+        # Thread-safe progress counter
+        progress_lock = threading.Lock()
+        progress = {"success": 0, "failed": 0}
+
         # Each worker generates all questions for one type, sequentially
         def _generate_type_batch(qtype: str, count: int) -> Dict[str, int]:
             """Generate `count` questions of `qtype` sequentially."""
@@ -842,20 +860,22 @@ Keep it brief but informative. This summary will help continue the conversation.
                     i + 1, count, existing_questions,
                     max_iterations=max_iterations, question_type=qtype,
                 )
-                if success:
-                    batch_results["success"] += 1
+                with progress_lock:
+                    if success:
+                        batch_results["success"] += 1
+                        progress["success"] += 1
+                    else:
+                        batch_results["failed"] += 1
+                        progress["failed"] += 1
+                    done = progress["success"] + progress["failed"]
+                    status = "ok" if success else "FAIL"
                     print(
-                        f"{Colors.GREEN}[{qtype}] {batch_results['success']}/{count} generated{Colors.ENDC}"
-                    )
-                else:
-                    batch_results["failed"] += 1
-                    print(
-                        f"{Colors.RED}[{qtype}] question {i+1}/{count} failed{Colors.ENDC}"
+                        f"  [{done}/{num_questions}] {qtype} {i+1}/{count} — {status}"
+                        f"  (total: {progress['success']} ok, {progress['failed']} failed)"
                     )
             return batch_results
 
         # Launch one worker per type, capped at num_workers
-        all_results = {"success": 0, "failed": 0}
         with ThreadPoolExecutor(max_workers=min(num_workers, len(type_counts))) as executor:
             futures = {}
             for qtype, count in type_counts.items():
@@ -866,20 +886,20 @@ Keep it brief but informative. This summary will help continue the conversation.
                 qtype = futures[future]
                 try:
                     batch = future.result()
-                    all_results["success"] += batch["success"]
-                    all_results["failed"] += batch["failed"]
                     print(
-                        f"{Colors.CYAN}[{qtype}] batch done: "
+                        f"  {Colors.CYAN}[{qtype}] done: "
                         f"{batch['success']} succeeded, {batch['failed']} failed{Colors.ENDC}"
                     )
                 except Exception as e:
-                    all_results["failed"] += type_counts[qtype]
-                    print(f"{Colors.RED}[{qtype}] batch error: {e}{Colors.ENDC}")
+                    progress["failed"] += type_counts[qtype]
+                    print(f"  {Colors.RED}[{qtype}] batch error: {e}{Colors.ENDC}")
+
+        self.quiet = False
 
         self._print_separator("=")
         print(f"\n{Colors.HEADER}Parallel generation complete!{Colors.ENDC}")
-        print(f"  Succeeded: {all_results['success']}/{num_questions}")
-        print(f"  Failed: {all_results['failed']}/{num_questions}")
+        print(f"  Succeeded: {progress['success']}/{num_questions}")
+        print(f"  Failed: {progress['failed']}/{num_questions}")
         print(
             f"  {Colors.DIM}Total tokens: {self.total_tokens['input']:,} in, {self.total_tokens['output']:,} out{Colors.ENDC}"
         )
@@ -901,7 +921,7 @@ def main():
         default=Path(__file__).parent / "data" / "generated_questions",
         help="Output directory for generated questions (will create timestamped subdirectory)",
     )
-    parser.add_argument("--model", type=str, default="claude-sonnet-4-20250514", help="Claude model to use")
+    parser.add_argument("--model", type=str, default="claude-opus-4-5-20251101", help="Claude model to use")
     parser.add_argument(
         "--question-type",
         type=str,
