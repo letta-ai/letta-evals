@@ -163,9 +163,18 @@ class RegisterQuestionTool:
 
         # Check answer is not a negation/absence
         negation_phrases = [
-            "does not own", "do not own", "doesn't own", "don't own",
-            "no record", "no pets", "no vehicles", "no bank", "no credit",
-            "no insurance", "not found", "none",
+            "does not own",
+            "do not own",
+            "doesn't own",
+            "don't own",
+            "no record",
+            "no pets",
+            "no vehicles",
+            "no bank",
+            "no credit",
+            "no insurance",
+            "not found",
+            "none",
         ]
         answer_lower = answer.lower().strip()
         if any(phrase in answer_lower for phrase in negation_phrases):
@@ -177,8 +186,13 @@ class RegisterQuestionTool:
 
         # Check valid question type
         valid_types = [
-            "multi_hop_chain", "aggregation", "set_intersection", "negation",
-            "comparison_tiebreak", "multi_entity_comparison", "cross_file_counting",
+            "multi_hop_chain",
+            "aggregation",
+            "set_intersection",
+            "negation",
+            "comparison_tiebreak",
+            "multi_entity_comparison",
+            "cross_file_counting",
             "temporal_reasoning",
         ]
         if question_type not in valid_types:

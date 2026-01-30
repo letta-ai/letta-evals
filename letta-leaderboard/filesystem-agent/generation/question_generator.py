@@ -32,7 +32,9 @@ load_dotenv()
 
 
 class QuestionGeneratorAgent(DisplayMixin, ContextMixin, ParallelMixin):
-    def __init__(self, db_path: Path, output_path: Path, model: str = None, config: Dict[str, Any] = None, quiet: bool = False):
+    def __init__(
+        self, db_path: Path, output_path: Path, model: str = None, config: Dict[str, Any] = None, quiet: bool = False
+    ):
         self.db_path = db_path
         self.output_path = output_path
         self.quiet = quiet
@@ -97,9 +99,7 @@ class QuestionGeneratorAgent(DisplayMixin, ContextMixin, ParallelMixin):
         print(
             f"{Colors.DIM}Database loaded: {len(db_overview['statistics'])} tables, {total_rows:,} total rows{Colors.ENDC}"
         )
-        print(
-            f"{Colors.DIM}Question types loaded: {list(self.type_prompts.keys())}{Colors.ENDC}"
-        )
+        print(f"{Colors.DIM}Question types loaded: {list(self.type_prompts.keys())}{Colors.ENDC}")
 
         # Track token usage
         self.total_tokens = {"input": 0, "output": 0}
@@ -523,7 +523,9 @@ class QuestionGeneratorAgent(DisplayMixin, ContextMixin, ParallelMixin):
             existing_questions = self.get_existing_questions()
             current_type = type_schedule[question_num]
 
-            print(f"\n{Colors.BOLD}Generating question {question_num + 1}/{num_questions} [{current_type}]{Colors.ENDC}")
+            print(
+                f"\n{Colors.BOLD}Generating question {question_num + 1}/{num_questions} [{current_type}]{Colors.ENDC}"
+            )
             print(f"   {Colors.DIM}Existing questions in corpus: {len(existing_questions)}{Colors.ENDC}")
             self._print_separator()
 
@@ -601,8 +603,13 @@ def main():
         type=str,
         default=None,
         choices=[
-            "multi_hop_chain", "aggregation", "set_intersection", "negation",
-            "comparison_tiebreak", "multi_entity_comparison", "cross_file_counting",
+            "multi_hop_chain",
+            "aggregation",
+            "set_intersection",
+            "negation",
+            "comparison_tiebreak",
+            "multi_entity_comparison",
+            "cross_file_counting",
             "temporal_reasoning",
         ],
         help="Generate all questions of this specific type (default: use distribution from config)",

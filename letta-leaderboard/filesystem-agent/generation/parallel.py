@@ -1,9 +1,8 @@
 """Parallel question generation with progress bars."""
 
 import threading
-from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from display import Colors
 
@@ -48,10 +47,7 @@ class ParallelMixin:
         # Thread-safe progress state
         progress_lock = threading.Lock()
         progress = {"success": 0, "failed": 0}
-        type_progress = {
-            qtype: {"done": 0, "ok": 0, "fail": 0, "total": count}
-            for qtype, count in type_counts.items()
-        }
+        type_progress = {qtype: {"done": 0, "ok": 0, "fail": 0, "total": count} for qtype, count in type_counts.items()}
 
         max_name_len = max(len(name) for name in type_counts)
 
@@ -87,7 +83,9 @@ class ParallelMixin:
 
             total_done = progress["success"] + progress["failed"]
             lines.append("")  # blank line
-            lines.append(f"  Total: {total_done}/{num_questions} ({progress['success']} ok, {progress['failed']} failed)")
+            lines.append(
+                f"  Total: {total_done}/{num_questions} ({progress['success']} ok, {progress['failed']} failed)"
+            )
 
             # Move cursor up by render_height, clear to end of screen, print
             output = "\n".join(lines)
@@ -105,8 +103,11 @@ class ParallelMixin:
             for i in range(count):
                 existing_questions = self.get_existing_questions()
                 success, _ = self.generate_single_question(
-                    i + 1, count, existing_questions,
-                    max_iterations=max_iterations, question_type=qtype,
+                    i + 1,
+                    count,
+                    existing_questions,
+                    max_iterations=max_iterations,
+                    question_type=qtype,
                 )
                 with progress_lock:
                     if success:
@@ -132,7 +133,7 @@ class ParallelMixin:
                 qtype = futures[future]
                 try:
                     future.result()
-                except Exception as e:
+                except Exception:
                     with progress_lock:
                         remaining = type_counts[qtype] - type_progress[qtype]["done"]
                         progress["failed"] += remaining
@@ -169,6 +170,6 @@ class ParallelMixin:
             type_counts[most_common] = type_counts.get(most_common, 0) + (num_questions - total)
         elif total > num_questions:
             most_common = max(type_counts, key=type_counts.get)
-            type_counts[most_common] -= (total - num_questions)
+            type_counts[most_common] -= total - num_questions
 
         return type_counts
