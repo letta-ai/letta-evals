@@ -27,13 +27,13 @@ The generator produces 8 question types, each with a dedicated prompt template i
 # Generate 100 questions using the configured type distribution
 python3 question_generator.py \
     --num-questions 100 \
-    --model claude-sonnet-4-20250514 \
+    --model claude-opus-4-5-20251101 \
     --new-run
 
 # Generate with parallel workers (one per question type)
 python3 question_generator.py \
     --num-questions 100 \
-    --parallel 8 \
+    --parallel 15 \
     --new-run
 
 # Generate only a specific question type
