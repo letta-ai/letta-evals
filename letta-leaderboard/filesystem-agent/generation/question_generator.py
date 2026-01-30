@@ -522,7 +522,7 @@ Keep it brief but informative. This summary will help continue the conversation.
                 continue
 
             # Print parallel execution indicator if multiple SQL queries
-            if len(sql_blocks) > 1:
+            if len(sql_blocks) > 1 and not self.quiet:
                 print(f"\n{Colors.CYAN}Executing {len(sql_blocks)} SQL queries in parallel...{Colors.ENDC}")
 
             # Execute SQL queries concurrently if there are multiple
@@ -842,9 +842,55 @@ Keep it brief but informative. This summary will help continue the conversation.
         # Suppress verbose output in parallel mode
         self.quiet = True
 
-        # Thread-safe progress counter
+        # Thread-safe progress state
         progress_lock = threading.Lock()
         progress = {"success": 0, "failed": 0}
+        # Per-type progress: {type_name: {"done": N, "ok": N, "fail": N, "total": N}}
+        type_progress = {qtype: {"done": 0, "ok": 0, "fail": 0, "total": count} for qtype, count in type_counts.items()}
+
+        # Find the longest type name for alignment
+        max_name_len = max(len(name) for name in type_counts)
+
+        def _render_progress():
+            """Render all progress bars to stdout."""
+            lines = []
+            for qtype in type_counts:
+                tp = type_progress[qtype]
+                total = tp["total"]
+                ok = tp["ok"]
+                fail = tp["fail"]
+                done = tp["done"]
+
+                # Build bar: ████░░░░ 3/15
+                bar_width = 20
+                filled = int(bar_width * done / total) if total > 0 else 0
+                bar = "█" * filled + "░" * (bar_width - filled)
+
+                # Color: green if all ok so far, yellow if some failed, dim if not started
+                if done == 0:
+                    color = Colors.DIM
+                elif fail > 0:
+                    color = Colors.YELLOW
+                elif done == total:
+                    color = Colors.GREEN
+                else:
+                    color = Colors.CYAN
+
+                name_padded = qtype.ljust(max_name_len)
+                fail_str = f" ({fail} failed)" if fail > 0 else ""
+                lines.append(f"  {color}{name_padded}  {bar}  {ok}/{total}{fail_str}{Colors.ENDC}")
+
+            total_done = progress["success"] + progress["failed"]
+            lines.append(f"\n  Total: {total_done}/{num_questions} ({progress['success']} ok, {progress['failed']} failed)")
+
+            # Move cursor up and overwrite previous render
+            output = "\n".join(lines)
+            print(f"\033[{len(lines) + 1}A\033[J{output}", flush=True)
+
+        # Print initial empty progress bars
+        num_lines = len(type_counts) + 2  # +1 for total line, +1 for blank
+        print("\n" * num_lines, flush=True)
+        _render_progress()
 
         # Each worker generates all questions for one type, sequentially
         def _generate_type_batch(qtype: str, count: int) -> Dict[str, int]:
@@ -862,15 +908,13 @@ Keep it brief but informative. This summary will help continue the conversation.
                     if success:
                         batch_results["success"] += 1
                         progress["success"] += 1
+                        type_progress[qtype]["ok"] += 1
                     else:
                         batch_results["failed"] += 1
                         progress["failed"] += 1
-                    done = progress["success"] + progress["failed"]
-                    status = "ok" if success else "FAIL"
-                    print(
-                        f"  [{done}/{num_questions}] {qtype} {i+1}/{count} — {status}"
-                        f"  (total: {progress['success']} ok, {progress['failed']} failed)"
-                    )
+                        type_progress[qtype]["fail"] += 1
+                    type_progress[qtype]["done"] += 1
+                    _render_progress()
             return batch_results
 
         # Launch one worker per type, capped at num_workers
@@ -883,14 +927,14 @@ Keep it brief but informative. This summary will help continue the conversation.
             for future in as_completed(futures):
                 qtype = futures[future]
                 try:
-                    batch = future.result()
-                    print(
-                        f"  {Colors.CYAN}[{qtype}] done: "
-                        f"{batch['success']} succeeded, {batch['failed']} failed{Colors.ENDC}"
-                    )
+                    future.result()
                 except Exception as e:
-                    progress["failed"] += type_counts[qtype]
-                    print(f"  {Colors.RED}[{qtype}] batch error: {e}{Colors.ENDC}")
+                    with progress_lock:
+                        remaining = type_counts[qtype] - type_progress[qtype]["done"]
+                        progress["failed"] += remaining
+                        type_progress[qtype]["fail"] += remaining
+                        type_progress[qtype]["done"] = type_counts[qtype]
+                        _render_progress()
 
         self.quiet = False
 
