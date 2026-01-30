@@ -20,6 +20,17 @@ Text files available to the agent:
 - pets.txt: Pet ownership records (species, name, breed)
 - vehicles.txt: Vehicle registrations (make, model, year, license plate)
 
+Example of what the benchmark agent sees in people.txt:
+```
+### pers-0001
+name: John Smith
+date_of_birth: 1985-03-15
+email: john.smith@email.com
+phone: 555-0123
+blood_type: O+
+ssn: 123-45-6789
+```
+
 ## Available Resources
 
 ### Database Overview
@@ -29,6 +40,14 @@ Text files available to the agent:
 {% for table_name, stats in statistics.items() %}
 * {{ table_name }}: {{ stats.row_count }} rows
 {% endfor %}
+
+### Your Tools
+- `execute_sql(query)`: Explore the database to discover patterns and verify answer uniqueness
+  - You can call this tool multiple times in parallel to speed up exploration
+  - Use parallel calls when exploring different aspects of the data simultaneously
+- `register_question(question, sql_queries, answer, ...)`: Submit your final question
+  - This tool must be called ALONE, never in parallel with other tools
+  - Calling this tool ends your session immediately
 
 ## Difficulty Target
 Your questions should achieve approximately **60% success rate** among top AI models. This means:
