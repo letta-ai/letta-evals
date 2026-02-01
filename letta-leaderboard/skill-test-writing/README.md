@@ -51,7 +51,6 @@ parsed/
 skill-test-writing/
 ├── skill_test_code.yaml    # Letta Code agents
 ├── skill_test_cloud.yaml   # Cloud agents
-├── skill_test_debug.yaml   # Debug config (fewer models/samples)
 ├── judge_prompt.md         # Grader rubric
 ├── generate_dataset.py     # Generates data/dataset.jsonl from skills
 ├── results/

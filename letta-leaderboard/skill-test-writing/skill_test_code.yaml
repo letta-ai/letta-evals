@@ -15,18 +15,21 @@ target:
     - anthropic/claude-opus-4-5-20251101
     - anthropic/claude-sonnet-4-5-20250929
     - anthropic/claude-haiku-4-5-20251001
-    # OpenAI
+    # OpenAI (only GPT-5.x models work)
     - openai/gpt-5.2-2025-12-11
     - openai/gpt-5.1-codex
-    - openai/gpt-4.1-2025-04-14
-    - openai/gpt-4.1-nano-2025-04-14
-    # Google
-    - google/gemini-3-flash-preview
+    - openai/gpt-5.1-codex-mini
+    # Google (use shorthand, not google/ prefix)
+    - gemini-3-flash
+    # gemini-3-pro not available in letta CLI
     # Other providers (via openrouter)
     - openrouter/z-ai/glm-4.6
     - openrouter/minimax/minimax-m2
-    - openrouter/moonshotai/kimi-k2-0905
-    - openrouter/openai/gpt-oss-120b
+    - openrouter/deepseek/deepseek-r1
+    - openrouter/deepseek/deepseek-chat
+    - openrouter/meta-llama/llama-3.3-70b-instruct
+    - openrouter/qwen/qwen-2.5-coder-32b-instruct
+    - openrouter/mistralai/mistral-large-2411
 
 graders:
   test_quality:

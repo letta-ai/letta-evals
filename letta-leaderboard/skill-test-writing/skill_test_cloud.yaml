@@ -7,37 +7,29 @@ target:
   base_url: https://api.letta.com/
   agent_script: setup_cloud_agent.py:setup_agent
   model_configs:
-    # Anthropic
+    # Anthropic (all working)
     - claude-4-5-opus
     - claude-4-5-sonnet
     - claude-4-5-haiku
     - claude-4-1-opus
-    # OpenAI
+    # OpenAI (only GPT-5.2 and codex models work)
     - openai-gpt-5.2-medium
     - openai-gpt-5.2-high
     - openai-gpt-5.2-xhigh
-    - openai-gpt-5.1
     - openai-gpt-5.1-codex
     - openai-gpt-5.1-codex-mini
-    - openai-gpt-5
-    - openai-gpt-5-mini
-    - openai-gpt-5-nano
-    - openai-gpt-4.1
-    - openai-gpt-4.1-mini
-    - openai-gpt-4.1-nano
-    # Google
+    # Google (all working)
     - gemini-3-pro
     - gemini-3-flash
     # Other providers
-    - deepseek-reasoner
-    - deepseek-chat
-    - openrouter-kimi-k2-0905
-    - openrouter-deepseek-v3.1
     - openrouter-glm-4.6
     - openrouter-minimax-m2
+    - deepseek-chat
+    - deepseek-reasoner
+    - openrouter-deepseek-v3.1
     - openrouter-mistral-large-3
-    - together-gpt-oss-120b
-    - together-gpt-oss-20b
+    - together-llama-3-3-70b
+    - together-qwen-2-5-72b
 
 graders:
   test_quality:
