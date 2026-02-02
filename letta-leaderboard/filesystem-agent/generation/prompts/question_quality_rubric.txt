@@ -1,73 +1,77 @@
 ## QUALITY RUBRIC FOR FILE NAVIGATION BENCHMARK
 
-### 1. COMPLEXITY TIERS
+### 1. THE PARALLELIZATION TEST (MOST IMPORTANT)
+
+Before accepting ANY question, ask: "Can the agent run all conditions as independent greps and intersect?"
+
+- **REJECT if parallelizable**:
+  - "Who has a Mastercard, owns a dog, and lives in Texas?"
+    → All 3 conditions can be grepped independently
+  - "Among people with O+ blood who own dogs, who has the highest salary?"
+    → Both filters (O+ blood, owns dogs) are parallel greps
+  - Any question where ALL conditions can be evaluated independently
+
+- **ACCEPT if truly sequential**:
+  - Step N's output is step N+1's query INPUT
+  - You cannot write the next grep until the previous completes
+  - At least one step involves an INDIRECT RELATIONSHIP
+
+### 2. INDIRECT RELATIONSHIPS (REQUIRED)
+
+Questions must include at least one relationship that cannot be grepped directly:
+
+- **Coworker**: same employer (must find employer first)
+- **Neighbor/Same city**: must find the city first, then find others
+- **Financial peer**: same bank (must find bank first)
+- **Same state**: must find state first, then find others
+
+Examples:
+- GOOD: "What pet does the COWORKER of person X own?"
+- BAD: "What pet does person X own?" (direct lookup)
+
+### 3. COMPLEXITY TIERS
 
 - **Too Easy (REJECT)**:
-  - 1-2 file lookups
-  - Can be solved with 1-2 grep commands
-  - Simple "find person by X, look up Y" chains
-  - Example: "What is the name of person with ID pers-0001?"
-  - Example: "What pet does the person with plate XYZ own?" (just 2 hops)
+  - Parallelizable conditions
+  - Direct ID lookups only (no derived relationships)
+  - 1-3 file lookups
+  - Example: "What pet does the person with plate XYZ own?" (2 hops, direct)
 
-- **Medium (ACCEPT)**:
-  - 3 file lookups with a clear chain
-  - Requires at least one non-trivial step (filtering, comparing within a small group)
-  - Example: "What job does the person with the earliest expiring Visa card have?"
-  - Example: "Among the 4 employees at X Corp, who owns the most vehicles?"
+- **Medium (ACCEPT with caution)**:
+  - 4 file lookups with sequential dependencies
+  - One indirect relationship
+  - Example: "What is the employer of the coworker of the person with plate XYZ?"
 
 - **Hard (ACCEPT, PREFERRED)**:
-  - 4-5 file lookups
-  - Requires reasoning: aggregation, comparison, set intersection, negation, or temporal logic
-  - Example: "What is the total bank balance of the person who owns plate XYZ and has a Mastercard?"
-  - Example: "Among people with O+ blood who own dogs, who has the highest salary? If tied, who is oldest?"
-  - Example: "Between the owner of plate ABC and the person with SSN ending 789, who has more pets?"
+  - 4-5 file lookups with true sequential dependencies
+  - Multiple indirect relationships or chain-defined groups
+  - Example: "Among people who work at the same company as the owner of plate XYZ, who has the highest bank balance?"
+  - Example: "What pet does the newest employee at the company where the owner of dog 'Buddy' works own?"
 
-### 2. ANSWER QUALITY
+### 4. ANSWER QUALITY
 
 - **REJECT if answer is**:
   - A negation: "does not own", "None", "no record found"
-  - Ambiguous: person has multiple matching records (2 dogs, 2 jobs)
-  - A list without clear ordering: "Dog and Cat" (which one?)
+  - Ambiguous: person has multiple matching records
+  - A list without clear ordering
 
 - **ACCEPT if answer is**:
   - A specific name: "John Smith"
-  - A specific number: "$145,315.33", "4 vehicles", "3"
+  - A specific number: "$145,315.33", "4 vehicles"
   - A specific date: "2025-06-19"
-  - A specific identifier: "prg-64550245"
 
-### 3. GREP-ABILITY
+### 5. GROUP SIZE FOR COMPARISONS
 
-- **Not Feasible (REJECT)**:
-  - Requires scanning ALL 500 people
-  - Needs exact counting across hundreds of records
-  - Complex math that grep cannot approximate
-  - Example: "What is the average bank balance across all people?"
+- Groups defined by chains (coworkers, same-city residents) should be 5-15 people
+- Too small (3) = trivial enumeration
+- Too large (50+) = not feasible with grep
 
-- **Feasible (ACCEPT)**:
-  - Starts with a specific identifier or small group (3-15 people)
-  - Each step narrows candidates using grep-able patterns
-  - Counting within a group of 3-10 records
-  - Example: "Among the 5 employees at X Corp, who has the most credit cards?"
-
-### 4. AMBIGUITY CHECK
-
-- **REJECT if**:
-  - Question asks about "the dog" but person has multiple dogs
-  - Question asks about "the job title" but person has 2 jobs
-  - Multiple people could be the correct answer
-  - The filtering conditions don't narrow to exactly 1 person
-
-- **ACCEPT if**:
-  - Question specifies which record: "the oldest vehicle", "the highest-balance account"
-  - Person has exactly 1 of the asked-about record type
-  - Exactly 1 person satisfies all conditions
-
-### 5. EVALUATION APPROACH
+### 6. EVALUATION CHECKLIST
 
 For each question:
-1. Read the question, SQL queries, and answer carefully
-2. Verify the answer is unique (exactly 1 correct answer)
-3. Check ambiguity (no multi-record confusion)
-4. Verify minimum 3 files are required
-5. Assess difficulty tier (prefer Hard over Medium)
-6. Ensure the answer is a concrete value, not a negation
+1. **Parallelization test**: Can all conditions be grepped independently? → REJECT
+2. **Sequential test**: Write out the steps. Does step N+1 require step N's result? → GOOD
+3. **Indirect relationship**: Is there at least one derived relationship? → REQUIRED
+4. **Uniqueness**: Does verification_query return exactly 1 row? → REQUIRED
+5. **File count**: Are 4-5 files truly required (not just touched)? → REQUIRED
+6. **Concrete answer**: Is it a name/number/date, not a negation? → REQUIRED
