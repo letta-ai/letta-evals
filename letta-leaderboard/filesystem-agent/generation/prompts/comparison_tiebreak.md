@@ -10,22 +10,24 @@ Define a comparison group through a CHAIN (not independent conditions), then fin
 
 ## Examples
 
-**Good (chain-defined group):**
-- "Among people who work at the same company as the owner of vehicle plate 'XYZ-789', who has the highest bank balance? If tied, who is oldest?"
-  - Step 1: vehicles.txt → find owner of plate → `pers-042`
-  - Step 2: employments.txt → find their employer → "Tech Corp"
-  - Step 3: employments.txt → find ALL employees at Tech Corp → [pers-042, pers-055, pers-087, ...]
-  - Step 4: bank_accounts.txt → sum balances per person in that group
-  - Step 5: Find max; if tied → people.txt → compare DOB
+**Good (nested superlatives — multiple comparison steps):**
+- "Among people with the highest bank balance in their state, who has the fewest credit cards? If tied, who is oldest?"
+  - Step 1: addresses.txt + bank_accounts.txt → find highest balance per state → [~50 people, one per state]
+  - Step 2: credit_cards.txt → count cards for each of the 50 → find minimum
+  - Step 3: If tied → people.txt → compare DOB
   
-  The comparison group (Tech Corp employees) comes from a chain.
+  TWO superlative operations: "highest per state" then "fewest among those"
 
-- "Among people who bank at the same institution as the owner of pet 'Whiskers', whose insurance policy expires last? If tied, who has more pets?"
-  - Step 1: pets.txt → find owner of pet Whiskers → `pers-012`
-  - Step 2: bank_accounts.txt → find their bank → "Chase"
-  - Step 3: bank_accounts.txt → find ALL Chase customers → [20 people]
-  - Step 4: insurance_policies.txt → find latest expiry date in that group
-  - Step 5: If tied → pets.txt → count pets
+- "Among the 10 employees with the longest tenure at companies with 5+ employees, who has the most vehicles? If tied, who has the highest salary?"
+  - Step 1: employments.txt → find companies with 5+ employees
+  - Step 2: employments.txt → find longest tenure (earliest start) at each → [N people]
+  - Step 3: Take top 10 by tenure
+  - Step 4: vehicles.txt → count for each of the 10 → find max
+  - Step 5: If tied → compare salaries
+
+**Bad (single comparison):**
+- "Among people at company X, who has the most pets?"
+  - Only ONE comparison step — too easy
 
 **Bad (parallel conditions):**
 - "Among people with O+ blood who own dogs, who has the highest salary?"

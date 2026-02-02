@@ -10,22 +10,31 @@ Find a person through a multi-step chain, THEN aggregate their records. The aggr
 
 ## Examples
 
-**Good (chain → aggregate):**
-- "What is the total bank balance of the person who works at the same company as the owner of the dog named 'Buddy'?"
-  - Step 1: pets.txt → find dog named Buddy → owner is `pers-033`
-  - Step 2: employments.txt → find employer of pers-033 → "Acme Corp"
-  - Step 3: employments.txt → find another employee at Acme Corp → `pers-087`
-  - Step 4: bank_accounts.txt → find ALL accounts for pers-087 → sum balances
+**Good (multi-step aggregation with group selection):**
+- "What is the total bank balance of the employee with the most credit cards at the company where the owner of pet 'Buddy' works?"
+  - Step 1: pets.txt → find owner of Buddy → `pers-033`
+  - Step 2: employments.txt → find employer → "Acme Corp"
+  - Step 3: employments.txt → find ALL Acme Corp employees → [8 people]
+  - Step 4: credit_cards.txt → count cards for EACH of the 8 → find max
+  - Step 5: bank_accounts.txt → sum balances for the winner
   
-  The aggregation target (pers-087) comes from a chain, not directly given.
+  TWO aggregations: first "most credit cards among 8", then "sum balances"
 
-- "How many total insurance policies do the employees of the company where the owner of pet 'Fluffy' works have combined?"
-  - Step 1: pets.txt → find owner of pet Fluffy → `pers-012`
-  - Step 2: employments.txt → find their employer → "Tech Inc"
-  - Step 3: employments.txt → find ALL employees at Tech Inc → [5 person IDs]
-  - Step 4: insurance_policies.txt → count policies for each → sum
+- "What is the combined salary of the 3 highest-paid employees at companies with more than 10 employees?"
+  - Step 1: employments.txt → count employees per company → filter to >10 employees
+  - Step 2: employments.txt → for those companies, find top 3 salaries
+  - Step 3: Sum the 3 salaries
+  
+  Nested aggregation: filter companies, then rank employees, then sum.
 
-  Aggregation across a GROUP found through a chain.
+- "What is the average vehicle age for people who have the highest bank balance in their city?"
+  - Step 1: addresses.txt + bank_accounts.txt → find highest balance per city → [~50 people]
+  - Step 2: vehicles.txt → get vehicle years for each of the 50
+  - Step 3: Calculate average (current year - vehicle year)
+
+**Bad (simple aggregation):**
+- "What is the total balance of person X?"
+  - Just one SUM, no intermediate selection step
 
 AVOID SSN in questions (triggers safety refusals). Use license plates, usernames, pet names instead.
 
@@ -36,10 +45,18 @@ AVOID SSN in questions (triggers safety refusals). Use license plates, usernames
 
 ## Constraints
 - Minimum 4 files required
-- The person/group to aggregate MUST be found through a 2+ hop chain
-- The person should have 3+ records in the aggregated file
+- Must include TWO aggregation steps (not just "find person → sum their records"):
+  - First: select from a group (e.g., "most credit cards among N employees")
+  - Second: aggregate the selected person's records (e.g., "sum their balances")
+- The intermediate group should have 5-15 candidates to compare
 - Answer must be a specific number (formatted: "$145,315.33" or "7 policies")
 - Verify by running SQL: if missing one record changes the answer by >10%, it's a good question
+
+## Key Difficulty Requirement
+Questions must have a SELECTION step before the final aggregation:
+- "What is the total X of the person with the most Y among Z?"
+- "What is the combined A of the top 3 B at company C?"
+Single-step aggregations (just summing one person's records) are too easy.
 
 ## Common Pitfalls
 - Person is directly identified (no chain)

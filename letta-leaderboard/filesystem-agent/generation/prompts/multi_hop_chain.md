@@ -10,23 +10,27 @@ Create a chain where **each step's output is the next step's query input**. The 
 
 ## Examples
 
-**Good (true sequential):**
-- "What is the insurance provider of the newest employee at the company where the owner of license plate '999-KUZJ' works?"
-  - Step 1: vehicles.txt → find owner of plate '999-KUZJ' → get `pers-042`
-  - Step 2: employments.txt → find employer of pers-042 → get "Acme Corp"
-  - Step 3: employments.txt → find ALL employees at "Acme Corp" → get list [pers-042, pers-087, ...]
-  - Step 4: employments.txt → find who started most recently → get `pers-087`
-  - Step 5: insurance_policies.txt → find pers-087's insurer
+**Good (multi-candidate intermediate steps):**
+- "What is the insurance provider of the employee with the most credit cards at the company where the owner of plate '999-KUZJ' works?"
+  - Step 1: vehicles.txt → find owner of plate → `pers-042`
+  - Step 2: employments.txt → find employer of pers-042 → "Acme Corp"
+  - Step 3: employments.txt → find ALL employees at Acme Corp → [pers-042, pers-055, pers-087, pers-099, pers-112] (5 people)
+  - Step 4: credit_cards.txt → count cards for EACH of the 5 → find max
+  - Step 5: insurance_policies.txt → get winner's insurer
   
-  You cannot write step 3's query until step 2 returns the employer name.
+  Step 3 returns MULTIPLE candidates. Step 4 must compare all of them.
 
-- "What pet does the coworker of Morgan Hunter own? (Morgan works at a company with exactly 2 employees)"
-  - Step 1: people.txt → find Morgan Hunter → get `pers-007`
-  - Step 2: employments.txt → find employer of pers-007 → get "Small Corp"
-  - Step 3: employments.txt → find OTHER employees at "Small Corp" → get `pers-099`
-  - Step 4: pets.txt → find pers-099's pet
+- "Among the coworkers of the owner of pet 'Buddy', who has the highest bank balance? What is their employer's name?"
+  - Step 1: pets.txt → find owner of Buddy → `pers-045`
+  - Step 2: employments.txt → find employer → "Tech Inc"
+  - Step 3: employments.txt → find ALL Tech Inc employees → [6 people]
+  - Step 4: bank_accounts.txt → sum balances for EACH of the 6 → find max
+  - Step 5: Return winner's employer (Tech Inc, but model must verify)
 
-  "Coworker" is an indirect relationship — not a field you can grep.
+**Bad (single candidate per step):**
+- "What pet does the coworker of Morgan Hunter own?"
+  - If Morgan's company has only 2 employees, there's only 1 coworker
+  - No comparison needed, model just follows breadcrumbs
 
 **Bad (parallelizable):**
 - "Who has a Mastercard, owns a rabbit, and lives in Texas?"
@@ -34,12 +38,19 @@ Create a chain where **each step's output is the next step's query input**. The 
   - No step depends on another step's output
 
 ## Constraints
-- Minimum 4 files, 4-5 hops
+- Minimum 4 files, 5-6 hops
+- At least ONE hop must return MULTIPLE candidates (5-15 people) that require comparison
 - At least ONE hop must involve an indirect relationship (coworker, same employer, same city, same bank)
 - The query for step N+1 must be impossible to write without step N's result
 - Start with a unique identifier (plate, username, pet name, email)
 - Verify the final answer is unique
 - AVOID SSN (triggers safety refusals) and "neighbor" (ambiguous)
+
+## Key Difficulty Requirement
+The chain must have a step where the model must COMPARE multiple candidates:
+- "Among the N employees at company X, find who has the most Y"
+- "Among people in city Z, find who has the highest balance"
+This is where models fail — they can follow single-candidate chains but mess up multi-candidate comparisons.
 
 ## Common Pitfalls
 - Making all conditions independent (parallelizable)

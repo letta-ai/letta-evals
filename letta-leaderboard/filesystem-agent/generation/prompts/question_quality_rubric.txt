@@ -33,20 +33,23 @@ Examples:
 
 - **Too Easy (REJECT)**:
   - Parallelizable conditions
-  - Direct ID lookups only (no derived relationships)
-  - 1-3 file lookups
+  - Single candidate at each step (just following breadcrumbs)
+  - Single aggregation (just "sum person X's records")
   - Example: "What pet does the person with plate XYZ own?" (2 hops, direct)
+  - Example: "What is the total balance of the coworker of person X?" (only 1 coworker)
 
 - **Medium (ACCEPT with caution)**:
-  - 4 file lookups with sequential dependencies
-  - One indirect relationship
-  - Example: "What is the employer of the coworker of the person with plate XYZ?"
+  - 4-5 file lookups with sequential dependencies
+  - One step with multiple candidates requiring comparison
+  - Example: "Among the 5 employees at company X, who has the most pets?"
 
 - **Hard (ACCEPT, PREFERRED)**:
-  - 4-5 file lookups with true sequential dependencies
-  - Multiple indirect relationships or chain-defined groups
-  - Example: "Among people who work at the same company as the owner of plate XYZ, who has the highest bank balance?"
-  - Example: "What pet does the newest employee at the company where the owner of dog 'Buddy' works own?"
+  - 5-6 file lookups with multiple comparison/aggregation steps
+  - Intermediate steps return 5-15 candidates that must be compared
+  - Nested superlatives: "Among people with the highest X, who has the lowest Y?"
+  - Aggregate-then-filter: "Among the top 10 by X, who matches condition Y?"
+  - Conditional chains: "If X > Y, return A. Otherwise, return B."
+  - Example: "What is the total balance of the person with the most credit cards among employees at the company where the owner of pet 'Buddy' works?"
 
 ### 4. ANSWER QUALITY
 
@@ -86,10 +89,18 @@ This is where models actually fail — they follow the right process but mess up
 
 For each question:
 1. **Parallelization test**: Can all conditions be grepped independently? → REJECT
-2. **Sequential test**: Write out the steps. Does step N+1 require step N's result? → GOOD
-3. **Indirect relationship**: Is there at least one derived relationship (coworker, same city)? → REQUIRED
-4. **Close comparisons**: If comparing values, are the top candidates within 5%? → REQUIRED
-5. **No SSN/neighbor**: Does the question avoid SSN and "neighbor"? → REQUIRED
-6. **Uniqueness**: Does verification_query return exactly 1 row? → REQUIRED
-7. **File count**: Are 4-5 files truly required? → REQUIRED
-8. **Concrete answer**: Is it a name/number/date, not a negation? → REQUIRED
+2. **Multi-candidate test**: Does at least one step return 5+ candidates that must be compared? → REQUIRED
+3. **Sequential test**: Write out the steps. Does step N+1 require step N's result? → GOOD
+4. **Indirect relationship**: Is there at least one derived relationship (coworker, same city)? → REQUIRED
+5. **Close comparisons**: If comparing values, are the top candidates within 5%? → REQUIRED
+6. **No SSN/neighbor**: Does the question avoid SSN and "neighbor"? → REQUIRED
+7. **Uniqueness**: Does verification_query return exactly 1 row? → REQUIRED
+8. **File count**: Are 5-6 files truly required? → REQUIRED
+9. **Concrete answer**: Is it a name/number/date, not a negation? → REQUIRED
+
+### 9. ADVANCED PATTERNS (at least one required)
+
+- **Nested superlatives**: Multiple max/min operations (e.g., "highest among those with lowest")
+- **Aggregate-then-filter**: Large set first (top N), then filter by condition
+- **Conditional chains**: Different answer branches based on comparison result
+- **Multi-step aggregation**: Select from group, THEN aggregate selected person's records

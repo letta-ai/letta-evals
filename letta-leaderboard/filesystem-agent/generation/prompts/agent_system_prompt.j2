@@ -37,7 +37,31 @@ Questions with comparisons should have CLOSE VALUES so small errors matter:
 - Dates within days/weeks of each other
 - Counts that differ by only 1-2
 
-This is where models actually fail — they can follow the process but mess up close comparisons.
+## Multi-Candidate Steps (KEY TO DIFFICULTY)
+The hardest questions have **multiple candidates at intermediate steps**, not just 1:
+
+**Too easy (single candidate per step):**
+"Find owner of plate XYZ → pers-042 → get their employer"
+- Each step has exactly 1 answer, model just follows breadcrumbs
+
+**Hard (multiple candidates, must rank/filter):**
+"Among the 5 employees at 'Martinez LLC', find who has the most credit cards, then get their insurance provider"
+- Step 1 returns 5 people, model must compare all 5
+- More room for counting/comparison errors
+
+## Advanced Patterns (USE THESE!)
+
+1. **Nested superlatives**: 
+   "Among people with the highest bank balance in their city, who has the fewest pets?"
+   - Multiple max/min operations that compound errors
+
+2. **Aggregate-then-filter**:
+   "Among the 10 people with the most vehicles, who lives in the same state as the owner of pet 'Buddy'?"
+   - Large intermediate set (top 10), then filter
+
+3. **Conditional chains**:
+   "If the owner of plate 'ABC-123' has more pets than vehicles, what is their employer? Otherwise, what is their insurance provider?"
+   - Model must evaluate condition AND follow correct branch
 
 ## Identifier Guidelines
 AVOID using SSN in questions — it triggers safety refusals in some models.

@@ -10,23 +10,25 @@ Find people who match a condition that ITSELF requires a chain to define. The "s
 
 ## Examples
 
-**Good (set defined by chain):**
-- "Among the pet owners who live in the same state as the owner of vehicle with plate 'XYZ-789', who owns the oldest pet?"
-  - Step 1: vehicles.txt → find owner of plate XYZ-789 → `pers-042`
-  - Step 2: addresses.txt → find their state → "Texas"
-  - Step 3: addresses.txt → find ALL people in Texas → [50 person IDs]
-  - Step 4: pets.txt → filter to those who own pets → [12 person IDs]
-  - Step 5: pets.txt → among those, find oldest pet → owner is `pers-087`
-  - Step 6: people.txt → get name
+**Good (aggregate-then-filter — large intermediate set):**
+- "Among the 15 people with the highest total bank balance, who lives in the same state as the owner of pet 'Buddy'?"
+  - Step 1: bank_accounts.txt → sum balance per person for ALL 500 people
+  - Step 2: Rank and take top 15
+  - Step 3: pets.txt → find owner of Buddy → `pers-045`
+  - Step 4: addresses.txt → find Buddy owner's state → "California"
+  - Step 5: addresses.txt → filter the 15 to those in California → should be 1
 
-  The candidate set (Texas residents) cannot be defined until steps 1-2 complete.
+  Model must rank 500 people FIRST, then filter. Large intermediate set = more error-prone.
 
-- "Among people who bank at the same institution as the owner of vehicle plate 'ABC-123', who has the highest total balance?"
-  - Step 1: vehicles.txt → find owner of plate → `pers-055`
-  - Step 2: bank_accounts.txt → find their bank → "Chase"
-  - Step 3: bank_accounts.txt → find ALL Chase customers → [30 person IDs]
-  - Step 4: bank_accounts.txt → sum balance per person → find max
-  - Step 5: people.txt → get name
+- "Among people who own more than 3 vehicles, who works at the same company as the owner of the cat named 'Whiskers'?"
+  - Step 1: vehicles.txt → count per person → filter to those with >3 → [~20 people]
+  - Step 2: pets.txt → find owner of Whiskers → `pers-033`
+  - Step 3: employments.txt → find their employer → "Acme Corp"
+  - Step 4: employments.txt → filter the 20 to Acme Corp employees → should be 1
+
+**Bad (small intermediate set):**
+- "Among people in Texas who own dogs, who has the highest balance?"
+  - Both conditions are simple greps, no aggregation needed first
 
 **Bad (parallel greps):**
 - "Who has a Mastercard, owns a rabbit, has O+ blood, and lives in Texas?"
@@ -35,10 +37,17 @@ Find people who match a condition that ITSELF requires a chain to define. The "s
 
 ## Constraints
 - Minimum 4 files required
-- The candidate SET must be defined through a chain (same state as X, same employer as Y, same bank as Z)
-- The filtering criterion must also span multiple files
-- Verify intermediate set sizes: the "same X as person Y" group should be 10-50 people
+- Use AGGREGATE-THEN-FILTER pattern: first create a large set (top N by some metric), then filter
+- The initial aggregation should rank/filter across many people (50+)
+- The intermediate set should be 10-20 people before final filtering
 - Final answer must be exactly 1 person
+
+## Key Difficulty Requirement
+The first step should be an AGGREGATION across many records:
+- "Among the 15 people with the highest X..."
+- "Among people who own more than 3 Y..."
+- "Among people whose total Z exceeds $50,000..."
+This forces the model to aggregate/rank before filtering, creating more room for error.
 
 ## Common Pitfalls
 - All conditions are independent (no chain defines the set)
