@@ -1,38 +1,45 @@
-# Question Type: Comparison with Tiebreak
+# Question Type: Comparison with Tiebreak (Chain-Defined Group)
 
 ## Pattern
-Among a filtered group of people, find who has the highest/lowest value for some attribute. Include a tiebreak criterion in case multiple people share the top value.
+Define a comparison group through a CHAIN (not independent conditions), then find the max/min with a tiebreak.
 
 ## What makes this HARD
-- The agent must compare values across multiple people
-- Tiebreak adds a second dimension of comparison
-- Requires careful reading of multiple records and numerical/date comparison
+- The comparison group is defined by a chain: "people who work at the same company as X", "people who live in the same city as Y"
+- Cannot parallelize: must find X first, then their company, then coworkers
+- Tiebreak forces checking secondary criterion even when there's a clear winner
 
 ## Examples
 
-**Good (4-5 files):**
-- "Among the people with O+ blood type who own dogs, who has the highest total bank balance? If tied, who is oldest?"
-  - medical_records.txt -> O+ blood type people
-  - pets.txt -> filter to dog owners
-  - bank_accounts.txt -> sum balances per person
-  - people.txt -> get DOB for tiebreak
+**Good (chain-defined group):**
+- "Among people who work at the same company as the owner of vehicle plate 'XYZ-789', who has the highest bank balance? If tied, who is oldest?"
+  - Step 1: vehicles.txt → find owner of plate → `pers-042`
+  - Step 2: employments.txt → find their employer → "Tech Corp"
+  - Step 3: employments.txt → find ALL employees at Tech Corp → [pers-042, pers-055, pers-087, ...]
+  - Step 4: bank_accounts.txt → sum balances per person in that group
+  - Step 5: Find max; if tied → people.txt → compare DOB
+  
+  The comparison group (Tech Corp employees) comes from a chain.
 
-- "Among people who work as engineers and have a Visa card, whose insurance policy expires last? If tied, who has the most pets?"
-  - employments.txt -> engineers
-  - credit_cards.txt -> Visa holders
-  - insurance_policies.txt -> latest expiry
-  - pets.txt -> count pets for tiebreak
+- "Among people who bank at the same institution as the person with SSN ending '9999', whose insurance policy expires last? If tied, who has more pets?"
+  - Step 1: medical_records.txt → find person with SSN ending 9999 → `pers-012`
+  - Step 2: bank_accounts.txt → find their bank → "Chase"
+  - Step 3: bank_accounts.txt → find ALL Chase customers → [20 people]
+  - Step 4: insurance_policies.txt → find latest expiry date in that group
+  - Step 5: If tied → pets.txt → count pets
+
+**Bad (parallel conditions):**
+- "Among people with O+ blood who own dogs, who has the highest salary?"
+  - Both conditions (O+ blood, owns dogs) can be grepped in parallel
+  - No chain defines the group
 
 ## Constraints
 - Minimum 4 files required
-- The filtering step should produce a group of 3-8 people
-- The comparison attribute must be quantitative (balance, date, count)
-- Include a clear tiebreak: "If tied, who has [second criterion]?"
-- Verify there IS actually a unique winner (with or without tiebreak)
-- The answer is a person's name
+- The group MUST be defined by a chain: "same X as person Y"
+- Group size should be 5-15 people (verify with SQL)
+- Primary comparison should be close (within 20% of each other) to make tiebreak realistic
+- Always include tiebreak even if not needed — forces agent to verify
 
 ## Common Pitfalls
-- Group too large (15+ people makes comparison infeasible with grep)
-- No tiebreak needed (clear winner) — still include it for difficulty, it forces the agent to check
-- The tiebreak itself is tied (must verify uniqueness through both levels)
-- Comparing non-numeric fields
+- Group defined by independent conditions (parallelizable)
+- Clear winner (tiebreak never matters)
+- Group too small (3 people) or too large (50+ people)

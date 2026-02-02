@@ -1,38 +1,46 @@
-# Question Type: Set Intersection
+# Question Type: Set Intersection (Through Sequential Chain)
 
 ## Pattern
-Find a person (or people) who satisfy conditions across multiple independent files simultaneously. The agent must search multiple files and intersect the candidate sets.
+Find people who match a condition that ITSELF requires a chain to define. The "set" comes from tracing a relationship, not a simple grep.
 
-## What makes this HARD
-- Not a linear chain (A -> B -> C). Instead: find set from A, find set from B, find set from C, intersect.
-- The agent must track candidates across files and eliminate non-matches
-- More files = harder intersection
+## What makes this HARD (vs parallel grep + intersect)
+- The set of candidates is defined by a chain, not a simple condition
+- Example: "people who live in the same state as X" requires finding X first, then their state, then others in that state
+- Intermediate results must be tracked across files
 
 ## Examples
 
-**Good (4-5 files):**
-- "Which person has a Mastercard expiring in 2026, owns a pet rabbit, lives in Texas, AND works as an engineer?"
-  - credit_cards.txt -> people with Mastercard expiring 2026
-  - pets.txt -> people who own rabbits
-  - addresses.txt -> people in Texas
-  - employments.txt -> people who are engineers
-  - Intersect all 4 sets -> should be exactly 1 person
+**Good (set defined by chain):**
+- "Among the pet owners who live in the same state as the person with SSN ending '4370', who owns the oldest pet?"
+  - Step 1: medical_records.txt → find person with SSN ending 4370 → `pers-042`
+  - Step 2: addresses.txt → find their state → "Texas"
+  - Step 3: addresses.txt → find ALL people in Texas → [50 person IDs]
+  - Step 4: pets.txt → filter to those who own pets → [12 person IDs]
+  - Step 5: pets.txt → among those, find oldest pet → owner is `pers-087`
+  - Step 6: people.txt → get name
 
-- "Who has both an internet account on smith.com AND a vehicle made by Bailey Inc AND O+ blood type?"
-  - internet_accounts.txt -> smith.com users
-  - vehicles.txt -> Bailey Inc owners
-  - medical_records.txt -> O+ blood type
-  - Intersect -> 1 person
+  The candidate set (Texas residents) cannot be defined until steps 1-2 complete.
+
+- "Among people who bank at the same institution as the owner of vehicle plate 'ABC-123', who has the highest total balance?"
+  - Step 1: vehicles.txt → find owner of plate → `pers-055`
+  - Step 2: bank_accounts.txt → find their bank → "Chase"
+  - Step 3: bank_accounts.txt → find ALL Chase customers → [30 person IDs]
+  - Step 4: bank_accounts.txt → sum balance per person → find max
+  - Step 5: people.txt → get name
+
+**Bad (parallel greps):**
+- "Who has a Mastercard, owns a rabbit, has O+ blood, and lives in Texas?"
+  - All 4 conditions can be grepped independently and intersected
+  - No condition depends on another condition's result
 
 ## Constraints
 - Minimum 4 files required
-- Each condition should independently match 5-30 people (not too broad, not too narrow)
-- The intersection must yield exactly 1 person
-- Verify each individual condition's match count before combining
-- The answer should be the person's name or a specific attribute of theirs
+- The candidate SET must be defined through a chain (same state as X, same employer as Y, same bank as Z)
+- The filtering criterion must also span multiple files
+- Verify intermediate set sizes: the "same X as person Y" group should be 10-50 people
+- Final answer must be exactly 1 person
 
 ## Common Pitfalls
-- One condition already uniquely identifies the person (other conditions are irrelevant)
-- Conditions are too broad (e.g. "has a credit card" matches everyone)
-- Conditions are too narrow (e.g. "born on 1985-03-15" only matches 1 person already)
-- Not verifying the intersection is exactly 1
+- All conditions are independent (no chain defines the set)
+- Set is trivially small (3 people) making it too easy
+- Not tracking intermediate candidates properly

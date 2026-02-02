@@ -1,37 +1,45 @@
-# Question Type: Aggregation
+# Question Type: Aggregation (With Sequential Chain)
 
 ## Pattern
-Find a person through some chain, then compute an aggregate value across their records in another file. The answer is a computed value (total, sum, count), not a simple lookup.
+Find a person through a multi-step chain, THEN aggregate their records. The aggregation target must be discovered through the chain, not given directly.
 
 ## What makes this HARD
-- The agent must find ALL records for a person in a file and aggregate them
-- Requires arithmetic (summing balances, counting records)
-- Easy to miss records if the agent stops searching too early
+- The person to aggregate is found through a chain (not "person with plate X")
+- Aggregation requires finding ALL records and computing correctly
+- Missing one record in the sum changes the answer completely
 
 ## Examples
 
-**Good:**
-- "What is the total bank account balance of the person who owns the vehicle with plate '999-KUZJ'?"
-  - vehicles.txt -> find owner
-  - people.txt -> confirm person
-  - bank_accounts.txt -> find ALL accounts, sum balances
+**Good (chain → aggregate):**
+- "What is the total bank balance of the person who works at the same company as the owner of the dog named 'Buddy'?"
+  - Step 1: pets.txt → find dog named Buddy → owner is `pers-033`
+  - Step 2: employments.txt → find employer of pers-033 → "Acme Corp"
+  - Step 3: employments.txt → find another employee at Acme Corp → `pers-087`
+  - Step 4: bank_accounts.txt → find ALL accounts for pers-087 → sum balances
+  
+  The aggregation target (pers-087) comes from a chain, not directly given.
 
-- "How much total salary does the person with SSN ending in 4567 earn across all their jobs?"
-  - medical_records.txt -> find person by SSN
-  - employments.txt -> find ALL employments, sum salaries
+- "How many total insurance policies do the employees of the company where the person with SSN ending '4567' works have combined?"
+  - Step 1: medical_records.txt → find person with SSN ending 4567 → `pers-012`
+  - Step 2: employments.txt → find their employer → "Tech Inc"
+  - Step 3: employments.txt → find ALL employees at Tech Inc → [5 person IDs]
+  - Step 4: insurance_policies.txt → count policies for each → sum
 
-- "What is the combined credit limit of all credit cards held by the person with internet username 'jdoe' on smith.com?"
-  - internet_accounts.txt -> find person
-  - credit_cards.txt -> find ALL cards, sum limits
+  Aggregation across a GROUP found through a chain.
+
+**Bad (direct aggregation):**
+- "What is the total bank balance of the person with plate 'ABC-123'?"
+  - Only 2 hops: vehicles → bank_accounts
+  - The person is directly identified, no chain needed
 
 ## Constraints
-- Minimum 3 files required
-- The answer MUST be a specific number (e.g. "$145,315.33", "3 accounts")
-- Verify the aggregate by running the SQL yourself
-- The target person must have 2+ records in the aggregated file (otherwise it's just a lookup)
-- Format currency answers with $ and commas
+- Minimum 4 files required
+- The person/group to aggregate MUST be found through a 2+ hop chain
+- The person should have 3+ records in the aggregated file
+- Answer must be a specific number (formatted: "$145,315.33" or "7 policies")
+- Verify by running SQL: if missing one record changes the answer by >10%, it's a good question
 
 ## Common Pitfalls
-- Person only has 1 bank account (not really aggregation)
-- Not summing ALL records (missing one because of a different owner ID format)
-- Ambiguous when person has multiple of the same type and you ask for "the" one
+- Person is directly identified (no chain)
+- Person only has 1-2 records (aggregation is trivial)
+- Chain is optional (could skip to direct lookup)

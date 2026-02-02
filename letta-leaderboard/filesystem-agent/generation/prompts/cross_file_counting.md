@@ -1,39 +1,49 @@
-# Question Type: Cross-File Counting
+# Question Type: Cross-File Counting (Chain-Derived Target)
 
 ## Pattern
-Count records for a person across multiple different files and combine the counts. The answer is a total count spanning different data domains.
+Count records across multiple files for a person/group that is found through a CHAIN, not directly identified.
 
 ## What makes this HARD
-- The agent must search 3+ files for the same person and count records in each
-- Requires addition across file boundaries
-- Easy to miss one file or double-count
+- The counting target is discovered through a multi-hop chain
+- Must count across 3+ different record types
+- Missing one file or one record type changes the answer
 
 ## Examples
 
-**Good (4-5 files):**
-- "How many total financial products (bank accounts + credit cards + insurance policies) does the person with license plate 'XYZ-789' own?"
-  - vehicles.txt -> find person
-  - bank_accounts.txt -> count accounts
-  - credit_cards.txt -> count cards
-  - insurance_policies.txt -> count policies
-  - Sum all counts
+**Good (chain → count):**
+- "How many total items (pets + vehicles + credit cards) does the highest-paid employee at 'Martinez LLC' own?"
+  - Step 1: employments.txt → find Martinez LLC employees → [pers-012, pers-033, pers-055]
+  - Step 2: employments.txt → find highest salary among them → `pers-033`
+  - Step 3: pets.txt → count pets for pers-033 → 2
+  - Step 4: vehicles.txt → count vehicles → 1
+  - Step 5: credit_cards.txt → count cards → 3
+  - Step 6: Sum → 6
 
-- "How many total records (pets + vehicles + internet accounts) does the person with SSN ending 4567 have?"
-  - medical_records.txt -> find person by SSN
-  - pets.txt -> count pets
-  - vehicles.txt -> count vehicles
-  - internet_accounts.txt -> count accounts
-  - Sum all
+  The person to count (pers-033) is found through a 2-hop chain.
+
+- "What is the total number of records (bank accounts + insurance policies + internet accounts) for people who work at the same company as the owner of pet 'Buddy'?"
+  - Step 1: pets.txt → find owner of Buddy → `pers-045`
+  - Step 2: employments.txt → find their employer → "Tech Inc"
+  - Step 3: employments.txt → find ALL Tech Inc employees → [pers-045, pers-087, pers-099]
+  - Step 4: For EACH employee, count across 3 file types
+  - Step 5: Sum all counts
+  
+  Counting across a GROUP found through a chain.
+
+**Bad (direct count):**
+- "How many total items does the person with plate 'XYZ-123' own?"
+  - Person directly identified via plate
+  - No chain required
 
 ## Constraints
-- Minimum 4 files required (1 to identify person + 3 to count across)
+- Minimum 4 files required (1+ to find target, 3+ to count across)
+- Target person/group MUST be found through a chain
 - Count across at least 3 different record types
-- The answer must be a specific number
-- Verify the count by running individual SQL queries for each file
-- The person should have records in ALL counted files (not zero in any)
+- Target should have records in ALL counted files (not zero in any)
+- Answer is a specific number
 
 ## Common Pitfalls
-- Person has 0 records in one of the files (less interesting)
-- Only counting in 1-2 files (not really cross-file)
-- Ambiguous starting identifier
-- Not specifying which record types to count (vague "how many records")
+- Target is directly identified (no chain)
+- Only counting in 1-2 files
+- Person has 0 records in one file (less interesting)
+- Not specifying which record types to count

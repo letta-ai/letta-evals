@@ -1,33 +1,46 @@
-# Question Type: Multi-Hop Chain
+# Question Type: Multi-Hop Chain (TRUE Sequential)
 
 ## Pattern
-Follow a chain of references across 3-4 files. Start with a unique identifier in one file, resolve the person, then look up an attribute in a different file.
+Create a chain where **each step's output is the next step's query input**. The agent CANNOT parallelize these queries — they must complete step N before they can even formulate the query for step N+1.
 
-## What makes this HARD (not a simple 2-hop)
-- Require 3-4 hops minimum, not just "find person -> get attribute"
-- Include a filtering step in the middle of the chain (not just at the start)
-- The answer should require the LAST hop to be non-trivial (e.g. looking up a specific record among multiple)
+## What makes this HARD (vs parallelizable queries)
+- Step N+1's query depends on step N's result (not just the same person ID)
+- Include "indirect relationships" that must be derived: coworker (same employer), neighbor (same city), financial peer (same bank)
+- The chain should be 4-5 hops with at least one hop requiring a derived relationship
 
 ## Examples
 
-**Good (3-4 hops):**
-- "What is the employer of the person whose pet rabbit is named 'Kenneth' and who has a Mastercard expiring in 02/30?"
-  - Hop 1: pets.txt -> find owner of rabbit named Kenneth
-  - Hop 2: credit_cards.txt -> verify they have Mastercard expiring 02/30
-  - Hop 3: employments.txt -> get their employer
+**Good (true sequential):**
+- "What is the insurance provider of the newest employee at the company where the owner of license plate '999-KUZJ' works?"
+  - Step 1: vehicles.txt → find owner of plate '999-KUZJ' → get `pers-042`
+  - Step 2: employments.txt → find employer of pers-042 → get "Acme Corp"
+  - Step 3: employments.txt → find ALL employees at "Acme Corp" → get list [pers-042, pers-087, ...]
+  - Step 4: employments.txt → find who started most recently → get `pers-087`
+  - Step 5: insurance_policies.txt → find pers-087's insurer
+  
+  You cannot write step 3's query until step 2 returns the employer name.
 
-**Bad (too simple, 2 hops):**
-- "What pet does the person with license plate XYZ own?"
-  - Only 2 hops: vehicles -> people -> pets
+- "What pet does the coworker of Morgan Hunter own? (Morgan works at a company with exactly 2 employees)"
+  - Step 1: people.txt → find Morgan Hunter → get `pers-007`
+  - Step 2: employments.txt → find employer of pers-007 → get "Small Corp"
+  - Step 3: employments.txt → find OTHER employees at "Small Corp" → get `pers-099`
+  - Step 4: pets.txt → find pers-099's pet
+
+  "Coworker" is an indirect relationship — not a field you can grep.
+
+**Bad (parallelizable):**
+- "Who has a Mastercard, owns a rabbit, and lives in Texas?"
+  - These are 3 independent greps that can run in parallel and intersect
+  - No step depends on another step's output
 
 ## Constraints
-- Minimum 3 files required
-- Start with a specific, unique identifier (license plate, account number ending, SSN ending, username)
-- Each hop must narrow the candidate set
-- Verify exactly 1 person matches the full chain
-- If asking about pets/employments, ensure the person has exactly 1 of that type (or specify which one)
+- Minimum 4 files, 4-5 hops
+- At least ONE hop must involve an indirect relationship (coworker, same employer, same city, same bank)
+- The query for step N+1 must be impossible to write without step N's result
+- Start with a unique identifier (plate, SSN ending, username)
+- Verify the final answer is unique
 
 ## Common Pitfalls
-- Starting with a condition that matches too many people (e.g. "people with O+ blood type")
-- Only requiring 2 hops and calling it multi-hop
-- Not verifying the answer is unique
+- Making all conditions independent (parallelizable)
+- Only using direct ID lookups (no derived relationships)
+- Chain where you could theoretically skip a step

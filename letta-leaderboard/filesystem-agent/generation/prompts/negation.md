@@ -1,35 +1,47 @@
-# Question Type: Negation / Absence
+# Question Type: Negation / Absence (Chain-Defined Group)
 
 ## Pattern
-Find a person who does NOT have something, among a small, well-defined group. The agent must search a file and confirm the ABSENCE of a record.
+Find a person who does NOT have something, among a group that is DEFINED BY A CHAIN (not a simple grep).
 
 ## What makes this HARD
-- Proving a negative requires exhaustive search within a group
-- The agent must check every member of the group, not just find one match
-- Easy to make false assumptions about absence
+- The group to check is found through a chain: "coworkers of X", "people in the same city as Y"
+- Must enumerate the chain-derived group, then check each for absence
+- Proving a negative requires exhaustive search within the group
 
 ## Examples
 
-**Good:**
-- "Among the 3 employees at Palmer and Sons, who does NOT own any vehicles?"
-  - employments.txt -> find the 3 employees
-  - people.txt -> get their names/IDs
-  - vehicles.txt -> check each person, find who has NO vehicles
+**Good (chain-defined group):**
+- "Among the coworkers of the person with SSN ending '4567', who does NOT own any vehicles?"
+  - Step 1: medical_records.txt → find person with SSN ending 4567 → `pers-012`
+  - Step 2: employments.txt → find their employer → "Acme Corp"
+  - Step 3: employments.txt → find ALL Acme Corp employees → [pers-012, pers-033, pers-055, pers-087]
+  - Step 4: vehicles.txt → check each coworker for vehicles
+  - Step 5: Find the one with NO vehicles
+  
+  The group (coworkers) is derived through a chain, not a simple grep.
 
-- "Which of the 4 people with internet accounts on jones.com does NOT have any insurance policies?"
-  - internet_accounts.txt -> find the 4 people
-  - insurance_policies.txt -> check each, find who has none
+- "Among people who live in the same state as the owner of pet 'Fluffy', who does NOT have any credit cards?"
+  - Step 1: pets.txt → find owner of pet named Fluffy → `pers-045`
+  - Step 2: addresses.txt → find their state → "California"
+  - Step 3: addresses.txt → find people in California → [30 people]
+  - Step 4: credit_cards.txt → filter to those with NO credit cards
+
+  But 30 is too many — narrow further with another condition.
+
+**Bad (simple group):**
+- "Among the 5 people with internet accounts on jones.com, who does NOT own pets?"
+  - Group is a single grep: internet_accounts.txt → jones.com users
+  - No chain required
 
 ## Constraints
 - Minimum 3 files required
-- The group MUST be small (3-6 people). Verify the group size with SQL first.
-- Exactly 1 person in the group should lack the item (verify this!)
-- The answer MUST be a concrete value (the person's name), NOT "no one" or "none"
-- NEVER create questions where the GT answer is "None", "No one", or "does not own X"
-- Frame as "who does NOT have X?" not "does person Y have X?"
+- The group MUST be defined by a chain (coworkers, same city, same bank)
+- Group size: 4-8 people (verify with SQL)
+- Exactly 1 person in the group should lack the item
+- Answer is the person's NAME (never "None" or "no one")
 
 ## Common Pitfalls
-- Group too large (checking 20+ people for absence is infeasible with grep)
-- Multiple people lack the item (ambiguous answer)
-- Everyone in the group has the item (no valid answer)
-- Phrasing the answer as a negation instead of a name
+- Group defined by simple grep (not a chain)
+- Multiple people lack the item (ambiguous)
+- Group too large to enumerate
+- Phrasing answer as negation instead of name
