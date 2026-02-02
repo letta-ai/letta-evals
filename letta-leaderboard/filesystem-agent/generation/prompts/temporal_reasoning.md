@@ -11,8 +11,8 @@ Compare dates across files where the entities/group to compare is found through 
 ## Examples
 
 **Good (chain → temporal comparison):**
-- "Among the coworkers of the person with SSN ending '4567', whose employment started most recently?"
-  - Step 1: medical_records.txt → find person with SSN 4567 → `pers-012`
+- "Among the coworkers of the owner of vehicle plate 'ABC-123', whose employment started most recently?"
+  - Step 1: vehicles.txt → find owner of plate ABC-123 → `pers-012`
   - Step 2: employments.txt → find their employer → "Tech Corp"
   - Step 3: employments.txt → find ALL Tech Corp employees → [5 people]
   - Step 4: employments.txt → compare start_date for each → find most recent
@@ -40,9 +40,12 @@ Compare dates across files where the entities/group to compare is found through 
 ## Constraints
 - Minimum 4 files required
 - The group/entities for comparison MUST come from a chain
-- Dates should be close (within 30 days) to test comparison accuracy
+- **CRITICAL: Dates must be CLOSE** — within days or weeks, not months
+  - Good: 2025-06-14, 2025-06-17, 2025-06-19 (days apart)
+  - Bad: 2024-01-01, 2025-06-01, 2026-12-01 (obvious winner)
 - Answer is a person's name or a specific date
 - Verify with SQL date comparisons
+- AVOID SSN in questions (triggers safety refusals). Use license plates, usernames, pet names instead.
 
 ## Common Pitfalls
 - Group is a simple grep (not chain-derived)

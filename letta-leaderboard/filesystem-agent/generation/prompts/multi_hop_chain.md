@@ -5,7 +5,7 @@ Create a chain where **each step's output is the next step's query input**. The 
 
 ## What makes this HARD (vs parallelizable queries)
 - Step N+1's query depends on step N's result (not just the same person ID)
-- Include "indirect relationships" that must be derived: coworker (same employer), neighbor (same city), financial peer (same bank)
+- Include "indirect relationships" that must be derived: coworker (same employer), same city, same bank
 - The chain should be 4-5 hops with at least one hop requiring a derived relationship
 
 ## Examples
@@ -37,8 +37,9 @@ Create a chain where **each step's output is the next step's query input**. The 
 - Minimum 4 files, 4-5 hops
 - At least ONE hop must involve an indirect relationship (coworker, same employer, same city, same bank)
 - The query for step N+1 must be impossible to write without step N's result
-- Start with a unique identifier (plate, SSN ending, username)
+- Start with a unique identifier (plate, username, pet name, email)
 - Verify the final answer is unique
+- AVOID SSN (triggers safety refusals) and "neighbor" (ambiguous)
 
 ## Common Pitfalls
 - Making all conditions independent (parallelizable)

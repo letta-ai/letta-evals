@@ -66,12 +66,30 @@ Examples:
 - Too small (3) = trivial enumeration
 - Too large (50+) = not feasible with grep
 
-### 6. EVALUATION CHECKLIST
+### 6. CLOSE COMPARISONS (KEY TO DIFFICULTY)
+
+For any comparison question, the top candidates should have CLOSE values:
+- **Bank balances**: within 5% of each other (e.g., $45,000 vs $44,500)
+- **Dates**: within days/weeks (e.g., 2025-06-14 vs 2025-06-17)
+- **Counts**: differ by only 1-2 (e.g., 4 credit cards vs 3 credit cards)
+
+This is where models actually fail — they follow the right process but mess up close comparisons.
+
+### 7. IDENTIFIER GUIDELINES
+
+- **AVOID SSN** — triggers safety refusals in many models
+- **AVOID "neighbor"** — ambiguous, models don't know what it means
+- **PREFER**: license plates, internet usernames, pet names, email addresses, employer names
+- **SAY EXPLICITLY**: "same city" or "same state" instead of "neighbor"
+
+### 8. EVALUATION CHECKLIST
 
 For each question:
 1. **Parallelization test**: Can all conditions be grepped independently? → REJECT
 2. **Sequential test**: Write out the steps. Does step N+1 require step N's result? → GOOD
-3. **Indirect relationship**: Is there at least one derived relationship? → REQUIRED
-4. **Uniqueness**: Does verification_query return exactly 1 row? → REQUIRED
-5. **File count**: Are 4-5 files truly required (not just touched)? → REQUIRED
-6. **Concrete answer**: Is it a name/number/date, not a negation? → REQUIRED
+3. **Indirect relationship**: Is there at least one derived relationship (coworker, same city)? → REQUIRED
+4. **Close comparisons**: If comparing values, are the top candidates within 5%? → REQUIRED
+5. **No SSN/neighbor**: Does the question avoid SSN and "neighbor"? → REQUIRED
+6. **Uniqueness**: Does verification_query return exactly 1 row? → REQUIRED
+7. **File count**: Are 4-5 files truly required? → REQUIRED
+8. **Concrete answer**: Is it a name/number/date, not a negation? → REQUIRED

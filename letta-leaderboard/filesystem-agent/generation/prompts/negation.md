@@ -11,8 +11,8 @@ Find a person who does NOT have something, among a group that is DEFINED BY A CH
 ## Examples
 
 **Good (chain-defined group):**
-- "Among the coworkers of the person with SSN ending '4567', who does NOT own any vehicles?"
-  - Step 1: medical_records.txt → find person with SSN ending 4567 → `pers-012`
+- "Among the coworkers of the owner of vehicle with plate 'ABC-123', who does NOT own any pets?"
+  - Step 1: vehicles.txt → find owner of plate ABC-123 → `pers-012`
   - Step 2: employments.txt → find their employer → "Acme Corp"
   - Step 3: employments.txt → find ALL Acme Corp employees → [pers-012, pers-033, pers-055, pers-087]
   - Step 4: vehicles.txt → check each coworker for vehicles
@@ -45,3 +45,4 @@ Find a person who does NOT have something, among a group that is DEFINED BY A CH
 - Multiple people lack the item (ambiguous)
 - Group too large to enumerate
 - Phrasing answer as negation instead of name
+- Using SSN (triggers safety refusals) or "neighbor" (ambiguous)

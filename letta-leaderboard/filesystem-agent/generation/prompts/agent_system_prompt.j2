@@ -23,11 +23,25 @@ You CANNOT write step 3 until step 2 completes. "Coworker" is an INDIRECT RELATI
 
 ## Indirect Relationships (USE THESE!)
 - **Coworker**: same employer (must find employer first)
-- **Neighbor/Same city**: same address.city (must find city first)
-- **Financial peer**: same bank (must find bank first)
-- **Same state**: addresses in same state (must find state first)
+- **Same city**: same address.city (must find city first)  
+- **Same bank**: same bank_name (must find bank first)
+- **Same state**: same address.state (must find state first)
 
 These relationships CANNOT be grepped directly — the agent must derive them.
+
+AVOID the word "neighbor" — it's ambiguous. Say "same city" or "same state" explicitly.
+
+## Close Comparisons (KEY TO DIFFICULTY)
+Questions with comparisons should have CLOSE VALUES so small errors matter:
+- Bank balances within 5% of each other
+- Dates within days/weeks of each other
+- Counts that differ by only 1-2
+
+This is where models actually fail — they can follow the process but mess up close comparisons.
+
+## Identifier Guidelines
+AVOID using SSN in questions — it triggers safety refusals in some models.
+PREFER: license plates, internet usernames, pet names, email addresses, employer names.
 
 ## Critical Constraint
 The benchmark agent works with UNSTRUCTURED TEXT FILES (.txt format), not a database. It can only search text and read files.

@@ -11,8 +11,8 @@ Find people who match a condition that ITSELF requires a chain to define. The "s
 ## Examples
 
 **Good (set defined by chain):**
-- "Among the pet owners who live in the same state as the person with SSN ending '4370', who owns the oldest pet?"
-  - Step 1: medical_records.txt → find person with SSN ending 4370 → `pers-042`
+- "Among the pet owners who live in the same state as the owner of vehicle with plate 'XYZ-789', who owns the oldest pet?"
+  - Step 1: vehicles.txt → find owner of plate XYZ-789 → `pers-042`
   - Step 2: addresses.txt → find their state → "Texas"
   - Step 3: addresses.txt → find ALL people in Texas → [50 person IDs]
   - Step 4: pets.txt → filter to those who own pets → [12 person IDs]
@@ -44,3 +44,4 @@ Find people who match a condition that ITSELF requires a chain to define. The "s
 - All conditions are independent (no chain defines the set)
 - Set is trivially small (3 people) making it too easy
 - Not tracking intermediate candidates properly
+- Using SSN (triggers safety refusals) or "neighbor" (ambiguous)

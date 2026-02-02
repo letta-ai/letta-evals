@@ -19,13 +19,15 @@ Find a person through a multi-step chain, THEN aggregate their records. The aggr
   
   The aggregation target (pers-087) comes from a chain, not directly given.
 
-- "How many total insurance policies do the employees of the company where the person with SSN ending '4567' works have combined?"
-  - Step 1: medical_records.txt → find person with SSN ending 4567 → `pers-012`
+- "How many total insurance policies do the employees of the company where the owner of pet 'Fluffy' works have combined?"
+  - Step 1: pets.txt → find owner of pet Fluffy → `pers-012`
   - Step 2: employments.txt → find their employer → "Tech Inc"
   - Step 3: employments.txt → find ALL employees at Tech Inc → [5 person IDs]
   - Step 4: insurance_policies.txt → count policies for each → sum
 
   Aggregation across a GROUP found through a chain.
+
+AVOID SSN in questions (triggers safety refusals). Use license plates, usernames, pet names instead.
 
 **Bad (direct aggregation):**
 - "What is the total bank balance of the person with plate 'ABC-123'?"

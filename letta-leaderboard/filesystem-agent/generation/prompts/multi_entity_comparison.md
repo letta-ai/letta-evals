@@ -22,21 +22,24 @@ Two PARALLEL chains that each resolve to a person, then a comparison between the
   - Chain B: pets.txt → find dogs → oldest by age → owner is `pers-055`
   - Compare: credit_cards.txt → count for each → determine winner
 
-- "Who lives in a more expensive state (by their rent/address): the person with username 'jdoe' on gmail.com, or the person with SSN ending '9876'?"
-  - Chain A: internet_accounts.txt → find jdoe → `pers-012` → addresses.txt → get state
-  - Chain B: medical_records.txt → find SSN ending 9876 → `pers-045` → addresses.txt → get state
-  - Compare: (would need external knowledge or derive from data patterns)
+- "Between the owner of the vehicle with plate 'ABC-123' and the owner of the dog named 'Buddy', who has more bank accounts? If tied, who has the higher total balance?"
+  - Chain A: vehicles.txt → find owner of plate → `pers-012` 
+  - Chain B: pets.txt → find owner of dog Buddy → `pers-045`
+  - Compare: bank_accounts.txt → count for each → if tied, sum balances
 
 ## Constraints
 - Minimum 4 files required
 - EACH chain must be 2+ hops (not just "find person with plate X")
 - The two chains must resolve to DIFFERENT people (verify!)
+- **CRITICAL: Comparison values should be CLOSE** — within 1-2 of each other for counts, 5% for amounts
 - Include a tiebreak: "If tied, who [second criterion]?"
 - Design the primary comparison to possibly tie, forcing tiebreak logic
 - Answer is the winning person's name
+- AVOID SSN in questions (triggers safety refusals). Use license plates, usernames, pet names instead.
 
 ## Common Pitfalls
 - One or both chains are single-hop lookups (too easy)
 - Both chains resolve to the same person
-- Comparison has a clear winner (tiebreak never tested)
+- Comparison has a clear winner with large margin (too easy — values should be close)
 - Not verifying the chains are truly independent
+- Using SSN which triggers model refusals

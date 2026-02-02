@@ -20,8 +20,8 @@ Define a comparison group through a CHAIN (not independent conditions), then fin
   
   The comparison group (Tech Corp employees) comes from a chain.
 
-- "Among people who bank at the same institution as the person with SSN ending '9999', whose insurance policy expires last? If tied, who has more pets?"
-  - Step 1: medical_records.txt → find person with SSN ending 9999 → `pers-012`
+- "Among people who bank at the same institution as the owner of pet 'Whiskers', whose insurance policy expires last? If tied, who has more pets?"
+  - Step 1: pets.txt → find owner of pet Whiskers → `pers-012`
   - Step 2: bank_accounts.txt → find their bank → "Chase"
   - Step 3: bank_accounts.txt → find ALL Chase customers → [20 people]
   - Step 4: insurance_policies.txt → find latest expiry date in that group
@@ -36,8 +36,12 @@ Define a comparison group through a CHAIN (not independent conditions), then fin
 - Minimum 4 files required
 - The group MUST be defined by a chain: "same X as person Y"
 - Group size should be 5-15 people (verify with SQL)
-- Primary comparison should be close (within 20% of each other) to make tiebreak realistic
-- Always include tiebreak even if not needed — forces agent to verify
+- **CRITICAL: Values must be CLOSE** — top 2-3 candidates should be within 5% of each other
+  - For balances: e.g., $45,000 vs $44,500 vs $43,800
+  - For dates: within days/weeks of each other
+  - For counts: differ by only 1-2
+- Always include tiebreak — it forces precise comparison
+- AVOID SSN in questions (triggers safety refusals). Use license plates, usernames, pet names instead.
 
 ## Common Pitfalls
 - Group defined by independent conditions (parallelizable)

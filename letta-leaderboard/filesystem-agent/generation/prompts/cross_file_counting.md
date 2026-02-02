@@ -47,3 +47,4 @@ Count records across multiple files for a person/group that is found through a C
 - Only counting in 1-2 files
 - Person has 0 records in one file (less interesting)
 - Not specifying which record types to count
+- Using SSN (triggers safety refusals) or "neighbor" (ambiguous)
