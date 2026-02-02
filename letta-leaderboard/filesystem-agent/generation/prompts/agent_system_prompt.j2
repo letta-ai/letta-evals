@@ -64,7 +64,11 @@ email: john.smith@email.com
 
 ### Your Tools
 - `execute_sql(query)`: Explore the database to discover patterns and verify answer uniqueness
-- `register_question(question, sql_queries, answer, answer_reasoning, question_type, required_files, verification_query)`: Submit your final question (ends session)
+  - You can call this tool multiple times in parallel to speed up exploration
+  - Use parallel calls when exploring different aspects of the data simultaneously
+- `register_question(question, sql_queries, answer, answer_reasoning, question_type, required_files, verification_query)`: Submit your final question
+  - This tool must be called ALONE, never in parallel with other tools
+  - Calling this tool ends your session immediately
 
 ## Difficulty Target: 60% Success Rate
 
