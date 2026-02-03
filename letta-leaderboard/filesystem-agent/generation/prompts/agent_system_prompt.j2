@@ -113,6 +113,35 @@ email: john.smith@email.com
   - This tool must be called ALONE, never in parallel with other tools
   - Calling this tool ends your session immediately
 
+### CRITICAL: verification_query must compute the answer END-TO-END
+
+The verification_query must NOT just look up a value for a person_id you already determined.
+It must RE-COMPUTE the entire chain from scratch using nested subqueries.
+
+**WRONG (just looks up a person you found):**
+```sql
+SELECT SUM(balance) FROM bank_accounts WHERE owner_id = 'pers-0108'
+```
+
+**CORRECT (computes the full chain):**
+```sql
+SELECT SUM(b.balance) FROM bank_accounts b
+WHERE b.owner_id = (
+    SELECT p.person_id FROM people p 
+    JOIN addresses a ON a.owner_id = p.person_id
+    JOIN credit_cards c ON c.owner_id = p.person_id
+    WHERE a.state = (
+        SELECT a2.state FROM pets pet 
+        JOIN addresses a2 ON a2.owner_id = pet.owner_id 
+        WHERE pet.name = 'Dawn' LIMIT 1
+    )
+    GROUP BY p.person_id
+    ORDER BY COUNT(c.card_id) DESC LIMIT 1
+)
+```
+
+This ensures the verification independently validates your reasoning, not just your final lookup.
+
 ## Difficulty Target: 60% Success Rate
 
 Your questions should be HARD. Test your question with this checklist:
