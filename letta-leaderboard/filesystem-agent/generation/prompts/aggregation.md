@@ -10,31 +10,35 @@ Find a person through a multi-step chain, THEN aggregate their records. The aggr
 
 ## Examples
 
-**Good (multi-step aggregation with group selection):**
-- "What is the total bank balance of the employee with the most credit cards at the company where the owner of pet 'Buddy' works?"
+**Good (multi-person aggregation):**
+- "What is the COMBINED bank balance of ALL employees at the company where the owner of pet 'Buddy' works?"
   - Step 1: pets.txt → find owner of Buddy → `pers-033`
   - Step 2: employments.txt → find employer → "Acme Corp"
-  - Step 3: employments.txt → find ALL Acme Corp employees → [8 people]
-  - Step 4: credit_cards.txt → count cards for EACH of the 8 → find max
-  - Step 5: bank_accounts.txt → sum balances for the winner
+  - Step 3: employments.txt → find ALL Acme Corp employees → [pers-033, pers-055, pers-087, pers-099, pers-112] (5 people)
+  - Step 4: bank_accounts.txt → sum balances for EACH of the 5 people
+  - Step 5: Sum all 5 totals together
   
-  TWO aggregations: first "most credit cards among 8", then "sum balances"
+  Miss ONE employee = wrong answer. 5 people × multiple accounts each = lots of room for error.
 
-- "What is the combined salary of the 3 highest-paid employees at companies with more than 10 employees?"
-  - Step 1: employments.txt → count employees per company → filter to >10 employees
-  - Step 2: employments.txt → for those companies, find top 3 salaries
-  - Step 3: Sum the 3 salaries
+- "What is the TOTAL number of vehicles owned by people who live in the same state as the owner of the cat named 'Whiskers'?"
+  - Step 1: pets.txt → find owner of Whiskers → `pers-012`
+  - Step 2: addresses.txt → find their state → "Texas"
+  - Step 3: addresses.txt → find ALL people in Texas → [~30 people]
+  - Step 4: vehicles.txt → count vehicles for EACH of the 30
+  - Step 5: Sum all counts
   
-  Nested aggregation: filter companies, then rank employees, then sum.
+  30 people to check, miss one = wrong total.
 
-- "What is the average vehicle age for people who have the highest bank balance in their city?"
-  - Step 1: addresses.txt + bank_accounts.txt → find highest balance per city → [~50 people]
-  - Step 2: vehicles.txt → get vehicle years for each of the 50
-  - Step 3: Calculate average (current year - vehicle year)
+- "What is the AVERAGE salary of employees at companies where people with Mastercard work?"
+  - Step 1: credit_cards.txt → find all Mastercard holders → [~50 people]
+  - Step 2: employments.txt → find their employers → [~20 unique companies]
+  - Step 3: employments.txt → find ALL employees at those companies → [~100 people]
+  - Step 4: Calculate average salary across all ~100
 
-**Bad (simple aggregation):**
-- "What is the total balance of person X?"
-  - Just one SUM, no intermediate selection step
+**Bad (single-person aggregation — REJECT):**
+- "What is the total balance of person X?" — just one person
+- "What is the total balance of the person with the most pets?" — finds ONE person, then sums
+- "How many credit cards does person Y have?" — just counting one person
 
 AVOID SSN in questions (triggers safety refusals). Use license plates, usernames, pet names instead.
 
@@ -44,19 +48,25 @@ AVOID SSN in questions (triggers safety refusals). Use license plates, usernames
   - The person is directly identified, no chain needed
 
 ## Constraints
-- Minimum 4 files required
-- Must include TWO aggregation steps (not just "find person → sum their records"):
-  - First: select from a group (e.g., "most credit cards among N employees")
-  - Second: aggregate the selected person's records (e.g., "sum their balances")
-- The intermediate group should have 5-15 candidates to compare
+- Minimum 5 files required
+- Must aggregate across MULTIPLE PEOPLE (3+), not just one person's records
+- The group to aggregate should be found through a chain
 - Answer must be a specific number (formatted: "$145,315.33" or "7 policies")
-- Verify by running SQL: if missing one record changes the answer by >10%, it's a good question
+- Verify by running SQL: if missing one person changes the answer by >10%, it's a good question
 
-## Key Difficulty Requirement
-Questions must have a SELECTION step before the final aggregation:
-- "What is the total X of the person with the most Y among Z?"
-- "What is the combined A of the top 3 B at company C?"
-Single-step aggregations (just summing one person's records) are too easy.
+## Key Difficulty Requirement: MULTI-PERSON AGGREGATION
+Questions must sum/count across MULTIPLE people, not just one person:
+
+**REQUIRED (multi-person):**
+- "What is the COMBINED bank balance of ALL employees at company X?"
+- "What is the TOTAL number of pets owned by people in the same city as person Y?"
+- "What is the AVERAGE salary of the 5 highest-paid employees at companies with 10+ employees?"
+
+**REJECT (single-person):**
+- "What is the total balance of person X?" — just summing one person's accounts
+- "How many pets does person Y own?" — just counting one person's records
+
+Multi-person aggregations are hard because missing ONE person ruins the answer.
 
 ## Common Pitfalls
 - Person is directly identified (no chain)
