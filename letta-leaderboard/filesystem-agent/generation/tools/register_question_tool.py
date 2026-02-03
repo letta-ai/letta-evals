@@ -90,10 +90,15 @@ def compute_difficulty(question_type: str, required_files: List[str], sql_querie
     Scoring:
       - Files: 3 → 0pts, 4 → 1pt, 5+ → 2pts
       - SQL queries: 3 → 0pts, 4 → 1pt, 5+ → 2pts
-      - Hard question types: +1pt
-        (negation, comparison_tiebreak, multi_entity_comparison, temporal_reasoning)
-
+      - Two-chain patterns (hardest): +2pts
+        (multi_hop_chain, multi_entity_comparison)
+      
     Total: 0-1 → easy, 2-3 → medium, 4+ → hard
+    
+    Based on empirical results:
+      - multi_hop_chain: 40% Opus accuracy (HARD)
+      - multi_entity_comparison: 50% Opus accuracy (HARD)
+      - All other types: ~100% Opus accuracy (EASY)
     """
     score = 0
 
@@ -109,9 +114,10 @@ def compute_difficulty(question_type: str, required_files: List[str], sql_querie
     elif num_queries >= 5:
         score += 2
 
-    hard_types = {"negation", "comparison_tiebreak", "multi_entity_comparison", "temporal_reasoning"}
+    # Two-chain patterns are empirically the hardest
+    hard_types = {"multi_hop_chain", "multi_entity_comparison"}
     if question_type in hard_types:
-        score += 1
+        score += 2  # +2 because these are significantly harder
 
     if score <= 1:
         return "easy"
