@@ -49,19 +49,24 @@ The hardest questions have **multiple candidates at intermediate steps**, not ju
 - Step 1 returns 5 people, model must compare all 5
 - More room for counting/comparison errors
 
-## Advanced Patterns (USE THESE!)
+## THE HARDEST PATTERN (USE THIS!)
 
-1. **Nested superlatives**: 
-   "Among people with the highest bank balance in their city, who has the fewest pets?"
-   - Multiple max/min operations that compound errors
+**Two parallel chains + compare** is the ONLY pattern that consistently fails strong models:
 
-2. **Aggregate-then-filter**:
-   "Among the 10 people with the most vehicles, who lives in the same state as the owner of pet 'Buddy'?"
-   - Large intermediate set (top 10), then filter
+```
+"Who has more X: [4-hop chain A to find person] OR [4-hop chain B to find person]?"
+```
 
-3. **Conditional chains**:
-   "If the owner of plate 'ABC-123' has more pets than vehicles, what is their employer? Otherwise, what is their insurance provider?"
-   - Model must evaluate condition AND follow correct branch
+Example:
+- "Who owns more vehicles: the person with the highest bank balance among residents of the same state as the owner of pet 'Eduardo', OR the person with the highest bank balance among residents of the same state as the owner of pet 'Jasmine'?"
+
+This works because:
+1. Model must complete TWO independent 4-hop chains
+2. Model must track results from BOTH chains
+3. Model must compare correctly at the end
+4. Error in ANY step of EITHER chain = wrong answer
+
+EVERY question should use this two-parallel-chains pattern where possible.
 
 ## Identifier Guidelines
 AVOID using SSN in questions — it triggers safety refusals in some models.

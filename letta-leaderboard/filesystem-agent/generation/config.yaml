@@ -10,13 +10,13 @@ generation:
   # Question type distribution (must sum to 1.0)
   # Each type has a corresponding prompt file in prompts/{type_name}.md
   question_types:
-    multi_hop_chain: 0.20       # 3-4 files — follow references across files
-    aggregation: 0.15           # 3-5 files — total balance, sum records
-    set_intersection: 0.15      # 4-5 files — person matching X AND Y AND Z
-    negation: 0.10              # 3-4 files — who does NOT own X
-    comparison_tiebreak: 0.15   # 4-5 files — highest Y, if tied oldest
-    multi_entity_comparison: 0.10  # 4-5 files — between person A and B
-    cross_file_counting: 0.10   # 4-5 files — total financial products
+    multi_hop_chain: 0.25       # TWO parallel chains + compare (hardest pattern)
+    multi_entity_comparison: 0.30  # TWO parallel chains + compare (hardest pattern)
+    aggregation: 0.10           # 3-5 files — total balance, sum records
+    set_intersection: 0.10      # 4-5 files — person matching X AND Y AND Z
+    comparison_tiebreak: 0.10   # 4-5 files — highest Y, if tied oldest
+    negation: 0.05              # 3-4 files — who does NOT own X
+    cross_file_counting: 0.05   # 4-5 files — total financial products
     temporal_reasoning: 0.05    # 3-4 files — date comparisons
 
 # Agent question generator configuration
@@ -31,7 +31,7 @@ agent_question_generator:
   max_tokens_per_response: 4096
 
   # Generation parameters
-  max_iterations_per_question: 50
+  max_iterations_per_question: 100
   force_registration_on_max_iterations: true
 
   # LLM summarization settings (for context trimming)

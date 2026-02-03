@@ -58,7 +58,7 @@ python3 question_generator.py \
 
 # Generate with parallel workers (one per question type)
 python3 question_generator.py \
-    --num-questions 100 \
+    --num-questions 20 \
     --parallel 8 \
     --new-run
 

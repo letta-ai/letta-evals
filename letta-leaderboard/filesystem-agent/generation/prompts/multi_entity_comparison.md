@@ -33,13 +33,15 @@ Two PARALLEL chains that each resolve to a person, then a comparison between the
   - Compare insurance_policies.txt
 
 ## Constraints
-- Minimum 5 files required
-- EACH chain must include an aggregation step (find max/min among a group, not just "find person with X")
+- Minimum 6 files required
+- EACH chain must be 4+ hops (not 2-3)
+- EACH chain must include an aggregation step (find max/min among a group)
 - The two chains must resolve to DIFFERENT people (verify!)
-- **CRITICAL: Comparison values should be CLOSE** — within 1-2 of each other for counts, 5% for amounts
-- PREFERRED: Use conditional branching — "If X has more, return A. Otherwise, return B."
-- Answer depends on which branch is taken
-- AVOID SSN in questions (triggers safety refusals). Use license plates, usernames, pet names instead.
+- **CRITICAL: Comparison values should be CLOSE** — within 1-2 of each other
+- AVOID SSN. Use license plates, usernames, pet names instead.
+
+## THIS IS THE HARDEST PATTERN
+This two-parallel-chains pattern is the ONLY one that consistently fails strong models like Opus. Use it heavily. Every multi_entity_comparison question MUST have two 4+ hop chains.
 
 ## Key Difficulty Requirement
 Each chain should involve AGGREGATION over a group, not just a single lookup:

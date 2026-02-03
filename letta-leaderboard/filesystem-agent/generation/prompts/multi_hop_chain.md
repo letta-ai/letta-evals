@@ -1,7 +1,12 @@
-# Question Type: Multi-Hop Chain (TRUE Sequential)
+# Question Type: Multi-Hop Chain (TWO PARALLEL CHAINS)
 
 ## Pattern
-Create a chain where **each step's output is the next step's query input**. The agent CANNOT parallelize these queries — they must complete step N before they can even formulate the query for step N+1.
+Create TWO independent chains that must BOTH complete, then compare or combine their results. This is the only pattern that consistently fails strong models.
+
+Structure:
+1. Chain A: 3-4 hops → finds Person/Value A
+2. Chain B: 3-4 hops → finds Person/Value B  
+3. Final step: Compare A vs B, or combine A and B
 
 ## What makes this HARD (vs parallelizable queries)
 - Step N+1's query depends on step N's result (not just the same person ID)
@@ -10,27 +15,20 @@ Create a chain where **each step's output is the next step's query input**. The 
 
 ## Examples
 
-**Good (multi-candidate intermediate steps):**
-- "What is the insurance provider of the employee with the most credit cards at the company where the owner of plate '999-KUZJ' works?"
-  - Step 1: vehicles.txt → find owner of plate → `pers-042`
-  - Step 2: employments.txt → find employer of pers-042 → "Acme Corp"
-  - Step 3: employments.txt → find ALL employees at Acme Corp → [pers-042, pers-055, pers-087, pers-099, pers-112] (5 people)
-  - Step 4: credit_cards.txt → count cards for EACH of the 5 → find max
-  - Step 5: insurance_policies.txt → get winner's insurer
-  
-  Step 3 returns MULTIPLE candidates. Step 4 must compare all of them.
+**REQUIRED PATTERN (two parallel chains + compare):**
+- "Who owns more vehicles: the person with the highest bank balance in the same state as the owner of pet 'Eduardo', OR the person with the highest bank balance in the same state as the owner of pet 'Jasmine'?"
+  - Chain A: pets.txt → owner of Eduardo → addresses.txt → state → bank_accounts.txt → highest balance in that state → Person A
+  - Chain B: pets.txt → owner of Jasmine → addresses.txt → state → bank_accounts.txt → highest balance in that state → Person B
+  - Compare: vehicles.txt → count for A vs B → return winner's name
 
-- "Among the coworkers of the owner of pet 'Buddy', who has the highest bank balance? What is their employer's name?"
-  - Step 1: pets.txt → find owner of Buddy → `pers-045`
-  - Step 2: employments.txt → find employer → "Tech Inc"
-  - Step 3: employments.txt → find ALL Tech Inc employees → [6 people]
-  - Step 4: bank_accounts.txt → sum balances for EACH of the 6 → find max
-  - Step 5: Return winner's employer (Tech Inc, but model must verify)
+- "What is the combined salary of: the person with the most pets among employees at 'Tech Corp', AND the person with the most credit cards among employees at 'Acme Inc'?"
+  - Chain A: employments.txt → Tech Corp employees → pets.txt → count per person → find max → get salary
+  - Chain B: employments.txt → Acme Inc employees → credit_cards.txt → count per person → find max → get salary
+  - Combine: sum both salaries
 
-**Bad (single candidate per step):**
-- "What pet does the coworker of Morgan Hunter own?"
-  - If Morgan's company has only 2 employees, there's only 1 coworker
-  - No comparison needed, model just follows breadcrumbs
+**BAD (single chain — too easy for strong models):**
+- "What is the employer of the person with the most pets at company X?"
+  - Only ONE chain, strong models solve this easily
 
 **Bad (parallelizable):**
 - "Who has a Mastercard, owns a rabbit, and lives in Texas?"
