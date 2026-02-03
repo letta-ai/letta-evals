@@ -10,50 +10,41 @@ Count records across multiple files for a person/group that is found through a C
 
 ## Examples
 
-**Good (multi-person cross-file counting):**
-- "How many total items (pets + vehicles + credit cards) do ALL employees at the company where the owner of pet 'Buddy' works own COMBINED?"
+**Good (chain → count):**
+- "How many total items (pets + vehicles + credit cards) does the highest-paid employee at 'Martinez LLC' own?"
+  - Step 1: employments.txt → find Martinez LLC employees → [pers-012, pers-033, pers-055]
+  - Step 2: employments.txt → find highest salary among them → `pers-033`
+  - Step 3: pets.txt → count pets for pers-033 → 2
+  - Step 4: vehicles.txt → count vehicles → 1
+  - Step 5: credit_cards.txt → count cards → 3
+  - Step 6: Sum → 6
+
+  The person to count (pers-033) is found through a 2-hop chain.
+
+- "What is the total number of records (bank accounts + insurance policies + internet accounts) for people who work at the same company as the owner of pet 'Buddy'?"
   - Step 1: pets.txt → find owner of Buddy → `pers-045`
   - Step 2: employments.txt → find their employer → "Tech Inc"
-  - Step 3: employments.txt → find ALL Tech Inc employees → [pers-045, pers-087, pers-099, pers-112, pers-156] (5 people)
-  - Step 4: For EACH of the 5 employees:
-    - pets.txt → count pets
-    - vehicles.txt → count vehicles  
-    - credit_cards.txt → count cards
-  - Step 5: Sum ALL counts across ALL 5 people
-  
-  5 people × 3 file types = 15 lookups. Miss one = wrong total.
-
-- "What is the TOTAL number of bank accounts held by people who live in the same state as the owner of vehicle plate 'ABC-123'?"
-  - Step 1: vehicles.txt → find owner of plate → `pers-042`
-  - Step 2: addresses.txt → find their state → "California"
-  - Step 3: addresses.txt → find ALL people in California → [~40 people]
-  - Step 4: bank_accounts.txt → count accounts for EACH of the 40
+  - Step 3: employments.txt → find ALL Tech Inc employees → [pers-045, pers-087, pers-099]
+  - Step 4: For EACH employee, count across 3 file types
   - Step 5: Sum all counts
   
-  40 people to check across a single file type.
+  Counting across a GROUP found through a chain.
 
-**Bad (single-person counting — REJECT):**
+**Bad (direct count):**
 - "How many total items does the person with plate 'XYZ-123' own?"
-  - Just ONE person's records
-- "How many items does the highest-paid employee at company X own?"
-  - Finds ONE person, then counts their records
+  - Person directly identified via plate
+  - No chain required
 
 ## Constraints
-- Minimum 5 files required
-- Must count across MULTIPLE PEOPLE (5+), not just one person
-- The group to count should be found through a chain (same employer, same state, same city)
-- Count across at least 2-3 different record types per person
-- Answer is a specific number (total across all people)
-
-## Key Difficulty Requirement: MULTI-PERSON COUNTING
-Questions must count records across a GROUP of people:
-- "How many total X do ALL employees at company Y own?"
-- "What is the combined count of A + B + C for people in the same state as Z?"
-
-Single-person counting is too easy — model just needs to find one person and count.
-Multi-person counting requires finding ALL members of a group, counting for EACH, summing.
+- Minimum 4 files required (1+ to find target, 3+ to count across)
+- Target person/group MUST be found through a chain
+- Count across at least 3 different record types
+- Target should have records in ALL counted files (not zero in any)
+- Answer is a specific number
 
 ## Common Pitfalls
-- Counting for just ONE person (too easy)
-- Group too small (2-3 people) — need 5+ people
+- Target is directly identified (no chain)
+- Only counting in 1-2 files
+- Person has 0 records in one file (less interesting)
+- Not specifying which record types to count
 - Using SSN (triggers safety refusals) or "neighbor" (ambiguous)
