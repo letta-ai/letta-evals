@@ -32,6 +32,7 @@ agent_question_generator:
 
   # Generation parameters
   max_iterations_per_question: 100
+  max_retries_per_question: 3      # Retry failed questions up to this many times
   force_registration_on_max_iterations: true
 
   # LLM summarization settings (for context trimming)

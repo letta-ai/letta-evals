@@ -518,6 +518,8 @@ class QuestionGeneratorAgent(DisplayMixin, ContextMixin, ParallelMixin):
             print(f"Type distribution: {dict(type_counts)}")
         self._print_separator("=")
 
+        max_retries = self.config.get("max_retries_per_question", 3)
+
         for question_num in range(num_questions):
             # Get all existing questions for context
             existing_questions = self.get_existing_questions()
@@ -529,24 +531,38 @@ class QuestionGeneratorAgent(DisplayMixin, ContextMixin, ParallelMixin):
             print(f"   {Colors.DIM}Existing questions in corpus: {len(existing_questions)}{Colors.ENDC}")
             self._print_separator()
 
-            # Generate one question with fresh context
+            # Generate one question with fresh context, with retries
             max_iterations = self.config.get("max_iterations_per_question", 20)
-            success, conversation = self.generate_single_question(
-                question_num + 1,
-                num_questions,
-                existing_questions,
-                max_iterations=max_iterations,
-                question_type=current_type,
-            )
+            success = False
+            conversation = []
+            
+            for attempt in range(1, max_retries + 1):
+                if attempt > 1:
+                    print(f"\n{Colors.YELLOW}Retry attempt {attempt}/{max_retries} for question {question_num + 1}{Colors.ENDC}")
+                    # Refresh existing questions in case something changed
+                    existing_questions = self.get_existing_questions()
+                
+                success, conversation = self.generate_single_question(
+                    question_num + 1,
+                    num_questions,
+                    existing_questions,
+                    max_iterations=max_iterations,
+                    question_type=current_type,
+                )
+                
+                if success:
+                    break
+                elif attempt < max_retries:
+                    print(f"{Colors.YELLOW}Attempt {attempt} failed, will retry...{Colors.ENDC}")
 
-            # Store conversation
+            # Store conversation (from last attempt)
             all_conversations.append(
-                {"question_number": question_num + 1, "success": success, "conversation": conversation}
+                {"question_number": question_num + 1, "success": success, "attempts": attempt, "conversation": conversation}
             )
 
             self._print_separator()
             if success:
-                print(f"\n{Colors.GREEN}Successfully generated question {question_num + 1}{Colors.ENDC}")
+                print(f"\n{Colors.GREEN}Successfully generated question {question_num + 1}{' (after ' + str(attempt) + ' attempts)' if attempt > 1 else ''}{Colors.ENDC}")
                 # Get the newly registered question to show it
                 new_questions = self.get_existing_questions()
                 if new_questions and len(new_questions) > len(existing_questions):
@@ -554,7 +570,7 @@ class QuestionGeneratorAgent(DisplayMixin, ContextMixin, ParallelMixin):
                     print(f"   {Colors.BOLD}Question:{Colors.ENDC} {latest['question']}")
                     print(f"   {Colors.BOLD}Answer:{Colors.ENDC} {latest['answer']}")
             else:
-                print(f"\n{Colors.RED}Failed to generate question {question_num + 1}{Colors.ENDC}")
+                print(f"\n{Colors.RED}Failed to generate question {question_num + 1} after {max_retries} attempts{Colors.ENDC}")
 
             self._print_separator("=")
 
