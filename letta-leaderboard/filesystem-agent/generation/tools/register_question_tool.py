@@ -50,7 +50,20 @@ REGISTER_QUESTION_TOOL_DICT = {
             },
             "verification_query": {
                 "type": "string",
-                "description": "A single SQL query that returns exactly 1 row containing the answer value. Used to verify uniqueness. Example: SELECT full_name FROM people WHERE person_id = 'pers-0042'",
+                "description": """A single SQL query that computes the answer END-TO-END using nested subqueries. 
+MUST NOT contain hardcoded person IDs (pers-XXXX) or CASE statements with hardcoded answers.
+The query must derive the answer from scratch starting from the original question parameters.
+
+WRONG (hardcoded ID): SELECT full_name FROM people WHERE person_id = 'pers-0042'
+
+CORRECT (end-to-end): 
+SELECT p.full_name FROM people p WHERE p.person_id = (
+    SELECT p2.person_id FROM people p2 
+    JOIN addresses a ON a.owner_id = p2.person_id
+    JOIN credit_cards c ON c.owner_id = p2.person_id
+    WHERE a.state = (SELECT a2.state FROM pets pet JOIN addresses a2 ON a2.owner_id = pet.owner_id WHERE pet.name = 'Dawn' LIMIT 1)
+    GROUP BY p2.person_id ORDER BY COUNT(c.card_id) DESC LIMIT 1
+)""",
             },
             "required_files": {
                 "type": "array",
@@ -225,25 +238,32 @@ class RegisterQuestionTool:
             cursor = conn.cursor()
 
             # --- Verification query check ---
-            if verification_query:
-                # REJECT if verification query contains hardcoded person IDs
-                if "pers-" in verification_query:
-                    conn.close()
-                    return {
-                        "success": False,
-                        "error": "INVALID VERIFICATION QUERY: Contains hardcoded person ID (pers-XXXX). "
-                        "The verification query must compute the answer end-to-end using nested subqueries, "
-                        "not look up a pre-determined person ID. Rewrite the query to derive the person from scratch.",
-                    }
-                
-                # REJECT if verification query contains CASE with hardcoded names
-                if "CASE" in verification_query.upper() and "THEN '" in verification_query:
-                    conn.close()
-                    return {
-                        "success": False,
-                        "error": "INVALID VERIFICATION QUERY: Contains CASE statement with hardcoded answer. "
-                        "The verification query must compute and return the answer, not embed it in a CASE statement.",
-                    }
+            if not verification_query or not verification_query.strip():
+                conn.close()
+                return {
+                    "success": False,
+                    "error": "MISSING VERIFICATION QUERY: You must provide a verification_query that computes "
+                    "the answer end-to-end using nested subqueries. This is required to validate correctness.",
+                }
+            
+            # REJECT if verification query contains hardcoded person IDs
+            if "pers-" in verification_query:
+                conn.close()
+                return {
+                    "success": False,
+                    "error": "INVALID VERIFICATION QUERY: Contains hardcoded person ID (pers-XXXX). "
+                    "The verification query must compute the answer end-to-end using nested subqueries, "
+                    "not look up a pre-determined person ID. Rewrite the query to derive the person from scratch.",
+                }
+            
+            # REJECT if verification query contains CASE with hardcoded names
+            if "CASE" in verification_query.upper() and "THEN '" in verification_query:
+                conn.close()
+                return {
+                    "success": False,
+                    "error": "INVALID VERIFICATION QUERY: Contains CASE statement with hardcoded answer. "
+                    "The verification query must compute and return the answer, not embed it in a CASE statement.",
+                }
                 
                 try:
                     cursor.execute(verification_query)
