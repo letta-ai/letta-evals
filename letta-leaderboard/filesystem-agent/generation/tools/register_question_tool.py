@@ -352,6 +352,7 @@ class RegisterQuestionTool:
                 "required_files": required_files,
                 "answer_reasoning": answer_reasoning,
                 "sql_queries": query_results,
+                "verification_query": verification_query,
                 "timestamp": datetime.now().isoformat(),
             }
 
