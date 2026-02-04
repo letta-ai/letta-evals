@@ -1,0 +1,14 @@
+Here is the rubric with multiple criteria for evaluating whether the compressed context preserves task-critical information.
+
+Use the Expected Answer (Ground Truth) JSON as the target to compare against.
+
+Each criterion is binary with a score of either 0 or 0.25.
+The final score should thus be one of [0, 0.25, 0.5, 0.75, 1] based on how many criteria are satisfied.
+
+Criteria:
+1. **Valid JSON only**: The submission is a single valid JSON object with required keys (summary, must_keep, constraints, open_questions, safe_to_drop) and correct types.
+2. **Correct summary**: The summary captures the main task, decisions, and current status without major omissions.
+3. **Correct must_keep/constraints/open_questions**: Critical facts, deadlines, artifacts, and open questions match the ground truth in substance.
+4. **Correct safe_to_drop**: Irrelevant or superseded details are correctly listed. No critical items are marked safe_to_drop.
+
+IMPORTANT: Be critical with your evaluation. Make sure to clearly express your rationale and scoring.

@@ -1,0 +1,32 @@
+name: compression-full
+description: v0 context compression (response-only) full suite
+dataset: data/dataset_all.jsonl
+
+target:
+  kind: letta_code
+  base_url: https://api.letta.com/
+  working_dir: output-compression-full
+  sandbox: false
+  timeout: 300
+  max_retries: 0
+  model_handles:
+    - anthropic/claude-sonnet-4-5-20250929
+    - openai/gpt-5.1-codex-mini
+    - gemini-3-flash
+
+graders:
+  compression:
+    kind: model_judge
+    display_name: "context compression score"
+    prompt_path: rubric_context_compression.txt
+    model: gpt-5-mini
+    temperature: 0.0
+    provider: openai
+    extractor: last_assistant
+
+gate:
+  kind: simple
+  metric_key: compression
+  aggregation: avg_score
+  op: gte
+  value: 0.75
