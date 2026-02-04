@@ -1,0 +1,48 @@
+name: validating-file-writes-with-prettooluse-hook
+skills:
+  - Hook Development
+prompt: |
+  You need to create a PreToolUse hook for a Claude Code plugin that validates file write operations for security.
+
+  Requirements:
+  - Create hooks.json configuration for a plugin (not user settings)
+  - Hook should trigger before Write and Edit operations
+  - Use prompt-based hook (not command hook)
+  - The hook should validate:
+    * Check for path traversal attempts (../ in paths)
+    * Deny writes to sensitive files (.env, .password, *.key)
+    * Provide clear security warnings
+  - Output should include permission decision (allow/deny)
+  - Include system message explaining the decision to Claude
+
+  Create the complete hooks.json configuration file. Focus on the correct JSON structure, hook event type, matcher patterns, and prompt-based hook format with proper validation logic.
+timeout: 300
+grader:
+  kind: letta_judge
+  prompt: |
+    Evaluate if the response correctly creates a PreToolUse hook configuration.
+
+    Score 1.0 if ALL criteria are met:
+    - Uses correct plugin hooks.json format (with "hooks" wrapper, no top-level events)
+    - PreToolUse hook is properly configured
+    - Matcher targets Write and/or Edit operations
+    - Uses prompt-based hook (not command hook)
+    - Includes security validation for path traversal (../)
+    - Includes validation for sensitive files (.env, .password, *.key)
+    - Returns proper output format with permissionDecision and systemMessage
+    - JSON structure is valid
+
+    Score 0.5 if:
+    - Has correct hook structure but minor issues (wrong wrapper format, wrong event name)
+    - Includes security checks but incomplete validation
+    - Missing one or two key requirements
+
+    Score 0.0 if:
+    - Uses wrong configuration format (user settings instead of plugin)
+    - Wrong hook event type
+    - Missing security validation entirely
+    - Invalid JSON structure
+    - Uses command hook instead of prompt-based hook when prompt was specifically requested
+
+    Focus on whether the model understands the difference between plugin and settings formats, proper hook configuration, and includes meaningful security validation.
+  extractor: last_assistant

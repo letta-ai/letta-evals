@@ -1,0 +1,37 @@
+name: docx-redlining-workflow
+skills:
+  - docx
+prompt: |
+  You have received a business contract document (contract.docx) that needs several edits made with tracked changes enabled. The client has requested the following modifications:
+
+  1. Change the contract term from "30 days" to "60 days" in the payment terms section
+  2. Update the company name from "ABC Corporation" to "XYZ Industries" throughout the document
+  3. Add a new clause about data protection after the confidentiality section
+  4. Update the effective date from "January 1, 2024" to "March 1, 2024"
+
+  Please implement these changes using proper tracked changes (redlining) so the client can review each modification. Follow the redlining workflow outlined in the documentation, including:
+  - Converting the document to markdown for analysis
+  - Organizing changes into logical batches
+  - Implementing changes with proper XML markup
+  - Ensuring all changes are properly tracked with author attribution
+
+  The final document should be saved as "contract-reviewed.docx" with all changes clearly marked for client review.
+timeout: 300
+
+grader:
+  kind: letta_judge
+  prompt: |
+    Evaluate whether the response demonstrates proper use of the docx skill knowledge for implementing tracked changes in a Word document. Score 1.0 if the response:
+
+    - Correctly identifies and uses the redlining workflow for editing an existing document
+    - Follows the proper sequence: convert to markdown, organize changes into batches, implement changes systematically
+    - Shows understanding of when to use tracked changes vs basic editing (redlining is required for client documents)
+    - Demonstrates knowledge of XML structure for tracked changes (<w:ins>, <w:del>, RSID usage)
+    - Organizes changes logically into manageable batches as recommended
+    - Shows awareness of the batching strategy for complex document edits
+    - Mentions proper tools and workflows (pandoc for conversion, Document library for editing, etc.)
+
+    Score 0.5 if the response shows partial understanding but misses key workflow steps or demonstrates confusion about when to use redlining vs basic editing.
+
+    Score 0.0 if the response fails to demonstrate knowledge of the docx skill, uses inappropriate approaches (like treating .docx as plain text), or shows no understanding of tracked changes workflow.
+  extractor: last_assistant

@@ -1,0 +1,86 @@
+[
+  {
+    "file": "00_Big_Chungus_the_2nd.af",
+    "agent": "Big Chungus the 2nd",
+    "bloated_block": "project",
+    "size": 11151,
+    "topics": 21
+  },
+  {
+    "file": "01_Nameless_Agent.af",
+    "agent": "Nameless Agent",
+    "bloated_block": "search_results",
+    "size": 4459,
+    "topics": 14
+  },
+  {
+    "file": "02_Nameless_Agent.af",
+    "agent": "Nameless Agent",
+    "bloated_block": "persona",
+    "size": 4328,
+    "topics": 13
+  },
+  {
+    "file": "03_Nameless_Agent.af",
+    "agent": "Nameless Agent",
+    "bloated_block": "letta_types_analysis",
+    "size": 8622,
+    "topics": 10
+  },
+  {
+    "file": "04_Nameless_Agent.af",
+    "agent": "Nameless Agent",
+    "bloated_block": "letta_memory_implementation",
+    "size": 5220,
+    "topics": 9
+  },
+  {
+    "file": "05_Nameless_Agent.af",
+    "agent": "Nameless Agent",
+    "bloated_block": "findings_letta_skills_system",
+    "size": 9266,
+    "topics": 9
+  },
+  {
+    "file": "06_letta-code-agent.af",
+    "agent": "letta-code-agent",
+    "bloated_block": "letta_code_skills_and_init_exploration",
+    "size": 9343,
+    "topics": 9
+  },
+  {
+    "file": "07_Nameless_Agent.af",
+    "agent": "Nameless Agent",
+    "bloated_block": "tools_structure",
+    "size": 3962,
+    "topics": 8
+  },
+  {
+    "file": "08_Nameless_Agent.af",
+    "agent": "Nameless Agent",
+    "bloated_block": "project",
+    "size": 2124,
+    "topics": 7
+  },
+  {
+    "file": "09_letta-cloud-buddy-sdk-discussi.af",
+    "agent": "letta-cloud-buddy-sdk-discussion",
+    "bloated_block": "project",
+    "size": 2919,
+    "topics": 6
+  },
+  {
+    "file": "10_letta-cloud-buddy.af",
+    "agent": "letta-cloud-buddy",
+    "bloated_block": "project",
+    "size": 2919,
+    "topics": 6
+  },
+  {
+    "file": "11_Nameless_Agent.af",
+    "agent": "Nameless Agent",
+    "bloated_block": "tools_structure",
+    "size": 2394,
+    "topics": 6
+  }
+]
