@@ -1,0 +1,38 @@
+name: user-model-maintenance-smoke
+description: v0 user model maintenance (response-only) smoke suite
+dataset: data/dataset_all.jsonl
+max_samples: 3
+
+target:
+  kind: letta_code
+  base_url: https://api.letta.com/
+  working_dir: output-user-model-maintenance-smoke
+  sandbox: false
+  timeout: 300
+  max_retries: 0
+  model_handles:
+    - anthropic/claude-sonnet-4-5-20250929
+    - anthropic/claude-opus-4-5-20251101
+    - openai/gpt-5.1-codex
+    - openai/gpt-5.2-medium
+    - openai/gpt-5.1-codex-mini
+    - gemini-3-pro
+    - gemini-3-flash
+    - openrouter/deepseek/deepseek-r1
+
+graders:
+  user_model:
+    kind: model_judge
+    display_name: "user model score"
+    prompt_path: rubric_user_model.txt
+    model: gpt-5-mini
+    temperature: 0.0
+    provider: openai
+    extractor: last_assistant
+
+gate:
+  kind: simple
+  metric_key: user_model
+  aggregation: avg_score
+  op: gte
+  value: 0.75
