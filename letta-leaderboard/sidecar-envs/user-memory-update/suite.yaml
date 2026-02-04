@@ -1,0 +1,35 @@
+name: user-memory-update
+description: Test agent's ability to update memory blocks based on new user information
+dataset: data/dataset_memory.jsonl
+max_samples: 5
+
+target:
+  kind: letta_agent
+  base_url: https://api.letta.com/
+  agent_script: agent_factory.py:create_user_memory_agent
+  model_handles:
+    - anthropic/claude-sonnet-4-5-20250929
+    - anthropic/claude-opus-4-5-20251101
+    - anthropic/claude-haiku-4-5-20251001
+    - openai/gpt-5.1-codex-mini
+    - openai/gpt-5.2
+    - openai/gpt-4.1-nano
+    - google_ai/gemini-3-pro-preview
+    - google_ai/gemini-3-flash-preview
+    - zai/glm-4.6
+    - zai/glm-4.7
+
+graders:
+  memory_update:
+    kind: tool
+    function: custom_grader.py:user_memory_grader
+    extractor: memory_block
+    extractor_config:
+      block_label: "user"
+
+gate:
+  kind: simple
+  metric_key: memory_update
+  aggregation: avg_score
+  op: gte
+  value: 0.75
