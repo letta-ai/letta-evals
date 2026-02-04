@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-02-04T04:34:32.136878+00:00",
+  "categories": [
+    {
+      "name": "session-handoff",
+      "display_name": "Session Handoff",
+      "data_file": "data/session-handoff.json",
+      "scenario_count": 6,
+      "dataset_count": 1
+    },
+    {
+      "name": "skill-learning",
+      "display_name": "Skill Learning",
+      "data_file": "data/skill-learning.json",
+      "scenario_count": 5,
+      "dataset_count": 1
+    },
+    {
+      "name": "skill-test-writing",
+      "display_name": "Skill Test Writing",
+      "data_file": "data/skill-test-writing.json",
+      "scenario_count": 13,
+      "dataset_count": 1
+    },
+    {
+      "name": "tool-exploration",
+      "display_name": "Tool Exploration",
+      "data_file": "data/tool-exploration.json",
+      "scenario_count": 6,
+      "dataset_count": 1
+    },
+    {
+      "name": "user-model-maintenance",
+      "display_name": "User Model Maintenance",
+      "data_file": "data/user-model-maintenance.json",
+      "scenario_count": 6,
+      "dataset_count": 1
+    }
+  ]
+}

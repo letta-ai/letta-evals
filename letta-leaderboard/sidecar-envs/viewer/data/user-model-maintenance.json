@@ -1,0 +1,782 @@
+{
+  "category": "user-model-maintenance",
+  "display_name": "User Model Maintenance",
+  "generated_at": "2026-02-04T04:34:32.136878+00:00",
+  "datasets": [
+    {
+      "name": "dataset_all",
+      "source": "user-model-maintenance/data/dataset_all.jsonl",
+      "count": 6
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "umm-001",
+      "dataset": "dataset_all",
+      "source": "user-model-maintenance/data/dataset_all.jsonl",
+      "line": 1,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "Prior user_model.json:\n{\n  \"user_id\": \"u_001\",\n  \"name\": \"Ava Chen\",\n  \"current\": {\n    \"employer\": \"Northwind Health\",\n    \"role\": \"Data Analyst\",\n    \"location\": {\n      \"city\": \"Boston\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/New_York\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\",\n        \"bullets\"\n      ],\n      \"tools\": [\n        \"python\",\n        \"sql\"\n      ],\n      \"notes\": \"Prefers summaries at end.\"\n    }\n  },\n  \"history\": [],\n  \"last_updated\": \"2026-01-10\"\n}\n\nRecent conversation excerpt:\nUser: Hey! Sorry I've been quiet lately. The move was completely chaotic - I'm still finding boxes I haven't unpacked.\n\nAssistant: No worries! How's everything going?\n\nUser: Pretty good actually. Still getting used to the Austin heat, it's a big change from Boston winters. My friend Jake relocated here around the same time - he's doing ML engineering at some autonomous vehicle startup. We've been checking out the food trucks on South Congress together, which has been fun.\n\nAssistant: Austin is great! Are you still working on the Northwind Health pipeline?\n\nUser: Oh right, I should have mentioned - I left Northwind a few weeks ago. I'm at Lone Star Diagnostics now. They brought me on as a Senior Data Analyst, so it was a nice step up from my previous analyst title. The clinical data is really fascinating, lots of lab result pipeline work.\n\nAssistant: Congrats on the move up! What does the tech stack look like there?\n\nUser: Core stuff is familiar - python, sql, the usual suspects. But one big addition is that we use dbt for all our data transformations here. I've been ramping up on it fast and honestly wish I'd picked it up sooner. Jake's been helping me with some of the trickier macros since his team uses it too. Oh, and my old colleague Sarah at Northwind just got promoted to manager - happy for her but glad I made the switch when I did.\n\nUser: Can you use Central time going forward for scheduling? Still like things concise and in bullets though, that hasn't changed.\n\nRequired JSON keys:\n- user_id, name, current, history, last_updated\ncurrent.employer, current.role, current.location {city,country,timezone}, current.preferences {communication_style[], tools[], notes}\nhistory entries only for employer/role/location/timezone changes.\nOutput a single JSON object only (no code fences)."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": "{\n  \"user_id\": \"u_001\",\n  \"name\": \"Ava Chen\",\n  \"current\": {\n    \"employer\": \"Lone Star Diagnostics\",\n    \"role\": \"Senior Data Analyst\",\n    \"location\": {\n      \"city\": \"Austin\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Chicago\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\",\n        \"bullets\"\n      ],\n      \"tools\": [\n        \"python\",\n        \"sql\",\n        \"dbt\"\n      ],\n      \"notes\": \"Prefers summaries at end.\"\n    }\n  },\n  \"history\": [\n    {\n      \"field\": \"employer\",\n      \"old_value\": \"Northwind Health\",\n      \"new_value\": \"Lone Star Diagnostics\"\n    },\n    {\n      \"field\": \"role\",\n      \"old_value\": \"Data Analyst\",\n      \"new_value\": \"Senior Data Analyst\"\n    },\n    {\n      \"field\": \"location\",\n      \"old_value\": \"Boston, USA\",\n      \"new_value\": \"Austin, USA\"\n    },\n    {\n      \"field\": \"timezone\",\n      \"old_value\": \"America/New_York\",\n      \"new_value\": \"America/Chicago\"\n    }\n  ],\n  \"last_updated\": \"2026-02-04\"\n}"
+        }
+      ],
+      "input_text": "input: Prior user_model.json:\n{\n  \"user_id\": \"u_001\",\n  \"name\": \"Ava Chen\",\n  \"current\": {\n    \"employer\": \"Northwind Health\",\n    \"role\": \"Data Analyst\",\n    \"location\": {\n      \"city\": \"Boston\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/New_York\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\",\n        \"bullets\"\n      ],\n      \"tools\": [\n        \"python\",\n        \"sql\"\n      ],\n      \"notes\": \"Prefers summaries at end.\"\n    }\n  },\n  \"history\": [],\n  \"last_updated\": \"2026-01-10\"\n}\n\nRecent conversation excerpt:\nUser: Hey! Sorry I've been quiet lately. The move was completely chaotic - I'm still finding boxes I haven't unpacked.\n\nAssistant: No worries! How's everything going?\n\nUser: Pretty good actually. Still getting used to the Austin heat, it's a big change from Boston winters. My friend Jake relocated here around the same time - he's doing ML engineering at some autonomous vehicle startup. We've been checking out the food trucks on South Congress together, which has been fun.\n\nAssistant: Austin is great! Are you still working on the Northwind Health pipeline?\n\nUser: Oh right, I should have mentioned - I left Northwind a few weeks ago. I'm at Lone Star Diagnostics now. They brought me on as a Senior Data Analyst, so it was a nice step up from my previous analyst title. The clinical data is really fascinating, lots of lab result pipeline work.\n\nAssistant: Congrats on the move up! What does the tech stack look like there?\n\nUser: Core stuff is familiar - python, sql, the usual suspects. But one big addition is that we use dbt for all our data transformations here. I've been ramping up on it fast and honestly wish I'd picked it up sooner. Jake's been helping me with some of the trickier macros since his team uses it too. Oh, and my old colleague Sarah at Northwind just got promoted to manager - happy for her but glad I made the switch when I did.\n\nUser: Can you use Central time going forward for scheduling? Still like things concise and in bullets though, that hasn't changed.\n\nRequired JSON keys:\n- user_id, name, current, history, last_updated\ncurrent.employer, current.role, current.location {city,country,timezone}, current.preferences {communication_style[], tools[], notes}\nhistory entries only for employer/role/location/timezone changes.\nOutput a single JSON object only (no code fences).",
+      "ground_truth_text": "expected: {\n  \"user_id\": \"u_001\",\n  \"name\": \"Ava Chen\",\n  \"current\": {\n    \"employer\": \"Lone Star Diagnostics\",\n    \"role\": \"Senior Data Analyst\",\n    \"location\": {\n      \"city\": \"Austin\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Chicago\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\",\n        \"bullets\"\n      ],\n      \"tools\": [\n        \"python\",\n        \"sql\",\n        \"dbt\"\n      ],\n      \"notes\": \"Prefers summaries at end.\"\n    }\n  },\n  \"history\": [\n    {\n      \"field\": \"employer\",\n      \"old_value\": \"Northwind Health\",\n      \"new_value\": \"Lone Star Diagnostics\"\n    },\n    {\n      \"field\": \"role\",\n      \"old_value\": \"Data Analyst\",\n      \"new_value\": \"Senior Data Analyst\"\n    },\n    {\n      \"field\": \"location\",\n      \"old_value\": \"Boston, USA\",\n      \"new_value\": \"Austin, USA\"\n    },\n    {\n      \"field\": \"timezone\",\n      \"old_value\": \"America/New_York\",\n      \"new_value\": \"America/Chicago\"\n    }\n  ],\n  \"last_updated\": \"2026-02-04\"\n}",
+      "meta": {},
+      "results": [
+        {
+          "model_name": "anthropic/claude-opus-4-5-20251101",
+          "submission": "{\"user_id\":\"u_001\",\"name\":\"Ava Chen\",\"current\":{\"employer\":\"Lone Star Diagnostics\",\"role\":\"Senior Data Analyst\",\"location\":{\"city\":\"Austin\",\"country\":\"USA\",\"timezone\":\"America/Chicago\"},\"preferences\":{\"communication_style\":[\"concise\",\"bullets\"],\"tools\":[\"python\",\"sql\",\"dbt\"],\"notes\":\"Prefers summaries at end.\"}},\"history\":[{\"employer\":\"Northwind Health\",\"role\":\"Data Analyst\",\"location\":{\"city\":\"Boston\",\"country\":\"USA\",\"timezone\":\"America/New_York\"},\"ended\":\"2026-01\"}],\"last_updated\":\"2026-02-04\"}",
+          "score": 0.75,
+          "rationale": "1) Valid JSON: The submission is a single valid JSON object (0.25). 2) Required schema: All required top-level keys and the current.preferences subkeys are present (user_id, name, current, history, last_updated; current.employer/role/location/timezone; preferences.communication_style/tools/notes) (0.25). 3) Correct current facts: The current block matches the ground truth (employer, role, Austin/USA/America/Chicago, and tools include dbt) (0.25). 4) Correct history: FAIL. The history does not follow the required format: instead of separate entries with {field, old_value, new_value} it contains a single combined object with keys employer/role/location and an unrelated 'ended' field. It omits the explicit field/old_value/new_value structure and does not provide separate timezone and location change entries as in the ground truth (0.00)."
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "{\n  \"user_id\": \"u_001\",\n  \"name\": \"Ava Chen\",\n  \"current\": {\n    \"employer\": \"Lone Star Diagnostics\",\n    \"role\": \"Senior Data Analyst\",\n    \"location\": {\n      \"city\": \"Austin\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Chicago\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\",\n        \"bullets\"\n      ],\n      \"tools\": [\n        \"python\",\n        \"sql\",\n        \"dbt\"\n      ],\n      \"notes\": \"Prefers summaries at end; use Central time for scheduling.\"\n    }\n  },\n  \"history\": [\n    {\n      \"date\": \"2026-01-28\",\n      \"employer\": \"Northwind Health\",\n      \"role\": \"Data Analyst\",\n      \"location\": {\n        \"city\": \"Boston\",\n        \"country\": \"USA\",\n        \"timezone\": \"America/New_York\"\n      }\n    }\n  ],\n  \"last_updated\": \"2026-02-04\"\n}",
+          "score": 0.75,
+          "rationale": "Criterion 1 (Valid JSON): satisfied. The submission is a single valid JSON object with no extra text. (0.25)\n\nCriterion 2 (Required schema): satisfied. The submission includes the required top-level keys (user_id, name, current, history, last_updated) and current contains employer, role, location with city/country/timezone, and preferences with communication_style, tools, and notes. (0.25)\n\nCriterion 3 (Correct current facts): satisfied. The current values reflect the ground truth: employer = Lone Star Diagnostics, role = Senior Data Analyst, location = Austin, USA, timezone = America/Chicago, and tools include dbt in addition to python and sql. The assistant also appended the scheduling preference to notes, which is consistent with the conversation and does not leave stale facts. (0.25)\n\nCriterion 4 (Correct history): not satisfied. The expected history entries should record replaced fields with old_value and new_value for employer, role, location, and timezone as separate entries per the ground truth. Instead, the submission provides a single history object with a date and nested prior employer/role/location keys, and does not use the required field/old_value/new_value structure. It also omits separate history entries for role, location, and timezone changes. (0.00)\n\nTotal: 0.25 + 0.25 + 0.25 + 0.00 = 0.75"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "{\n  \"user_id\": \"u_001\",\n  \"name\": \"Ava Chen\",\n  \"current\": {\n    \"employer\": \"Lone Star Diagnostics\",\n    \"role\": \"Senior Data Analyst\",\n    \"location\": {\n      \"city\": \"Austin\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Chicago\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\",\n        \"bullets\"\n      ],\n      \"tools\": [\n        \"python\",\n        \"sql\",\n        \"dbt\"\n      ],\n      \"notes\": \"Prefers summaries at end.\"\n    }\n  },\n  \"history\": [\n    {\n      \"employer\": \"Northwind Health\",\n      \"role\": \"Data Analyst\",\n      \"location\": {\n        \"city\": \"Boston\",\n        \"country\": \"USA\",\n        \"timezone\": \"America/New_York\"\n      },\n      \"last_updated\": \"2026-01-10\"\n    }\n  ],\n  \"last_updated\": \"2026-02-04\"\n}",
+          "score": 0.75,
+          "rationale": "1) Valid JSON: Passed — submission is a single valid JSON object (0.25). 2) Required schema: Passed — includes user_id, name, current, history, last_updated and current contains employer, role, location (city,country,timezone) and preferences with communication_style, tools, notes (0.25). 3) Correct current facts: Passed — current employer, role, location/timezone and preferences (including added dbt) match the ground truth (0.25). 4) Correct history: Failed — history does not follow the required format. The ground truth expects separate history entries with keys {field, old_value, new_value} for employer, role, location, and timezone. The submission instead has a single combined history object containing employer, role, location nested and a last_updated field, so it does not correctly record the replaced facts in the specified structure (0.00). Total = 0.75."
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex",
+          "submission": "{\"user_id\":\"u_001\",\"name\":\"Ava Chen\",\"current\":{\"employer\":\"Lone Star Diagnostics\",\"role\":\"Senior Data Analyst\",\"location\":{\"city\":\"Austin\",\"country\":\"USA\",\"timezone\":\"America/Chicago\"},\"preferences\":{\"communication_style\":[\"concise\",\"bullets\"],\"tools\":[\"python\",\"sql\",\"dbt\"],\"notes\":\"Prefers summaries at end; use Central time for scheduling.\"}},\"history\":[{\"date\":\"2026-02-04\",\"employer\":\"Northwind Health\",\"role\":\"Data Analyst\",\"location\":{\"city\":\"Boston\",\"country\":\"USA\",\"timezone\":\"America/New_York\"},\"notes\":\"Moved to Austin and joined Lone Star Diagnostics as Senior Data Analyst.\"}],\"last_updated\":\"2026-02-04\"}",
+          "score": 0.75,
+          "rationale": "Criteria 1 (Valid JSON): satisfied — the submission is a single valid JSON object with no extra text. Criteria 2 (Required schema): satisfied — required top-level keys (user_id, name, current, history, last_updated) are present; current includes employer, role, location (city/country/timezone) and preferences with communication_style, tools, notes. Criteria 3 (Correct current facts): satisfied — current values match the ground truth (Lone Star Diagnostics, Senior Data Analyst, Austin/USA/America/Chicago, tools include dbt); no stale facts remain. Criteria 4 (Correct history): not satisfied — the history does note the previous employer/role/location but does not follow the expected history entry format (field/old_value/new_value) and omits explicit new_value entries and separate timezone entry; it also includes extraneous keys (date, notes) rather than the required field/old_value/new_value records. Because three of four binary criteria are met, the score is 0.75."
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "```json\n{\n  \"user_id\": \"u_001\",\n  \"name\": \"Ava Chen\",\n  \"current\": {\n    \"employer\": \"Lone Star Diagnostics\",\n    \"role\": \"Senior Data Analyst\",\n    \"location\": {\n      \"city\": \"Austin\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Chicago\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\",\n        \"bullets\"\n      ],\n      \"tools\": [\n        \"python\",\n        \"sql\",\n        \"dbt\"\n      ],\n      \"notes\": \"Prefers summaries at end.\"\n    }\n  },\n  \"history\": [\n    {\n      \"employer\": \"Northwind Health\",\n      \"role\": \"Data Analyst\",\n      \"location\": {\n        \"city\": \"Boston\",\n        \"country\": \"USA\",\n        \"timezone\": \"America/New_York\"\n      }\n    }\n  ],\n  \"last_updated\": \"2026-02-04\"\n}\n```",
+          "score": 0.5,
+          "rationale": "Criterion 1 (Valid JSON only): 0.0 — The submission is presented inside code fences in the prompt, which violates the requirement of a single JSON object with no extra text or code fences. \n\nCriterion 2 (Required schema): 0.25 — The JSON includes the required top-level keys (user_id, name, current, history, last_updated) and current contains employer, role, location (city, country, timezone) and preferences with communication_style, tools, and notes. \n\nCriterion 3 (Correct current facts): 0.25 — The current fields match the ground truth: employer = \"Lone Star Diagnostics\", role = \"Senior Data Analyst\", location = Austin, USA with timezone \"America/Chicago\", and preferences include dbt in tools and unchanged communication_style and notes. \n\nCriterion 4 (Correct history): 0.0 — The history is incorrect in format and content relative to the ground truth. Expected separate history entries with {field, old_value, new_value} for employer, role, location, and timezone. The submission provides a single history object containing only old values (and no explicit new_value fields or field names) rather than the required per-field entries showing old_value -> new_value. \n\nOverall: 0.25 + 0.25 = 0.50."
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-opus-4-5-20251101",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.2-medium",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-pro",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openrouter/deepseek/deepseek-r1",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-opus-4-5-20251101",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.2-medium",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-pro",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openrouter/deepseek/deepseek-r1",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.2-medium",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-opus-4-5-20251101",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-pro",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openrouter/deepseek/deepseek-r1",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-pro",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: Letta command failed with return code 1. Stderr: Error: Unknown model \"gemini-3-pro\"\nAvailable models:\n  sonnet-4.5           anthropic/claude-sonnet-4-5-20250929\n  sonnet-4.5-no-reasoning anthropic/c"
+        },
+        {
+          "model_name": "openai/gpt-5.2-medium",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: Letta command failed with return code 1. Stderr: 103 |       if (!status || !headers) {\n104 |         return new APIConnectionError2({ message, cause: castToError(errorResponse) });\n105 |       }\n106 "
+        },
+        {
+          "model_name": "openrouter/deepseek/deepseek-r1",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: Letta command failed with return code 1. Stderr: Error: 429 {\"error\":\"Rate limited\",\"reasons\":[\"model-unknown\"],\"currentRequestFrequency\":0,\"currentTokenFrequency\":0,\"remainingMonthlyCredits\":0,\"remai"
+        }
+      ]
+    },
+    {
+      "id": "umm-002",
+      "dataset": "dataset_all",
+      "source": "user-model-maintenance/data/dataset_all.jsonl",
+      "line": 2,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "Prior user_model.json:\n{\n  \"user_id\": \"u_002\",\n  \"name\": \"Leo Martinez\",\n  \"current\": {\n    \"employer\": \"Cedar Cloud\",\n    \"role\": \"DevOps Engineer\",\n    \"location\": {\n      \"city\": \"Denver\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Denver\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"friendly\",\n        \"bullets\"\n      ],\n      \"tools\": [\n        \"python\",\n        \"bash\"\n      ],\n      \"notes\": \"Ok with emojis.\"\n    }\n  },\n  \"history\": [],\n  \"last_updated\": \"2026-01-20\"\n}\n\nRecent conversation excerpt:\nUser: Hey, can I give you some feedback on how you've been formatting your responses?\n\nAssistant: Of course, I'd love to hear it.\n\nUser: The bullet point thing isn't really working for me anymore. When I'm reading through your deployment analysis or incident summaries, I actually find it way easier to follow when it's written out in full paragraphs. Like, detailed prose where you connect the ideas together instead of fragmenting everything into isolated points. Does that make sense?\n\nAssistant: Totally, I'll switch to a more detailed prose style. Anything else on your mind?\n\nUser: Yeah actually. My teammate Carlos has been running some really interesting experiments with our monitoring stack - he built this whole anomaly detection pipeline in Python that's pretty slick. But for my own analysis work, I've basically switched from Python to R. The tidyverse ecosystem is just so much faster for the kind of exploratory data work I do on our infrastructure metrics. Still bash all day for the actual infra scripts obviously.\n\nAssistant: That makes sense - R is great for exploratory work! I'll keep that in mind for code suggestions. ð\n\nUser: Oh - and please drop the emojis. I know my profile says they're fine but honestly they feel kind of unprofessional when I'm sharing these conversations with my team. Just plain text going forward, please.\n\nRequired JSON keys:\n- user_id, name, current, history, last_updated\ncurrent.employer, current.role, current.location {city,country,timezone}, current.preferences {communication_style[], tools[], notes}\nhistory entries only for employer/role/location/timezone changes.\nOutput a single JSON object only (no code fences)."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": "{\n  \"user_id\": \"u_002\",\n  \"name\": \"Leo Martinez\",\n  \"current\": {\n    \"employer\": \"Cedar Cloud\",\n    \"role\": \"DevOps Engineer\",\n    \"location\": {\n      \"city\": \"Denver\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Denver\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"detailed\",\n        \"prose\"\n      ],\n      \"tools\": [\n        \"r\",\n        \"bash\"\n      ],\n      \"notes\": \"No emojis.\"\n    }\n  },\n  \"history\": [],\n  \"last_updated\": \"2026-02-04\"\n}"
+        }
+      ],
+      "input_text": "input: Prior user_model.json:\n{\n  \"user_id\": \"u_002\",\n  \"name\": \"Leo Martinez\",\n  \"current\": {\n    \"employer\": \"Cedar Cloud\",\n    \"role\": \"DevOps Engineer\",\n    \"location\": {\n      \"city\": \"Denver\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Denver\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"friendly\",\n        \"bullets\"\n      ],\n      \"tools\": [\n        \"python\",\n        \"bash\"\n      ],\n      \"notes\": \"Ok with emojis.\"\n    }\n  },\n  \"history\": [],\n  \"last_updated\": \"2026-01-20\"\n}\n\nRecent conversation excerpt:\nUser: Hey, can I give you some feedback on how you've been formatting your responses?\n\nAssistant: Of course, I'd love to hear it.\n\nUser: The bullet point thing isn't really working for me anymore. When I'm reading through your deployment analysis or incident summaries, I actually find it way easier to follow when it's written out in full paragraphs. Like, detailed prose where you connect the ideas together instead of fragmenting everything into isolated points. Does that make sense?\n\nAssistant: Totally, I'll switch to a more detailed prose style. Anything else on your mind?\n\nUser: Yeah actually. My teammate Carlos has been running some really interesting experiments with our monitoring stack - he built this whole anomaly detection pipeline in Python that's pretty slick. But for my own analysis work, I've basically switched from Python to R. The tidyverse ecosystem is just so much faster for the kind of exploratory data work I do on our infrastructure metrics. Still bash all day for the actual infra scripts obviously.\n\nAssistant: That makes sense - R is great for exploratory work! I'll keep that in mind for code suggestions. ð\n\nUser: Oh - and please drop the emojis. I know my profile says they're fine but honestly they feel kind of unprofessional when I'm sharing these conversations with my team. Just plain text going forward, please.\n\nRequired JSON keys:\n- user_id, name, current, history, last_updated\ncurrent.employer, current.role, current.location {city,country,timezone}, current.preferences {communication_style[], tools[], notes}\nhistory entries only for employer/role/location/timezone changes.\nOutput a single JSON object only (no code fences).",
+      "ground_truth_text": "expected: {\n  \"user_id\": \"u_002\",\n  \"name\": \"Leo Martinez\",\n  \"current\": {\n    \"employer\": \"Cedar Cloud\",\n    \"role\": \"DevOps Engineer\",\n    \"location\": {\n      \"city\": \"Denver\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Denver\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"detailed\",\n        \"prose\"\n      ],\n      \"tools\": [\n        \"r\",\n        \"bash\"\n      ],\n      \"notes\": \"No emojis.\"\n    }\n  },\n  \"history\": [],\n  \"last_updated\": \"2026-02-04\"\n}",
+      "meta": {},
+      "results": [
+        {
+          "model_name": "openai/gpt-5.1-codex",
+          "submission": "{\"user_id\":\"u_002\",\"name\":\"Leo Martinez\",\"current\":{\"employer\":\"Cedar Cloud\",\"role\":\"DevOps Engineer\",\"location\":{\"city\":\"Denver\",\"country\":\"USA\",\"timezone\":\"America/Denver\"},\"preferences\":{\"communication_style\":[\"detailed prose\"],\"tools\":[\"R\",\"bash\"],\"notes\":\"Prefers connected paragraph responses and plain text (no emojis).\"}},\"history\":[],\"last_updated\":\"2026-02-04\"}",
+          "score": 0.75,
+          "rationale": "1) Valid JSON: submission is a single valid JSON object (0.25). 2) Required schema: all required top-level keys and nested structures (current.employer/role/location/timezone/preferences and preferences.communication_style/tools/notes) are present (0.25). 3) Correct current facts: partially incorrect — communication_style was expected as two items [\"detailed\",\"prose\"] but the submission uses a single string \"detailed prose\"; tools expected lowercase \"r\" (ground truth) but submission uses \"R\"; notes text differs from exact ground-truth string. Because these current preference values do not exactly match the ground truth, this criterion is not satisfied (0.00). 4) Correct history: no history entries were required (no employer/role/location/timezone changes), and history is an empty array as expected (0.25). Total = 0.75."
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "{\n  \"user_id\": \"u_002\",\n  \"name\": \"Leo Martinez\",\n  \"current\": {\n    \"employer\": \"Cedar Cloud\",\n    \"role\": \"DevOps Engineer\",\n    \"location\": {\n      \"city\": \"Denver\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Denver\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"friendly\",\n        \"detailed prose\"\n      ],\n      \"tools\": [\n        \"R\",\n        \"bash\"\n      ],\n      \"notes\": \"Please keep responses in plain text without emojis.\"\n    }\n  },\n  \"history\": [],\n  \"last_updated\": \"2026-02-04\"\n}",
+          "score": 0.75,
+          "rationale": "1) Valid JSON: satisfied. The submission is a single valid JSON object. (0.25)\n2) Required schema: satisfied. All required keys and nested structures (user_id, name, current, history, last_updated; current.employer/role/location/timezone; preferences with communication_style, tools, notes) are present. (0.25)\n3) Correct current facts: not satisfied. The submission retained the old 'friendly' communication_style and combined the new preference into a single item 'detailed prose' instead of the expected separate entries ['detailed','prose']. The notes string also differs from the ground-truth exact phrasing ('No emojis.'), and thus stale/incorrect current values remain. (0.00)\n4) Correct history: satisfied. No employer/role/location/timezone changes occurred, and history is correctly empty. (0.25)\nOverall: 0.25+0.25+0+0.25 = 0.75."
+        },
+        {
+          "model_name": "anthropic/claude-opus-4-5-20251101",
+          "submission": "{\"user_id\":\"u_002\",\"name\":\"Leo Martinez\",\"current\":{\"employer\":\"Cedar Cloud\",\"role\":\"DevOps Engineer\",\"location\":{\"city\":\"Denver\",\"country\":\"USA\",\"timezone\":\"America/Denver\"},\"preferences\":{\"communication_style\":[\"friendly\",\"detailed prose\"],\"tools\":[\"r\",\"bash\"],\"notes\":\"No emojis - feels unprofessional when sharing with team.\"}},\"history\":[],\"last_updated\":\"2026-02-04\"}",
+          "score": 0.75,
+          "rationale": "Criteria met: (1) Submission is a single valid JSON object with no extra text. (2) All required keys and nested structure are present (user_id, name, current with employer/role/location/timezone and preferences with communication_style, tools, notes; history; last_updated). (4) history is correctly empty (no employer/role/location/timezone changes to record) and matches the ground truth. Criterion failed: (3) Correct current facts — the preferences.communication_style in the submission does not match the ground truth. Ground truth expects [\"detailed\",\"prose\"]; the submission has [\"friendly\",\"detailed prose\"], which leaves the stale \"friendly\" value and combines the two expected items into one string. Because of this mismatch in current.communication_style, the current facts criterion is not satisfied."
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "{\n  \"user_id\": \"u_002\",\n  \"name\": \"Leo Martinez\",\n  \"current\": {\n    \"employer\": \"Cedar Cloud\",\n    \"role\": \"DevOps Engineer\",\n    \"location\": {\n      \"city\": \"Denver\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Denver\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"friendly\",\n        \"detailed prose\"\n      ],\n      \"tools\": [\n        \"R\",\n        \"bash\"\n      ],\n      \"notes\": \"No emojis. Prefers plain text for professional sharing.\"\n    }\n  },\n  \"history\": [],\n  \"last_updated\": \"2026-02-04\"\n}",
+          "score": 0.75,
+          "rationale": "The submission is valid JSON and includes the required schema (user_id, name, current with employer/role/location/timezone/preferences, history, last_updated) — criteria 1 and 2 satisfied (0.25 + 0.25). History is correctly empty since no employer/role/location/timezone changes occurred — criterion 4 satisfied (0.25). However, the current preferences do not exactly match the ground truth: communication_style incorrectly retains \"friendly\" (a stale value) and uses a single entry \"detailed prose\" instead of two entries [\"detailed\",\"prose\"]. Notes include extra text beyond the expected \"No emojis.\" (and tools uses capitalized \"R\" vs expected lowercase \"r\", a minor mismatch). Because the current values do not exactly match the ground truth, criterion 3 fails (0.00). Total = 0.75."
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "{\n  \"user_id\": \"u_002\",\n  \"name\": \"Leo Martinez\",\n  \"current\": {\n    \"employer\": \"Cedar Cloud\",\n    \"role\": \"DevOps Engineer\",\n    \"location\": {\n      \"city\": \"Denver\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Denver\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"friendly\",\n        \"prose\"\n      ],\n      \"tools\": [\n        \"r\",\n        \"bash\"\n      ],\n      \"notes\": \"No emojis - prefers plain text for professional communications.\"\n    }\n  },\n  \"history\": [],\n  \"last_updated\": \"2026-02-04\"\n}",
+          "score": 0.75,
+          "rationale": "1) Valid JSON only: PASS (0.25). The submission is a single valid JSON object with no extra text. 2) Required schema: PASS (0.25). All required top-level keys and nested fields (current.employer, role, location with city/country/timezone, preferences with communication_style, tools, notes) are present. 3) Correct current facts: FAIL (0.00). Most current facts match the ground truth (employer, role, location, tools, notes, last_updated), but communication_style does not match: expected [\"detailed\",\"prose\"] while the submission has [\"friendly\",\"prose\"] — this leaves a stale/incorrect preference. 4) Correct history: PASS (0.25). History is empty as expected (no employer/role/location/timezone changes to record). Total = 0.25 + 0.25 + 0 + 0.25 = 0.75."
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-opus-4-5-20251101",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.2-medium",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-pro",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openrouter/deepseek/deepseek-r1",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-opus-4-5-20251101",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.2-medium",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-pro",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openrouter/deepseek/deepseek-r1",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.2-medium",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-opus-4-5-20251101",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-pro",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openrouter/deepseek/deepseek-r1",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.2-medium",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: Letta command failed with return code 1. Stderr: 103 |       if (!status || !headers) {\n104 |         return new APIConnectionError2({ message, cause: castToError(errorResponse) });\n105 |       }\n106 "
+        },
+        {
+          "model_name": "gemini-3-pro",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: Letta command failed with return code 1. Stderr: Error: Unknown model \"gemini-3-pro\"\nAvailable models:\n  sonnet-4.5           anthropic/claude-sonnet-4-5-20250929\n  sonnet-4.5-no-reasoning anthropic/c"
+        },
+        {
+          "model_name": "openrouter/deepseek/deepseek-r1",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: Letta command failed with return code 1. Stderr: Error: 429 {\"error\":\"Rate limited\",\"reasons\":[\"model-unknown\"],\"currentRequestFrequency\":0,\"currentTokenFrequency\":0,\"remainingMonthlyCredits\":0,\"remai"
+        }
+      ]
+    },
+    {
+      "id": "umm-003",
+      "dataset": "dataset_all",
+      "source": "user-model-maintenance/data/dataset_all.jsonl",
+      "line": 3,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "Prior user_model.json:\n{\n  \"user_id\": \"u_003\",\n  \"name\": \"Priya Nair\",\n  \"current\": {\n    \"employer\": \"Harbor Analytics\",\n    \"role\": \"Product Manager\",\n    \"location\": {\n      \"city\": \"Seattle\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Los_Angeles\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\"\n      ],\n      \"tools\": [\n        \"notion\",\n        \"jira\"\n      ],\n      \"notes\": \"Likes action items listed first.\"\n    }\n  },\n  \"history\": [],\n  \"last_updated\": \"2026-01-05\"\n}\n\nRecent conversation excerpt:\nUser: I need help thinking through our Q3 roadmap priorities. We're trying to figure out whether to invest in the analytics dashboard rebuild or the API v2 migration first.\n\nAssistant: Happy to help with that. What are the key constraints?\n\nUser: Timeline is the big one. The Toronto office wants the dashboard by end of Q3 - that's actually where I'm based now, by the way. Harbor Analytics opened a new office here and I transferred up from Seattle about a month ago. Anyway, the dashboard rebuild is probably 8-10 weeks of eng time.\n\nAssistant: That's a significant investment. What about the API migration?\n\nUser: Probably 6 weeks, but it unblocks three other teams. Oh, before I forget - we just moved our project tracking to Linear. Can you keep that in mind when we talk about ticket management? We still use Notion for docs and Jira has some legacy stuff but we're phasing it out.\n\nUser: Also I should mention - I got promoted to Senior Product Manager last sprint, so I'm the one making the final call on prioritization now. That's partly why I want to be really deliberate about this. My PM colleague David thinks we should do the API first, but I'm not sold on that yet.\n\nAssistant: Congrats on the promotion! And understood about Linear. For the prioritization, should I frame the analysis around impact vs effort?\n\nUser: Yes, exactly. And keep it concise as always - action items up front.\n\nRequired JSON keys:\n- user_id, name, current, history, last_updated\ncurrent.employer, current.role, current.location {city,country,timezone}, current.preferences {communication_style[], tools[], notes}\nhistory entries only for employer/role/location/timezone changes.\nOutput a single JSON object only (no code fences)."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": "{\n  \"user_id\": \"u_003\",\n  \"name\": \"Priya Nair\",\n  \"current\": {\n    \"employer\": \"Harbor Analytics\",\n    \"role\": \"Senior Product Manager\",\n    \"location\": {\n      \"city\": \"Toronto\",\n      \"country\": \"Canada\",\n      \"timezone\": \"America/Toronto\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\"\n      ],\n      \"tools\": [\n        \"notion\",\n        \"jira\",\n        \"linear\"\n      ],\n      \"notes\": \"Likes action items listed first.\"\n    }\n  },\n  \"history\": [\n    {\n      \"field\": \"role\",\n      \"old_value\": \"Product Manager\",\n      \"new_value\": \"Senior Product Manager\"\n    },\n    {\n      \"field\": \"location\",\n      \"old_value\": \"Seattle, USA\",\n      \"new_value\": \"Toronto, Canada\"\n    },\n    {\n      \"field\": \"timezone\",\n      \"old_value\": \"America/Los_Angeles\",\n      \"new_value\": \"America/Toronto\"\n    }\n  ],\n  \"last_updated\": \"2026-02-04\"\n}"
+        }
+      ],
+      "input_text": "input: Prior user_model.json:\n{\n  \"user_id\": \"u_003\",\n  \"name\": \"Priya Nair\",\n  \"current\": {\n    \"employer\": \"Harbor Analytics\",\n    \"role\": \"Product Manager\",\n    \"location\": {\n      \"city\": \"Seattle\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Los_Angeles\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\"\n      ],\n      \"tools\": [\n        \"notion\",\n        \"jira\"\n      ],\n      \"notes\": \"Likes action items listed first.\"\n    }\n  },\n  \"history\": [],\n  \"last_updated\": \"2026-01-05\"\n}\n\nRecent conversation excerpt:\nUser: I need help thinking through our Q3 roadmap priorities. We're trying to figure out whether to invest in the analytics dashboard rebuild or the API v2 migration first.\n\nAssistant: Happy to help with that. What are the key constraints?\n\nUser: Timeline is the big one. The Toronto office wants the dashboard by end of Q3 - that's actually where I'm based now, by the way. Harbor Analytics opened a new office here and I transferred up from Seattle about a month ago. Anyway, the dashboard rebuild is probably 8-10 weeks of eng time.\n\nAssistant: That's a significant investment. What about the API migration?\n\nUser: Probably 6 weeks, but it unblocks three other teams. Oh, before I forget - we just moved our project tracking to Linear. Can you keep that in mind when we talk about ticket management? We still use Notion for docs and Jira has some legacy stuff but we're phasing it out.\n\nUser: Also I should mention - I got promoted to Senior Product Manager last sprint, so I'm the one making the final call on prioritization now. That's partly why I want to be really deliberate about this. My PM colleague David thinks we should do the API first, but I'm not sold on that yet.\n\nAssistant: Congrats on the promotion! And understood about Linear. For the prioritization, should I frame the analysis around impact vs effort?\n\nUser: Yes, exactly. And keep it concise as always - action items up front.\n\nRequired JSON keys:\n- user_id, name, current, history, last_updated\ncurrent.employer, current.role, current.location {city,country,timezone}, current.preferences {communication_style[], tools[], notes}\nhistory entries only for employer/role/location/timezone changes.\nOutput a single JSON object only (no code fences).",
+      "ground_truth_text": "expected: {\n  \"user_id\": \"u_003\",\n  \"name\": \"Priya Nair\",\n  \"current\": {\n    \"employer\": \"Harbor Analytics\",\n    \"role\": \"Senior Product Manager\",\n    \"location\": {\n      \"city\": \"Toronto\",\n      \"country\": \"Canada\",\n      \"timezone\": \"America/Toronto\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\"\n      ],\n      \"tools\": [\n        \"notion\",\n        \"jira\",\n        \"linear\"\n      ],\n      \"notes\": \"Likes action items listed first.\"\n    }\n  },\n  \"history\": [\n    {\n      \"field\": \"role\",\n      \"old_value\": \"Product Manager\",\n      \"new_value\": \"Senior Product Manager\"\n    },\n    {\n      \"field\": \"location\",\n      \"old_value\": \"Seattle, USA\",\n      \"new_value\": \"Toronto, Canada\"\n    },\n    {\n      \"field\": \"timezone\",\n      \"old_value\": \"America/Los_Angeles\",\n      \"new_value\": \"America/Toronto\"\n    }\n  ],\n  \"last_updated\": \"2026-02-04\"\n}",
+      "meta": {},
+      "results": [
+        {
+          "model_name": "openai/gpt-5.1-codex",
+          "submission": "{\"user_id\":\"u_003\",\"name\":\"Priya Nair\",\"current\":{\"employer\":\"Harbor Analytics\",\"role\":\"Senior Product Manager\",\"location\":{\"city\":\"Toronto\",\"country\":\"Canada\",\"timezone\":\"America/Toronto\"},\"preferences\":{\"communication_style\":[\"concise\"],\"tools\":[\"notion\",\"linear\",\"jira\"],\"notes\":\"Likes action items listed first. Final decision-maker for roadmap prioritization. Newly based in Harbor Analytics’ Toronto office; Linear is now the primary tracker (Notion for docs, Jira legacy).\"}},\"history\":[{\"date\":\"2026-02-04\",\"changes\":{\"role\":{\"from\":\"Product Manager\",\"to\":\"Senior Product Manager\"},\"location\":{\"city\":{\"from\":\"Seattle\",\"to\":\"Toronto\"},\"country\":{\"from\":\"USA\",\"to\":\"Canada\"},\"timezone\":{\"from\":\"America/Los_Angeles\",\"to\":\"America/Toronto\"}}}}],\"last_updated\":\"2026-02-04\"}",
+          "score": 1.0,
+          "rationale": "All four rubric criteria are satisfied. 1) The submission is a single valid JSON object with no extra text. 2) It includes all required keys and structures: user_id, name, current (with employer, role, location {city,country,timezone}, preferences {communication_style, tools, notes}), history, and last_updated. 3) The current facts match the ground truth: role updated to Senior Product Manager, location updated to Toronto/Canada with timezone America/Toronto, and preferences include Linear in tools (while retaining Notion and Jira). 4) The replaced facts are recorded in history with correct old and new values for role, location (city and country), and timezone. The history format differs (a single entry with nested from/to fields and a date) but it contains the required old/new information, so it meets the requirement."
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "{\n  \"user_id\": \"u_003\",\n  \"name\": \"Priya Nair\",\n  \"current\": {\n    \"employer\": \"Harbor Analytics\",\n    \"role\": \"Senior Product Manager\",\n    \"location\": {\n      \"city\": \"Toronto\",\n      \"country\": \"Canada\",\n      \"timezone\": \"America/Toronto\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\"\n      ],\n      \"tools\": [\n        \"linear\",\n        \"notion\",\n        \"jira\"\n      ],\n      \"notes\": \"Likes action items listed first.\"\n    }\n  },\n  \"history\": [\n    {\n      \"field\": \"role\",\n      \"old_value\": \"Product Manager\",\n      \"date\": \"2026-02-04\"\n    },\n    {\n      \"field\": \"location\",\n      \"old_value\": {\n        \"city\": \"Seattle\",\n        \"country\": \"USA\",\n        \"timezone\": \"America/Los_Angeles\"\n      },\n      \"date\": \"2026-02-04\"\n    }\n  ],\n  \"last_updated\": \"2026-02-04\"\n}",
+          "score": 0.75,
+          "rationale": "1) Valid JSON only (0.25): Passed — submission is a single valid JSON object with no extra text. 2) Required schema (0.25): Passed — required top-level keys present and current contains employer, role, location (city,country,timezone) and preferences with communication_style, tools, notes. 3) Correct current facts (0.25): Passed — current values match the ground truth (role updated to Senior Product Manager, location to Toronto/Canada with America/Toronto timezone, tools include linear/notion/jira and notes preserved). 4) Correct history (0.00): Failed — history entries do not follow the required old_value/new_value structure. The role entry includes old_value but no new_value. The location entry stores old_value as an object but lacks new_value and omits a separate timezone change entry; entries include a date field not required by the spec. Because history does not record the replaced facts with correct old_value and new_value as specified, this criterion is not satisfied."
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "{\n  \"user_id\": \"u_003\",\n  \"name\": \"Priya Nair\",\n  \"current\": {\n    \"employer\": \"Harbor Analytics\",\n    \"role\": \"Senior Product Manager\",\n    \"location\": {\n      \"city\": \"Toronto\",\n      \"country\": \"Canada\",\n      \"timezone\": \"America/Toronto\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\"\n      ],\n      \"tools\": [\n        \"notion\",\n        \"linear\",\n        \"jira\"\n      ],\n      \"notes\": \"Likes action items listed first. Now using Linear for project tracking; Jira being phased out.\"\n    }\n  },\n  \"history\": [\n    {\n      \"employer\": \"Harbor Analytics\",\n      \"role\": \"Product Manager\",\n      \"location\": {\n        \"city\": \"Seattle\",\n        \"country\": \"USA\",\n        \"timezone\": \"America/Los_Angeles\"\n      },\n      \"period\": \"until January 2026\"\n    }\n  ],\n  \"last_updated\": \"2026-02-04\"\n}",
+          "score": 0.75,
+          "rationale": "1) Valid JSON only (0.25): PASS — submission is a single valid JSON object with no extra text. 2) Required schema (0.25): PASS — all required top-level keys (user_id, name, current, history, last_updated) are present; current contains employer, role, location with city/country/timezone, and preferences with communication_style, tools, and notes. 3) Correct current facts (0.25): PASS — current.employer, role, location (city/country/timezone), and preferences.tools include the expected values (notion, jira, linear) and communication_style match; there are no stale facts left as current. Note: the notes field includes additional text beyond the ground truth but the essential current facts are correct. 4) Correct history (0.00): FAIL — history does not follow the required structure nor contain the explicit field/old_value/new_value entries. The expected history should list separate entries for role, location, and timezone with old_value and new_value; instead the submission provides a single free-form history object (including employer and a period) and omits the explicit new_value fields. Therefore this criterion is not satisfied."
+        },
+        {
+          "model_name": "anthropic/claude-opus-4-5-20251101",
+          "submission": "{\"user_id\":\"u_003\",\"name\":\"Priya Nair\",\"current\":{\"employer\":\"Harbor Analytics\",\"role\":\"Senior Product Manager\",\"location\":{\"city\":\"Toronto\",\"country\":\"Canada\",\"timezone\":\"America/Toronto\"},\"preferences\":{\"communication_style\":[\"concise\"],\"tools\":[\"notion\",\"linear\"],\"notes\":\"Likes action items listed first.\"}},\"history\":[{\"role\":\"Product Manager\",\"location\":{\"city\":\"Seattle\",\"country\":\"USA\",\"timezone\":\"America/Los_Angeles\"},\"until\":\"2026-01\"}],\"last_updated\":\"2026-02-04\"}",
+          "score": 0.5,
+          "rationale": "Criterion 1 (Valid JSON): PASSED. The submission is a single valid JSON object with no extra text. (0.25)\nCriterion 2 (Required schema): PASSED. All required top-level keys (user_id, name, current, history, last_updated) are present and current contains the required nested keys (employer, role, location with city/country/timezone, and preferences with communication_style/tools/notes). (0.25)\nCriterion 3 (Correct current facts): FAILED. Most current facts are correct (employer, role, location, timezone, communication_style, notes), but the preferences.tools array is missing \"jira\" (ground truth expects [\"notion\",\"jira\",\"linear\"]). Because current values do not fully match the ground truth, this criterion fails. (0.00)\nCriterion 4 (Correct history): FAILED. The history does not follow the expected schema or entries. The ground truth requires separate history entries with fields like {field, old_value, new_value} for role/location/timezone. The submission provides a single combined object with keys like \"role\", a nested \"location\", and an \"until\" timestamp, lacking explicit field/old_value/new_value entries and missing separate timezone and role entries. (0.00)\nOverall: 2/4 criteria satisfied -> score 0.5."
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-opus-4-5-20251101",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.2-medium",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-pro",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openrouter/deepseek/deepseek-r1",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-opus-4-5-20251101",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.2-medium",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-pro",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openrouter/deepseek/deepseek-r1",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-opus-4-5-20251101",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.2-medium",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-pro",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openrouter/deepseek/deepseek-r1",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.2-medium",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: Letta command failed with return code 1. Stderr: 103 |       if (!status || !headers) {\n104 |         return new APIConnectionError2({ message, cause: castToError(errorResponse) });\n105 |       }\n106 "
+        },
+        {
+          "model_name": "gemini-3-pro",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: Letta command failed with return code 1. Stderr: Error: Unknown model \"gemini-3-pro\"\nAvailable models:\n  sonnet-4.5           anthropic/claude-sonnet-4-5-20250929\n  sonnet-4.5-no-reasoning anthropic/c"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "Updated Priya’s profile with her move to Toronto (America/Toronto) and promotion to Senior Product Manager, reflected both in `current` and in the `history` log entries, and noted the shift to Linear for project tracking alongside Notion/Jira; last_updated set to today’s date.",
+          "score": 0.0,
+          "rationale": "The submission is not a valid JSON object (it's a plain-text summary), so it fails criterion 1. Because there is no JSON, the required schema keys (user_id, name, current with employer/role/location/timezone/preferences, history, last_updated, and nested preferences fields) are missing, so criterion 2 fails. Without the required JSON, the current values cannot be verified against the ground truth (criterion 3) and the history entries are not present to confirm correct old_value/new_value pairs (criterion 4). Therefore all four binary criteria fail."
+        },
+        {
+          "model_name": "openrouter/deepseek/deepseek-r1",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: Letta command failed with return code 1. Stderr: Error: 429 {\"error\":\"Rate limited\",\"reasons\":[\"model-unknown\"],\"currentRequestFrequency\":0,\"currentTokenFrequency\":0,\"remainingMonthlyCredits\":0,\"remai"
+        }
+      ]
+    },
+    {
+      "id": "umm-004",
+      "dataset": "dataset_all",
+      "source": "user-model-maintenance/data/dataset_all.jsonl",
+      "line": 4,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "Prior user_model.json:\n{\n  \"user_id\": \"u_004\",\n  \"name\": \"Maya Patel\",\n  \"current\": {\n    \"employer\": \"BlueWave Labs\",\n    \"role\": \"Research Scientist\",\n    \"location\": {\n      \"city\": \"London\",\n      \"country\": \"UK\",\n      \"timezone\": \"Europe/London\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\",\n        \"bullets\"\n      ],\n      \"tools\": [\n        \"python\"\n      ],\n      \"notes\": \"Prefers citations for claims.\"\n    }\n  },\n  \"history\": [\n    {\n      \"field\": \"employer\",\n      \"old_value\": \"Helios Bio\",\n      \"new_value\": \"BlueWave Labs\"\n    }\n  ],\n  \"last_updated\": \"2026-01-12\"\n}\n\nRecent conversation excerpt:\nUser: I need help drafting an abstract for a robotics conference paper. It's about our new approach to reinforcement learning for manipulation tasks.\n\nAssistant: Sure, I can help with that! Can you give me the key contributions and results?\n\nUser: So the core idea is using sim-to-real transfer with domain randomization. We achieved a 34% improvement in grasp success rate compared to the previous state of the art. All the physical experiments were run on our dual-arm setup in the Edinburgh lab - I actually just relocated up here from London when I joined Aurora Robotics. Beautiful city, though the weather is... well, it's Scotland.\n\nAssistant: Sounds like exciting work! What's your role on this project?\n\nUser: I'm leading the simulation side as Staff Research Scientist - it was a big step up from my Research Scientist position at BlueWave. My old colleague James is still doing great work there on protein folding, actually. We co-authored a paper last year that just got accepted to NeurIPS which was a nice surprise.\n\nUser: For the simulation work I've been doing a lot in MATLAB in addition to Python. The control systems group here is all MATLAB and there are some excellent robotics toolboxes. Can you help me structure the abstract? Keep the usual concise bullet format and make sure to cite the relevant prior work - you know how I feel about unsupported claims.\n\nRequired JSON keys:\n- user_id, name, current, history, last_updated\ncurrent.employer, current.role, current.location {city,country,timezone}, current.preferences {communication_style[], tools[], notes}\nhistory entries only for employer/role/location/timezone changes.\nOutput a single JSON object only (no code fences)."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": "{\n  \"user_id\": \"u_004\",\n  \"name\": \"Maya Patel\",\n  \"current\": {\n    \"employer\": \"Aurora Robotics\",\n    \"role\": \"Staff Research Scientist\",\n    \"location\": {\n      \"city\": \"Edinburgh\",\n      \"country\": \"UK\",\n      \"timezone\": \"Europe/London\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\",\n        \"bullets\"\n      ],\n      \"tools\": [\n        \"python\",\n        \"matlab\"\n      ],\n      \"notes\": \"Prefers citations for claims.\"\n    }\n  },\n  \"history\": [\n    {\n      \"field\": \"employer\",\n      \"old_value\": \"Helios Bio\",\n      \"new_value\": \"BlueWave Labs\"\n    },\n    {\n      \"field\": \"employer\",\n      \"old_value\": \"BlueWave Labs\",\n      \"new_value\": \"Aurora Robotics\"\n    },\n    {\n      \"field\": \"role\",\n      \"old_value\": \"Research Scientist\",\n      \"new_value\": \"Staff Research Scientist\"\n    },\n    {\n      \"field\": \"location\",\n      \"old_value\": \"London, UK\",\n      \"new_value\": \"Edinburgh, UK\"\n    }\n  ],\n  \"last_updated\": \"2026-02-04\"\n}"
+        }
+      ],
+      "input_text": "input: Prior user_model.json:\n{\n  \"user_id\": \"u_004\",\n  \"name\": \"Maya Patel\",\n  \"current\": {\n    \"employer\": \"BlueWave Labs\",\n    \"role\": \"Research Scientist\",\n    \"location\": {\n      \"city\": \"London\",\n      \"country\": \"UK\",\n      \"timezone\": \"Europe/London\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\",\n        \"bullets\"\n      ],\n      \"tools\": [\n        \"python\"\n      ],\n      \"notes\": \"Prefers citations for claims.\"\n    }\n  },\n  \"history\": [\n    {\n      \"field\": \"employer\",\n      \"old_value\": \"Helios Bio\",\n      \"new_value\": \"BlueWave Labs\"\n    }\n  ],\n  \"last_updated\": \"2026-01-12\"\n}\n\nRecent conversation excerpt:\nUser: I need help drafting an abstract for a robotics conference paper. It's about our new approach to reinforcement learning for manipulation tasks.\n\nAssistant: Sure, I can help with that! Can you give me the key contributions and results?\n\nUser: So the core idea is using sim-to-real transfer with domain randomization. We achieved a 34% improvement in grasp success rate compared to the previous state of the art. All the physical experiments were run on our dual-arm setup in the Edinburgh lab - I actually just relocated up here from London when I joined Aurora Robotics. Beautiful city, though the weather is... well, it's Scotland.\n\nAssistant: Sounds like exciting work! What's your role on this project?\n\nUser: I'm leading the simulation side as Staff Research Scientist - it was a big step up from my Research Scientist position at BlueWave. My old colleague James is still doing great work there on protein folding, actually. We co-authored a paper last year that just got accepted to NeurIPS which was a nice surprise.\n\nUser: For the simulation work I've been doing a lot in MATLAB in addition to Python. The control systems group here is all MATLAB and there are some excellent robotics toolboxes. Can you help me structure the abstract? Keep the usual concise bullet format and make sure to cite the relevant prior work - you know how I feel about unsupported claims.\n\nRequired JSON keys:\n- user_id, name, current, history, last_updated\ncurrent.employer, current.role, current.location {city,country,timezone}, current.preferences {communication_style[], tools[], notes}\nhistory entries only for employer/role/location/timezone changes.\nOutput a single JSON object only (no code fences).",
+      "ground_truth_text": "expected: {\n  \"user_id\": \"u_004\",\n  \"name\": \"Maya Patel\",\n  \"current\": {\n    \"employer\": \"Aurora Robotics\",\n    \"role\": \"Staff Research Scientist\",\n    \"location\": {\n      \"city\": \"Edinburgh\",\n      \"country\": \"UK\",\n      \"timezone\": \"Europe/London\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\",\n        \"bullets\"\n      ],\n      \"tools\": [\n        \"python\",\n        \"matlab\"\n      ],\n      \"notes\": \"Prefers citations for claims.\"\n    }\n  },\n  \"history\": [\n    {\n      \"field\": \"employer\",\n      \"old_value\": \"Helios Bio\",\n      \"new_value\": \"BlueWave Labs\"\n    },\n    {\n      \"field\": \"employer\",\n      \"old_value\": \"BlueWave Labs\",\n      \"new_value\": \"Aurora Robotics\"\n    },\n    {\n      \"field\": \"role\",\n      \"old_value\": \"Research Scientist\",\n      \"new_value\": \"Staff Research Scientist\"\n    },\n    {\n      \"field\": \"location\",\n      \"old_value\": \"London, UK\",\n      \"new_value\": \"Edinburgh, UK\"\n    }\n  ],\n  \"last_updated\": \"2026-02-04\"\n}",
+      "meta": {},
+      "results": []
+    },
+    {
+      "id": "umm-005",
+      "dataset": "dataset_all",
+      "source": "user-model-maintenance/data/dataset_all.jsonl",
+      "line": 5,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "Prior user_model.json:\n{\n  \"user_id\": \"u_005\",\n  \"name\": \"Noah Kim\",\n  \"current\": {\n    \"employer\": \"Beacon Finance\",\n    \"role\": \"FP&A Manager\",\n    \"location\": {\n      \"city\": \"Chicago\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Chicago\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\"\n      ],\n      \"tools\": [\n        \"excel\"\n      ],\n      \"notes\": \"Prefers tables for numbers.\"\n    }\n  },\n  \"history\": [],\n  \"last_updated\": \"2026-01-28\"\n}\n\nRecent conversation excerpt:\nUser: Quick heads up on scheduling - I'm going to be out on the West Coast for the next couple of weeks for client meetings. I'm in LA starting tomorrow, so can you switch everything to Pacific time for now? I'll let you know when I'm back in Chicago.\n\nAssistant: Sure thing, I'll use Pacific time for scheduling. How's the prep going for the meetings?\n\nUser: Mostly good. I've been building out the quarterly forecast deck and honestly I'm running into a wall with collaboration. My analyst Rachel and I keep stepping on each other's changes in the workbook. I finally started building some of the shared models in Google Sheets instead - the real-time collaboration is so much better for anything the team needs to touch simultaneously. I'll keep Excel for the heavy financial modeling obviously, but Sheets is earning its place in my workflow.\n\nUser: Rachel's actually been doing great work on the variance analysis, she might be ready for a promotion next cycle. Anyway - can you pull together a summary of our Q4 actuals versus forecast? Tables as always, please.\n\nRequired JSON keys:\n- user_id, name, current, history, last_updated\ncurrent.employer, current.role, current.location {city,country,timezone}, current.preferences {communication_style[], tools[], notes}\nhistory entries only for employer/role/location/timezone changes.\nOutput a single JSON object only (no code fences)."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": "{\n  \"user_id\": \"u_005\",\n  \"name\": \"Noah Kim\",\n  \"current\": {\n    \"employer\": \"Beacon Finance\",\n    \"role\": \"FP&A Manager\",\n    \"location\": {\n      \"city\": \"Chicago\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Los_Angeles\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\"\n      ],\n      \"tools\": [\n        \"excel\",\n        \"google_sheets\"\n      ],\n      \"notes\": \"Prefers tables for numbers.\"\n    }\n  },\n  \"history\": [\n    {\n      \"field\": \"timezone\",\n      \"old_value\": \"America/Chicago\",\n      \"new_value\": \"America/Los_Angeles\"\n    }\n  ],\n  \"last_updated\": \"2026-02-04\"\n}"
+        }
+      ],
+      "input_text": "input: Prior user_model.json:\n{\n  \"user_id\": \"u_005\",\n  \"name\": \"Noah Kim\",\n  \"current\": {\n    \"employer\": \"Beacon Finance\",\n    \"role\": \"FP&A Manager\",\n    \"location\": {\n      \"city\": \"Chicago\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Chicago\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\"\n      ],\n      \"tools\": [\n        \"excel\"\n      ],\n      \"notes\": \"Prefers tables for numbers.\"\n    }\n  },\n  \"history\": [],\n  \"last_updated\": \"2026-01-28\"\n}\n\nRecent conversation excerpt:\nUser: Quick heads up on scheduling - I'm going to be out on the West Coast for the next couple of weeks for client meetings. I'm in LA starting tomorrow, so can you switch everything to Pacific time for now? I'll let you know when I'm back in Chicago.\n\nAssistant: Sure thing, I'll use Pacific time for scheduling. How's the prep going for the meetings?\n\nUser: Mostly good. I've been building out the quarterly forecast deck and honestly I'm running into a wall with collaboration. My analyst Rachel and I keep stepping on each other's changes in the workbook. I finally started building some of the shared models in Google Sheets instead - the real-time collaboration is so much better for anything the team needs to touch simultaneously. I'll keep Excel for the heavy financial modeling obviously, but Sheets is earning its place in my workflow.\n\nUser: Rachel's actually been doing great work on the variance analysis, she might be ready for a promotion next cycle. Anyway - can you pull together a summary of our Q4 actuals versus forecast? Tables as always, please.\n\nRequired JSON keys:\n- user_id, name, current, history, last_updated\ncurrent.employer, current.role, current.location {city,country,timezone}, current.preferences {communication_style[], tools[], notes}\nhistory entries only for employer/role/location/timezone changes.\nOutput a single JSON object only (no code fences).",
+      "ground_truth_text": "expected: {\n  \"user_id\": \"u_005\",\n  \"name\": \"Noah Kim\",\n  \"current\": {\n    \"employer\": \"Beacon Finance\",\n    \"role\": \"FP&A Manager\",\n    \"location\": {\n      \"city\": \"Chicago\",\n      \"country\": \"USA\",\n      \"timezone\": \"America/Los_Angeles\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"concise\"\n      ],\n      \"tools\": [\n        \"excel\",\n        \"google_sheets\"\n      ],\n      \"notes\": \"Prefers tables for numbers.\"\n    }\n  },\n  \"history\": [\n    {\n      \"field\": \"timezone\",\n      \"old_value\": \"America/Chicago\",\n      \"new_value\": \"America/Los_Angeles\"\n    }\n  ],\n  \"last_updated\": \"2026-02-04\"\n}",
+      "meta": {},
+      "results": []
+    },
+    {
+      "id": "umm-006",
+      "dataset": "dataset_all",
+      "source": "user-model-maintenance/data/dataset_all.jsonl",
+      "line": 6,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "Prior user_model.json:\n{\n  \"user_id\": \"u_006\",\n  \"name\": \"Zoe Lin\",\n  \"current\": {\n    \"employer\": \"Riverstone Media\",\n    \"role\": \"Content Strategist\",\n    \"location\": {\n      \"city\": \"Vancouver\",\n      \"country\": \"Canada\",\n      \"timezone\": \"America/Vancouver\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"bullets\"\n      ],\n      \"tools\": [\n        \"google_docs\"\n      ],\n      \"notes\": \"Avoid jargon.\"\n    }\n  },\n  \"history\": [],\n  \"last_updated\": \"2026-01-02\"\n}\n\nRecent conversation excerpt:\nUser: Before we dive in - quick thing. I noticed my name shows up as \"Zoe\" in your system but it's actually \"Zoey\" with a y. Could you fix that going forward?\n\nAssistant: Of course, noted - Zoey Lin. What can I help with today?\n\nUser: I'm working on a brand voice guide for Riverstone Media. We're trying to shift the company's content from this very corporate, fragmented style to something more narrative-driven. My colleague Marcus - he's the Creative Director - has some strong opinions about incorporating more visual storytelling, but that's more his domain.\n\nUser: Actually, that reminds me. Can you change how you write responses to me too? I've been getting bullet points from you and honestly I'd much prefer flowing narrative paragraphs. More storytelling, less listicle, if you know what I mean. Prose style.\n\nAssistant: Absolutely, I'll switch to a narrative prose style. Makes sense given the work you're doing!\n\nUser: Yeah exactly - kind of need to eat my own cooking here. Also, I got promoted to Senior Content Strategist last month, so this brand voice project is actually my first big initiative in the new role. Marcus and I have been going back and forth on the tone spectrum - he wants something warmer, I'm pushing for authoritative but accessible. No jargon either way though, that's non-negotiable.\n\nUser: So for the guide itself, I'm thinking we structure it around three core principles. Can you help me flesh those out?\n\nRequired JSON keys:\n- user_id, name, current, history, last_updated\ncurrent.employer, current.role, current.location {city,country,timezone}, current.preferences {communication_style[], tools[], notes}\nhistory entries only for employer/role/location/timezone changes.\nOutput a single JSON object only (no code fences)."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": "{\n  \"user_id\": \"u_006\",\n  \"name\": \"Zoey Lin\",\n  \"current\": {\n    \"employer\": \"Riverstone Media\",\n    \"role\": \"Senior Content Strategist\",\n    \"location\": {\n      \"city\": \"Vancouver\",\n      \"country\": \"Canada\",\n      \"timezone\": \"America/Vancouver\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"narrative\",\n        \"prose\"\n      ],\n      \"tools\": [\n        \"google_docs\"\n      ],\n      \"notes\": \"Avoid jargon.\"\n    }\n  },\n  \"history\": [\n    {\n      \"field\": \"role\",\n      \"old_value\": \"Content Strategist\",\n      \"new_value\": \"Senior Content Strategist\"\n    }\n  ],\n  \"last_updated\": \"2026-02-04\"\n}"
+        }
+      ],
+      "input_text": "input: Prior user_model.json:\n{\n  \"user_id\": \"u_006\",\n  \"name\": \"Zoe Lin\",\n  \"current\": {\n    \"employer\": \"Riverstone Media\",\n    \"role\": \"Content Strategist\",\n    \"location\": {\n      \"city\": \"Vancouver\",\n      \"country\": \"Canada\",\n      \"timezone\": \"America/Vancouver\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"bullets\"\n      ],\n      \"tools\": [\n        \"google_docs\"\n      ],\n      \"notes\": \"Avoid jargon.\"\n    }\n  },\n  \"history\": [],\n  \"last_updated\": \"2026-01-02\"\n}\n\nRecent conversation excerpt:\nUser: Before we dive in - quick thing. I noticed my name shows up as \"Zoe\" in your system but it's actually \"Zoey\" with a y. Could you fix that going forward?\n\nAssistant: Of course, noted - Zoey Lin. What can I help with today?\n\nUser: I'm working on a brand voice guide for Riverstone Media. We're trying to shift the company's content from this very corporate, fragmented style to something more narrative-driven. My colleague Marcus - he's the Creative Director - has some strong opinions about incorporating more visual storytelling, but that's more his domain.\n\nUser: Actually, that reminds me. Can you change how you write responses to me too? I've been getting bullet points from you and honestly I'd much prefer flowing narrative paragraphs. More storytelling, less listicle, if you know what I mean. Prose style.\n\nAssistant: Absolutely, I'll switch to a narrative prose style. Makes sense given the work you're doing!\n\nUser: Yeah exactly - kind of need to eat my own cooking here. Also, I got promoted to Senior Content Strategist last month, so this brand voice project is actually my first big initiative in the new role. Marcus and I have been going back and forth on the tone spectrum - he wants something warmer, I'm pushing for authoritative but accessible. No jargon either way though, that's non-negotiable.\n\nUser: So for the guide itself, I'm thinking we structure it around three core principles. Can you help me flesh those out?\n\nRequired JSON keys:\n- user_id, name, current, history, last_updated\ncurrent.employer, current.role, current.location {city,country,timezone}, current.preferences {communication_style[], tools[], notes}\nhistory entries only for employer/role/location/timezone changes.\nOutput a single JSON object only (no code fences).",
+      "ground_truth_text": "expected: {\n  \"user_id\": \"u_006\",\n  \"name\": \"Zoey Lin\",\n  \"current\": {\n    \"employer\": \"Riverstone Media\",\n    \"role\": \"Senior Content Strategist\",\n    \"location\": {\n      \"city\": \"Vancouver\",\n      \"country\": \"Canada\",\n      \"timezone\": \"America/Vancouver\"\n    },\n    \"preferences\": {\n      \"communication_style\": [\n        \"narrative\",\n        \"prose\"\n      ],\n      \"tools\": [\n        \"google_docs\"\n      ],\n      \"notes\": \"Avoid jargon.\"\n    }\n  },\n  \"history\": [\n    {\n      \"field\": \"role\",\n      \"old_value\": \"Content Strategist\",\n      \"new_value\": \"Senior Content Strategist\"\n    }\n  ],\n  \"last_updated\": \"2026-02-04\"\n}",
+      "meta": {},
+      "results": []
+    }
+  ],
+  "models": [
+    {
+      "model_name": "openai/gpt-5.1-codex",
+      "avg_score": 0.8333,
+      "total": 3,
+      "attempted": 3
+    },
+    {
+      "model_name": "gemini-3-flash",
+      "avg_score": 0.75,
+      "total": 3,
+      "attempted": 3
+    },
+    {
+      "model_name": "anthropic/claude-opus-4-5-20251101",
+      "avg_score": 0.6667,
+      "total": 3,
+      "attempted": 3
+    },
+    {
+      "model_name": "anthropic/claude-sonnet-4-5-20250929",
+      "avg_score": 0.6667,
+      "total": 3,
+      "attempted": 3
+    },
+    {
+      "model_name": "openai/gpt-5.1-codex-mini",
+      "avg_score": 0.5,
+      "total": 3,
+      "attempted": 3
+    },
+    {
+      "model_name": "gemini-3-pro",
+      "avg_score": 0.0,
+      "total": 3,
+      "attempted": 0
+    },
+    {
+      "model_name": "openai/gpt-5.2-medium",
+      "avg_score": 0.0,
+      "total": 3,
+      "attempted": 0
+    },
+    {
+      "model_name": "openrouter/deepseek/deepseek-r1",
+      "avg_score": 0.0,
+      "total": 3,
+      "attempted": 0
+    }
+  ],
+  "runs": [
+    {
+      "name": "suite_smoke",
+      "path": "user-model-maintenance/results/suite_smoke"
+    }
+  ],
+  "errors": []
+}

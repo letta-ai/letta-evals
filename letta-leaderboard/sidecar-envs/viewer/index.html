@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sidecar Trajectory Viewer</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="brand">
+            <div class="badge">Sidecar Envs</div>
+            <div class="brand-title">Trajectory Viewer</div>
+          </div>
+          <div class="top-controls">
+            <div class="control-block">
+              <div class="control-label">Category</div>
+              <div id="categoryTabs" class="tabs"></div>
+            </div>
+            <div class="control-block">
+              <div class="control-label">Model</div>
+              <select id="modelSelect" class="select"></select>
+            </div>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <div class="control-block">
+            <label for="searchInput">Search</label>
+            <input
+              id="searchInput"
+              type="search"
+              placeholder="Search id, dataset, or prompt"
+              autocomplete="off"
+            />
+          </div>
+          <div class="stats">
+            <div class="stat">
+              <div class="stat-label">Categories</div>
+              <div class="stat-value" id="categoryCount">0</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Scenarios</div>
+              <div class="stat-value" id="scenarioCount">0</div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="content">
+        <aside class="sidebar">
+          <div class="sidebar-header">
+            <div class="panel-title" id="listTitle">Scenarios</div>
+            <div class="panel-meta" id="listMeta"></div>
+          </div>
+          <div id="scenarioList" class="list"></div>
+        </aside>
+
+        <main class="panel-grid">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Context</div>
+                <div class="panel-meta" id="contextMeta"></div>
+              </div>
+            </div>
+            <div id="contextBody" class="panel-body"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Rubric</div>
+                <div class="panel-meta" id="rubricMeta"></div>
+              </div>
+            </div>
+            <div id="rubricBody" class="panel-body"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Response</div>
+                <div class="panel-meta" id="responseMeta"></div>
+              </div>
+            </div>
+            <div id="responseBody" class="panel-body"></div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

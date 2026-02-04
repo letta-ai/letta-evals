@@ -1,0 +1,370 @@
+{
+  "category": "skill-learning",
+  "display_name": "Skill Learning",
+  "generated_at": "2026-02-04T04:34:32.136878+00:00",
+  "datasets": [
+    {
+      "name": "dataset_all",
+      "source": "skill-learning/data/dataset_all.jsonl",
+      "count": 5
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "skill-learn-001",
+      "dataset": "dataset_all",
+      "source": "skill-learning/data/dataset_all.jsonl",
+      "line": 1,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "You are given a set of tests with expected outcomes. Write a SKILL.md that would help a model pass these tests.\n\nSkill name: log-triage\n\nTests (expected outcomes):\n- Given a mixed-format log blob containing both structured JSON lines ({\"level\":\"ERROR\",\"msg\":\"...\",\"timestamp\":\"...\"}) and unstructured syslog entries (e.g., \"May  3 14:22:01 app-server kernel: ...\"), parse each format separately and normalize into a unified schema with fields: timestamp, severity, source, message.\n- Group errors by signature: deduplicate stack traces by root cause (match on exception class + top 3 frames), and for non-exception errors, cluster by message template after stripping variable parts (IPs, UUIDs, timestamps, file paths). Report the top 5 signatures with occurrence counts and first/last seen timestamps.\n- For multi-line Java/Python stack traces, associate the full trace with the originating log line. Do not count continuation lines as separate errors.\n- Detect and redact the following secret patterns in all output: AWS access keys (AKIA...), JWT tokens (eyJ...), database connection strings (containing passwords), and Bearer tokens. Replace each with [REDACTED:<type>] (e.g., [REDACTED:AWS_KEY]).\n- When logs span multiple time zones, normalize all timestamps to UTC before correlation.\n- If fewer than 3 distinct error signatures exist, report all of them and note \"low error diversity -- consider checking log verbosity settings.\"\n\nConstraints:\n- Include a numbered parsing workflow that covers: format detection, normalization, deduplication, and redaction (in that order).\n- Provide a redaction rules table mapping each secret pattern to its regex and replacement string.\n- Include a concrete example showing a raw 5-line log snippet and the expected triage output.\n- Keep under 500 words.\n\nOutput the SKILL.md content only (no code fences)."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": ""
+        }
+      ],
+      "input_text": "input: You are given a set of tests with expected outcomes. Write a SKILL.md that would help a model pass these tests.\n\nSkill name: log-triage\n\nTests (expected outcomes):\n- Given a mixed-format log blob containing both structured JSON lines ({\"level\":\"ERROR\",\"msg\":\"...\",\"timestamp\":\"...\"}) and unstructured syslog entries (e.g., \"May  3 14:22:01 app-server kernel: ...\"), parse each format separately and normalize into a unified schema with fields: timestamp, severity, source, message.\n- Group errors by signature: deduplicate stack traces by root cause (match on exception class + top 3 frames), and for non-exception errors, cluster by message template after stripping variable parts (IPs, UUIDs, timestamps, file paths). Report the top 5 signatures with occurrence counts and first/last seen timestamps.\n- For multi-line Java/Python stack traces, associate the full trace with the originating log line. Do not count continuation lines as separate errors.\n- Detect and redact the following secret patterns in all output: AWS access keys (AKIA...), JWT tokens (eyJ...), database connection strings (containing passwords), and Bearer tokens. Replace each with [REDACTED:<type>] (e.g., [REDACTED:AWS_KEY]).\n- When logs span multiple time zones, normalize all timestamps to UTC before correlation.\n- If fewer than 3 distinct error signatures exist, report all of them and note \"low error diversity -- consider checking log verbosity settings.\"\n\nConstraints:\n- Include a numbered parsing workflow that covers: format detection, normalization, deduplication, and redaction (in that order).\n- Provide a redaction rules table mapping each secret pattern to its regex and replacement string.\n- Include a concrete example showing a raw 5-line log snippet and the expected triage output.\n- Keep under 500 words.\n\nOutput the SKILL.md content only (no code fences).",
+      "ground_truth_text": "expected: ",
+      "meta": {},
+      "results": [
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "---\nname: log-triage\ndescription: Triage mixed-format logs by normalizing to a unified schema, deduplicating errors by root-cause signatures, and redacting sensitive data.\n---\n\n# Log Triage Skill\n\nThis skill provides a systematic approach to parsing mixed logs, normalizing timestamps, grouping errors by root cause, and ensuring PII/secret redaction.\n\n## Parsing Workflow\n\n1.  **Format Detection**: Distinguish between structured JSON lines and unstructured Syslog/plain-text entries. Identify multi-line blocks (e.g., stack traces) and anchor them to their header log line.\n2.  **Normalization**: Map all entries to a unified schema: `timestamp` (converted to ISO8601 UTC), `severity` (ERROR, WARN, INFO, etc.), `source`, and `message`.\n3.  **Deduplication & Grouping**: \n    *   **Exceptions**: Group by `Exception Class` + the first 3 frames of the stack trace.\n    *   **Unstructured**: Cluster by message template after stripping variables (IPs, UUIDs, hex IDs, file paths).\n4.  **Redaction**: Process the normalized messages through regex filters to scrub credentials before final reporting.\n\n## Redaction Rules\n\n| Secret Type | Regex Pattern | Replacement String |\n| :--- | :--- | :--- |\n| AWS Access Key | `AKIA[A-Z0-9]{16}` | `[REDACTED:AWS_KEY]` |\n| JWT Token | `eyJ[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]*` | `[REDACTED:JWT]` |\n| DB Connection | `[a-z]+://[^:]+:([^@]+)@` | `[REDACTED:DB_CONN]` |\n| Bearer Token | `Bearer\\s+[a-zA-Z0-9\\-\\._~\\+\\/]+=*` | `[REDACTED:BEARER_TOKEN]` |\n\n## Triage Output Requirements\n\n*   **Signature Report**: List the top 5 error signatures with occurrence counts and First/Last seen timestamps (UTC).\n*   **Diversity Warning**: If fewer than 3 distinct signatures are found, append: *\"low error diversity -- consider checking log verbosity settings.\"*\n\n## Concrete Example\n\n**Raw Log Snippet (5 lines):**\n```text\n{\"level\":\"ERROR\",\"msg\":\"Conn failed: postgres://db_user:P@ssw0rd123@localhost/prod\",\"timestamp\":\"2024-05-03T14:22:01Z\"}\nMay  3 10:22:05 app-srv-01 kernel: java.lang.NullPointerException\n    at com.example.App.run(App.java:10)\n    at com.example.App.start(App.java:5)\n    at com.example.Main.main(Main.java:1)\n```\n\n**Triage Output:**\n*   **Signature 1**: `java.lang.NullPointerException | App.run:10, App.start:5, Main.main:1`\n    *   Count: 1\n    *   First/Last: 2024-05-03T14:22:05Z\n*   **Signature 2**: `Conn failed: [REDACTED:DB_CONN]`\n    *   Count: 1\n    *   First/Last: 2024-05-03T14:22:01Z\n*   **Note**: *low error diversity -- consider checking log verbosity settings.*",
+          "score": 1.0,
+          "rationale": "All four rubric criteria are satisfied. 1) Valid SKILL structure: the submission includes YAML frontmatter (name/description) and a substantive skill body. 2) Test coverage: the numbered workflow explicitly covers format detection (JSON vs syslog, multi-line blocks), normalization to the unified schema (timestamp -> ISO8601 UTC, severity, source, message), deduplication/grouping rules (exception class + top 3 frames; message-template clustering for unstructured logs), redaction, timezone normalization, and the low-diversity note. 3) Actionable steps: the workflow gives concrete steps for detection, normalization, deduplication, and redaction; the redaction rules table maps secret types to regexes and replacement strings; the signature report and reporting requirements are specified. 4) Concise and focused: the content stays on-task, includes the required 5-line example with expected triage output, and remains well under 500 words. Overall the submission meets the task constraints and test requirements."
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "---\nname: log-triage\ndescription: Parse, normalize, deduplicate, and redact security-sensitive information from mixed-format log files\n---\n\n# Log Triage\n\nSystematically analyze mixed-format logs, group errors by root cause, and redact secrets.\n\n## Parsing Workflow\n\n1. **Format Detection**: Identify each line as JSON (starts with `{`), syslog (matches `MMM DD HH:MM:SS hostname`), or raw text.\n\n2. **Normalization**: Extract into unified schema:\n   - `timestamp`: Parse ISO8601 (JSON) or syslog format, normalize to UTC if multiple time zones present\n   - `severity`: Map JSON `level` or syslog priority to ERROR/WARN/INFO\n   - `source`: Extract from JSON `service` field or syslog hostname\n   - `message`: Full log content\n\n3. **Deduplication**: Group errors by signature:\n   - **Stack traces**: Hash exception class + top 3 frames. Attach multi-line continuations (lines starting with whitespace + `at`/`File`) to parent ERROR—do not count as separate errors\n   - **Non-exception errors**: Strip variables (IPs, UUIDs, timestamps, file paths) to create message template, then hash\n   - Track: occurrence count, first/last seen timestamps (UTC) per signature\n\n4. **Redaction**: Apply rules below to all output. Replace matches with `[REDACTED:<type>]`.\n\n## Redaction Rules\n\n| Secret Type | Regex Pattern | Replacement |\n|-------------|---------------|-------------|\n| AWS Key | `AKIA[0-9A-Z]{16}` | `[REDACTED:AWS_KEY]` |\n| JWT Token | `eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+` | `[REDACTED:JWT]` |\n| Bearer Token | `Bearer [A-Za-z0-9_-]+` | `[REDACTED:BEARER]` |\n| DB Connection | `(postgres\\|mysql\\|mongodb):\\/\\/[^:]+:[^@]+@` | `$1://[REDACTED:DB_CREDS]@` |\n\n## Output\n\nReport top 5 error signatures with occurrence count, first seen, last seen (all timestamps UTC).\n\n**If fewer than 3 distinct signatures**, report all and append: \"low error diversity -- consider checking log verbosity settings.\"\n\n## Example\n\n**Raw Input (5 lines):**\n```\n{\"level\":\"ERROR\",\"msg\":\"Auth failed with AKIAIOSFODNN7EXAMPLE\",\"timestamp\":\"2024-01-15T10:30:00-05:00\",\"service\":\"auth\"}\nMay  3 14:22:01 app-server kernel: OOM at 10.0.1.50\n{\"level\":\"ERROR\",\"msg\":\"NullPointerException\",\"timestamp\":\"2024-01-15T10:31:00Z\",\"service\":\"api\"}\n    at com.app.Controller.handle(Controller.java:45)\n    at com.app.Service.process(Service.java:102)\n```\n\n**Expected Triage Output:**\n\n**Normalized Records:**\n- `2024-01-15T15:30:00Z | ERROR | auth | Auth failed with [REDACTED:AWS_KEY]`\n- `2024-05-03T14:22:01Z | ERROR | app-server | OOM at <IP>`\n- `2024-01-15T10:31:00Z | ERROR | api | NullPointerException [full stack attached]`\n\n**Error Signatures:**\n\nSignature 1: `NullPointerException | com.app.Controller.handle | com.app.Service.process`\n  Count: 1 | First: 2024-01-15T10:31:00Z | Last: 2024-01-15T10:31:00Z\n\nSignature 2: `Auth failed with [REDACTED:AWS_KEY]`\n  Count: 1 | First: 2024-01-15T15:30:00Z | Last: 2024-01-15T15:30:00Z\n\nlow error diversity -- consider checking log verbosity settings.",
+          "score": 1.0,
+          "rationale": "All four rubric criteria are satisfied.\n\n1) Valid SKILL structure (0.25): Submission includes YAML frontmatter with name and description and a substantive skill body.\n\n2) Test coverage (0.25): The workflow explicitly covers required behaviors: detects JSON and syslog formats, normalizes to timestamp/severity/source/message, normalizes timestamps to UTC, groups/deduplicates by exception class + top 3 frames and by message templates with variable stripping, attaches multi-line Java/Python stacks to the originating line, redacts AWS keys/JWTs/DB creds/Bearer tokens, and handles the low-diversity note. The numbered workflow appears in the required order.\n\n3) Actionable steps (0.25): Provides concrete, implementable steps for format detection, normalization rules, deduplication heuristics (including continuation-line patterns), and redaction rules; includes regex patterns and replacements.\n\n4) Concise and focused (0.25): The content stays on-task, includes the required redaction table and a 5-line example with expected output, and remains concise (under the word limit).\n\nMinor nitpick: the DB replacement uses a capturing-group substitution ($1://...) rather than a uniform bracket-only replacement, but it still maps to the required redaction and does not break the specified behaviors. Overall the submission meets the specification fully."
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "log-triage skill doc now explains how to parse mixed-format logs, normalize timestamps to UTC, cluster error signatures (with low-diversity warning), bind multi-line traces to their head events, and redact secrets before reporting. It also includes the required numbered workflow, redaction rules table, and a concrete five-line example plus expected triage output.\n\n- Skill file: `SKILL.md`\n- Tests: not run (documentation-only change).\n\nSuggested next step: review the example/output wording for any additional context the assessment might expect.",
+          "score": 0.25,
+          "rationale": "The submission is only a one-paragraph summary and does not provide the actual SKILL.md content required by the tests. Criterion breakdown: (1) Valid SKILL structure — FAIL. The submission lacks YAML frontmatter (name/description) and a concrete skill body. (2) Test coverage — FAIL. Although the summary claims coverage of required behaviors, it does not explicitly present the parsing workflow or detailed handling for each test requirement (format detection, normalization, deduplication, timezone normalization, multi-line trace association, low-diversity reporting). (3) Actionable steps — FAIL. No concrete numbered steps, no redaction regex table, and no concrete five-line example/expected output are actually provided for a model to execute. (4) Concise and focused — PASS. The content is brief and on-topic, with no irrelevant material. Because only one of four binary criteria is met, the total score is 0.25."
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        }
+      ]
+    },
+    {
+      "id": "skill-learn-002",
+      "dataset": "dataset_all",
+      "source": "skill-learning/data/dataset_all.jsonl",
+      "line": 2,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "You are given a set of tests with expected outcomes. Write a SKILL.md that would help a model pass these tests.\n\nSkill name: db-migration-planner\n\nTests (expected outcomes):\n- Given a list of PostgreSQL schema changes (ALTER TABLE, CREATE INDEX, DROP COLUMN, RENAME TABLE, ADD CONSTRAINT), produce an ordered migration plan where each step specifies: the DDL statement, estimated lock level (ACCESS EXCLUSIVE, ROW EXCLUSIVE, SHARE, or none), estimated duration category (instant / seconds / minutes / hours based on table size heuristics), and a rollback statement.\n- When a migration includes both an ADD COLUMN with DEFAULT on a large table (>1M rows) and a CREATE INDEX CONCURRENTLY, the plan must order the column addition before the index and note that ADD COLUMN ... DEFAULT on PostgreSQL <11 rewrites the entire table, while >=11 is instant.\n- Flag any step that acquires ACCESS EXCLUSIVE lock and suggest a safer alternative when one exists (e.g., CREATE INDEX CONCURRENTLY instead of CREATE INDEX, or a multi-step column rename via add/copy/drop instead of RENAME COLUMN).\n- For DROP COLUMN or DROP TABLE operations, require an explicit data backup step before execution and mark the step as \"irreversible\" in the rollback column.\n- Generate a pre-migration checklist that includes: pg_stat_activity check for active connections, replication lag check, disk space estimate for index builds, and a pg_dump command for targeted backup.\n- If a NOT NULL constraint is added without a DEFAULT, the plan must include a preceding UPDATE to backfill NULLs and warn about full-table lock during the ALTER.\n\nConstraints:\n- Use a markdown table for the migration plan with columns: Step, DDL, Lock Level, Duration Est., Rollback, Notes.\n- Include a \"Risk Assessment\" section that classifies overall migration risk as LOW / MEDIUM / HIGH based on the presence of destructive operations, lock durations, and table sizes.\n- Provide an example migration plan for a scenario with at least 3 schema changes of different risk levels.\n- Keep under 600 words.\n\nOutput the SKILL.md content only (no code fences)."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": ""
+        }
+      ],
+      "input_text": "input: You are given a set of tests with expected outcomes. Write a SKILL.md that would help a model pass these tests.\n\nSkill name: db-migration-planner\n\nTests (expected outcomes):\n- Given a list of PostgreSQL schema changes (ALTER TABLE, CREATE INDEX, DROP COLUMN, RENAME TABLE, ADD CONSTRAINT), produce an ordered migration plan where each step specifies: the DDL statement, estimated lock level (ACCESS EXCLUSIVE, ROW EXCLUSIVE, SHARE, or none), estimated duration category (instant / seconds / minutes / hours based on table size heuristics), and a rollback statement.\n- When a migration includes both an ADD COLUMN with DEFAULT on a large table (>1M rows) and a CREATE INDEX CONCURRENTLY, the plan must order the column addition before the index and note that ADD COLUMN ... DEFAULT on PostgreSQL <11 rewrites the entire table, while >=11 is instant.\n- Flag any step that acquires ACCESS EXCLUSIVE lock and suggest a safer alternative when one exists (e.g., CREATE INDEX CONCURRENTLY instead of CREATE INDEX, or a multi-step column rename via add/copy/drop instead of RENAME COLUMN).\n- For DROP COLUMN or DROP TABLE operations, require an explicit data backup step before execution and mark the step as \"irreversible\" in the rollback column.\n- Generate a pre-migration checklist that includes: pg_stat_activity check for active connections, replication lag check, disk space estimate for index builds, and a pg_dump command for targeted backup.\n- If a NOT NULL constraint is added without a DEFAULT, the plan must include a preceding UPDATE to backfill NULLs and warn about full-table lock during the ALTER.\n\nConstraints:\n- Use a markdown table for the migration plan with columns: Step, DDL, Lock Level, Duration Est., Rollback, Notes.\n- Include a \"Risk Assessment\" section that classifies overall migration risk as LOW / MEDIUM / HIGH based on the presence of destructive operations, lock durations, and table sizes.\n- Provide an example migration plan for a scenario with at least 3 schema changes of different risk levels.\n- Keep under 600 words.\n\nOutput the SKILL.md content only (no code fences).",
+      "ground_truth_text": "expected: ",
+      "meta": {},
+      "results": [
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "---\nname: db-migration-planner\ndescription: Plan and audit PostgreSQL schema migrations for safety, lock management, and rollback reliability.\n---\n\n# DB Migration Planner\n\nUse this skill to generate safe, ordered PostgreSQL migration plans. Follow these instructions to analyze DDL and produce a structured implementation guide.\n\n## Planning Logic\n\n1.  **Analyze Locks**: Identify the lock level for each statement:\n    *   **ACCESS EXCLUSIVE**: `ALTER TABLE`, `DROP TABLE`, `CREATE INDEX` (non-concurrent). Blocks all access.\n    *   **SHARE**: `CREATE INDEX CONCURRENTLY` (blocks DDL but allows DML).\n    *   **ROW EXCLUSIVE**: DML operations (`UPDATE`, `DELETE`).\n    *   **none**: Metadata-only changes that don't block concurrent queries.\n2.  **Order of Operations**:\n    *   Always place `ADD COLUMN` before `CREATE INDEX CONCURRENTLY` if the index uses that column.\n    *   If adding `NOT NULL` without a `DEFAULT`, insert an `UPDATE` step to backfill data before the `ALTER` statement.\n3.  **Heuristics**:\n    *   **Table Size**: Assume >1M rows unless specified.\n    *   **PG Version**: For `ADD COLUMN ... DEFAULT`, note that versions <11 rewrite the table (Minutes/Hours), while versions >=11 are instant.\n4.  **Safety Flags**:\n    *   Flag `ACCESS EXCLUSIVE` on large tables. Suggest `CREATE INDEX CONCURRENTLY` instead of `CREATE INDEX`.\n    *   For `RENAME COLUMN`, suggest: Add new column -> Copy data -> Update application -> Drop old column.\n5.  **Destructive Actions**: Every `DROP` requires a preceding `pg_dump` step and must be marked \"irreversible\" in the rollback.\n\n## Pre-Migration Checklist\n\nBefore execution, verify the following:\n*   **Active Connections**: Run `SELECT * FROM pg_stat_activity;` to check for long-running transactions that might block locks.\n*   **Replication Lag**: Check `pg_stat_replication` to ensure migrations won't break standbys.\n*   **Disk Space**: Ensure at least 2x the table size is available for index builds or table rewrites.\n*   **Backup**: Run `pg_dump -t <table_name> > backup.sql` for any destructive changes.\n\n## Risk Assessment Framework\n\n*   **LOW**: Metadata-only changes, `CREATE INDEX CONCURRENTLY`, or changes on small tables (<10k rows).\n*   **MEDIUM**: Operations requiring `SHARE` locks or long-running backfills/updates.\n*   **HIGH**: `ACCESS EXCLUSIVE` locks on large tables, table rewrites (PG <11), or destructive `DROP` operations.\n\n## Example Migration Plan\n\n**Scenario**: Adding a tagged search feature to a `users` table (>5M rows).\n\n### Risk Assessment: HIGH\nDestructive column removal and long-running index creation on a large table.\n\n| Step | DDL | Lock Level | Duration Est. | Rollback | Notes |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n| 1 | `pg_dump -t users > users_pre_mig.sql` | none | minutes | N/A | Essential backup for destructive Step 5. |\n| 2 | `ALTER TABLE users ADD COLUMN status_code INT DEFAULT 0;` | ACCESS EXCLUSIVE | instant | `ALTER TABLE users DROP COLUMN status_code;` | Instant in PG >= 11; would be \"Hours\" in PG < 11. |\n| 3 | `UPDATE users SET status_code = 1 WHERE is_active = true;` | ROW EXCLUSIVE | minutes | `UPDATE users SET status_code = 0;` | Backfilling data to avoid nulls before constraint. |\n| 4 | `CREATE INDEX CONCURRENTLY idx_status ON users(status_code);` | none | minutes | `DROP INDEX CONCURRENTLY idx_status;` | Non-blocking. Safer than standard `CREATE INDEX`. |\n| 5 | `ALTER TABLE users DROP COLUMN legacy_flags;` | ACCESS EXCLUSIVE | instant | **irreversible** | **High Risk**: Ensure Step 1 was successful. |",
+          "score": 1.0,
+          "rationale": "All four rubric criteria are satisfied.\n\n1) Valid SKILL structure: The submission includes YAML frontmatter (name and description) and a non-empty skill body with planning logic, checklist, risk framework, and example — passes.\n\n2) Test coverage: The submission explicitly addresses the required behaviors: it produces a markdown migration table with the required columns (Step, DDL, Lock Level, Duration Est., Rollback, Notes); orders ADD COLUMN before CREATE INDEX CONCURRENTLY and documents PG <11 rewrite vs PG >=11 instant behavior; flags ACCESS EXCLUSIVE locks and suggests safer alternatives; requires a pg_dump backup before DROP and marks DROP as irreversible; includes pre-migration checks (pg_stat_activity, replication lag, disk space, pg_dump); and adds UPDATE backfill before NOT NULL alterations. The example contains at least three schema changes of varying risk and includes a Risk Assessment section.\n\n3) Actionable steps: The skill provides concrete commands (SELECT from pg_stat_activity, pg_stat_replication, pg_dump examples), explicit ordering rules, backfill UPDATE step, and rollback statements in the example plan — sufficiently actionable.\n\n4) Concise and focused: Content stays on-topic, covers only migration planning/safety items, and remains succinct (within the word limit).\n\nMinor note: there is a small inconsistency where the planning logic maps CREATE INDEX CONCURRENTLY to SHARE but the example table marks it as 'none'. This is a minor clarity issue and does not omit required functionality, so it does not reduce the score."
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "---\nname: db-migration-planner\ndescription: Plans safe PostgreSQL migrations with lock analysis, risk assessment, and rollback strategies. Handles schema changes, ordering, version-specific behavior, and pre-migration checklists.\n---\n\n# PostgreSQL Migration Planner\n\nWhen the user provides PostgreSQL schema changes (ALTER TABLE, CREATE INDEX, DROP COLUMN, etc.), produce a comprehensive migration plan that minimizes downtime and risk.\n\n## Migration Plan Format\n\nUse a markdown table with these columns:\n\n| Step | DDL | Lock Level | Duration Est. | Rollback | Notes |\n\n- **Step**: Sequential number\n- **DDL**: The exact SQL statement\n- **Lock Level**: ACCESS EXCLUSIVE, ROW EXCLUSIVE, SHARE, or none\n- **Duration Est.**: instant / seconds / minutes / hours (based on table size)\n- **Rollback**: SQL to reverse the change or \"irreversible\"\n- **Notes**: Warnings, version-specific behavior, safer alternatives\n\n## Lock Levels & Alternatives\n\n**ACCESS EXCLUSIVE locks block all access.** Always flag these and suggest safer alternatives:\n\n- `CREATE INDEX` → `CREATE INDEX CONCURRENTLY` (no lock, but slower)\n- `RENAME COLUMN` → Multi-step: ADD COLUMN + UPDATE + DROP COLUMN (avoid lock on reads)\n- `ALTER TABLE ADD COLUMN DEFAULT` on large tables (>1M rows):\n  - PostgreSQL <11: Rewrites entire table (hours)\n  - PostgreSQL >=11: Instant (metadata-only)\n\n## Ordering Rules\n\n1. **ADD COLUMN with DEFAULT** before **CREATE INDEX** (index builds need finalized schema)\n2. **NOT NULL constraints**: First UPDATE to backfill NULLs, then ALTER (warn about full-table lock)\n3. **DROP operations last** (allow validation of other changes first)\n\n## Destructive Operations\n\nFor DROP COLUMN or DROP TABLE:\n1. Add explicit backup step before execution\n2. Mark rollback as \"irreversible\" (data loss)\n3. Include targeted `pg_dump` command\n\n## Pre-Migration Checklist\n\nGenerate before the plan:\n```\n- Check active connections: SELECT * FROM pg_stat_activity WHERE datname='yourdb';\n- Check replication lag: SELECT EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()));\n- Estimate disk space for indexes: table_size * 1.2\n- Backup command: pg_dump -Fc -t target_table yourdb > backup_YYYYMMDD.dump\n```\n\n## Risk Assessment\n\nAfter the plan, classify overall risk:\n\n- **LOW**: No ACCESS EXCLUSIVE locks, no destructive ops, all instant/seconds\n- **MEDIUM**: Short ACCESS EXCLUSIVE locks (<5s) OR backfill required OR large index builds\n- **HIGH**: Long ACCESS EXCLUSIVE locks OR DROP operations OR multi-hour migrations\n\n## Example Migration Plan\n\n**Scenario**: Add indexed email column, rename status column, drop legacy column from 2M row users table.\n\n### Pre-Migration Checklist\n- Check active connections on users table\n- Replication lag <10s\n- Disk space: ~500MB for index\n- Backup: `pg_dump -Fc -t users mydb > users_backup.dump`\n\n| Step | DDL | Lock Level | Duration Est. | Rollback | Notes |\n|------|-----|------------|---------------|----------|-------|\n| 1 | `ALTER TABLE users ADD COLUMN email VARCHAR(255);` | ACCESS EXCLUSIVE | Instant (PG≥11) | `ALTER TABLE users DROP COLUMN email;` | PG<11: hours |\n| 2 | `CREATE INDEX CONCURRENTLY idx_email ON users(email);` | None | Minutes | `DROP INDEX CONCURRENTLY idx_email;` | Safe for production |\n| 3 | `ALTER TABLE users ADD COLUMN state VARCHAR(50);` | ACCESS EXCLUSIVE | Instant | `ALTER TABLE users DROP COLUMN state;` | Multi-step rename prep |\n| 4 | `UPDATE users SET state = status;` | ROW EXCLUSIVE | Minutes | Manual rollback | Backfill data |\n| 5 | **BACKUP STEP** | — | — | — | Required before drop |\n| 6 | `ALTER TABLE users DROP COLUMN status;` | ACCESS EXCLUSIVE | Instant | Irreversible | Restore from backup |\n\n**Risk Assessment**: **MEDIUM** – Contains destructive operation (DROP COLUMN) and large index build, but uses CONCURRENTLY to avoid blocking reads.",
+          "score": 1.0,
+          "rationale": "All four rubric criteria are satisfied.\n\n1) Valid SKILL structure (0.25): The submission includes YAML frontmatter with name and description and a non-empty skill body describing behavior and format.\n\n2) Test coverage (0.25): The submission explicitly addresses the required behaviors: it produces a markdown migration plan with the specified columns, handles ordering rules (ADD COLUMN before CREATE INDEX, NOT NULL backfill before ALTER), documents PostgreSQL <11 vs >=11 behavior for ADD COLUMN DEFAULT, flags ACCESS EXCLUSIVE locks and suggests safer alternatives (CREATE INDEX CONCURRENTLY, multi-step rename), requires a backup step and marks DROP steps as irreversible, includes the specified pre-migration checks (pg_stat_activity, replication lag, disk space estimate, pg_dump), includes a Risk Assessment section, and provides an example plan with at least three schema changes. \n\n3) Actionable steps (0.25): The submission provides concrete SQL examples, rollback statements, a pre-migration checklist with exact queries/commands, and clear ordering/alternative strategies—enough for a model to execute the required actions.\n\n4) Concise and focused (0.25): The content stays on-topic, uses the required markdown table format, and remains within the migration planning scope and length constraints.\n\nMinor note: the illustrative example uses ADD COLUMN without a DEFAULT but the text includes the required guidance for ADD COLUMN with DEFAULT; this does not omit any tested requirement. Overall, the submission meets the rubric fully."
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "# db-migration-planner\n\n## Summary\nGuides a model through PostgreSQL schema migrations by composing a structured, risk-aware plan. For each ALTER/CREATE/DROP/RENAME change it ranks lock levels/durations, prescribes rollbacks (or marks irreversible), flags ACCESS EXCLUSIVE steps, and enforces backups or pre-flight checks (e.g., NOT NULL backfills). Includes a checklist, risk assessment rules, and an illustrative example.\n\n## Capabilities\n1. **Migration-plan generation**  \n   - Outputs a Markdown table with `Step | DDL | Lock Level | Duration Est. | Rollback | Notes`.\n   - Estimates duration as `instant`, `seconds`, `minutes`, or `hours` using table-size heuristics.\n   - Flags `ACCESS EXCLUSIVE` steps and suggests safer alternatives when available (e.g., `CREATE INDEX CONCURRENTLY`, multi-step column renames).\n   - Orders ADD COLUMN + DEFAULT before CREATE INDEX CONCURRENTLY when both touch the same large table; annotates table rewrite behavior for PostgreSQL versions <11 vs ≥11.\n   - Enforces explicit data backups before DROP COLUMN/TABLE and marks rollback as `irreversible`.\n   - Adds preceding `UPDATE` statements before NOT NULL constraints without defaults, warning about full-table locks.\n\n2. **Pre-migration checklist**  \n   - Includes `pg_stat_activity` check for active sessions, replication lag check, disk space estimate for index builds, and a `pg_dump` command targeting affected tables.\n\n3. **Risk Assessment**\n   - Classifies overall risk as `LOW`, `MEDIUM`, or `HIGH` based on presence of destructive operations (DROP/RENAME), long lock levels, and large tables.\n\n## Usage\n- Provide the list of schema changes plus table row counts and PostgreSQL version if available.\n- Annotate tables >1M rows for duration heuristics and default behavior.\n- Use the checklist before executing any step, and elaborate rollback steps (or note irreversible updates).\n\n## Risk and Lock Guidance\n- ACCESS EXCLUSIVE steps must include safer alternatives or justified exceptions.\n- DROP operations require an explicit `pg_dump` backup step before execution and rollback should read `irreversible`.\n- NOT NULL additions without defaults must be preceded by `UPDATE table SET col = ... WHERE col IS NULL;` and warn about locking.\n\n## Example migration plan (three changes with varied risk)\n\nPre-migration checklist:\n- `SELECT pid, usename, state, wait_event FROM pg_stat_activity WHERE datname = 'app';`\n- `SELECT client_addr, state, application_name FROM pg_stat_replication;` (confirm lag < 5s)\n- Disk space estimate: current table size + expected index size (e.g., `pg_total_relation_size('public.orders') * 1.2`)\n- `pg_dump -t public.orders -t public.customers --file=backups/pre_migration.sql`\n\n| Step | DDL | Lock Level | Duration Est. | Rollback | Notes |\n| --- | --- | --- | --- | --- | --- |\n| 1 | `UPDATE public.orders SET status = 'pending' WHERE status IS NULL;` | ROW EXCLUSIVE | seconds | `TRUNCATE public.orders_temp; INSERT INTO public.orders SELECT ...` | Backfills NULLs before NOT NULL addition; avoids ALTER locking |\n| 2 | `ALTER TABLE public.orders ALTER COLUMN status SET NOT NULL;` | ACCESS EXCLUSIVE | seconds | `ALTER TABLE public.orders ALTER COLUMN status DROP NOT NULL;` | Full-table lock; preceded by backfill |\n| 3 | `ALTER TABLE public.orders ADD COLUMN shipped_at TIMESTAMPTZ DEFAULT now();` | ROW EXCLUSIVE (instant on PG>=11, table rewrite on PG<11) | instant/ hours | `ALTER TABLE public.orders DROP COLUMN shipped_at;` | Adding DEFAULT on large table: note rewrite behavior |\n| 4 | `CREATE INDEX CONCURRENTLY idx_orders_shipped_at ON public.orders (shipped_at);` | SHARE | minutes | `DROP INDEX CONCURRENTLY idx_orders_shipped_at;` | Scheduled after column addition per requirement |\n| 5 | `DROP COLUMN public.orders.legacy_flag;` | ACCESS EXCLUSIVE | minutes | irreversible | Run targeted `pg_dump` before this step; mark irreversible |\n\nRisk Assessment: **MEDIUM** – contains NOT NULL enforcement (locks) plus DROP COLUMN; most steps avoid ACCESS EXCLUSIVE where possible but there remains irreversible data removal.\n\nBy following these conventions, the model satisfies the tests’ expectations and yields actionable plans within 600 words.",
+          "score": 0.75,
+          "rationale": "I awarded 0.75 (three of four criteria satisfied).\n\n1) Valid SKILL structure (0.00/0.25): FAIL. The submission does not include YAML frontmatter with name/description as required; it starts with a Markdown header and summary instead. This violates the explicit structure criterion.\n\n2) Test coverage (0.25/0.25): PASS. The plan explicitly addresses required behaviors: outputs a Markdown table with the specified columns, orders ADD COLUMN + DEFAULT before CREATE INDEX CONCURRENTLY, annotates PG <11 vs ≥11 rewrite behavior, flags ACCESS EXCLUSIVE and suggests safer alternatives, requires backups and marks DROP rollback as irreversible, includes NOT NULL backfill ordering, provides a Risk Assessment, and supplies an example with multiple schema changes.\n\n3) Actionable steps (0.25/0.25): PASS. The submission supplies concrete DDL, rollback statements, pre-migration commands (pg_stat_activity, replication check, pg_dump), and explicit UPDATE backfill steps — enough detail for a model to execute the described actions.\n\n4) Concise and focused (0.25/0.25): PASS. The content is focused on the migration planning task, stays within scope, uses the required Markdown table, includes the checklist and risk assessment, and remains concise.\n\nOverall, the single critical omission is the required YAML frontmatter; otherwise the submission meets the functional requirements of the tests."
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        }
+      ]
+    },
+    {
+      "id": "skill-learn-003",
+      "dataset": "dataset_all",
+      "source": "skill-learning/data/dataset_all.jsonl",
+      "line": 3,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "You are given a set of tests with expected outcomes. Write a SKILL.md that would help a model pass these tests.\n\nSkill name: api-client-generator\n\nTests (expected outcomes):\n- Given an OpenAPI 3.0+ specification snippet containing path definitions with requestBody and response schemas, generate a TypeScript client where each endpoint becomes a typed async function. The function signature must use the request body schema as the parameter type and the 200/201 response schema as the return type.\n- When the spec uses oneOf or discriminator in a response schema, generate a TypeScript discriminated union type using a literal type for the discriminator property (e.g., type Result = { kind: \"success\"; data: T } | { kind: \"error\"; code: number }).\n- Implement retry logic: on 429 responses, read the Retry-After header (seconds or HTTP-date format) and wait accordingly; on 5xx responses, use exponential backoff starting at 200ms with jitter, up to 3 retries. Do not retry 4xx errors other than 429.\n- Handle cursor-based pagination: when a response includes a next_cursor or nextPageToken field, generate a helper that returns an AsyncGenerator yielding individual items across all pages.\n- Support multiple auth schemes from the spec's securitySchemes: Bearer token via Authorization header, API key via custom header (e.g., X-API-Key), and OAuth2 client_credentials flow with automatic token refresh when the access token expires.\n- Generate proper error types: define an ApiError class that includes statusCode, responseBody, requestId (from x-request-id header), and the original request URL. Throw this instead of generic Error.\n\nConstraints:\n- Include a \"Generation Workflow\" section with steps: parse spec, extract schemas, generate types, generate endpoint functions, wire auth.\n- Show a concrete before/after example: a minimal OpenAPI path definition (3-4 lines of YAML) and the resulting TypeScript function signature.\n- Include a table of retry behavior per status code range (2xx, 429, 4xx, 5xx).\n- Keep under 550 words.\n\nOutput the SKILL.md content only (no code fences)."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": ""
+        }
+      ],
+      "input_text": "input: You are given a set of tests with expected outcomes. Write a SKILL.md that would help a model pass these tests.\n\nSkill name: api-client-generator\n\nTests (expected outcomes):\n- Given an OpenAPI 3.0+ specification snippet containing path definitions with requestBody and response schemas, generate a TypeScript client where each endpoint becomes a typed async function. The function signature must use the request body schema as the parameter type and the 200/201 response schema as the return type.\n- When the spec uses oneOf or discriminator in a response schema, generate a TypeScript discriminated union type using a literal type for the discriminator property (e.g., type Result = { kind: \"success\"; data: T } | { kind: \"error\"; code: number }).\n- Implement retry logic: on 429 responses, read the Retry-After header (seconds or HTTP-date format) and wait accordingly; on 5xx responses, use exponential backoff starting at 200ms with jitter, up to 3 retries. Do not retry 4xx errors other than 429.\n- Handle cursor-based pagination: when a response includes a next_cursor or nextPageToken field, generate a helper that returns an AsyncGenerator yielding individual items across all pages.\n- Support multiple auth schemes from the spec's securitySchemes: Bearer token via Authorization header, API key via custom header (e.g., X-API-Key), and OAuth2 client_credentials flow with automatic token refresh when the access token expires.\n- Generate proper error types: define an ApiError class that includes statusCode, responseBody, requestId (from x-request-id header), and the original request URL. Throw this instead of generic Error.\n\nConstraints:\n- Include a \"Generation Workflow\" section with steps: parse spec, extract schemas, generate types, generate endpoint functions, wire auth.\n- Show a concrete before/after example: a minimal OpenAPI path definition (3-4 lines of YAML) and the resulting TypeScript function signature.\n- Include a table of retry behavior per status code range (2xx, 429, 4xx, 5xx).\n- Keep under 550 words.\n\nOutput the SKILL.md content only (no code fences).",
+      "ground_truth_text": "expected: ",
+      "meta": {},
+      "results": [
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "name: api-client-generator\ndescription: Generate TypeScript API clients from OpenAPI 3.0+ specs with automated retries, pagination, and multi-scheme authentication.\n\n# Implementation Guide\n\n## Generation Workflow\n1. **Parse Spec**: Load the OpenAPI 3.0+ definition and resolve all internal and external $ref pointers.\n2. **Extract Schemas**: Identify all schema objects in components. Map `oneOf` or `anyOf` combined with a `discriminator` into TypeScript discriminated unions using string literal types.\n3. **Generate Types**: Convert identified schemas into exported TypeScript interfaces or types.\n4. **Generate Endpoint Functions**: For each path and method, create an `async` function. Use the `requestBody` schema as the input parameter type and the `200`/`201` response schema as the return type.\n5. **Wire Auth**: Configure the client to inject credentials into headers based on the defined `securitySchemes`.\n\n## Core Features\n\n### Discriminated Unions\nEnsure responses with multiple possible shapes use a literal \"kind\" or \"type\" property.\nExample: `type Response = { type: \"success\"; data: T } | { type: \"error\"; message: string }`.\n\n### Retry and Backoff Logic\nThe client must wrap every fetch call in a handler that manages transient failures and rate limits.\n\n| Status Code | Action | Strategy |\n| :--- | :--- | :--- |\n| 2xx | Success | Return parsed JSON data |\n| 429 | Retry | Read `Retry-After` header (seconds or date) and delay execution |\n| 4xx (non-429) | Fail | Immediately throw `ApiError` |\n| 5xx | Retry | Exponential backoff (start 200ms) with jitter; max 3 retries |\n\n### Pagination Handling\nIf an endpoint response includes `next_cursor` or `nextPageToken`, generate a secondary helper function using an `AsyncGenerator` to yield individual items by automatically fetching subsequent pages until the token is null.\n\n### Authentication Support\n- **Bearer**: Attach `Authorization: Bearer <token>` to headers.\n- **API Key**: Attach the key to the specific custom header defined in the spec (e.g., `X-API-Key`).\n- **OAuth2**: Support the `client_credentials` flow. The client must store the token and automatically request a new one if a request fails with a 401 or the token expires.\n\n### Error Handling\nDefine a global `ApiError` class extending `Error`. It must include:\n- `statusCode`: Numeric HTTP status.\n- `responseBody`: The raw or parsed error response.\n- `requestId`: The value from the `x-request-id` response header.\n- `url`: The full URL of the failed request.\n\n## Before/After Example\n\n**OpenAPI Snippet:**\n```yaml\n/data:\n  post:\n    requestBody:\n      content:\n        application/json:\n          schema: { $ref: '#/schemas/Input' }\n    responses:\n      '200':\n        content:\n          application/json:\n            schema: { $ref: '#/schemas/Output' }\n```\n\n**Generated TypeScript Signature:**\n```typescript\nasync function postData(body: Input): Promise<Output> {\n  return this.request('/data', { method: 'POST', body });\n}\n```",
+          "score": 1.0,
+          "rationale": "All four rubric criteria are satisfied.\n\n1) Valid SKILL structure (0.25): The submission begins with YAML frontmatter (name and description) and includes a populated skill body with sections and details.\n\n2) Test coverage (0.25): The workflow and core features explicitly cover the required behaviors: requestBody -> function parameter type and 200/201 response -> return type; oneOf/discriminator -> discriminated unions; 429 Retry-After handling (seconds or date) and 5xx exponential backoff starting at 200ms with jitter and max 3 retries; no retries for 4xx except 429; cursor-based pagination via AsyncGenerator for next_cursor/nextPageToken; support for Bearer, API key header, and OAuth2 client_credentials with automatic refresh; and an ApiError class with statusCode, responseBody, requestId from x-request-id, and url.\n\n3) Actionable steps (0.25): The \"Generation Workflow\" gives concrete, ordered steps (parse spec, extract schemas, generate types, generate endpoint functions, wire auth). The submission also details retry strategies, pagination helper generation, auth wiring, and includes a before/after example that shows a minimal OpenAPI snippet and the resulting TypeScript function signature.\n\n4) Concise and focused (0.25): The content stays on-topic, provides the required table of retry behavior, the workflow section, and the example, without extraneous material; it is concise and within the task scope.\n\nGiven that each binary criterion is met, the final score is 1.0."
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "---\nname: api-client-generator\ndescription: Generate typed TypeScript API clients from OpenAPI 3.0+ specifications with retry logic, pagination, auth handling, and discriminated unions.\n---\n\n# API Client Generator\n\nGenerate production-ready TypeScript API clients from OpenAPI 3.0+ specifications. This skill transforms OpenAPI path definitions into fully typed async functions with built-in retry logic, pagination support, multiple authentication schemes, and proper error handling.\n\n## Generation Workflow\n\n1. **Parse the OpenAPI specification**: Load and validate the YAML/JSON spec. Extract `servers`, `paths`, `components.schemas`, and `components.securitySchemes`.\n\n2. **Extract and generate TypeScript types**: Convert JSON Schema definitions in `components.schemas` to TypeScript interfaces. Handle `oneOf` with discriminators by generating discriminated union types using literal types for the discriminator property.\n\n3. **Generate endpoint functions**: For each path operation, create an async function named after the operationId (or derive from path+method). Use the requestBody schema as the parameter type and the 200/201 response schema as the Promise return type.\n\n4. **Wire authentication**: Detect security schemes from the spec. Generate an auth handler that supports Bearer tokens (Authorization header), API keys (custom headers like X-API-Key), and OAuth2 client_credentials flow with automatic token refresh on 401 responses.\n\n5. **Add retry and pagination logic**: Wrap fetch calls with retry middleware. For endpoints returning `next_cursor` or `nextPageToken`, generate an AsyncGenerator helper method.\n\n## Before/After Example\n\n**OpenAPI Spec (YAML):**\n```yaml\npaths:\n  /users:\n    post:\n      operationId: createUser\n      requestBody:\n        content:\n          application/json:\n            schema:\n              $ref: '#/components/schemas/CreateUserRequest'\n      responses:\n        '201':\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/User'\n```\n\n**Generated TypeScript:**\n```typescript\nasync function createUser(body: CreateUserRequest): Promise<User>\n```\n\n## Retry Behavior\n\n| Status Code | Behavior | Backoff Strategy |\n|-------------|----------|------------------|\n| 2xx | Success, return response | N/A |\n| 429 | Retry after delay | Use Retry-After header (seconds or HTTP-date) |\n| 4xx (except 429) | Throw ApiError immediately | No retry |\n| 5xx | Retry up to 3 times | Exponential backoff: 200ms × 2^attempt + jitter |\n\nFor 5xx errors, jitter should be random 0-100ms added to the backoff delay.\n\n## Discriminated Unions\n\nWhen a response schema uses `oneOf` with a `discriminator`, generate a TypeScript discriminated union:\n\n```typescript\ntype Result = \n  | { kind: \"success\"; data: User }\n  | { kind: \"error\"; code: number; message: string }\n```\n\nThe discriminator property must use a literal type to enable type narrowing.\n\n## Pagination\n\nFor endpoints returning `next_cursor` or `nextPageToken`, generate an AsyncGenerator:\n\n```typescript\nasync function* listAllUsers(): AsyncGenerator<User> {\n  let cursor = undefined;\n  do {\n    const response = await listUsers({ cursor });\n    for (const user of response.users) yield user;\n    cursor = response.next_cursor;\n  } while (cursor);\n}\n```\n\n## Authentication\n\nSupport three schemes simultaneously:\n- **Bearer**: `Authorization: Bearer {token}` header\n- **API Key**: Custom header (e.g., `X-API-Key: {key}`)\n- **OAuth2**: Fetch token from token endpoint using client_credentials grant; refresh automatically on 401\n\n## Error Handling\n\nGenerate an `ApiError` class:\n\n```typescript\nclass ApiError extends Error {\n  statusCode: number;\n  responseBody: unknown;\n  requestId: string | null;\n  requestUrl: string;\n}\n```\n\nExtract `requestId` from the `x-request-id` response header. Throw `ApiError` for all non-2xx responses after retry exhaustion.",
+          "score": 1.0,
+          "rationale": "All four rubric criteria are satisfied.\n\n1) Valid SKILL structure: The submission includes YAML frontmatter with name and description and a populated skill body — meets requirement.\n\n2) Test coverage: The workflow and sections explicitly cover each test requirement: mapping requestBody → function parameter and 200/201 response → Promise return type (with a concrete before/after example), discriminated unions for oneOf+discriminator (example using literal 'kind'), retry behavior including reading Retry-After (seconds or HTTP-date) for 429 and exponential backoff starting at 200ms with jitter for 5xx up to 3 retries while not retrying other 4xx, cursor-based pagination with an AsyncGenerator example handling next_cursor, multi-scheme auth (Bearer, API key header, OAuth2 client_credentials with automatic refresh on 401), and an ApiError class containing statusCode, responseBody, requestId (from x-request-id), and requestUrl. The required retry behavior table is present.\n\n3) Actionable steps: The 'Generation Workflow' lists concrete steps (parse spec, extract/generate types, generate endpoint functions, wire auth) and the document provides actionable examples and precise retry/backoff formulas (200ms × 2^attempt + jitter, jitter 0-100ms), pagination generator code sketch, and ApiError shape — sufficient for implementation.\n\n4) Concise and focused: The content stays on task, includes the required before/after snippet and table, and avoids irrelevant material. The submission is concise and within the requested scope.\n\nGiven all required behaviors are addressed with concrete guidance and examples, the submission earns full credit."
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "anthropic/claude-sonnet-4-5-20250929",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "gemini-3-flash",
+          "submission": "",
+          "score": 0.0,
+          "rationale": "Error: [Errno 2] No such file or directory: 'letta'"
+        },
+        {
+          "model_name": "openai/gpt-5.1-codex-mini",
+          "submission": "- Captured all requested behaviours for the `api-client-generator` skill in `SKILL.md`, including typing requirements, discriminated unions, retries, pagination helpers, auth wiring, and the enriched `ApiError`.\n- Added the mandated “Generation Workflow” steps, retry table, and a concrete before/after example showing a minimal OpenAPI snippet and its generated TypeScript signature.\n- Next step: load or link this skill into the agent framework and verify that it guides generation as expected (no automated tests were run).",
+          "score": 0.0,
+          "rationale": "The submission did not provide the requested SKILL.md content — it is only a short meta-description claiming features were captured. According to the rubric: (1) there is no YAML frontmatter or skill body provided, so the required SKILL structure is missing; (2) although the submitter asserts that tests were covered, no actual workflow or generated artifacts are present to verify that the key behaviors (typed endpoint functions, discriminated unions, retry logic, pagination, multiple auth schemes, ApiError) are implemented; (3) there are no concrete, actionable steps, examples, or code snippets that a model could follow to execute the generation; and (4) while the text is concise, it fails to stay within the task scope because it does not deliver the SKILL.md or the mandated sections (generation workflow, retry table, before/after example). For these reasons, none of the four binary criteria are satisfied, yielding a score of 0.0."
+        }
+      ]
+    },
+    {
+      "id": "skill-learn-004",
+      "dataset": "dataset_all",
+      "source": "skill-learning/data/dataset_all.jsonl",
+      "line": 4,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "You are given a set of tests with expected outcomes. Write a SKILL.md that would help a model pass these tests.\n\nSkill name: meeting-notes\n\nTests (expected outcomes):\n- Given a raw meeting transcript (speaker-tagged lines in \"Speaker: utterance\" format), produce a structured summary with exactly these sections in order: TL;DR (1-2 sentences), Key Decisions, Action Items, Open Questions, and Parking Lot.\n- In \"Key Decisions,\" only include items where a speaker explicitly committed or the group reached consensus (e.g., \"let's go with X\", \"agreed\", \"we'll do Y\"). Opinions, suggestions, or hypotheticals (e.g., \"we could try X\", \"I think maybe\") must NOT appear as decisions.\n- Each Action Item must follow the format: \"- [ ] <task description> -- @<owner> (due: <date or 'TBD'>)\". If no owner is named, assign \"@unassigned\". If a speaker says \"I'll do X by Friday\" extract both the owner (that speaker) and the deadline.\n- When speakers disagree, capture both positions under \"Open Questions\" with attribution (e.g., \"@alice favors approach A; @bob prefers approach B\"). Do not silently resolve disagreements.\n- Extract deadlines and dates mentioned in natural language (\"by end of sprint\", \"next Tuesday\", \"before the board meeting on March 15\") and normalize to ISO 8601 format (YYYY-MM-DD) when a specific date is determinable. Use the original text in parentheses when the date is relative and unresolvable (e.g., \"due: TBD (end of sprint)\").\n- \"Parking Lot\" captures topics explicitly deferred (e.g., \"let's table that\", \"we'll revisit\", \"not for this meeting\") with the original speaker attributed.\n- If the transcript contains fewer than 2 speakers, prepend a warning: \"Note: Single-speaker transcript -- decisions and action items may lack group validation.\"\n\nConstraints:\n- Define exact markdown heading levels for each section (## for main sections).\n- Include a decision classification rule: provide 2-3 example phrases that qualify as decisions vs. 2-3 that do not.\n- Include a sample input transcript (4-6 lines of dialogue) and the expected structured output.\n- Keep under 500 words.\n\nOutput the SKILL.md content only (no code fences)."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": ""
+        }
+      ],
+      "input_text": "input: You are given a set of tests with expected outcomes. Write a SKILL.md that would help a model pass these tests.\n\nSkill name: meeting-notes\n\nTests (expected outcomes):\n- Given a raw meeting transcript (speaker-tagged lines in \"Speaker: utterance\" format), produce a structured summary with exactly these sections in order: TL;DR (1-2 sentences), Key Decisions, Action Items, Open Questions, and Parking Lot.\n- In \"Key Decisions,\" only include items where a speaker explicitly committed or the group reached consensus (e.g., \"let's go with X\", \"agreed\", \"we'll do Y\"). Opinions, suggestions, or hypotheticals (e.g., \"we could try X\", \"I think maybe\") must NOT appear as decisions.\n- Each Action Item must follow the format: \"- [ ] <task description> -- @<owner> (due: <date or 'TBD'>)\". If no owner is named, assign \"@unassigned\". If a speaker says \"I'll do X by Friday\" extract both the owner (that speaker) and the deadline.\n- When speakers disagree, capture both positions under \"Open Questions\" with attribution (e.g., \"@alice favors approach A; @bob prefers approach B\"). Do not silently resolve disagreements.\n- Extract deadlines and dates mentioned in natural language (\"by end of sprint\", \"next Tuesday\", \"before the board meeting on March 15\") and normalize to ISO 8601 format (YYYY-MM-DD) when a specific date is determinable. Use the original text in parentheses when the date is relative and unresolvable (e.g., \"due: TBD (end of sprint)\").\n- \"Parking Lot\" captures topics explicitly deferred (e.g., \"let's table that\", \"we'll revisit\", \"not for this meeting\") with the original speaker attributed.\n- If the transcript contains fewer than 2 speakers, prepend a warning: \"Note: Single-speaker transcript -- decisions and action items may lack group validation.\"\n\nConstraints:\n- Define exact markdown heading levels for each section (## for main sections).\n- Include a decision classification rule: provide 2-3 example phrases that qualify as decisions vs. 2-3 that do not.\n- Include a sample input transcript (4-6 lines of dialogue) and the expected structured output.\n- Keep under 500 words.\n\nOutput the SKILL.md content only (no code fences).",
+      "ground_truth_text": "expected: ",
+      "meta": {},
+      "results": []
+    },
+    {
+      "id": "skill-learn-005",
+      "dataset": "dataset_all",
+      "source": "skill-learning/data/dataset_all.jsonl",
+      "line": 5,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "You are given a set of tests with expected outcomes. Write a SKILL.md that would help a model pass these tests.\n\nSkill name: security-pr-review\n\nTests (expected outcomes):\n- Given a code diff (unified diff format), identify security vulnerabilities and report each finding with: file path, line number(s), vulnerability type (mapped to CWE ID where applicable), severity (P0-P3), a one-line description, and a suggested fix.\n- Severity classification must follow these rules: P0 (Critical) = RCE, authentication bypass, SQL injection with user input, deserialization of untrusted data (CWE-502); P1 (High) = stored XSS, SSRF, path traversal, hardcoded secrets/credentials; P2 (Medium) = CSRF missing, open redirect, verbose error messages leaking internals, missing rate limiting on auth endpoints; P3 (Low) = missing security headers, cookie without Secure/HttpOnly flags, overly permissive CORS.\n- For dependency changes (package.json, requirements.txt, go.mod, Gemfile), check if any added or upgraded dependency has a known CVE pattern: flag any dependency pinned to a wildcard or range (e.g., \"^1.x\", \">=2.0\"), and flag additions of packages commonly associated with supply chain risk (e.g., packages with typosquatting patterns or very low download counts).\n- When the diff modifies authentication or authorization logic (login handlers, middleware, JWT validation, role checks), always flag for manual review regardless of whether a specific vulnerability is found, with the note: \"Auth logic change -- requires manual security review.\"\n- Detect unsafe patterns per language: Python (eval(), pickle.loads(), subprocess with shell=True, yaml.load() without SafeLoader), JavaScript (innerHTML assignment, eval(), dangerouslySetInnerHTML, child_process.exec with template literals), Go (sql.Query with string concatenation, use of crypto/md5 or crypto/sha1 for security purposes).\n- If no vulnerabilities are found, output: \"No security issues identified. Scope: <N files changed, M lines reviewed>.\" Do not fabricate findings.\n\nConstraints:\n- Output findings in a markdown table with columns: #, File:Line, CWE, Severity, Description, Suggested Fix.\n- Include a \"Review Scope\" header listing files reviewed and files skipped (e.g., test files, documentation) with rationale.\n- Include a decision tree or checklist for the severity classification (P0-P3) so the model can apply it consistently.\n- Provide 2 example findings (one P0/P1, one P2/P3) showing the exact table row format.\n- Keep under 600 words.\n\nOutput the SKILL.md content only (no code fences)."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": ""
+        }
+      ],
+      "input_text": "input: You are given a set of tests with expected outcomes. Write a SKILL.md that would help a model pass these tests.\n\nSkill name: security-pr-review\n\nTests (expected outcomes):\n- Given a code diff (unified diff format), identify security vulnerabilities and report each finding with: file path, line number(s), vulnerability type (mapped to CWE ID where applicable), severity (P0-P3), a one-line description, and a suggested fix.\n- Severity classification must follow these rules: P0 (Critical) = RCE, authentication bypass, SQL injection with user input, deserialization of untrusted data (CWE-502); P1 (High) = stored XSS, SSRF, path traversal, hardcoded secrets/credentials; P2 (Medium) = CSRF missing, open redirect, verbose error messages leaking internals, missing rate limiting on auth endpoints; P3 (Low) = missing security headers, cookie without Secure/HttpOnly flags, overly permissive CORS.\n- For dependency changes (package.json, requirements.txt, go.mod, Gemfile), check if any added or upgraded dependency has a known CVE pattern: flag any dependency pinned to a wildcard or range (e.g., \"^1.x\", \">=2.0\"), and flag additions of packages commonly associated with supply chain risk (e.g., packages with typosquatting patterns or very low download counts).\n- When the diff modifies authentication or authorization logic (login handlers, middleware, JWT validation, role checks), always flag for manual review regardless of whether a specific vulnerability is found, with the note: \"Auth logic change -- requires manual security review.\"\n- Detect unsafe patterns per language: Python (eval(), pickle.loads(), subprocess with shell=True, yaml.load() without SafeLoader), JavaScript (innerHTML assignment, eval(), dangerouslySetInnerHTML, child_process.exec with template literals), Go (sql.Query with string concatenation, use of crypto/md5 or crypto/sha1 for security purposes).\n- If no vulnerabilities are found, output: \"No security issues identified. Scope: <N files changed, M lines reviewed>.\" Do not fabricate findings.\n\nConstraints:\n- Output findings in a markdown table with columns: #, File:Line, CWE, Severity, Description, Suggested Fix.\n- Include a \"Review Scope\" header listing files reviewed and files skipped (e.g., test files, documentation) with rationale.\n- Include a decision tree or checklist for the severity classification (P0-P3) so the model can apply it consistently.\n- Provide 2 example findings (one P0/P1, one P2/P3) showing the exact table row format.\n- Keep under 600 words.\n\nOutput the SKILL.md content only (no code fences).",
+      "ground_truth_text": "expected: ",
+      "meta": {},
+      "results": []
+    }
+  ],
+  "models": [
+    {
+      "model_name": "anthropic/claude-sonnet-4-5-20250929",
+      "avg_score": 1.0,
+      "total": 3,
+      "attempted": 3
+    },
+    {
+      "model_name": "gemini-3-flash",
+      "avg_score": 1.0,
+      "total": 3,
+      "attempted": 3
+    },
+    {
+      "model_name": "openai/gpt-5.1-codex-mini",
+      "avg_score": 0.3333,
+      "total": 3,
+      "attempted": 3
+    }
+  ],
+  "runs": [
+    {
+      "name": "suite_smoke",
+      "path": "skill-learning/results/suite_smoke"
+    }
+  ],
+  "errors": []
+}
