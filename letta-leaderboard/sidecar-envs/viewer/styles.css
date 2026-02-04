@@ -529,6 +529,108 @@ button {
   }
 }
 
+/* Trajectory messages */
+.trajectory-msg {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 0;
+  border-left: 4px solid var(--line);
+}
+
+.trajectory-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+
+.trajectory-summary::-webkit-details-marker {
+  display: none;
+}
+
+.trajectory-summary::before {
+  content: "▸";
+  font-size: 0.75rem;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.trajectory-msg[open] > .trajectory-summary::before {
+  transform: rotate(90deg);
+}
+
+.trajectory-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.trajectory-preview {
+  font-size: 0.8rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.trajectory-msg[open] .trajectory-preview {
+  display: none;
+}
+
+.trajectory-msg > .turn-content {
+  margin: 0 14px 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fffdf8;
+}
+
+.trajectory-system {
+  border-left-color: #9e9e9e;
+}
+
+.trajectory-system .trajectory-label {
+  color: #757575;
+}
+
+.trajectory-user {
+  border-left-color: var(--accent);
+}
+
+.trajectory-user .trajectory-label {
+  color: var(--accent);
+}
+
+.trajectory-reasoning {
+  border-left-color: #7e57c2;
+  background: #faf5ff;
+}
+
+.trajectory-reasoning .trajectory-label {
+  color: #7e57c2;
+}
+
+.trajectory-assistant {
+  border-left-color: var(--accent-2);
+}
+
+.trajectory-assistant .trajectory-label {
+  color: var(--accent-2);
+}
+
+.trajectory-empty {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
 /* highlight.js overrides — inherit panel background */
 .panel-pre code.hljs,
 .turn-content code.hljs {

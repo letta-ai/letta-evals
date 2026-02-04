@@ -27,6 +27,8 @@ const rubricBodyEl = el("rubricBody");
 const responseBodyEl = el("responseBody");
 const judgeMetaEl = el("judgeMeta");
 const judgeBodyEl = el("judgeBody");
+const trajectoryMetaEl = el("trajectoryMeta");
+const trajectoryBodyEl = el("trajectoryBody");
 
 function toTitleCase(text) {
   return text
@@ -367,10 +369,12 @@ function renderPanels() {
   rubricBodyEl.innerHTML = "";
   responseBodyEl.innerHTML = "";
   judgeBodyEl.innerHTML = "";
+  trajectoryBodyEl.innerHTML = "";
   contextMetaEl.textContent = "";
   rubricMetaEl.textContent = "";
   responseMetaEl.textContent = "";
   judgeMetaEl.textContent = "";
+  trajectoryMetaEl.textContent = "";
 
   const scenario = getSelectedScenario();
   if (!scenario) {
@@ -378,6 +382,7 @@ function renderPanels() {
     contextBodyEl.appendChild(empty.cloneNode(true));
     rubricBodyEl.appendChild(empty.cloneNode(true));
     responseBodyEl.appendChild(empty.cloneNode(true));
+    trajectoryBodyEl.appendChild(empty.cloneNode(true));
     judgeBodyEl.appendChild(empty);
     return;
   }
@@ -461,6 +466,49 @@ function renderPanels() {
     judgeMetaEl.textContent = "No results";
     judgeBodyEl.appendChild(buildEmptyState("No judge rationale available."));
   }
+
+  // Trajectory panel
+  const trajectory = result?.trajectory || [];
+  if (trajectory.length) {
+    trajectoryMetaEl.textContent = `${trajectory.length} messages`;
+    trajectory.forEach((msg) => {
+      const msgType = msg.message_type || "unknown";
+      const typeLabel = msgType.replace(/_message$/, "");
+      const text = msg.reasoning || msg.content || "";
+
+      const details = document.createElement("details");
+      details.className = `trajectory-msg trajectory-${typeLabel}`;
+
+      const summary = document.createElement("summary");
+      summary.className = "trajectory-summary";
+      const label = document.createElement("span");
+      label.className = "trajectory-label";
+      label.textContent = typeLabel;
+      summary.appendChild(label);
+      if (text) {
+        const preview = document.createElement("span");
+        preview.className = "trajectory-preview";
+        preview.textContent = truncate(text, 120);
+        summary.appendChild(preview);
+      }
+      details.appendChild(summary);
+
+      if (text) {
+        const pre = document.createElement("pre");
+        pre.className = "turn-content";
+        const code = document.createElement("code");
+        code.textContent = text;
+        pre.appendChild(code);
+        highlightCode(code, text);
+        details.appendChild(pre);
+      }
+
+      trajectoryBodyEl.appendChild(details);
+    });
+  } else {
+    trajectoryMetaEl.textContent = "No trajectory";
+    trajectoryBodyEl.appendChild(buildEmptyState("No trajectory data available."));
+  }
 }
 
 const handleSearch = debounce((value) => {
@@ -484,7 +532,7 @@ modelSelectEl.addEventListener("change", (event) => {
 
 const panelViews = {
   left: { context: { body: contextBodyEl, meta: contextMetaEl }, rubric: { body: rubricBodyEl, meta: rubricMetaEl } },
-  right: { response: { body: responseBodyEl, meta: responseMetaEl }, judge: { body: judgeBodyEl, meta: judgeMetaEl } },
+  right: { response: { body: responseBodyEl, meta: responseMetaEl }, judge: { body: judgeBodyEl, meta: judgeMetaEl }, trajectory: { body: trajectoryBodyEl, meta: trajectoryMetaEl } },
 };
 
 document.querySelectorAll(".panel-tab").forEach((tab) => {

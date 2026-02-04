@@ -1,0 +1,147 @@
+{
+  "category": "compression",
+  "display_name": "Compression",
+  "generated_at": "2026-02-04T19:40:59.607786+00:00",
+  "datasets": [
+    {
+      "name": "dataset_all",
+      "source": "compression/data/dataset_all.jsonl",
+      "count": 6
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "cc-001",
+      "dataset": "dataset_all",
+      "source": "compression/data/dataset_all.jsonl",
+      "line": 1,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "Meeting transcript:\n\nRina: We need to redesign the Signal API. I propose we build the service in Go this time.\nOmar: Go works. For storage, Postgres as the primary store and Redis as the cache.\nRina: Agreed. Also, keep it single region for now: us-east-1.\nOmar: Performance target?\nRina: 10k RPS with p95 under 200ms.\nOmar: Deadline?\nRina: March 1, 2026.\nOmar: Next steps: draft the DB schema, set up CI, and write a migration plan.\nRina: I will update the design doc at docs/signal-api.md and push the skeleton in services/signal-api.\nOmar: We still need to choose auth: JWTs vs API keys.\nRina: And decide data retention: 30 days or 90 days.\nOmar: By the way, did you watch the game last night?\nRina: Yeah, the overtime was wild. Also, lunch at 12?\n\nOutput a single JSON object only (no code fences) with keys:\nsummary, must_keep, constraints, open_questions, safe_to_drop."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": "{\n  \"summary\": \"Signal API redesign will be implemented in Go with Postgres and Redis in a single us-east-1 region. Targets are 10k RPS at p95 < 200ms with a deadline of 2026-03-01. Next work includes schema/CI/migration planning, while auth and retention remain open.\",\n  \"must_keep\": [\n    \"Service in Go; repo path services/signal-api\",\n    \"Postgres primary store\",\n    \"Redis cache\",\n    \"Design doc docs/signal-api.md\",\n    \"Draft DB schema, set up CI, write migration plan\"\n  ],\n  \"constraints\": [\n    \"10k RPS\",\n    \"p95 < 200ms\",\n    \"Single region us-east-1\",\n    \"Deadline 2026-03-01\"\n  ],\n  \"open_questions\": [\n    \"Auth method: JWTs vs API keys\",\n    \"Data retention: 30 days vs 90 days\"\n  ],\n  \"safe_to_drop\": [\n    \"Game chat\",\n    \"Lunch plans\"\n  ]\n}"
+        }
+      ],
+      "input_text": "input: Meeting transcript:\n\nRina: We need to redesign the Signal API. I propose we build the service in Go this time.\nOmar: Go works. For storage, Postgres as the primary store and Redis as the cache.\nRina: Agreed. Also, keep it single region for now: us-east-1.\nOmar: Performance target?\nRina: 10k RPS with p95 under 200ms.\nOmar: Deadline?\nRina: March 1, 2026.\nOmar: Next steps: draft the DB schema, set up CI, and write a migration plan.\nRina: I will update the design doc at docs/signal-api.md and push the skeleton in services/signal-api.\nOmar: We still need to choose auth: JWTs vs API keys.\nRina: And decide data retention: 30 days or 90 days.\nOmar: By the way, did you watch the game last night?\nRina: Yeah, the overtime was wild. Also, lunch at 12?\n\nOutput a single JSON object only (no code fences) with keys:\nsummary, must_keep, constraints, open_questions, safe_to_drop.",
+      "ground_truth_text": "expected: {\n  \"summary\": \"Signal API redesign will be implemented in Go with Postgres and Redis in a single us-east-1 region. Targets are 10k RPS at p95 < 200ms with a deadline of 2026-03-01. Next work includes schema/CI/migration planning, while auth and retention remain open.\",\n  \"must_keep\": [\n    \"Service in Go; repo path services/signal-api\",\n    \"Postgres primary store\",\n    \"Redis cache\",\n    \"Design doc docs/signal-api.md\",\n    \"Draft DB schema, set up CI, write migration plan\"\n  ],\n  \"constraints\": [\n    \"10k RPS\",\n    \"p95 < 200ms\",\n    \"Single region us-east-1\",\n    \"Deadline 2026-03-01\"\n  ],\n  \"open_questions\": [\n    \"Auth method: JWTs vs API keys\",\n    \"Data retention: 30 days vs 90 days\"\n  ],\n  \"safe_to_drop\": [\n    \"Game chat\",\n    \"Lunch plans\"\n  ]\n}",
+      "meta": {}
+    },
+    {
+      "id": "cc-002",
+      "dataset": "dataset_all",
+      "source": "compression/data/dataset_all.jsonl",
+      "line": 2,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "Planning call notes:\n\nMaya: For the mobile MVP, we must include offline mode for saved items and push notifications.\nJules: Social sharing can wait; let's defer it.\nMaya: Target platforms are iOS 15+ and Android 12+.\nJules: Budget is tight - only two engineers for the next 6 weeks.\nMaya: We need this ready by 2026-02-20.\nJules: Design team wants the Aurora theme as the default.\nMaya: Next tasks are to finalize onboarding copy and set up a closed beta plan.\nJules: We still need to pick analytics: Amplitude vs Firebase.\nMaya: Also legal needs to review the privacy policy copy before we ship.\nJules: Totally unrelated, I might be out Friday for a family trip.\nMaya: Noted.\n\nOutput a single JSON object only (no code fences) with keys:\nsummary, must_keep, constraints, open_questions, safe_to_drop."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": "{\n  \"summary\": \"The mobile MVP will ship with offline saved items and push notifications, while social sharing is deferred. It targets iOS 15+ and Android 12+ with a deadline of 2026-02-20 and only two engineers available. Onboarding copy and a beta plan are next, and analytics selection plus legal review remain open.\",\n  \"must_keep\": [\n    \"MVP includes offline mode for saved items\",\n    \"MVP includes push notifications\",\n    \"Social sharing deferred\",\n    \"Aurora theme is the default design\",\n    \"Finalize onboarding copy\",\n    \"Set up closed beta plan\"\n  ],\n  \"constraints\": [\n    \"Platforms: iOS 15+ and Android 12+\",\n    \"Budget: two engineers for 6 weeks\",\n    \"Deadline 2026-02-20\"\n  ],\n  \"open_questions\": [\n    \"Choose analytics SDK: Amplitude vs Firebase\",\n    \"Complete legal review of privacy policy copy\"\n  ],\n  \"safe_to_drop\": [\n    \"Family trip note\"\n  ]\n}"
+        }
+      ],
+      "input_text": "input: Planning call notes:\n\nMaya: For the mobile MVP, we must include offline mode for saved items and push notifications.\nJules: Social sharing can wait; let's defer it.\nMaya: Target platforms are iOS 15+ and Android 12+.\nJules: Budget is tight - only two engineers for the next 6 weeks.\nMaya: We need this ready by 2026-02-20.\nJules: Design team wants the Aurora theme as the default.\nMaya: Next tasks are to finalize onboarding copy and set up a closed beta plan.\nJules: We still need to pick analytics: Amplitude vs Firebase.\nMaya: Also legal needs to review the privacy policy copy before we ship.\nJules: Totally unrelated, I might be out Friday for a family trip.\nMaya: Noted.\n\nOutput a single JSON object only (no code fences) with keys:\nsummary, must_keep, constraints, open_questions, safe_to_drop.",
+      "ground_truth_text": "expected: {\n  \"summary\": \"The mobile MVP will ship with offline saved items and push notifications, while social sharing is deferred. It targets iOS 15+ and Android 12+ with a deadline of 2026-02-20 and only two engineers available. Onboarding copy and a beta plan are next, and analytics selection plus legal review remain open.\",\n  \"must_keep\": [\n    \"MVP includes offline mode for saved items\",\n    \"MVP includes push notifications\",\n    \"Social sharing deferred\",\n    \"Aurora theme is the default design\",\n    \"Finalize onboarding copy\",\n    \"Set up closed beta plan\"\n  ],\n  \"constraints\": [\n    \"Platforms: iOS 15+ and Android 12+\",\n    \"Budget: two engineers for 6 weeks\",\n    \"Deadline 2026-02-20\"\n  ],\n  \"open_questions\": [\n    \"Choose analytics SDK: Amplitude vs Firebase\",\n    \"Complete legal review of privacy policy copy\"\n  ],\n  \"safe_to_drop\": [\n    \"Family trip note\"\n  ]\n}",
+      "meta": {}
+    },
+    {
+      "id": "cc-003",
+      "dataset": "dataset_all",
+      "source": "compression/data/dataset_all.jsonl",
+      "line": 3,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "Bug triage transcript:\n\nDev1: The search results leak data across tenants.\nDev2: I traced it to the cache key; tenant_id is missing.\nDev1: So the fix is to include tenant_id in the cache key and flush the existing cache.\nDev2: Agreed. We also need a regression test for this.\nDev1: Target hotfix by 2026-02-06.\nDev2: File is services/search/cache.py, issue SEARCH-217.\nDev1: Question - do we invalidate all cached entries or only per-tenant?\nDev2: We'll decide after we see the cache size.\nDev1: Did you see the new cafe downstairs?\nDev2: Not yet.\n\nOutput a single JSON object only (no code fences) with keys:\nsummary, must_keep, constraints, open_questions, safe_to_drop."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": "{\n  \"summary\": \"Search leakage is caused by cache keys missing tenant_id. The fix is to include tenant_id and flush cache, with a regression test, targeting a hotfix by 2026-02-06. The issue is tracked in SEARCH-217 and the code lives in services/search/cache.py.\",\n  \"must_keep\": [\n    \"Root cause: cache key missing tenant_id\",\n    \"Fix: include tenant_id in cache key and flush cache\",\n    \"Add regression test\",\n    \"Issue SEARCH-217\",\n    \"File services/search/cache.py\"\n  ],\n  \"constraints\": [\n    \"Hotfix deadline 2026-02-06\"\n  ],\n  \"open_questions\": [\n    \"Invalidate all cache entries or only per-tenant\"\n  ],\n  \"safe_to_drop\": [\n    \"Cafe chat\"\n  ]\n}"
+        }
+      ],
+      "input_text": "input: Bug triage transcript:\n\nDev1: The search results leak data across tenants.\nDev2: I traced it to the cache key; tenant_id is missing.\nDev1: So the fix is to include tenant_id in the cache key and flush the existing cache.\nDev2: Agreed. We also need a regression test for this.\nDev1: Target hotfix by 2026-02-06.\nDev2: File is services/search/cache.py, issue SEARCH-217.\nDev1: Question - do we invalidate all cached entries or only per-tenant?\nDev2: We'll decide after we see the cache size.\nDev1: Did you see the new cafe downstairs?\nDev2: Not yet.\n\nOutput a single JSON object only (no code fences) with keys:\nsummary, must_keep, constraints, open_questions, safe_to_drop.",
+      "ground_truth_text": "expected: {\n  \"summary\": \"Search leakage is caused by cache keys missing tenant_id. The fix is to include tenant_id and flush cache, with a regression test, targeting a hotfix by 2026-02-06. The issue is tracked in SEARCH-217 and the code lives in services/search/cache.py.\",\n  \"must_keep\": [\n    \"Root cause: cache key missing tenant_id\",\n    \"Fix: include tenant_id in cache key and flush cache\",\n    \"Add regression test\",\n    \"Issue SEARCH-217\",\n    \"File services/search/cache.py\"\n  ],\n  \"constraints\": [\n    \"Hotfix deadline 2026-02-06\"\n  ],\n  \"open_questions\": [\n    \"Invalidate all cache entries or only per-tenant\"\n  ],\n  \"safe_to_drop\": [\n    \"Cafe chat\"\n  ]\n}",
+      "meta": {}
+    },
+    {
+      "id": "cc-004",
+      "dataset": "dataset_all",
+      "source": "compression/data/dataset_all.jsonl",
+      "line": 4,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "Content brief conversation:\n\nWriter: We need a blog post titled \"S3 cost optimization for finance leaders\".\nEditor: Audience is CFOs and finance teams, so keep it non-technical and pragmatic.\nWriter: Length should be 1200-1500 words.\nEditor: Include three case studies with concrete numbers, but avoid vendor names.\nWriter: Add a CTA linking to https://acme.com/finops-playbook at the end.\nEditor: Deadline is 2026-02-10.\nWriter: Can we use internal savings numbers or do we need anonymized/public data?\nEditor: We need to confirm that.\nWriter: Also, my cat knocked over my coffee this morning.\n\nOutput a single JSON object only (no code fences) with keys:\nsummary, must_keep, constraints, open_questions, safe_to_drop."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": "{\n  \"summary\": \"Draft a 1200-1500 word blog post titled \\\"S3 cost optimization for finance leaders\\\" for CFO/finance audiences with a pragmatic, non-technical tone. It must include three numeric case studies, avoid vendor names, and end with a CTA to the FinOps playbook by 2026-02-10. The remaining question is whether internal savings data can be used or must be anonymized/public.\",\n  \"must_keep\": [\n    \"Title: S3 cost optimization for finance leaders\",\n    \"Include three case studies with concrete numbers\",\n    \"Avoid vendor names\",\n    \"CTA link: https://acme.com/finops-playbook\"\n  ],\n  \"constraints\": [\n    \"Audience: CFOs and finance teams\",\n    \"Tone: pragmatic, non-technical\",\n    \"Length: 1200-1500 words\",\n    \"Deadline 2026-02-10\"\n  ],\n  \"open_questions\": [\n    \"Whether to use internal savings numbers vs anonymized/public data\"\n  ],\n  \"safe_to_drop\": [\n    \"Cat/coffee anecdote\"\n  ]\n}"
+        }
+      ],
+      "input_text": "input: Content brief conversation:\n\nWriter: We need a blog post titled \"S3 cost optimization for finance leaders\".\nEditor: Audience is CFOs and finance teams, so keep it non-technical and pragmatic.\nWriter: Length should be 1200-1500 words.\nEditor: Include three case studies with concrete numbers, but avoid vendor names.\nWriter: Add a CTA linking to https://acme.com/finops-playbook at the end.\nEditor: Deadline is 2026-02-10.\nWriter: Can we use internal savings numbers or do we need anonymized/public data?\nEditor: We need to confirm that.\nWriter: Also, my cat knocked over my coffee this morning.\n\nOutput a single JSON object only (no code fences) with keys:\nsummary, must_keep, constraints, open_questions, safe_to_drop.",
+      "ground_truth_text": "expected: {\n  \"summary\": \"Draft a 1200-1500 word blog post titled \\\"S3 cost optimization for finance leaders\\\" for CFO/finance audiences with a pragmatic, non-technical tone. It must include three numeric case studies, avoid vendor names, and end with a CTA to the FinOps playbook by 2026-02-10. The remaining question is whether internal savings data can be used or must be anonymized/public.\",\n  \"must_keep\": [\n    \"Title: S3 cost optimization for finance leaders\",\n    \"Include three case studies with concrete numbers\",\n    \"Avoid vendor names\",\n    \"CTA link: https://acme.com/finops-playbook\"\n  ],\n  \"constraints\": [\n    \"Audience: CFOs and finance teams\",\n    \"Tone: pragmatic, non-technical\",\n    \"Length: 1200-1500 words\",\n    \"Deadline 2026-02-10\"\n  ],\n  \"open_questions\": [\n    \"Whether to use internal savings numbers vs anonymized/public data\"\n  ],\n  \"safe_to_drop\": [\n    \"Cat/coffee anecdote\"\n  ]\n}",
+      "meta": {}
+    },
+    {
+      "id": "cc-005",
+      "dataset": "dataset_all",
+      "source": "compression/data/dataset_all.jsonl",
+      "line": 5,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "Experiment summary chat:\n\nAlex: Experiment 14 finished. Baseline F1 was 0.62; the new method hit 0.71.\nBlair: Nice. Cost increased by about 18 percent though.\nAlex: Results are in results/exp_14.json and the notebook is notebooks/exp14.ipynb.\nBlair: Given the lift, we should proceed with the new method for the next run.\nAlex: Compute is limited to 8xA100 for 6 hours, so keep configs within that.\nBlair: Do we want to add synthetic data augmentation next?\nAlex: Not sure yet. Also, I am flying to Seattle tomorrow.\n\nOutput a single JSON object only (no code fences) with keys:\nsummary, must_keep, constraints, open_questions, safe_to_drop."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": "{\n  \"summary\": \"Experiment 14 improved F1 from 0.62 to 0.71 at a +18% cost, and the team decided to proceed with the new method. Results are stored in results/exp_14.json and notebooks/exp14.ipynb. Future runs must fit within 8xA100 for 6 hours, and synthetic data augmentation is still undecided.\",\n  \"must_keep\": [\n    \"Baseline F1 0.62; new method F1 0.71\",\n    \"Cost increase ~18%\",\n    \"Decision: proceed with new method for next run\",\n    \"Results file results/exp_14.json\",\n    \"Notebook notebooks/exp14.ipynb\"\n  ],\n  \"constraints\": [\n    \"Compute limit: 8xA100 for 6 hours\"\n  ],\n  \"open_questions\": [\n    \"Whether to add synthetic data augmentation\"\n  ],\n  \"safe_to_drop\": [\n    \"Travel note to Seattle\"\n  ]\n}"
+        }
+      ],
+      "input_text": "input: Experiment summary chat:\n\nAlex: Experiment 14 finished. Baseline F1 was 0.62; the new method hit 0.71.\nBlair: Nice. Cost increased by about 18 percent though.\nAlex: Results are in results/exp_14.json and the notebook is notebooks/exp14.ipynb.\nBlair: Given the lift, we should proceed with the new method for the next run.\nAlex: Compute is limited to 8xA100 for 6 hours, so keep configs within that.\nBlair: Do we want to add synthetic data augmentation next?\nAlex: Not sure yet. Also, I am flying to Seattle tomorrow.\n\nOutput a single JSON object only (no code fences) with keys:\nsummary, must_keep, constraints, open_questions, safe_to_drop.",
+      "ground_truth_text": "expected: {\n  \"summary\": \"Experiment 14 improved F1 from 0.62 to 0.71 at a +18% cost, and the team decided to proceed with the new method. Results are stored in results/exp_14.json and notebooks/exp14.ipynb. Future runs must fit within 8xA100 for 6 hours, and synthetic data augmentation is still undecided.\",\n  \"must_keep\": [\n    \"Baseline F1 0.62; new method F1 0.71\",\n    \"Cost increase ~18%\",\n    \"Decision: proceed with new method for next run\",\n    \"Results file results/exp_14.json\",\n    \"Notebook notebooks/exp14.ipynb\"\n  ],\n  \"constraints\": [\n    \"Compute limit: 8xA100 for 6 hours\"\n  ],\n  \"open_questions\": [\n    \"Whether to add synthetic data augmentation\"\n  ],\n  \"safe_to_drop\": [\n    \"Travel note to Seattle\"\n  ]\n}",
+      "meta": {}
+    },
+    {
+      "id": "cc-006",
+      "dataset": "dataset_all",
+      "source": "compression/data/dataset_all.jsonl",
+      "line": 6,
+      "input_turns": [
+        {
+          "role": "input",
+          "content": "Migration planning notes:\n\nSam: We are moving from on-prem to AWS.\nLee: Proposed stack is EKS for compute, RDS Postgres for DB, and S3 for backups.\nSam: Cutover target is 2026-03-05.\nLee: Downtime window must be under 2 hours. Data freeze starts 24 hours before cutover.\nSam: Tasks: inventory services, finalize DNS changes, and run a full load test.\nLee: We still need to pick the region: us-east-1 vs us-west-2.\nSam: By the way, the new office chairs are finally in.\n\nOutput a single JSON object only (no code fences) with keys:\nsummary, must_keep, constraints, open_questions, safe_to_drop."
+        }
+      ],
+      "ground_truth_turns": [
+        {
+          "role": "expected",
+          "content": "{\n  \"summary\": \"The on-prem to AWS migration will use EKS, RDS Postgres, and S3, with a cutover date of 2026-03-05. Downtime must be under 2 hours with a 24-hour data freeze. Key tasks are service inventory, DNS finalization, and a full load test, while the AWS region choice remains open.\",\n  \"must_keep\": [\n    \"Use EKS, RDS Postgres, and S3\",\n    \"Cutover date 2026-03-05\",\n    \"Inventory services\",\n    \"Finalize DNS changes\",\n    \"Run full load test\"\n  ],\n  \"constraints\": [\n    \"Downtime window under 2 hours\",\n    \"Data freeze starts 24 hours before cutover\"\n  ],\n  \"open_questions\": [\n    \"Choose region: us-east-1 vs us-west-2\"\n  ],\n  \"safe_to_drop\": [\n    \"Office chairs note\"\n  ]\n}"
+        }
+      ],
+      "input_text": "input: Migration planning notes:\n\nSam: We are moving from on-prem to AWS.\nLee: Proposed stack is EKS for compute, RDS Postgres for DB, and S3 for backups.\nSam: Cutover target is 2026-03-05.\nLee: Downtime window must be under 2 hours. Data freeze starts 24 hours before cutover.\nSam: Tasks: inventory services, finalize DNS changes, and run a full load test.\nLee: We still need to pick the region: us-east-1 vs us-west-2.\nSam: By the way, the new office chairs are finally in.\n\nOutput a single JSON object only (no code fences) with keys:\nsummary, must_keep, constraints, open_questions, safe_to_drop.",
+      "ground_truth_text": "expected: {\n  \"summary\": \"The on-prem to AWS migration will use EKS, RDS Postgres, and S3, with a cutover date of 2026-03-05. Downtime must be under 2 hours with a 24-hour data freeze. Key tasks are service inventory, DNS finalization, and a full load test, while the AWS region choice remains open.\",\n  \"must_keep\": [\n    \"Use EKS, RDS Postgres, and S3\",\n    \"Cutover date 2026-03-05\",\n    \"Inventory services\",\n    \"Finalize DNS changes\",\n    \"Run full load test\"\n  ],\n  \"constraints\": [\n    \"Downtime window under 2 hours\",\n    \"Data freeze starts 24 hours before cutover\"\n  ],\n  \"open_questions\": [\n    \"Choose region: us-east-1 vs us-west-2\"\n  ],\n  \"safe_to_drop\": [\n    \"Office chairs note\"\n  ]\n}",
+      "meta": {}
+    }
+  ],
+  "models": [],
+  "runs": [],
+  "errors": [],
+  "rubric": {
+    "path": "compression/rubric_context_compression.txt",
+    "content": "Here is the rubric with multiple criteria for evaluating whether the compressed context preserves task-critical information.\n\nUse the Expected Answer (Ground Truth) JSON as the target to compare against.\n\nEach criterion is binary with a score of either 0 or 0.25.\nThe final score should thus be one of [0, 0.25, 0.5, 0.75, 1] based on how many criteria are satisfied.\n\nCriteria:\n1. **Valid JSON only**: The submission is a single valid JSON object with required keys (summary, must_keep, constraints, open_questions, safe_to_drop) and correct types.\n2. **Correct summary**: The summary captures the main task, decisions, and current status without major omissions.\n3. **Correct must_keep/constraints/open_questions**: Critical facts, deadlines, artifacts, and open questions match the ground truth in substance.\n4. **Correct safe_to_drop**: Irrelevant or superseded details are correctly listed. No critical items are marked safe_to_drop.\n\nIMPORTANT: Be critical with your evaluation. Make sure to clearly express your rationale and scoring.\n"
+  }
+}

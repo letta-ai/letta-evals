@@ -45,6 +45,10 @@ def normalize_turn(turn: Any, default_role: str) -> dict[str, str]:
             or turn.get("value")
         )
         if content is None:
+            print(
+                f"  warning: turn dict has no recognized content key "
+                f"({list(turn.keys())}), using full dict"
+            )
             content = turn
         return {
             "role": stringify(role).strip() or default_role,
@@ -202,13 +206,38 @@ def ingest_results(
             # Map numeric sample id to scenario sample_id
             sample_id_num = sample.get("id")
             scenario_id = line_index.get(sample_id_num)
-            if scenario_id and scenario_id in scenario_map:
+            if scenario_id is None:
+                print(
+                    f"  warning: result has sample id {sample_id_num!r} "
+                    f"which does not map to any scenario"
+                )
+                continue
+            if scenario_id not in scenario_map:
+                print(
+                    f"  warning: scenario {scenario_id!r} from result "
+                    f"not found in loaded scenarios"
+                )
+                continue
+            # Extract trajectory messages (strip metadata, keep essentials)
+            raw_trajectory = result.get("trajectory", [])
+            messages = raw_trajectory[0] if raw_trajectory else []
+            trajectory = []
+            for msg in messages:
+                entry = {"message_type": msg.get("message_type", "unknown")}
+                if msg.get("reasoning"):
+                    entry["reasoning"] = msg["reasoning"]
+                if msg.get("content"):
+                    entry["content"] = msg["content"]
+                trajectory.append(entry)
+
+            if scenario_id in scenario_map:
                 scenario_map[scenario_id]["results"].append(
                     {
                         "model_name": model_name,
                         "submission": submission,
                         "score": score,
                         "rationale": rationale,
+                        "trajectory": trajectory,
                     }
                 )
 
