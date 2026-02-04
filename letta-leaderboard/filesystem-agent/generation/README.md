@@ -32,16 +32,18 @@ You cannot write step 3 until step 2 completes. "Coworker" is an **indirect rela
 
 The generator produces 8 question types, each with a dedicated prompt template in `prompts/`:
 
-| Type | % of Eval | Files | Description |
-|------|-----------|-------|-------------|
-| `multi_hop_chain` | 20% | 4-5 | True sequential chains with indirect relationships |
-| `aggregation` | 15% | 4-5 | Target found through chain, then aggregate |
-| `set_intersection` | 15% | 4-5 | Set defined by chain (same city as X), not parallel greps |
-| `negation` | 10% | 4-5 | Group defined by chain, then check absence |
-| `comparison_tiebreak` | 15% | 4-5 | Group defined by chain (coworkers of X), then compare |
-| `multi_entity_comparison` | 10% | 4-5 | Two non-trivial chains that converge for comparison |
-| `cross_file_counting` | 10% | 4-5 | Target found through chain, then count across files |
-| `temporal_reasoning` | 5% | 4-5 | Dates to compare found through chain |
+| Type | % of Eval | Files | Description | Opus Accuracy |
+|------|-----------|-------|-------------|---------------|
+| `multi_entity_comparison` | **30%** | 5-6 | Two parallel chains that converge for comparison | ~50% |
+| `multi_hop_chain` | **25%** | 4-5 | Two parallel chains with comparison | ~40% |
+| `aggregation` | 10% | 4-5 | Target found through chain, then aggregate | ~100% |
+| `set_intersection` | 10% | 4-5 | Set defined by chain (same city as X), not parallel greps | ~100% |
+| `comparison_tiebreak` | 10% | 4-5 | Group defined by chain, then compare with tiebreaker | ~100% |
+| `negation` | 5% | 4-5 | Group defined by chain, then check absence | ~100% |
+| `cross_file_counting` | 5% | 4-5 | Target found through chain, then count across files | ~100% |
+| `temporal_reasoning` | 5% | 4-5 | Dates to compare found through chain | ~100% |
+
+**~55% of questions use the two-parallel-chains pattern** (`multi_entity_comparison` + `multi_hop_chain`), which is the only pattern that consistently challenges strong models.
 
 All types require:
 - 4-5 files with true dependencies
@@ -94,12 +96,40 @@ The `register_question` tool enforces quality checks before accepting a question
 - Minimum 3 files required
 - Minimum 3 SQL queries in the reasoning chain
 - Answer must be a concrete value (rejects "None", "does not own", etc.)
-- `verification_query` must return exactly 1 row (proves answer uniqueness)
+- Answer must be short (<100 chars) and not contain question text
+- `verification_query` is **required** and must:
+  - Compute the answer **end-to-end** using nested subqueries
+  - NOT contain hardcoded person IDs (`pers-XXXX`)
+  - NOT contain CASE statements with hardcoded answers
+  - Return exactly 1 row that matches the provided answer
 - `question_type` must be one of the 8 valid types
+
+### Retry Logic
+
+If a question fails to generate (API error, validation failure), the generator retries up to `max_retries_per_question` times (default: 3) before moving on.
+
+## Validate Generated Questions
+
+After generation, **always validate before testing**:
+
+```bash
+python validate_questions.py data/generated_questions/run_XXXX/agent_generated_questions.jsonl
+```
+
+The validation script checks:
+- No forbidden terms (SSN, neighbor)
+- Answer quality (length, no question text, no negatives)
+- Verification query quality (no hardcoded IDs, end-to-end)
+- GT correctness (runs verification query against DB)
+
+**Exit codes:**
+- `0` = Clean, ready for testing
+- `1` = Issues found, review before testing
 
 ## Target Difficulty
 
-Questions should achieve ~60% accuracy among top models. The key test:
+Questions should achieve ~60-70% accuracy among top models. The key test:
 - **Can all conditions be grepped in parallel?** → Too easy
 - **Does step N+1 require step N's output?** → Good
 - **Does it require deriving an indirect relationship?** → Good
+- **Does it require completing TWO independent chains and comparing?** → Best
