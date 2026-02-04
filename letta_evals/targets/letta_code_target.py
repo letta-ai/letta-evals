@@ -9,6 +9,7 @@ from letta_client import AsyncLetta
 
 from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.base import AbstractAgentTarget
+from letta_evals.utils import load_object
 from letta_evals.visualization.base import ProgressCallback
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,8 @@ class LettaCodeTarget(AbstractAgentTarget):
         timeout: int = 300,
         max_retries: int = 0,
         base_url: Optional[str] = None,
+        agent_script: Optional[str] = None,
+        base_dir: Optional[Path] = None,
     ):
         """Initialize the Letta Code target.
 
@@ -44,6 +47,10 @@ class LettaCodeTarget(AbstractAgentTarget):
             timeout: Command timeout in seconds (default: 300)
             max_retries: Number of retry attempts on failure
             base_url: Base URL for the Letta server (passed to CLI via env var)
+            agent_script: Path to agent factory script (e.g., "setup_agent.py:setup_agent").
+                If provided, the factory function is called to create an agent per sample,
+                and --agent is used instead of --new-agent.
+            base_dir: Base directory for resolving relative paths in agent_script
         """
         self.client = client
         self.model_handle = model_handle
@@ -53,14 +60,16 @@ class LettaCodeTarget(AbstractAgentTarget):
         self.timeout = timeout
         self.max_retries = max_retries
         self.base_url = base_url
+        self.agent_script = agent_script
+        self.base_dir = base_dir or Path.cwd()
 
         # Resolve the working directory, optionally creating a per-model sandbox
-        base_dir = working_dir or Path.cwd()
+        wd_base = working_dir or Path.cwd()
         if sandbox:
             model_name = model_handle.split("/")[-1]
-            self.working_dir = base_dir / model_name
+            self.working_dir = wd_base / model_name
         else:
-            self.working_dir = base_dir
+            self.working_dir = wd_base
         self.working_dir.mkdir(parents=True, exist_ok=True)
 
     async def run(
@@ -86,17 +95,29 @@ class LettaCodeTarget(AbstractAgentTarget):
                 prompt = "\n".join(str(inp) for inp in inputs)
                 prompt = prompt.replace("{pwd}", self.working_dir.resolve().as_posix())
 
+                # If agent_script is provided, create agent via factory first
+                factory_agent_id = None
+                if self.agent_script:
+                    agent_factory_func = load_object(self.agent_script, self.base_dir)
+                    factory_agent_id = await agent_factory_func(self.client, sample)
+                    logger.info(f"Created agent {factory_agent_id} via agent_factory for sample {sample.id}")
+
                 # construct the letta-code CLI command (headless JSON output)
                 # NOTE: letta-code CLI flags have changed over time; keep to stable, documented flags.
                 cmd = [
                     "letta",
-                    "--new-agent",
                     "--yolo",
                     "--output-format",
                     "json",
                     "--model",
                     self.model_handle,
                 ]
+
+                # Use existing agent from factory, or create new one
+                if factory_agent_id:
+                    cmd.extend(["--agent", factory_agent_id])
+                else:
+                    cmd.append("--new-agent")
 
                 # Use codex system prompt for GPT-style models (matches `letta --help` examples)
                 if "gpt" in self.model_handle:
