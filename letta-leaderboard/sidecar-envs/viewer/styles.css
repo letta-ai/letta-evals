@@ -12,8 +12,9 @@
   --shadow-strong: rgba(44, 35, 31, 0.12);
   --font-body: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino,
     "Garamond", "Times New Roman", serif;
-  --font-mono: "SF Mono", "Menlo", "Consolas", "Liberation Mono",
-    "Courier New", monospace;
+  --font-mono: "MonoLisa", "JetBrains Mono", "Fira Code", "SF Mono", "Menlo",
+    "Consolas", monospace;
+  --font-size-mono: 13px;
 }
 
 * {
@@ -244,9 +245,37 @@ button {
 
 .panel-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   min-height: 0;
+}
+
+.panel-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.panel-tab {
+  border: 1px solid var(--line);
+  background: #fffdf8;
+  color: var(--muted);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.panel-tab.active {
+  background: var(--accent);
+  color: #fff7ef;
+  border-color: transparent;
+}
+
+.panel-tab:not(.active):hover {
+  border-color: var(--accent-soft);
+  color: var(--ink);
 }
 
 .panel-body {
@@ -264,11 +293,13 @@ button {
   border: 1px solid var(--line);
   background: #fffdf8;
   font-family: var(--font-mono);
+  font-size: var(--font-size-mono);
   white-space: pre-wrap;
   line-height: 1.4;
 }
 
-#responseBody .panel-pre {
+#responseBody .panel-pre,
+#judgeBody .panel-pre {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
@@ -389,6 +420,7 @@ button {
 .turn-content {
   margin: 0;
   font-family: var(--font-mono);
+  font-size: var(--font-size-mono);
   white-space: pre-wrap;
   line-height: 1.4;
 }
@@ -403,8 +435,8 @@ button {
 .meta-block pre {
   margin: 0;
   font-family: var(--font-mono);
+  font-size: var(--font-size-mono);
   white-space: pre-wrap;
-  font-size: 0.85rem;
   color: var(--muted);
 }
 
@@ -473,7 +505,7 @@ button {
 .collapsible-body {
   margin: 6px 0 0;
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: var(--font-size-mono);
   white-space: pre-wrap;
   line-height: 1.4;
   max-height: 300px;
@@ -495,6 +527,15 @@ button {
   .topbar {
     animation: none;
   }
+}
+
+/* highlight.js overrides — inherit panel background */
+.panel-pre code.hljs,
+.turn-content code.hljs {
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
 }
 
 /* Loading state */

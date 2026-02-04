@@ -7,6 +7,7 @@ const state = {
   search: "",
   selectedId: null,
   loading: false,
+  fetchGeneration: 0,
 };
 
 const el = (id) => document.getElementById(id);
@@ -24,6 +25,8 @@ const responseMetaEl = el("responseMeta");
 const contextBodyEl = el("contextBody");
 const rubricBodyEl = el("rubricBody");
 const responseBodyEl = el("responseBody");
+const judgeMetaEl = el("judgeMeta");
+const judgeBodyEl = el("judgeBody");
 
 function toTitleCase(text) {
   return text
@@ -56,6 +59,7 @@ function showError(message) {
   contextBodyEl.innerHTML = "";
   rubricBodyEl.innerHTML = "";
   responseBodyEl.innerHTML = "";
+  judgeBodyEl.innerHTML = "";
 
   const errorEl = document.createElement("div");
   errorEl.className = "error-message";
@@ -63,6 +67,7 @@ function showError(message) {
 
   contextBodyEl.appendChild(errorEl.cloneNode(true));
   rubricBodyEl.appendChild(errorEl.cloneNode(true));
+  judgeBodyEl.appendChild(errorEl.cloneNode(true));
   responseBodyEl.appendChild(errorEl);
 }
 
@@ -167,6 +172,7 @@ async function selectCategory(name) {
   const cat = state.index.categories.find((item) => item.name === name);
   if (!cat) return;
 
+  const generation = ++state.fetchGeneration;
   setLoading(true);
   try {
     const response = await fetch(cat.data_file);
@@ -174,6 +180,8 @@ async function selectCategory(name) {
       throw new Error(`Failed to load category: ${response.status}`);
     }
     const data = await response.json();
+
+    if (generation !== state.fetchGeneration) return;
 
     state.category = cat;
     state.data = data;
@@ -252,6 +260,25 @@ function renderScenarioList() {
   });
 }
 
+function detectLang(text) {
+  const trimmed = (text || "").trim();
+  if (
+    (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+    (trimmed.startsWith("[") && trimmed.endsWith("]"))
+  ) {
+    try {
+      JSON.parse(trimmed);
+      return "json";
+    } catch {}
+  }
+  return "markdown";
+}
+
+function highlightCode(code, text) {
+  code.className = `language-${detectLang(text)}`;
+  hljs.highlightElement(code);
+}
+
 function buildTurnCard(turn) {
   const card = document.createElement("div");
   card.className = "turn";
@@ -263,10 +290,13 @@ function buildTurnCard(turn) {
     card.appendChild(role);
   }
 
-  const content = document.createElement("pre");
-  content.className = "turn-content";
-  content.textContent = turn.content || "";
-  card.appendChild(content);
+  const pre = document.createElement("pre");
+  pre.className = "turn-content";
+  const code = document.createElement("code");
+  code.textContent = turn.content || "";
+  pre.appendChild(code);
+  highlightCode(code, turn.content);
+  card.appendChild(pre);
 
   return card;
 }
@@ -274,7 +304,10 @@ function buildTurnCard(turn) {
 function buildPreBlock(text) {
   const pre = document.createElement("pre");
   pre.className = "panel-pre";
-  pre.textContent = text || "";
+  const code = document.createElement("code");
+  code.textContent = text || "";
+  pre.appendChild(code);
+  highlightCode(code, text);
   return pre;
 }
 
@@ -333,16 +366,19 @@ function renderPanels() {
   contextBodyEl.innerHTML = "";
   rubricBodyEl.innerHTML = "";
   responseBodyEl.innerHTML = "";
+  judgeBodyEl.innerHTML = "";
   contextMetaEl.textContent = "";
   rubricMetaEl.textContent = "";
   responseMetaEl.textContent = "";
+  judgeMetaEl.textContent = "";
 
   const scenario = getSelectedScenario();
   if (!scenario) {
     const empty = buildEmptyState("Select a scenario from the left.");
     contextBodyEl.appendChild(empty.cloneNode(true));
     rubricBodyEl.appendChild(empty.cloneNode(true));
-    responseBodyEl.appendChild(empty);
+    responseBodyEl.appendChild(empty.cloneNode(true));
+    judgeBodyEl.appendChild(empty);
     return;
   }
 
@@ -389,12 +425,41 @@ function renderPanels() {
       responseMetaEl.textContent += ` · ${note}`;
     }
     responseBodyEl.appendChild(buildPreBlock(result.submission || ""));
+
+    // Judge panel
+    if (result.rationale) {
+      const scoreBadge = document.createElement("span");
+      scoreBadge.className = "score-badge";
+      if (typeof result.score === "number") {
+        scoreBadge.textContent = `${(result.score * 100).toFixed(0)}%`;
+        if (result.score >= 0.7) scoreBadge.classList.add("score-green");
+        else if (result.score >= 0.4) scoreBadge.classList.add("score-yellow");
+        else scoreBadge.classList.add("score-red");
+      }
+      judgeMetaEl.textContent = result.model_name;
+      if (scoreBadge.textContent) {
+        judgeMetaEl.textContent = "";
+        const metaWrapper = document.createDocumentFragment();
+        const modelText = document.createTextNode(`${result.model_name} `);
+        metaWrapper.appendChild(modelText);
+        metaWrapper.appendChild(scoreBadge);
+        judgeMetaEl.appendChild(metaWrapper);
+      }
+      judgeBodyEl.appendChild(buildPreBlock(result.rationale));
+    } else {
+      judgeMetaEl.textContent = "No rationale";
+      judgeBodyEl.appendChild(buildEmptyState("No judge rationale available."));
+    }
   } else if (scenario.ground_truth_text) {
     responseMetaEl.textContent = "Ground truth (no model response)";
     responseBodyEl.appendChild(buildPreBlock(scenario.ground_truth_text));
+    judgeMetaEl.textContent = "No results";
+    judgeBodyEl.appendChild(buildEmptyState("No judge rationale available."));
   } else {
     responseMetaEl.textContent = "No model response";
     responseBodyEl.appendChild(buildEmptyState("No response available."));
+    judgeMetaEl.textContent = "No results";
+    judgeBodyEl.appendChild(buildEmptyState("No judge rationale available."));
   }
 }
 
@@ -415,6 +480,27 @@ searchInputEl.addEventListener("input", (event) => {
 modelSelectEl.addEventListener("change", (event) => {
   state.selectedModel = event.target.value || null;
   renderPanels();
+});
+
+const panelViews = {
+  left: { context: { body: contextBodyEl, meta: contextMetaEl }, rubric: { body: rubricBodyEl, meta: rubricMetaEl } },
+  right: { response: { body: responseBodyEl, meta: responseMetaEl }, judge: { body: judgeBodyEl, meta: judgeMetaEl } },
+};
+
+document.querySelectorAll(".panel-tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    const panel = tab.dataset.panel;
+    const view = tab.dataset.view;
+    // Toggle tab active state
+    document.querySelectorAll(`.panel-tab[data-panel="${panel}"]`).forEach((t) => t.classList.remove("active"));
+    tab.classList.add("active");
+    // Toggle body/meta visibility
+    for (const [key, els] of Object.entries(panelViews[panel])) {
+      const show = key === view;
+      els.body.hidden = !show;
+      els.meta.hidden = !show;
+    }
+  });
 });
 
 loadIndex();
