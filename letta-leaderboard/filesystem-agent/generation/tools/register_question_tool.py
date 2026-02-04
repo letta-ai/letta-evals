@@ -92,9 +92,9 @@ def compute_difficulty(question_type: str, required_files: List[str], sql_querie
       - SQL queries: 3 → 0pts, 4 → 1pt, 5+ → 2pts
       - Two-chain patterns (hardest): +2pts
         (multi_hop_chain, multi_entity_comparison)
-      
+
     Total: 0-1 → easy, 2-3 → medium, 4+ → hard
-    
+
     Based on empirical results:
       - multi_hop_chain: 40% Opus accuracy (HARD)
       - multi_entity_comparison: 50% Opus accuracy (HARD)
@@ -211,7 +211,7 @@ class RegisterQuestionTool:
                 "error": f"Answer contains question text: '{answer}'. "
                 "The answer must be a simple value (name, number, date), not a description.",
             }
-        
+
         # Check answer is reasonably short (names/numbers, not sentences)
         if len(answer) > 100:
             return {
@@ -251,7 +251,7 @@ class RegisterQuestionTool:
                     "error": "MISSING VERIFICATION QUERY: You must provide a verification_query that computes "
                     "the answer end-to-end using nested subqueries. This is required to validate correctness.",
                 }
-            
+
             # REJECT if verification query contains hardcoded person IDs
             if "pers-" in verification_query:
                 conn.close()
@@ -261,7 +261,7 @@ class RegisterQuestionTool:
                     "The verification query must compute the answer end-to-end using nested subqueries, "
                     "not look up a pre-determined person ID. Rewrite the query to derive the person from scratch.",
                 }
-            
+
             # REJECT if verification query contains CASE with hardcoded names
             if "CASE" in verification_query.upper() and "THEN '" in verification_query:
                 conn.close()
@@ -270,7 +270,7 @@ class RegisterQuestionTool:
                     "error": "INVALID VERIFICATION QUERY: Contains CASE statement with hardcoded answer. "
                     "The verification query must compute and return the answer, not embed it in a CASE statement.",
                 }
-                
+
                 try:
                     cursor.execute(verification_query)
                     verification_rows = cursor.fetchall()
