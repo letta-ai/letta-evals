@@ -1,0 +1,14 @@
+Here is the rubric with multiple criteria for evaluating whether the handoff artifact was produced correctly.
+
+Use the Expected Answer (Ground Truth) JSON as the target to compare against.
+
+Each criterion is binary with a score of either 0 or 0.25.
+The final score should thus be one of [0, 0.25, 0.5, 0.75, 1] based on how many criterion are satisfied.
+
+Criteria:
+1. **Valid JSON only**: The submission is a single valid JSON object with no extra text or code fences.
+2. **Required schema**: The JSON includes all required keys and structure as specified (summary, decisions, open_todos, blockers, next_steps, artifacts, discarded).
+3. **Correct carry-forward**: Decisions, open todos, and next steps match the ground truth (no key items missing or contradicted).
+4. **Correct discard**: The discarded items match the ground truth (irrelevant/outdated details are not carried forward).
+
+IMPORTANT: Be critical with your evaluation. Make sure to clearly express your rationale and scoring.

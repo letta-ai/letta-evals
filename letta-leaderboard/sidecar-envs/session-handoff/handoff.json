@@ -1,0 +1,22 @@
+{
+  "summary": "Session focused on configuring grading infrastructure for v0 release, establishing model_judge rubric approach and JSON output format requirements.",
+  "decisions": [
+    "Use model_judge rubric for v0 grading",
+    "Output must be raw JSON only (no code fences)"
+  ],
+  "open_todos": [
+    "Write rubric text file",
+    "Add smoke suite yaml"
+  ],
+  "blockers": [],
+  "next_steps": [
+    "Create rubric text file for model_judge grading",
+    "Implement smoke suite yaml configuration"
+  ],
+  "artifacts": [
+    "letta-leaderboard/sidecar-envs/session-handoff/"
+  ],
+  "discarded": [
+    "Side chat about emoji usage"
+  ]
+}
