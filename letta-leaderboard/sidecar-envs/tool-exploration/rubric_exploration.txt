@@ -1,0 +1,14 @@
+Here is the rubric with multiple criteria for evaluating whether the tool exploration report was produced correctly.
+
+Use the Expected Answer (Ground Truth) JSON as the target to compare against.
+
+Each criterion is binary with a score of either 0 or 0.25.
+The final score should thus be one of [0, 0.25, 0.5, 0.75, 1] based on how many criteria are satisfied.
+
+Criteria:
+1. **Valid JSON only**: The submission is a single valid JSON object with no extra text or code fences. All required keys are present (tool_name, category, quirks, doc_errors, hidden_features, false_alarms) with correct types.
+2. **Correct quirks**: The quirks array identifies the same real behavioral issues as the ground truth. No significant quirks are missing, and no false alarms are promoted to quirks. Minor phrasing differences are acceptable if the substance matches.
+3. **Correct doc errors and hidden features**: Documentation errors are correctly identified (location and correction match the ground truth in substance). Hidden features match the ground truth.
+4. **Correct false alarms**: Items that appeared buggy but were actually user error or expected behavior are correctly classified as false alarms, matching the ground truth. No real quirks are demoted to false alarms.
+
+IMPORTANT: Be critical with your evaluation. Make sure to clearly express your rationale and scoring.

@@ -1,0 +1,33 @@
+name: tool-exploration-smoke
+description: v0 tool exploration quirk discovery (response-only) smoke suite
+dataset: data/dataset_all.jsonl
+max_samples: 3
+
+target:
+  kind: letta_code
+  base_url: https://api.letta.com/
+  working_dir: output-tool-exploration-smoke
+  sandbox: false
+  timeout: 300
+  max_retries: 0
+  model_handles:
+    - anthropic/claude-sonnet-4-5-20250929
+    - openai/gpt-5.1-codex-mini
+    - gemini-3-flash
+
+graders:
+  exploration:
+    kind: model_judge
+    display_name: "exploration score"
+    prompt_path: rubric_exploration.txt
+    model: gpt-5-mini
+    temperature: 0.0
+    provider: openai
+    extractor: last_assistant
+
+gate:
+  kind: simple
+  metric_key: exploration
+  aggregation: avg_score
+  op: gte
+  value: 0.75
