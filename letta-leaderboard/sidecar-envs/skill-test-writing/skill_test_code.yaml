@@ -1,6 +1,6 @@
 name: skill-test-writing
 description: Evaluate if agent can write high-quality test cases for skills
-dataset: data/dataset.jsonl
+dataset: data/dataset_all.jsonl
 
 target:
   kind: letta_code
@@ -30,6 +30,12 @@ target:
     - openrouter/meta-llama/llama-3.3-70b-instruct
     - openrouter/qwen/qwen-2.5-coder-32b-instruct
     - openrouter/mistralai/mistral-large-2411
+    # Additional models
+    - openrouter/x-ai/grok-3
+    - openrouter/qwen/qwen3-coder
+    - openrouter/nousresearch/hermes-4-70b
+    - openrouter/mistralai/codestral-2508
+    - openrouter/nvidia/llama-3.3-nemotron-super-49b-v1.5
 
 graders:
   test_quality:

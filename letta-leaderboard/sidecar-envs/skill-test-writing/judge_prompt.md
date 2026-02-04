@@ -39,6 +39,7 @@ Is the grader robust? Does it accept all valid solutions?
 | 1-2 | Fundamentally broken grader |
 
 **Score 1-3 if ANY apply:**
+
 - Regex/string matching that rejects valid solutions
 - Only accepts one approach when alternatives exist (e.g., only openpyxl, not xlsxwriter)
 - Requires files/servers/setup not provided

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate dataset.jsonl for skill-test-writing evaluation.
+"""Generate dataset_all.jsonl for skill-test-writing evaluation.
 
 For each skill in reference_skills/, creates a row asking the agent to write
 a test case for that skill. Uses extra_vars to pass skill metadata to the judge.
@@ -9,12 +9,10 @@ import json
 from pathlib import Path
 
 SKILLS_DIR = Path(__file__).parent / "reference_skills"
-OUTPUT_FILE = Path(__file__).parent / "data" / "dataset.jsonl"
+OUTPUT_FILE = Path(__file__).parent / "data" / "dataset_all.jsonl"
 
 # Prompt template for generating test cases
-PROMPT_TEMPLATE = """You are given a skill document that teaches an LLM specialized knowledge about a domain.
-
-Your task: Write ONE high-quality test case that measures whether having this skill helps an LLM succeed.
+PROMPT_TEMPLATE = """You are an evaluation designer. You have a skill document that teaches an LLM domain-specific knowledge. Your job is to write ONE test case that distinguishes a knowledgeable practitioner from a novice in this domain.
 
 ## The Skill
 
@@ -27,44 +25,60 @@ Your task: Write ONE high-quality test case that measures whether having this sk
 
 {additional_files_section}
 
-## Test Case Format
+## What Makes a Great Test Case
 
-Create a `test.yaml` file with this structure:
+A great test case captures a **moment where domain expertise changes the outcome** -- a decision point, a subtle pitfall, or a design tradeoff that practitioners learn from experience. The test should feel like a real question someone would ask a senior colleague, not a quiz about documentation.
 
-```yaml
-name: descriptive-kebab-case-name
-skills:
-  - {skill_name}
-prompt: |
-  The task prompt that tests whether the model has the skill's knowledge.
-  Should be a realistic task a practitioner would encounter.
-timeout: 300
+### The Transferability Principle
 
-grader:
-  kind: letta_judge  # or model_judge or tool
-  prompt: |
-    Evaluation criteria for scoring the response.
-    Score 1.0 if: <criteria for full credit>
-    Score 0.5 if: <criteria for partial credit>
-    Score 0.0 if: <criteria for no credit>
-  extractor: last_assistant
-```
+Ask yourself: "Would a domain expert who has NEVER read this specific skill document still get this right?" If yes, you are testing genuine domain knowledge. If no, you are testing document memorization.
 
-If you need programmatic grading, also create a `grader.py` file with a function that returns a score 0-1.
+**Transferable knowledge** (test this):
+- Architectural patterns and tradeoffs (e.g., "formulas vs hardcoded values in spreadsheets")
+- Common pitfalls and debugging patterns (e.g., "race condition when server isn't ready")
+- When to use which tool/approach for a given problem (e.g., "library X for tables, library Y for merging")
+- Destructive operations and their consequences (e.g., "opening with data_only=True then saving destroys formulas")
 
-## Guidelines
+**Skill-document trivia** (do NOT test this):
+- Exact script names, file paths, or CLI flags specific to this skill's tooling
+- Magic numbers or specific configuration values mentioned in the skill
+- The exact workflow steps described in the skill document
+- Which fields are required in the skill's configuration format
 
-**Good test cases:**
-- Test domain knowledge that practitioners genuinely need
-- Have robust graders that accept all valid solutions
-- Represent realistic tasks
+### Prompt Style: Scenario-Based
 
-**Bad test cases:**
-- Test skill-specific trivia (exact script names, magic numbers)
-- Have fragile graders that reject valid alternatives
-- Could only be solved by memorizing the skill document
+Write the prompt as a realistic situation -- a practitioner encountering a problem, making a decision, or asking for guidance. Frame it as something someone would type into a chat with a knowledgeable colleague.
 
-## Your Output
+**Strong prompt patterns:**
+- "I'm doing X and getting error Y. What's going wrong?" (debugging scenario)
+- "I need to accomplish X. Should I use approach A or approach B?" (design decision)
+- "I'm about to do X. Are there any risks I should know about?" (pitfall awareness)
+- "My X works in development but fails in production. Why?" (environment difference)
+
+**Weak prompt patterns to avoid:**
+- "What is the correct workflow for X?" (asks to recite steps from docs)
+- "What fields/parameters are required for X?" (asks to list facts)
+- "How often should I do X?" (asks for a magic number)
+- "What does tool X do?" (asks for a description, not application)
+
+## Grader Design: Grade Concepts, Not Strings
+
+The grader evaluates whether the response demonstrates **understanding of the underlying concept**, not whether it mentions specific terms.
+
+### Grader Anti-Patterns (avoid these):
+- Requiring a specific library name when alternatives exist (e.g., only accepting "openpyxl" when "xlsxwriter" also works)
+- Requiring a specific numeric value (e.g., "must say 30 minutes") when the concept matters more
+- Checking for exact phrases or keywords rather than conceptual understanding
+- Requiring mention of skill-specific script names or tools
+- Only accepting one valid approach when multiple exist
+
+### Grader Best Practices:
+- Grade on whether the response identifies the **core concept or pitfall**
+- Accept multiple valid solutions to the same problem
+- Use graduated scoring (0, 0.5, 1.0) based on depth of understanding
+- Focus the 1.0 criteria on explaining the "why" not just the "what"
+
+## Output Format
 
 Output your test.yaml content directly in a YAML code block:
 
@@ -73,12 +87,19 @@ name: descriptive-kebab-case-name
 skills:
   - {skill_name}
 prompt: |
-  Your test prompt here...
-timeout: 300
+  A scenario-based prompt that a practitioner would realistically encounter.
+  Should test transferable domain knowledge, not skill-document trivia.
+timeout: 120
 grader:
   kind: letta_judge
   prompt: |
-    Scoring criteria...
+    Evaluate whether the response demonstrates understanding of [core concept].
+
+    The key insight is: [what a knowledgeable practitioner would know]
+
+    Score 1.0 if: Explains [concept] AND why it matters. Accepts any valid approach.
+    Score 0.5 if: Identifies the issue but explanation is incomplete or misses the "why".
+    Score 0.0 if: Does not address [concept] or gives incorrect guidance.
   extractor: last_assistant
 ```
 """
@@ -149,7 +170,7 @@ def get_skill_file_tree(skill_dir: Path) -> str:
 
 
 def generate_dataset():
-    """Generate the dataset.jsonl file."""
+    """Generate the dataset_all.jsonl file."""
     rows = []
 
     for skill_dir in sorted(SKILLS_DIR.iterdir()):

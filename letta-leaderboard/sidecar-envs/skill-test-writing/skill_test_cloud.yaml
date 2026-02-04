@@ -1,6 +1,6 @@
 name: skill-test-writing-cloud
 description: Evaluate if agent can write high-quality test cases for skills (cloud agents)
-dataset: data/dataset.jsonl
+dataset: data/dataset_all.jsonl
 
 target:
   kind: letta_agent
