@@ -1,39 +1,46 @@
 {
-  "generated_at": "2026-02-04T04:34:32.136878+00:00",
+  "generated_at": "2026-02-04T18:49:22.542919+00:00",
   "categories": [
+    {
+      "name": "prompt-memory",
+      "display_name": "Prompt Memory",
+      "data_file": "data/prompt-memory.json",
+      "scenario_count": 6,
+      "dataset_count": 1
+    },
     {
       "name": "session-handoff",
       "display_name": "Session Handoff",
       "data_file": "data/session-handoff.json",
-      "scenario_count": 6,
+      "scenario_count": 16,
       "dataset_count": 1
     },
     {
       "name": "skill-learning",
       "display_name": "Skill Learning",
       "data_file": "data/skill-learning.json",
-      "scenario_count": 5,
+      "scenario_count": 15,
       "dataset_count": 1
     },
     {
       "name": "skill-test-writing",
       "display_name": "Skill Test Writing",
       "data_file": "data/skill-test-writing.json",
-      "scenario_count": 13,
+      "scenario_count": 23,
       "dataset_count": 1
     },
     {
       "name": "tool-exploration",
       "display_name": "Tool Exploration",
       "data_file": "data/tool-exploration.json",
-      "scenario_count": 6,
+      "scenario_count": 16,
       "dataset_count": 1
     },
     {
       "name": "user-model-maintenance",
       "display_name": "User Model Maintenance",
       "data_file": "data/user-model-maintenance.json",
-      "scenario_count": 6,
+      "scenario_count": 16,
       "dataset_count": 1
     }
   ]
