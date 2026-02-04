@@ -1,0 +1,14 @@
+Here is the rubric with multiple criteria for evaluating whether the prompt vs memory split was produced correctly.
+
+Use the Expected Answer (Ground Truth) JSON as the target to compare against.
+
+Each criterion is binary with a score of either 0 or 0.25.
+The final score should thus be one of [0, 0.25, 0.5, 0.75, 1] based on how many criteria are satisfied.
+
+Criteria:
+1. **Valid JSON only**: The submission is a single valid JSON object with required keys (system_prompt, dynamic_memory, discarded) and correct types.
+2. **Correct system_prompt**: Items that are stable and global match the ground truth. No user/project-specific or ephemeral items are incorrectly placed in system_prompt.
+3. **Correct dynamic_memory**: User/project/context-specific facts match the ground truth, and each includes a reasonable load_when trigger.
+4. **Correct discard**: Ephemeral/irrelevant/malicious items are correctly discarded. No critical items are discarded.
+
+IMPORTANT: Be critical with your evaluation. Make sure to clearly express your rationale and scoring.
