@@ -1,0 +1,32 @@
+name: precommit-full
+description: v0 precommit over prose (response-only) full suite
+dataset: data/dataset_all.jsonl
+
+target:
+  kind: letta_code
+  base_url: https://api.letta.com/
+  working_dir: output-precommit-full
+  sandbox: false
+  timeout: 300
+  max_retries: 0
+  model_handles:
+    - anthropic/claude-sonnet-4-5-20250929
+    - openai/gpt-5.1-codex-mini
+    - gemini-3-flash
+
+graders:
+  precommit:
+    kind: model_judge
+    display_name: "precommit score"
+    prompt_path: rubric_precommit.txt
+    model: gpt-5-mini
+    temperature: 0.0
+    provider: openai
+    extractor: last_assistant
+
+gate:
+  kind: simple
+  metric_key: precommit
+  aggregation: avg_score
+  op: gte
+  value: 0.75

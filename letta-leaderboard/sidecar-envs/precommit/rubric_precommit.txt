@@ -1,0 +1,14 @@
+Here is the rubric with multiple criteria for evaluating whether enforceable preferences were converted into config changes rather than prose memory.
+
+Use the Expected Answer (Ground Truth) JSON as the target to compare against.
+
+Each criterion is binary with a score of either 0 or 0.25.
+The final score should thus be one of [0, 0.25, 0.5, 0.75, 1] based on how many criteria are satisfied.
+
+Criteria:
+1. **Valid JSON only**: The submission is a single valid JSON object with required keys (config_changes, memory_notes, discarded) and correct types.
+2. **Correct config changes**: Enforceable preferences are placed in config_changes with appropriate file targets. No key enforceable item is missing.
+3. **Correct memory notes**: Subjective or non-enforceable preferences are placed in memory_notes and not in config_changes.
+4. **Correct discard**: Preferences already enforced or irrelevant are listed under discarded and not duplicated elsewhere.
+
+IMPORTANT: Be critical with your evaluation. Make sure to clearly express your rationale and scoring.
