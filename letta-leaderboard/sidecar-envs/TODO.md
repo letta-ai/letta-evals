@@ -101,8 +101,6 @@ Close the loop: high-scoring eval trajectories feed back into `letta-train` for 
 
 ## Further ideas
 
-- **System-prompt vs. dynamic memory**: Does the agent correctly decide what belongs in core/system prompt (stable, always-loaded) vs. dynamically loaded based on task context?
-
-- **Pre-commit over prose**: For code-enforceable preferences (e.g., "use pnpm not npm"), does the agent convert them to pre-commit/config rules rather than duplicating NL instructions in memory?
-
-- **Context compression**: Given a long context, can the agent produce a summary that preserves task-critical info? (Measure: downstream task success with compressed vs full context)
+- **System-prompt vs. dynamic memory**: Implemented in `prompt-memory/`.
+- **Pre-commit over prose**: Implemented in `precommit/`.
+- **Context compression**: Implemented in `compression/`.

@@ -27,6 +27,10 @@ Run a suite from the repo root:
 uv run letta-evals run letta-leaderboard/sidecar-envs/user-model-maintenance/suite_smoke.yaml -o results/umm-smoke/
 uv run letta-evals run letta-leaderboard/sidecar-envs/session-handoff/suite_smoke.yaml -o results/handoff-smoke/
 uv run letta-evals run letta-leaderboard/sidecar-envs/skill-learning/suite_smoke.yaml -o results/skill-learning-smoke/
+uv run letta-evals run letta-leaderboard/sidecar-envs/tool-exploration/suite_smoke.yaml -o results/tool-exploration-smoke/
+uv run letta-evals run letta-leaderboard/sidecar-envs/prompt-memory/suite_smoke.yaml -o results/prompt-memory-smoke/
+uv run letta-evals run letta-leaderboard/sidecar-envs/precommit/suite_smoke.yaml -o results/precommit-smoke/
+uv run letta-evals run letta-leaderboard/sidecar-envs/compression/suite_smoke.yaml -o results/compression-smoke/
 ```
 
 Notes:
@@ -64,6 +68,10 @@ Additional top-level keys may exist for other tooling, but `letta-evals` will ig
 - `session-handoff/`: produce a concise `handoff.json` for the next session (strict JSON output).
 - `skill-learning/`: given tests + expected outcomes, produce `SKILL.md` content (Markdown output only).
 - `skill-test-writing/`: generate strong tests for skills (includes dataset generation and result parsing utilities).
+- `tool-exploration/`: produce structured exploration reports for tools/APIs (strict JSON output).
+- `prompt-memory/`: split notes into system prompt vs dynamic memory (strict JSON output).
+- `precommit/`: convert enforceable preferences into config changes (strict JSON output).
+- `compression/`: compress long context into task-critical summaries (strict JSON output).
 
 ## letta-evals Reference
 
