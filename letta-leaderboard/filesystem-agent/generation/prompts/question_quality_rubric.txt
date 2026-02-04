@@ -1,53 +1,106 @@
-## QUALITY RUBRIC FOR GREP/OPEN_FILES BENCHMARK
+## QUALITY RUBRIC FOR FILE NAVIGATION BENCHMARK
 
-### 1. COMPLEXITY BALANCE
-- **Too Simple (REJECT)**: 
-  - Single file lookups
-  - Questions that can be answered with one grep command
-  - Example: "What is the name of person with ID pers-0001?"
+### 1. THE PARALLELIZATION TEST (MOST IMPORTANT)
 
-- **Too Complex (REJECT)**: 
-  - Requires counting/aggregating across multiple files
-  - Needs complex filtering that grep cannot handle (e.g., "exactly 4 accounts")
-  - Requires joining data from 3+ different files
-  - Example: "Among people who have both exactly 4 internet accounts and exactly 6 bank accounts..."
+Before accepting ANY question, ask: "Can the agent run all conditions as independent greps and intersect?"
 
-- **Just Right (ACCEPT)**: 
-  - Requires searching 2-4 files (mostly 2-3)
-  - Starts with a very specific, unique identifier
-  - Clear path but needs careful execution
-  - Example: "What type of pet does the person with bank account ending in 1234 own?"
+- **REJECT if parallelizable**:
+  - "Who has a Mastercard, owns a dog, and lives in Texas?"
+    → All 3 conditions can be grepped independently
+  - "Among people with O+ blood who own dogs, who has the highest salary?"
+    → Both filters (O+ blood, owns dogs) are parallel greps
+  - Any question where ALL conditions can be evaluated independently
 
-### 2. GREP-ABILITY & COUNTING
-- **Not Feasible (REJECT)**: 
-  - Requires counting across hundreds of records
-  - Needs to check every person in the database (1000+ people)
-  - Complex aggregations across multiple large files
-  - Example: "Among all 1000 people, who has exactly 4 internet accounts?"
+- **ACCEPT if truly sequential**:
+  - Step N's output is step N+1's query INPUT
+  - You cannot write the next grep until the previous completes
+  - At least one step involves an INDIRECT RELATIONSHIP
 
-- **Feasible (ACCEPT)**: 
-  - Counting within a small group (5-15 people) after filtering
-  - Requires 2-3 steps of narrowing down candidates
-  - Clear starting point with specific identifier
-  - Example: "Among the 5 employees at TechStartup Inc, who owns the most pets?"
+### 2. INDIRECT RELATIONSHIPS (REQUIRED)
 
-### 3. CHALLENGING BUT FAIR PATTERNS
-Accept questions that:
-- Require 2-4 file lookups (occasionally up to 4, but mostly 2-3)
-- Have a clear starting point with unique identifier
-- Need careful execution but not excessive complexity
-- Example: "How many credit cards does the owner of vehicle with plate 'XYZ-789' have?"
+Questions must include at least one relationship that cannot be grepped directly:
 
-Reject questions that:
-- Are trivial one-hop lookups
-- Require impossible aggregations across many files
-- Need complex mathematical operations
-- Example: "What is the name of person with ID pers-0001?" (too easy)
-- Example: "Total balance of all accounts owned by dog owners" (too hard)
+- **Coworker**: same employer (must find employer first)
+- **Neighbor/Same city**: must find the city first, then find others
+- **Financial peer**: same bank (must find bank first)
+- **Same state**: must find state first, then find others
 
-### 5. EVALUATION APPROACH
+Examples:
+- GOOD: "What pet does the COWORKER of person X own?"
+- BAD: "What pet does person X own?" (direct lookup)
+
+### 3. COMPLEXITY TIERS
+
+- **Too Easy (REJECT)**:
+  - Parallelizable conditions
+  - Single candidate at each step (just following breadcrumbs)
+  - Single aggregation (just "sum person X's records")
+  - Example: "What pet does the person with plate XYZ own?" (2 hops, direct)
+  - Example: "What is the total balance of the coworker of person X?" (only 1 coworker)
+
+- **Medium (ACCEPT with caution)**:
+  - 4-5 file lookups with sequential dependencies
+  - One step with multiple candidates requiring comparison
+  - Example: "Among the 5 employees at company X, who has the most pets?"
+
+- **Hard (ACCEPT, PREFERRED)**:
+  - 5-6 file lookups with multiple comparison/aggregation steps
+  - Intermediate steps return 5-15 candidates that must be compared
+  - Nested superlatives: "Among people with the highest X, who has the lowest Y?"
+  - Aggregate-then-filter: "Among the top 10 by X, who matches condition Y?"
+  - Conditional chains: "If X > Y, return A. Otherwise, return B."
+  - Example: "What is the total balance of the person with the most credit cards among employees at the company where the owner of pet 'Buddy' works?"
+
+### 4. ANSWER QUALITY
+
+- **REJECT if answer is**:
+  - A negation: "does not own", "None", "no record found"
+  - Ambiguous: person has multiple matching records
+  - A list without clear ordering
+
+- **ACCEPT if answer is**:
+  - A specific name: "John Smith"
+  - A specific number: "$145,315.33", "4 vehicles"
+  - A specific date: "2025-06-19"
+
+### 5. GROUP SIZE FOR COMPARISONS
+
+- Groups defined by chains (coworkers, same-city residents) should be 5-15 people
+- Too small (3) = trivial enumeration
+- Too large (50+) = not feasible with grep
+
+### 6. CLOSE COMPARISONS (KEY TO DIFFICULTY)
+
+For any comparison question, the top candidates should have CLOSE values:
+- **Bank balances**: within 5% of each other (e.g., $45,000 vs $44,500)
+- **Dates**: within days/weeks (e.g., 2025-06-14 vs 2025-06-17)
+- **Counts**: differ by only 1-2 (e.g., 4 credit cards vs 3 credit cards)
+
+This is where models actually fail — they follow the right process but mess up close comparisons.
+
+### 7. IDENTIFIER GUIDELINES
+
+- **AVOID SSN** — triggers safety refusals in many models
+- **AVOID "neighbor"** — ambiguous, models don't know what it means
+- **PREFER**: license plates, internet usernames, pet names, email addresses, employer names
+- **SAY EXPLICITLY**: "same city" or "same state" instead of "neighbor"
+
+### 8. EVALUATION CHECKLIST
+
 For each question:
-1. Read the question, SQL queries, and answer carefully
-2. Assess against each rubric criterion
-3. Consider if this tests meaningful file-searching abilities
-4. Make a decision and provide clear reasoning
+1. **Parallelization test**: Can all conditions be grepped independently? → REJECT
+2. **Multi-candidate test**: Does at least one step return 5+ candidates that must be compared? → REQUIRED
+3. **Sequential test**: Write out the steps. Does step N+1 require step N's result? → GOOD
+4. **Indirect relationship**: Is there at least one derived relationship (coworker, same city)? → REQUIRED
+5. **Close comparisons**: If comparing values, are the top candidates within 5%? → REQUIRED
+6. **No SSN/neighbor**: Does the question avoid SSN and "neighbor"? → REQUIRED
+7. **Uniqueness**: Does verification_query return exactly 1 row? → REQUIRED
+8. **File count**: Are 5-6 files truly required? → REQUIRED
+9. **Concrete answer**: Is it a name/number/date, not a negation? → REQUIRED
+
+### 9. ADVANCED PATTERNS (at least one required)
+
+- **Nested superlatives**: Multiple max/min operations (e.g., "highest among those with lowest")
+- **Aggregate-then-filter**: Large set first (top N), then filter by condition
+- **Conditional chains**: Different answer branches based on comparison result
+- **Multi-step aggregation**: Select from group, THEN aggregate selected person's records

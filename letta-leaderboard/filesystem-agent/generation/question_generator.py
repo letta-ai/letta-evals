@@ -11,38 +11,33 @@ This script runs an AI agent that generates difficult questions by:
 import argparse
 import json
 import os
+import random
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 from anthropic import Anthropic
+from context import ContextMixin
+from display import Colors, DisplayMixin
 from dotenv import load_dotenv
 from jinja2 import Template
+from parallel import ParallelMixin
 from tools.register_question_tool import REGISTER_QUESTION_TOOL_DICT, RegisterQuestionTool
 from tools.sql_execute_tool import EXECUTE_SQL_TOOL_DICT, SQLExecuteTool
 
 load_dotenv()
 
 
-# ANSI color codes
-class Colors:
-    HEADER = "\033[95m"
-    BLUE = "\033[94m"
-    CYAN = "\033[96m"
-    GREEN = "\033[92m"
-    YELLOW = "\033[93m"
-    RED = "\033[91m"
-    ENDC = "\033[0m"
-    BOLD = "\033[1m"
-    DIM = "\033[2m"
-
-
-class QuestionGeneratorAgent:
-    def __init__(self, db_path: Path, output_path: Path, model: str = None, config: Dict[str, Any] = None):
+class QuestionGeneratorAgent(DisplayMixin, ContextMixin, ParallelMixin):
+    def __init__(
+        self, db_path: Path, output_path: Path, model: str = None, config: Dict[str, Any] = None, quiet: bool = False
+    ):
         self.db_path = db_path
         self.output_path = output_path
+        self.quiet = quiet
 
         # Load config if not provided
         if config is None:
@@ -52,7 +47,7 @@ class QuestionGeneratorAgent:
                 config = full_config.get("agent_question_generator", {})
 
         self.config = config
-        self.model = model or config.get("default_model", "claude-sonnet-4-20250514")
+        self.model = model or config.get("default_model", "claude-opus-4-5-20251101")
 
         # Initialize tools
         self.sql_tool = SQLExecuteTool(db_path)
@@ -85,219 +80,31 @@ class QuestionGeneratorAgent:
             rubric=rubric_content,
         )
 
+        # Load question type prompt files
+        self.type_prompts = {}
+        prompts_dir = Path(__file__).parent / "prompts"
+        for md_file in prompts_dir.glob("*.md"):
+            type_name = md_file.stem  # e.g. "aggregation" from "aggregation.md"
+            with open(md_file, "r") as f:
+                self.type_prompts[type_name] = f.read()
+
+        # Load question type distribution from config
+        full_config_path = Path(__file__).parent / "config.yaml"
+        with open(full_config_path, "r") as f:
+            full_config = yaml.safe_load(f)
+        self.question_type_distribution = full_config.get("generation", {}).get("question_types", {})
+
         # Optional: Print database stats to show they're loaded
         total_rows = sum(stats["row_count"] for stats in db_overview["statistics"].values())
         print(
             f"{Colors.DIM}Database loaded: {len(db_overview['statistics'])} tables, {total_rows:,} total rows{Colors.ENDC}"
         )
+        print(f"{Colors.DIM}Question types loaded: {list(self.type_prompts.keys())}{Colors.ENDC}")
 
         # Track token usage
         self.total_tokens = {"input": 0, "output": 0}
 
-    def _print_separator(self, char: str = "─", length: int = None):
-        """Print a separator line."""
-        if length is None:
-            length = self.config.get("separator_length", 80)
-        print(f"{Colors.DIM}{char * length}{Colors.ENDC}")
-
-    def _print_tool_call(self, tool_name: str, tool_input: Dict[str, Any]):
-        """Print tool call information."""
-        print(f"\n{Colors.CYAN}Tool: {tool_name}{Colors.ENDC}")
-        if tool_name == "execute_sql":
-            # Format SQL query nicely
-            query = tool_input["query"]
-            # Simple formatting - indent and clean up
-            formatted_query = "\n   ".join(line.strip() for line in query.split("\n") if line.strip())
-            print(f"   {Colors.BOLD}Query:{Colors.ENDC}\n   {Colors.DIM}{formatted_query}{Colors.ENDC}")
-        elif tool_name == "register_question":
-            print(f"   {Colors.BOLD}Question:{Colors.ENDC} {tool_input['question']}")
-            if "sql_queries" in tool_input and tool_input["sql_queries"]:
-                print(f"   {Colors.BOLD}SQL Queries:{Colors.ENDC} {len(tool_input['sql_queries'])} queries")
-                for i, query_info in enumerate(tool_input["sql_queries"][:2]):  # Show first 2
-                    print(f"     {i + 1}. {query_info.get('description', 'Query')}")
-            if "answer" in tool_input:
-                print(
-                    f"   {Colors.BOLD}Answer:{Colors.ENDC} {tool_input['answer'][:100]}..."
-                    if len(tool_input["answer"]) > 100
-                    else f"   {Colors.BOLD}Answer:{Colors.ENDC} {tool_input['answer']}"
-                )
-
-    def _print_tool_result(self, tool_name: str, result: Dict[str, Any]):
-        """Print tool result information."""
-        if tool_name == "execute_sql":
-            if result["success"]:
-                # Format result based on type
-                res = result["result"]
-                truncate_rows = self.config.get("truncate_result_rows", 3)
-                truncate_str_len = self.config.get("truncate_result_string_length", 200)
-                if isinstance(res, list) and len(res) > truncate_rows * 2:
-                    # Truncate long lists
-                    print(
-                        f"   {Colors.GREEN}Result: {res[:truncate_rows]} ... (showing {truncate_rows} of {len(res)} rows){Colors.ENDC}"
-                    )
-                elif isinstance(res, str) and len(res) > truncate_str_len:
-                    # Truncate long strings
-                    print(f"   {Colors.GREEN}Result: {res[:truncate_str_len]}...{Colors.ENDC}")
-                else:
-                    print(f"   {Colors.GREEN}Result: {res}{Colors.ENDC}")
-                print(
-                    f"   {Colors.DIM}Rows: {result['row_count']} | Time: {result['execution_time_ms']:.1f}ms{Colors.ENDC}"
-                )
-            else:
-                print(f"   {Colors.RED}Error: {result['error']}{Colors.ENDC}")
-        elif tool_name == "register_question":
-            if result["success"]:
-                print(f"   {Colors.GREEN}{result['message']}{Colors.ENDC}")
-                print(f"   {Colors.BOLD}Answer: {result['answer']}{Colors.ENDC}")
-            else:
-                print(f"   {Colors.RED}{result['error']}{Colors.ENDC}")
-
-    def _print_progress(self, question_num: int, total: int, iteration: int, max_iterations: int):
-        """Print progress information."""
-        print(f"\n{Colors.BLUE}Question {question_num}/{total} | Iteration {iteration}/{max_iterations}{Colors.ENDC}")
-
-    def _print_token_usage(self, usage, session_tokens=None):
-        """Print token usage from response."""
-        if usage:
-            input_tokens = usage.input_tokens
-            output_tokens = usage.output_tokens
-
-            # Update both session and total tokens
-            if session_tokens:
-                session_tokens["input"] += input_tokens
-                session_tokens["output"] += output_tokens
-                print(
-                    f"   Tokens: {input_tokens} in, {output_tokens} out (Session: {session_tokens['input']:,} in, {session_tokens['output']:,} out)"
-                )
-
-            self.total_tokens["input"] += input_tokens
-            self.total_tokens["output"] += output_tokens
-
-    def _format_tool_response(self, tool_name: str, result: Dict[str, Any]) -> str:
-        """Format tool response for the agent."""
-        if tool_name == "execute_sql":
-            if result["success"]:
-                return f"SQL executed successfully.\nResult: {result['result']}\nRows: {result['row_count']}"
-            else:
-                return f"SQL error: {result['error']}"
-        elif tool_name == "register_question":
-            if result["success"]:
-                return f"Question registered! {result['message']}"
-            else:
-                return f"Registration failed: {result['error']}"
-        return str(result)
-
-    def _summarize_conversation_with_llm(self, messages_to_summarize: List[Dict[str, Any]]) -> str:
-        """Use LLM to create a concise summary of the conversation history."""
-        try:
-            # Create a summarization prompt
-            summary_prompt = """Please summarize the following conversation history into a concise summary.
-Focus on:
-1. What SQL queries were explored and their key findings
-2. What patterns or relationships were discovered
-3. What question ideas were considered
-4. What remains to be explored
-
-Keep it brief but informative. This summary will help continue the conversation."""
-
-            # Build conversation text for summarization
-            conversation_text = []
-            for msg in messages_to_summarize:
-                if msg["role"] == "assistant":
-                    # Extract text content from assistant messages
-                    if isinstance(msg["content"], list):
-                        for item in msg["content"]:
-                            if hasattr(item, "text"):
-                                conversation_text.append(f"Assistant: {item.text}")
-                    else:
-                        conversation_text.append(f"Assistant: {msg['content']}")
-                elif msg["role"] == "user":
-                    # Handle user messages (including tool results)
-                    if isinstance(msg["content"], list):
-                        for item in msg["content"]:
-                            if isinstance(item, dict) and item.get("type") == "tool_result":
-                                conversation_text.append(f"Tool Result: {item.get('content', '')}")
-                    else:
-                        conversation_text.append(f"User: {msg['content']}")
-
-            # Create messages for summarization - system goes as parameter, not in messages
-            max_items = self.config.get("summary_max_conversation_items", 30)
-            condensed_messages = [
-                {
-                    "role": "user",
-                    "content": summary_prompt
-                    + "\n\nConversation to summarize:\n"
-                    + "\n".join(conversation_text[:max_items]),
-                }
-            ]
-
-            # Call the LLM for summarization
-            response = self.client.messages.create(
-                model=self.model,
-                system="You are a helpful assistant that summarizes conversations.",  # System as parameter
-                messages=condensed_messages,
-                max_tokens=self.config.get("summary_max_tokens", 500),  # Keep summary concise
-                temperature=self.config.get("summary_temperature", 0.3),  # Lower temperature for factual summary
-            )
-
-            # Extract the summary text
-            summary = (
-                response.content[0].text
-                if response.content
-                else "Previous exploration of database patterns and relationships."
-            )
-
-            return f"[Context Summary]\n{summary}\n[End Summary]"
-
-        except Exception as e:
-            print(f"{Colors.YELLOW}Warning: Could not generate LLM summary: {e}{Colors.ENDC}")
-            # Fallback to basic summary
-            return "[Context Summary]\nPrevious exploration included multiple SQL queries and pattern discovery.\n[End Summary]"
-
-    def _trim_messages_if_needed(
-        self, messages: List[Dict[str, Any]], last_response_tokens: int = None
-    ) -> List[Dict[str, Any]]:
-        """Trim older messages if approaching context limit."""
-        # Use the input tokens from last response as indicator of current context size
-        trim_threshold = self.config.get("trim_threshold", 140000)
-        if last_response_tokens is None or last_response_tokens < trim_threshold:
-            return messages
-
-        print(
-            f"\n{Colors.YELLOW}Approaching token limit ({last_response_tokens:,} tokens in last request) - compressing conversation...{Colors.ENDC}"
-        )
-
-        # We need to be careful to keep tool_use/tool_result pairs together
-        # Find the last complete exchange (assistant message followed by optional user tool results)
-        messages_to_keep = self.config.get("messages_to_keep_on_trim", 6)
-        keep_from_index = max(1, len(messages) - messages_to_keep)  # Keep more messages to ensure completeness
-
-        # Ensure we start from an assistant message to maintain pairing
-        while keep_from_index < len(messages) - 1 and messages[keep_from_index]["role"] != "assistant":
-            keep_from_index += 1
-
-        if keep_from_index > 1:
-            # Messages to summarize
-            messages_to_summarize = messages[1:keep_from_index]
-
-            # Generate LLM summary
-            summary = self._summarize_conversation_with_llm(messages_to_summarize)
-
-            # Build new message list
-            new_messages = [messages[0]]  # Keep initial user message
-
-            # Add summary as a user message (safer than assistant)
-            summary_message = {"role": "user", "content": summary}
-            new_messages.append(summary_message)
-
-            # Keep messages from the cutoff point
-            new_messages.extend(messages[keep_from_index:])
-
-            removed = len(messages) - len(new_messages)
-            print(f"{Colors.DIM}Compressed {removed} messages into LLM-generated summary{Colors.ENDC}")
-            return new_messages
-
-        return messages
+    # --- Question helpers ---
 
     def get_existing_questions(self) -> List[Dict[str, str]]:
         """Get list of already generated questions from output file."""
@@ -357,8 +164,33 @@ Keep it brief but informative. This summary will help continue the conversation.
             )
         print(f"Saved conversation trace to {trace_path}")
 
+    def _build_type_schedule(self, num_questions: int) -> List[str]:
+        """Build a schedule of question types based on the configured distribution."""
+        schedule = []
+        for type_name, pct in self.question_type_distribution.items():
+            count = round(num_questions * pct)
+            schedule.extend([type_name] * count)
+
+        # Pad or trim to exact count
+        while len(schedule) < num_questions:
+            # Add the most common type
+            most_common = max(self.question_type_distribution, key=self.question_type_distribution.get)
+            schedule.append(most_common)
+        schedule = schedule[:num_questions]
+
+        # Shuffle to avoid generating all of one type in a row
+        random.shuffle(schedule)
+        return schedule
+
+    # --- Core generation ---
+
     def generate_single_question(
-        self, question_number: int, total: int, existing_questions: List[Dict[str, str]], max_iterations: int = 100
+        self,
+        question_number: int,
+        total: int,
+        existing_questions: List[Dict[str, str]],
+        max_iterations: int = 100,
+        question_type: Optional[str] = None,
     ) -> Tuple[bool, List[Dict[str, Any]]]:
         """Generate a single question with fresh conversation."""
 
@@ -368,17 +200,31 @@ Keep it brief but informative. This summary will help continue the conversation.
         # Build user message with context about existing questions
         existing_summary = self._format_existing_questions(existing_questions)
 
+        # Build type-specific instruction
+        type_instruction = ""
+        if question_type and question_type in self.type_prompts:
+            type_instruction = (
+                f"\n\n**REQUIRED QUESTION TYPE: {question_type}**\n\n"
+                f"Follow these type-specific instructions:\n\n"
+                f"{self.type_prompts[question_type]}\n\n"
+                f"You MUST generate a question of this exact type. Do not deviate.\n"
+            )
+        elif question_type:
+            type_instruction = f"\n\n**REQUIRED QUESTION TYPE: {question_type}**\n"
+
         messages = [
             {
                 "role": "user",
                 "content": f"Generate question #{question_number}.\n\n"
                 f"{existing_summary}\n\n"
-                f"Your task: Create ONE challenging question that requires ~3-4 file lookups and is COMPLETELY DIFFERENT from the above.\n\n"
+                f"Your task: Create ONE challenging question that requires 3-5 file lookups and is COMPLETELY DIFFERENT from the above."
+                f"{type_instruction}\n\n"
                 f"Key requirements:\n"
                 f"1. Start by exploring different tables/attributes than recent questions\n"
-                f"2. Verify exactly ONE correct answer exists\n"
-                f"3. Mix up answer types: try counts, comparisons, names, dates, etc.\n"
-                f"4. Avoid patterns you see repeated above\n\n"
+                f"2. Verify exactly ONE correct answer exists (use verification_query)\n"
+                f"3. The answer must be a CONCRETE value (name, number, date) — never 'None' or 'does not own'\n"
+                f"4. If asking about a pet or job, verify the person has exactly 1 of that type\n"
+                f"5. Minimum 3 files required\n\n"
                 f"EXPLORATION STRATEGY: Run multiple SQL queries in parallel to explore efficiently!\n"
                 f"Example: Check different tables, test various conditions, explore relationships simultaneously.\n\n"
                 f"When you find a great question with a unique answer, call register_question ALONE (this ends the session).",
@@ -455,12 +301,11 @@ Keep it brief but informative. This summary will help continue the conversation.
                 print(f"{Colors.YELLOW}Warning: Tool call parsing error: {e}. Continuing...{Colors.ENDC}")
                 continue
 
-            # Print parallel execution indicator if multiple SQL queries
-            if len(sql_blocks) > 1:
-                print(f"\n{Colors.CYAN}Executing {len(sql_blocks)} SQL queries in parallel...{Colors.ENDC}")
-
             # Execute SQL queries concurrently if there are multiple
             if len(sql_blocks) > 1:
+                if not self.quiet:
+                    print(f"\n{Colors.CYAN}Executing {len(sql_blocks)} SQL queries in parallel...{Colors.ENDC}")
+
                 with ThreadPoolExecutor(max_workers=min(len(sql_blocks), 10)) as executor:
                     # Submit all SQL queries
                     future_to_block = {}
@@ -529,9 +374,9 @@ Keep it brief but informative. This summary will help continue the conversation.
                             tool_input["sql_queries"],
                             tool_input["answer"],
                             tool_input["answer_reasoning"],
-                            tool_input["difficulty"],
                             tool_input["question_type"],
                             tool_input["required_files"],
+                            tool_input.get("verification_query", ""),
                         )
                         if result["success"]:
                             question_registered = True
@@ -625,9 +470,9 @@ Keep it brief but informative. This summary will help continue the conversation.
                             tool_input["sql_queries"],
                             tool_input["answer"],
                             tool_input["answer_reasoning"],
-                            tool_input["difficulty"],
                             tool_input["question_type"],
                             tool_input["required_files"],
+                            tool_input.get("verification_query", ""),
                         )
 
                         if result["success"]:
@@ -650,39 +495,83 @@ Keep it brief but informative. This summary will help continue the conversation.
 
         return question_registered, conversation_trace
 
-    def generate_questions(self, num_questions: int = 10):
+    def generate_questions(self, num_questions: int = 10, question_type: Optional[str] = None):
         """Generate questions using the agent - one at a time with fresh context."""
         session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         all_conversations = []
+
+        # Build type schedule
+        if question_type:
+            # All questions of the same type
+            type_schedule = [question_type] * num_questions
+        else:
+            type_schedule = self._build_type_schedule(num_questions)
 
         print(f"\n{Colors.HEADER}Starting question generation with {self.model}{Colors.ENDC}")
         print(f"Target: {num_questions} questions")
         print(f"Output directory: {self.output_path.parent}")
         print(f"Questions file: {self.output_path.name}")
+        if question_type:
+            print(f"Question type: {question_type} (all questions)")
+        else:
+            type_counts = Counter(type_schedule)
+            print(f"Type distribution: {dict(type_counts)}")
         self._print_separator("=")
+
+        max_retries = self.config.get("max_retries_per_question", 3)
 
         for question_num in range(num_questions):
             # Get all existing questions for context
             existing_questions = self.get_existing_questions()
+            current_type = type_schedule[question_num]
 
-            print(f"\n{Colors.BOLD}Generating question {question_num + 1}/{num_questions}{Colors.ENDC}")
+            print(
+                f"\n{Colors.BOLD}Generating question {question_num + 1}/{num_questions} [{current_type}]{Colors.ENDC}"
+            )
             print(f"   {Colors.DIM}Existing questions in corpus: {len(existing_questions)}{Colors.ENDC}")
             self._print_separator()
 
-            # Generate one question with fresh context
+            # Generate one question with fresh context, with retries
             max_iterations = self.config.get("max_iterations_per_question", 20)
-            success, conversation = self.generate_single_question(
-                question_num + 1, num_questions, existing_questions, max_iterations=max_iterations
-            )
+            success = False
+            conversation = []
 
-            # Store conversation
+            for attempt in range(1, max_retries + 1):
+                if attempt > 1:
+                    print(
+                        f"\n{Colors.YELLOW}Retry attempt {attempt}/{max_retries} for question {question_num + 1}{Colors.ENDC}"
+                    )
+                    # Refresh existing questions in case something changed
+                    existing_questions = self.get_existing_questions()
+
+                success, conversation = self.generate_single_question(
+                    question_num + 1,
+                    num_questions,
+                    existing_questions,
+                    max_iterations=max_iterations,
+                    question_type=current_type,
+                )
+
+                if success:
+                    break
+                elif attempt < max_retries:
+                    print(f"{Colors.YELLOW}Attempt {attempt} failed, will retry...{Colors.ENDC}")
+
+            # Store conversation (from last attempt)
             all_conversations.append(
-                {"question_number": question_num + 1, "success": success, "conversation": conversation}
+                {
+                    "question_number": question_num + 1,
+                    "success": success,
+                    "attempts": attempt,
+                    "conversation": conversation,
+                }
             )
 
             self._print_separator()
             if success:
-                print(f"\n{Colors.GREEN}Successfully generated question {question_num + 1}{Colors.ENDC}")
+                print(
+                    f"\n{Colors.GREEN}Successfully generated question {question_num + 1}{' (after ' + str(attempt) + ' attempts)' if attempt > 1 else ''}{Colors.ENDC}"
+                )
                 # Get the newly registered question to show it
                 new_questions = self.get_existing_questions()
                 if new_questions and len(new_questions) > len(existing_questions):
@@ -690,7 +579,9 @@ Keep it brief but informative. This summary will help continue the conversation.
                     print(f"   {Colors.BOLD}Question:{Colors.ENDC} {latest['question']}")
                     print(f"   {Colors.BOLD}Answer:{Colors.ENDC} {latest['answer']}")
             else:
-                print(f"\n{Colors.RED}Failed to generate question {question_num + 1}{Colors.ENDC}")
+                print(
+                    f"\n{Colors.RED}Failed to generate question {question_num + 1} after {max_retries} attempts{Colors.ENDC}"
+                )
 
             self._print_separator("=")
 
@@ -733,7 +624,29 @@ def main():
         default=Path(__file__).parent / "data" / "generated_questions",
         help="Output directory for generated questions (will create timestamped subdirectory)",
     )
-    parser.add_argument("--model", type=str, default="claude-sonnet-4-20250514", help="Claude model to use")
+    parser.add_argument("--model", type=str, default="claude-opus-4-5-20251101", help="Claude model to use")
+    parser.add_argument(
+        "--question-type",
+        type=str,
+        default=None,
+        choices=[
+            "multi_hop_chain",
+            "aggregation",
+            "set_intersection",
+            "negation",
+            "comparison_tiebreak",
+            "multi_entity_comparison",
+            "cross_file_counting",
+            "temporal_reasoning",
+        ],
+        help="Generate all questions of this specific type (default: use distribution from config)",
+    )
+    parser.add_argument(
+        "--parallel",
+        type=int,
+        default=1,
+        help="Number of parallel workers for question generation (default: 1, sequential)",
+    )
     parser.add_argument(
         "--append",
         action="store_true",
@@ -792,7 +705,14 @@ def main():
         print(f"Questions file: {output_path.name}")
         print(f"Target: {args.num_questions} questions\n")
 
-        agent.generate_questions(args.num_questions)
+        if args.parallel > 1:
+            agent.generate_questions_parallel(
+                args.num_questions,
+                num_workers=args.parallel,
+                question_type=args.question_type,
+            )
+        else:
+            agent.generate_questions(args.num_questions, question_type=args.question_type)
 
     except Exception as e:
         print(f"{Colors.RED}Fatal error during initialization: {e}{Colors.ENDC}")
