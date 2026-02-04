@@ -1,0 +1,12 @@
+Here is the rubric with multiple criteria for evaluating whether the skill content is adequate to pass the tests.
+
+Each criterion is binary with a score of either 0 or 0.25.
+The final score should thus be one of [0, 0.25, 0.5, 0.75, 1] based on how many criterion are satisfied.
+
+Criteria:
+1. **Valid SKILL structure**: Includes YAML frontmatter with name/description and a clear skill body (not empty).
+2. **Test coverage**: The workflow explicitly addresses the key behaviors required by the tests (no major test requirement omitted).
+3. **Actionable steps**: Provides concrete steps/checklists or examples that would let a model execute the required actions.
+4. **Concise and focused**: Avoids irrelevant content; stays within the task’s scope.
+
+IMPORTANT: Be critical with your evaluation. Make sure to clearly express your rationale and scoring.
