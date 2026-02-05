@@ -11,6 +11,7 @@ target:
   timeout: 600
   max_retries: 1
   model_handles:
+    - anthropic/claude-opus-4-6
     - anthropic/claude-opus-4-5-20251101
     - anthropic/claude-sonnet-4-5-20250929
     - anthropic/claude-haiku-4-5-20251001

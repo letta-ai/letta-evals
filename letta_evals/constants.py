@@ -14,6 +14,10 @@ MODEL_COSTS = {
         "prompt_tokens": 5,
         "completion_tokens": 25,
     },
+    "anthropic/claude-opus-4-6": {
+        "prompt_tokens": 5,
+        "completion_tokens": 25,
+    },
     "anthropic/claude-opus-4-1-20250805": {
         "prompt_tokens": 15,
         "completion_tokens": 75,
@@ -126,6 +130,7 @@ MODEL_COSTS = {
 # Key: canonical MODEL_COSTS key, Value: list of aliases that map to it.
 MODEL_ALIASES = {
     "openai/gpt-5.1-codex": ["gpt-5.1-codex-max-medium"],
+    "openai/gpt-5.2-2025-12-11": ["gpt-5.2-xhigh"],
     "moonshotai/kimi-k2-0905": ["kimi-k2"],
     "mistralai/mistral-large-2512": ["mistral-large-3"],
     "google_ai/gemini-3-pro-preview": ["gemini-3-pro", "gemini-3"],

@@ -1,7 +1,7 @@
 name: filesystem-code
 description: Test if a Letta Code agent can correctly retrieve and analyze information from local filesystem data files
 dataset: datasets/filesystem_code.jsonl
-num_runs: 2
+num_runs: 1
 
 target:
   kind: letta_code
@@ -15,25 +15,16 @@ target:
     - anthropic/claude-opus-4-5-20251101
     - anthropic/claude-sonnet-4-5-20250929
     - anthropic/claude-haiku-4-5-20251001
-    - anthropic/claude-opus-4-1-20250805
-    - gpt-5.2-medium
-    - gpt-5.2-high
+    - anthropic/claude-opus-4-6
+    - gemini-3
+    - gemini-3-flash
     - gpt-5.2-xhigh
-    - gpt-5.1-medium
-    - gpt-5.1-codex-medium
-    - gpt-5.1-codex-mini-medium
-    - gpt-5-medium
-    - gpt-5-mini-medium
-    - gpt-5-nano-medium
-    - gpt-4.1
-    - gpt-4.1-mini
-    - gpt-4.1-nano
+    - gpt-5.2-codex-xhigh
+    - gpt-5-mini-high
     - glm-4.6
     - minimax-m2
     - kimi-k2
     - deepseek-chat-v3.1
-    - gemini-3-pro
-    - gemini-3-flash
     - deepseek-reasoner
     - deepseek-chat
     - mistral-large-3
