@@ -1,5 +1,10 @@
 # Leaderboard Updates
 
+### February 5, 2026
+- Opus 4.6
+  - #1 on Filesystem and #3 on Skills
+  - Same price as Opus 4.5 but less token efficient leading to higher costs
+
 ### December 18, 2025
 - Gemini 3 Flash
     - Outperforms Haiku and GPT 5 Mini on Filesystem
