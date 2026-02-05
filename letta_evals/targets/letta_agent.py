@@ -79,7 +79,7 @@ class LettaAgentTarget(AbstractAgentTarget):
                 elif self.model_handle and agent_id:
                     await self.client.agents.update(agent_id=agent_id, model=self.model_handle)
 
-                agent = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=[])
+                agent = await self.client.agents.retrieve(agent_id=agent_id, include=[])
                 if self.llm_config:
                     model_name = self.llm_config.model
                 elif self.model_handle:
@@ -152,7 +152,7 @@ class LettaAgentTarget(AbstractAgentTarget):
 
                 final_agent_state = None
                 if retrieve_agent_state:
-                    final_agent_state = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=[])
+                    final_agent_state = await self.client.agents.retrieve(agent_id=agent_id, include=["blocks"])
 
                 return TargetResult(
                     trajectory=trajectory,
