@@ -204,12 +204,17 @@ class LettaCodeTarget(AbstractAgentTarget):
                         }
                     )
 
+                # Retrieve agent state if needed (e.g., for memory block extractors)
+                agent_state = None
+                if retrieve_agent_state:
+                    agent_state = await self.client.agents.retrieve(agent_id=agent_id, include_relationships=[])
+
                 return TargetResult(
                     trajectory=trajectory,
                     agent_id=agent_id,
                     model_name=self.model_handle,
                     agent_usage=usage_stats if usage_stats else None,
-                    agent_state=None,
+                    agent_state=agent_state,
                 )
 
             except Exception as e:
