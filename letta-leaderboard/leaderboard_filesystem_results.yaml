@@ -1,5 +1,5 @@
 benchmark_name: Filesystem Suite
-last_updated: Dec 18, 2025
+last_updated: Feb 5, 2026
 metrics:
   leaderboard_filesystem_100:
     name: Filesystem Rubric
@@ -21,6 +21,10 @@ results:
   average: 76.8
   leaderboard_filesystem_100: 76.8
   total_cost: 39.91
+- model: anthropic/claude-opus-4-6
+  average: 83.43
+  leaderboard_filesystem_100: 83.43
+  total_cost: 115.08
 - model: anthropic/claude-sonnet-4-5-20250929
   average: 74.0
   total_cost: 24.58

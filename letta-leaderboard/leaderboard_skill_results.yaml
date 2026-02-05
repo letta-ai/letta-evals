@@ -1,5 +1,5 @@
 benchmark_name: Skills Suite
-last_updated: Dec 18, 2025
+last_updated: Feb 5, 2026
 arrange_by: task_completion
 metrics:
   task_completion:
@@ -26,6 +26,10 @@ results:
   average: 72.18
   task_completion: 75.54
   skill_use: 68.82
+- model: anthropic/claude-opus-4-6
+  average: 71.98
+  task_completion: 81.32
+  skill_use: 62.64
 - model: anthropic/claude-sonnet-4-5-20250929
   average: 74.25
   task_completion: 76.5
