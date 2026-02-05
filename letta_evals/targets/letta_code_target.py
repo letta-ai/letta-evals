@@ -207,7 +207,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                 # Retrieve agent state if needed (e.g., for memory block extractors)
                 agent_state = None
                 if retrieve_agent_state:
-                    agent_state = await self.client.agents.retrieve(agent_id=agent_id, include=["blocks"])
+                    agent_state = await self.client.agents.retrieve(agent_id=agent_id, include=["agent.blocks"])
 
                 return TargetResult(
                     trajectory=trajectory,
