@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.10.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.9.0...letta-evals-v0.10.0) (2026-02-06)
+
+
+### Features
+
+* Add `agent_script` support to LettaCodeTarget ([#171](https://github.com/letta-ai/letta-evals/issues/171)) ([39cc8bc](https://github.com/letta-ai/letta-evals/commit/39cc8bc5f4339d7878d7a0843ce16be1d0024a7c))
+* Evaluate letta code agents on filesystem suite ([#167](https://github.com/letta-ai/letta-evals/issues/167)) ([5f18158](https://github.com/letta-ai/letta-evals/commit/5f1815829b8de69d1d48645e25d82018047ad0be))
+* Filesystem v2 ([#170](https://github.com/letta-ai/letta-evals/issues/170)) ([04e4260](https://github.com/letta-ai/letta-evals/commit/04e426037061b53fd69c3848f80a12b02226ef50))
+
+
+### Bug Fixes
+
+* Agent script for letta code ([#176](https://github.com/letta-ai/letta-evals/issues/176)) ([2d80c9b](https://github.com/letta-ai/letta-evals/commit/2d80c9bce573d727eb5edef5c0d84e6f82b1e60f))
+* Pass base_url to letta CLI for LettaCodeTarget ([#157](https://github.com/letta-ai/letta-evals/issues/157)) ([56f01c1](https://github.com/letta-ai/letta-evals/commit/56f01c1f48c5cf0fac6b245da3f5305dadc8e3e4))
+* Resolve model handles with reasoning / effort level ([#169](https://github.com/letta-ai/letta-evals/issues/169)) ([b1cacd2](https://github.com/letta-ai/letta-evals/commit/b1cacd2df0ba57df6983feeaffc633acd1dc2bf2))
+* Support agent_id for letta_judge grader (Issue [#156](https://github.com/letta-ai/letta-evals/issues/156)) ([#159](https://github.com/letta-ai/letta-evals/issues/159)) ([e3e06ce](https://github.com/letta-ai/letta-evals/commit/e3e06ce0899e7381aafa7c8ae4bbf0d80bbbc007))
+* Track tokens even when no costs ([#164](https://github.com/letta-ai/letta-evals/issues/164)) ([405022b](https://github.com/letta-ai/letta-evals/commit/405022b509c0a1a769cdae22290344dc682090d8))
+* Update agent judge examples to use gpt-4o-mini ([#172](https://github.com/letta-ai/letta-evals/issues/172)) ([9b8e4ac](https://github.com/letta-ai/letta-evals/commit/9b8e4acaa293261b40cd1bd2cd150956f9af3fcb))
+* Update examples to use cloud by default ([#152](https://github.com/letta-ai/letta-evals/issues/152)) ([b343ceb](https://github.com/letta-ai/letta-evals/commit/b343ceb0701286b54500a5c3673870310b540d13))
+* Use --new-agent for letta code ([#166](https://github.com/letta-ai/letta-evals/issues/166)) ([2516391](https://github.com/letta-ai/letta-evals/commit/251639172fdf42323d45a8ba4234bd4c4069f33e))
+
+
+### Chores
+
+* Add Opus 4.6 to leaderboard ([#175](https://github.com/letta-ai/letta-evals/issues/175)) ([c3437b7](https://github.com/letta-ai/letta-evals/commit/c3437b7ef0b5a7d19c229ecceb341ec774cfab07))
+* Add rank column, row styling, and provider filter to leaderboard ([#168](https://github.com/letta-ai/letta-evals/issues/168)) ([a9eb17f](https://github.com/letta-ai/letta-evals/commit/a9eb17f53e28b82d0de9b29c30069051d7ae835e))
+* Add sandbox attribute for letta code ([#163](https://github.com/letta-ai/letta-evals/issues/163)) ([84c4f5a](https://github.com/letta-ai/letta-evals/commit/84c4f5a5b7719b3cdbe7195d0b1ea1b61d6595dc))
+* Retrieve agent state for letta code ([#173](https://github.com/letta-ai/letta-evals/issues/173)) ([210dfa8](https://github.com/letta-ai/letta-evals/commit/210dfa80389b50775bb0aafaf8a2128fa36baffc))
+* Retrieve memory blocks with agent state ([#174](https://github.com/letta-ai/letta-evals/issues/174)) ([784dff2](https://github.com/letta-ai/letta-evals/commit/784dff2f3942caab3225d094b24f62453d1d64cd))
+* Track usage metrics for letta code ([#165](https://github.com/letta-ai/letta-evals/issues/165)) ([b1bab86](https://github.com/letta-ai/letta-evals/commit/b1bab86d7d2a8d88e980aeedb8a6f1119ea7cd5a))
+
 ## [0.9.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.8.1...letta-evals-v0.9.0) (2025-12-23)
 
 
