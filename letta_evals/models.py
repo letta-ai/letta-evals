@@ -139,6 +139,9 @@ class LettaCodeTargetSpec(BaseTargetSpec):
         default=True, description="Create a per-model subdirectory under working_dir for isolated sandbox execution."
     )
     skills_dir: Optional[Path] = Field(default=None, description="Directory containing skills to load")
+    agent_script: Optional[str] = Field(
+        default=None, description="Path to Python script with AgentFactory (e.g., script.py:factory_fn)"
+    )
     allowed_tools: Optional[List[str]] = Field(
         default=None, description="List of allowed tools for letta code (e.g., ['Bash', 'Read'])"
     )
