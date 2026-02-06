@@ -94,6 +94,10 @@ class BaseTargetSpec(BaseModel):
         default=None, description="List of model handles (e.g., 'openai/gpt-4.1') for cloud deployments"
     )
 
+    agent_script: Optional[str] = Field(
+        default=None, description="Path to Python script with AgentFactory (e.g., script.py:factory_fn)"
+    )
+
     # internal field for path resolution
     base_dir: Optional[Path] = Field(default=None, exclude=True)
 
@@ -105,10 +109,6 @@ class LettaAgentTargetSpec(BaseTargetSpec):
 
     agent_id: Optional[str] = Field(default=None, description="ID of existing agent to use")
     agent_file: Optional[Path] = Field(default=None, description="Path to .af agent file to upload")
-    agent_script: Optional[str] = Field(
-        default=None, description="Path to Python script with AgentFactory (e.g., script.py:FactoryClass)"
-    )
-
     @field_validator("agent_file")
     @classmethod
     def validate_agent_file(cls, v: Optional[Path]) -> Optional[Path]:
@@ -139,9 +139,6 @@ class LettaCodeTargetSpec(BaseTargetSpec):
         default=True, description="Create a per-model subdirectory under working_dir for isolated sandbox execution."
     )
     skills_dir: Optional[Path] = Field(default=None, description="Directory containing skills to load")
-    agent_script: Optional[str] = Field(
-        default=None, description="Path to Python script with AgentFactory (e.g., script.py:factory_fn)"
-    )
     allowed_tools: Optional[List[str]] = Field(
         default=None, description="List of allowed tools for letta code (e.g., ['Bash', 'Read'])"
     )
