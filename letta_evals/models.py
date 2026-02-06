@@ -109,6 +109,7 @@ class LettaAgentTargetSpec(BaseTargetSpec):
 
     agent_id: Optional[str] = Field(default=None, description="ID of existing agent to use")
     agent_file: Optional[Path] = Field(default=None, description="Path to .af agent file to upload")
+
     @field_validator("agent_file")
     @classmethod
     def validate_agent_file(cls, v: Optional[Path]) -> Optional[Path]:
