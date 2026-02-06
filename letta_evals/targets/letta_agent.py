@@ -102,49 +102,69 @@ class LettaAgentTarget(AbstractAgentTarget):
                             sample.id, i + 1, total_messages, agent_id=agent_id, model_name=model_name
                         )
 
-                    stream = await self.client.agents.messages.stream(
+                    stream = await self.client.agents.messages.create(
                         agent_id=agent_id,
                         messages=[MessageCreateParam(role="user", content=str(input_msg))],
+                        streaming=True,
+                        background=True,
                         stream_tokens=True,
+                        max_steps=100,
                     )
 
                     run_id = None
-                    chunks = []
-                    async for chunk in stream:
-                        # derive run_id from very first chunk, all should have the same
-                        # defensive for now, letta server needs fix to standardize run_id
-                        chunks.append(chunk)
+                    last_seq_id = None
 
-                        if not run_id and hasattr(chunk, "run_id"):
-                            run_id = chunk.run_id
+                    async def _consume_stream(stream_iter):
+                        """Consume stream chunks, tracking run_id and seq_id for resumability."""
+                        nonlocal run_id, last_seq_id
+                        async for chunk in stream_iter:
+                            if hasattr(chunk, "run_id") and chunk.run_id:
+                                run_id = chunk.run_id
+                            if hasattr(chunk, "seq_id"):
+                                last_seq_id = chunk.seq_id
 
-                        if hasattr(chunk, "message_type"):
-                            if chunk.message_type == "usage_statistics":
-                                usage_rec = None
-                                if hasattr(chunk, "model_dump") and callable(getattr(chunk, "model_dump")):
-                                    try:
-                                        usage_rec = chunk.model_dump()
-                                    except Exception:
-                                        usage_rec = None
-                                if usage_rec is None and hasattr(chunk, "dict") and callable(getattr(chunk, "dict")):
-                                    try:
-                                        usage_rec = chunk.dict()  # type: ignore[attr-defined]
-                                    except Exception:
-                                        usage_rec = None
-                                if usage_rec is None and hasattr(chunk, "__dict__"):
-                                    try:
-                                        usage_rec = dict(chunk.__dict__)
-                                    except Exception:
-                                        usage_rec = None
-                                if usage_rec is None:
-                                    usage_rec = {"raw": str(chunk)}
-                                usage_stats.append(usage_rec)
-                                continue
-                            if chunk.message_type == "error_message":
-                                raise RuntimeError(f"Error for sample {sample.id}: {chunk.message_type.detail}")
+                            if hasattr(chunk, "message_type"):
+                                if chunk.message_type == "usage_statistics":
+                                    usage_rec = None
+                                    if hasattr(chunk, "model_dump") and callable(getattr(chunk, "model_dump")):
+                                        try:
+                                            usage_rec = chunk.model_dump()
+                                        except Exception:
+                                            usage_rec = None
+                                    if usage_rec is None and hasattr(chunk, "dict") and callable(getattr(chunk, "dict")):
+                                        try:
+                                            usage_rec = chunk.dict()  # type: ignore[attr-defined]
+                                        except Exception:
+                                            usage_rec = None
+                                    if usage_rec is None and hasattr(chunk, "__dict__"):
+                                        try:
+                                            usage_rec = dict(chunk.__dict__)
+                                        except Exception:
+                                            usage_rec = None
+                                    if usage_rec is None:
+                                        usage_rec = {"raw": str(chunk)}
+                                    usage_stats.append(usage_rec)
+                                    continue
+                                if chunk.message_type == "error_message":
+                                    raise RuntimeError(f"Error for sample {sample.id}: {chunk.message_type.detail}")
+
+                    try:
+                        await _consume_stream(stream)
+                    except RuntimeError:
+                        raise
+                    except Exception as stream_err:
+                        if run_id and last_seq_id is not None:
+                            logger.debug(
+                                f"Stream disconnected for sample {sample.id}, "
+                                f"resuming from seq_id {last_seq_id}: {stream_err}"
+                            )
+                            resumed_stream = await self.client.runs.messages.stream(run_id, starting_after=last_seq_id)
+                            await _consume_stream(resumed_stream)
+                        else:
+                            raise
 
                     if not run_id:
-                        raise RuntimeError(f"Unexpected error: no run ID was found from streaming chunks: {chunks}")
+                        raise RuntimeError("Unexpected error: no run ID was found from background stream")
 
                     # TODO: Set limit here potentially, this is capped to 100
                     messages_page = await self.client.runs.messages.list(run_id=run_id)

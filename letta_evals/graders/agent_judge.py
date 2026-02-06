@@ -91,17 +91,34 @@ class AgentJudgeGrader(Grader):
                     judge_agent_id = resp.agent_ids[0]
 
             # send prompt to judge agent
-            stream = await self.client.agents.messages.stream(
+            stream = await self.client.agents.messages.create(
                 agent_id=judge_agent_id,
                 messages=[MessageCreateParam(role="user", content=judge_prompt)],
+                streaming=True,
+                background=True,
                 stream_tokens=False,
+                max_steps=100,
             )
 
-            # consume stream
+            # consume stream, tracking seq_id for resumability
             run_id = None
-            async for chunk in stream:
-                if hasattr(chunk, "run_id"):
-                    run_id = chunk.run_id
+            last_seq_id = None
+            try:
+                async for chunk in stream:
+                    if hasattr(chunk, "run_id") and chunk.run_id:
+                        run_id = chunk.run_id
+                    if hasattr(chunk, "seq_id"):
+                        last_seq_id = chunk.seq_id
+            except RuntimeError:
+                raise
+            except Exception:
+                if run_id and last_seq_id is not None:
+                    resumed_stream = await self.client.runs.messages.stream(run_id, starting_after=last_seq_id)
+                    async for chunk in resumed_stream:
+                        if hasattr(chunk, "seq_id"):
+                            last_seq_id = chunk.seq_id
+                else:
+                    raise
 
             if not run_id:
                 raise RuntimeError("No run_id received from judge agent stream")
