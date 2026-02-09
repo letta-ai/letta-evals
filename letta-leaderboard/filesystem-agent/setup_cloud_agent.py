@@ -117,9 +117,6 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
         # Attach the folder to the agent
         await client.agents.folders.attach(agent_id=agent.id, folder_id=folder_id)
 
-        print(f"✓ Attached folder {folder_name} (ID: {folder_id}) to agent {agent.id}")
-        print(f"✓ Attached tools: {required_tool_names}")
-
         return agent.id
 
     except Exception as e:
