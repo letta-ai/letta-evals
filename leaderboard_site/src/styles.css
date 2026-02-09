@@ -556,7 +556,7 @@ body {
 @media (max-width: 1200px) {
   .multi-metric-header,
   .multi-metric-row {
-    grid-template-columns: 2rem 14rem 1fr;
+    grid-template-columns: 2rem minmax(0, 14rem) 1fr;
   }
 
   .metrics-columns-header,
@@ -627,7 +627,7 @@ body {
   }
 
   .chart-row {
-    grid-template-columns: 2rem 14rem 1fr;
+    grid-template-columns: 2rem minmax(0, 14rem) 1fr;
   }
 }
 
@@ -638,10 +638,11 @@ body {
 
   .chart-row {
     grid-template-columns: 2rem 1fr;
-    gap: 0.5rem;
+    gap: 0.25rem 0.5rem;
   }
 
   .chart-bar-wrapper {
+    grid-column: 1 / -1;
     height: 1.5rem;
   }
 
