@@ -123,7 +123,7 @@ class AgentJudgeGrader(Grader):
             if not run_id:
                 raise RuntimeError("No run_id received from judge agent stream")
 
-            messages_page = await self.client.runs.messages.list(run_id=run_id)
+            messages_page = await self.client.runs.messages.list(run_id=run_id, limit=1000)
             score, rationale = self._parse_tool_calls(messages_page.items)
 
             metadata = {"judge_agent_id": judge_agent_id}
