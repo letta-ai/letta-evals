@@ -19,11 +19,11 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg-color: #000;
-    --text-color: #ffffff;
-    --border-color: #444444;
-    --bar-color: rgb(255, 119, 92);
-    --bar-bg: rgb(23, 23, 23);
+    --bg-color: #202020;
+    --text-color: #C8CDD1;
+    --border-color: #3a3a3a;
+    --bar-color: #555860;
+    --bar-bg: #2a2a2a;
   }
 }
 
@@ -44,10 +44,11 @@ nav {
 nav a {
   color: initial;
   text-decoration: overline;
+  transition: color 0.2s ease;
 }
 
 nav a:hover {
-  background: rgba(0, 0, 0, 0.1);
+  color: #FF421B;
 }
 
 .header {
@@ -101,6 +102,8 @@ th {
   .provider-option-icon {
     filter: invert(1) brightness(1);
   }
+
+
 }
 
 body {
