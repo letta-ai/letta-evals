@@ -27,6 +27,7 @@ class LettaAgentTarget(AbstractAgentTarget):
         llm_config: Optional[LlmConfig] = None,
         model_handle: Optional[str] = None,
         max_retries: int = 0,
+        timeout: Optional[int] = None,
     ):
         self.client = client
         self.agent_id = agent_id
@@ -36,6 +37,7 @@ class LettaAgentTarget(AbstractAgentTarget):
         self.llm_config = llm_config
         self.model_handle = model_handle
         self.max_retries = max_retries
+        self.timeout = timeout
 
     async def run(
         self,
@@ -53,134 +55,134 @@ class LettaAgentTarget(AbstractAgentTarget):
             agent_id_to_cleanup = None
 
             try:
-                if self.agent_file:
-                    with open(self.agent_file, "rb") as f:
-                        resp = await self.client.agents.import_file(
-                            file=f, append_copy_suffix=False, override_existing_tools=False, project_id=project_id
-                        )
-                        if len(resp.agent_ids) > 1:
-                            raise RuntimeError(
-                                f"Expected single agent from .af file, got {len(resp.agent_ids)} agents. We don't support multi-agent evals yet."
+                with anyio.fail_after(self.timeout):
+                    if self.agent_file:
+                        with open(self.agent_file, "rb") as f:
+                            resp = await self.client.agents.import_file(
+                                file=f, append_copy_suffix=False, override_existing_tools=False, project_id=project_id
                             )
+                            if len(resp.agent_ids) > 1:
+                                raise RuntimeError(
+                                    f"Expected single agent from .af file, got {len(resp.agent_ids)} agents. We don't support multi-agent evals yet."
+                                )
 
-                        agent_id = resp.agent_ids[0]
+                            agent_id = resp.agent_ids[0]
+                            agent_id_to_cleanup = agent_id
+
+                    elif self.agent_script:
+                        agent_factory_func = load_object(self.agent_script, self.base_dir)
+                        agent_id = await agent_factory_func(self.client, sample)
                         agent_id_to_cleanup = agent_id
 
-                elif self.agent_script:
-                    agent_factory_func = load_object(self.agent_script, self.base_dir)
-                    agent_id = await agent_factory_func(self.client, sample)
-                    agent_id_to_cleanup = agent_id
+                    if self.llm_config and agent_id:
+                        # Workaround for letta-client SDK bug: serialize with aliases
+                        # The SDK doesn't use by_alias=True, causing model_endpoint_type -> api_model_endpoint_type
+                        llm_config_dict = self.llm_config.model_dump(by_alias=True, exclude_none=True)
+                        await self.client.agents.update(agent_id=agent_id, llm_config=llm_config_dict)
+                    elif self.model_handle and agent_id:
+                        await self.client.agents.update(agent_id=agent_id, model=self.model_handle)
 
-                if self.llm_config and agent_id:
-                    # Workaround for letta-client SDK bug: serialize with aliases
-                    # The SDK doesn't use by_alias=True, causing model_endpoint_type -> api_model_endpoint_type
-                    llm_config_dict = self.llm_config.model_dump(by_alias=True, exclude_none=True)
-                    await self.client.agents.update(agent_id=agent_id, llm_config=llm_config_dict)
-                elif self.model_handle and agent_id:
-                    await self.client.agents.update(agent_id=agent_id, model=self.model_handle)
+                    agent = await self.client.agents.retrieve(agent_id=agent_id, include=[])
+                    if self.llm_config:
+                        model_name = self.llm_config.model
+                    elif self.model_handle:
+                        model_name = self.model_handle
+                    else:
+                        model_name = agent.llm_config.model
 
-                agent = await self.client.agents.retrieve(agent_id=agent_id, include=[])
-                if self.llm_config:
-                    model_name = self.llm_config.model
-                elif self.model_handle:
-                    model_name = self.model_handle
-                else:
-                    model_name = agent.llm_config.model
+                    if progress_callback and (self.agent_file or self.agent_script):
+                        await progress_callback.agent_loading(sample.id, model_name=model_name)
 
-                if progress_callback and (self.agent_file or self.agent_script):
-                    await progress_callback.agent_loading(sample.id, model_name=model_name)
+                    trajectory = []
+                    usage_stats: list[dict] = []
 
-                trajectory = []
-                usage_stats: list[dict] = []
+                    inputs = sample.input if isinstance(sample.input, list) else [sample.input]
+                    total_messages = len(inputs)
 
-                inputs = sample.input if isinstance(sample.input, list) else [sample.input]
-                total_messages = len(inputs)
+                    for i, input_msg in enumerate(inputs):
+                        if progress_callback:
+                            await progress_callback.message_sending(
+                                sample.id, i + 1, total_messages, agent_id=agent_id, model_name=model_name
+                            )
 
-                for i, input_msg in enumerate(inputs):
-                    if progress_callback:
-                        await progress_callback.message_sending(
-                            sample.id, i + 1, total_messages, agent_id=agent_id, model_name=model_name
+                        stream = await self.client.agents.messages.create(
+                            agent_id=agent_id,
+                            messages=[MessageCreateParam(role="user", content=str(input_msg))],
+                            streaming=True,
+                            background=True,
+                            stream_tokens=True,
+                            max_steps=100,
                         )
 
-                    stream = await self.client.agents.messages.create(
-                        agent_id=agent_id,
-                        messages=[MessageCreateParam(role="user", content=str(input_msg))],
-                        streaming=True,
-                        background=True,
-                        stream_tokens=True,
-                        max_steps=100,
-                    )
+                        run_id = None
+                        last_seq_id = None
 
-                    run_id = None
-                    last_seq_id = None
+                        async def _consume_stream(stream_iter):
+                            """Consume stream chunks, tracking run_id and seq_id for resumability."""
+                            nonlocal run_id, last_seq_id
+                            async for chunk in stream_iter:
+                                if hasattr(chunk, "run_id") and chunk.run_id:
+                                    run_id = chunk.run_id
+                                if hasattr(chunk, "seq_id"):
+                                    last_seq_id = chunk.seq_id
 
-                    async def _consume_stream(stream_iter):
-                        """Consume stream chunks, tracking run_id and seq_id for resumability."""
-                        nonlocal run_id, last_seq_id
-                        async for chunk in stream_iter:
-                            if hasattr(chunk, "run_id") and chunk.run_id:
-                                run_id = chunk.run_id
-                            if hasattr(chunk, "seq_id"):
-                                last_seq_id = chunk.seq_id
+                                if hasattr(chunk, "message_type"):
+                                    if chunk.message_type == "usage_statistics":
+                                        usage_rec = None
+                                        if hasattr(chunk, "model_dump") and callable(getattr(chunk, "model_dump")):
+                                            try:
+                                                usage_rec = chunk.model_dump()
+                                            except Exception:
+                                                usage_rec = None
+                                        if usage_rec is None and hasattr(chunk, "dict") and callable(getattr(chunk, "dict")):
+                                            try:
+                                                usage_rec = chunk.dict()  # type: ignore[attr-defined]
+                                            except Exception:
+                                                usage_rec = None
+                                        if usage_rec is None and hasattr(chunk, "__dict__"):
+                                            try:
+                                                usage_rec = dict(chunk.__dict__)
+                                            except Exception:
+                                                usage_rec = None
+                                        if usage_rec is None:
+                                            usage_rec = {"raw": str(chunk)}
+                                        usage_stats.append(usage_rec)
+                                        continue
+                                    if chunk.message_type == "error_message":
+                                        raise RuntimeError(f"Error for sample {sample.id}: {chunk.message_type.detail}")
 
-                            if hasattr(chunk, "message_type"):
-                                if chunk.message_type == "usage_statistics":
-                                    usage_rec = None
-                                    if hasattr(chunk, "model_dump") and callable(getattr(chunk, "model_dump")):
-                                        try:
-                                            usage_rec = chunk.model_dump()
-                                        except Exception:
-                                            usage_rec = None
-                                    if usage_rec is None and hasattr(chunk, "dict") and callable(getattr(chunk, "dict")):
-                                        try:
-                                            usage_rec = chunk.dict()  # type: ignore[attr-defined]
-                                        except Exception:
-                                            usage_rec = None
-                                    if usage_rec is None and hasattr(chunk, "__dict__"):
-                                        try:
-                                            usage_rec = dict(chunk.__dict__)
-                                        except Exception:
-                                            usage_rec = None
-                                    if usage_rec is None:
-                                        usage_rec = {"raw": str(chunk)}
-                                    usage_stats.append(usage_rec)
-                                    continue
-                                if chunk.message_type == "error_message":
-                                    raise RuntimeError(f"Error for sample {sample.id}: {chunk.message_type.detail}")
-
-                    try:
-                        await _consume_stream(stream)
-                    except RuntimeError:
-                        raise
-                    except Exception as stream_err:
-                        if run_id and last_seq_id is not None:
-                            logger.debug(
-                                f"Stream disconnected for sample {sample.id}, "
-                                f"resuming from seq_id {last_seq_id}: {stream_err}"
-                            )
-                            resumed_stream = await self.client.runs.messages.stream(run_id, starting_after=last_seq_id)
-                            await _consume_stream(resumed_stream)
-                        else:
+                        try:
+                            await _consume_stream(stream)
+                        except RuntimeError:
                             raise
+                        except Exception as stream_err:
+                            if run_id and last_seq_id is not None:
+                                logger.debug(
+                                    f"Stream disconnected for sample {sample.id}, "
+                                    f"resuming from seq_id {last_seq_id}: {stream_err}"
+                                )
+                                resumed_stream = await self.client.runs.messages.stream(run_id, starting_after=last_seq_id)
+                                await _consume_stream(resumed_stream)
+                            else:
+                                raise
 
-                    if not run_id:
-                        raise RuntimeError("Unexpected error: no run ID was found from background stream")
+                        if not run_id:
+                            raise RuntimeError("Unexpected error: no run ID was found from background stream")
 
-                    # TODO: Set limit here potentially, this is capped to 100
-                    messages_page = await self.client.runs.messages.list(run_id=run_id)
-                    trajectory.append(messages_page.items)
+                        messages_page = await self.client.runs.messages.list(run_id=run_id, limit=1000)
+                        trajectory.append(messages_page.items)
 
-                final_agent_state = None
-                if retrieve_agent_state:
-                    final_agent_state = await self.client.agents.retrieve(agent_id=agent_id, include=["agent.blocks"])
+                    final_agent_state = None
+                    if retrieve_agent_state:
+                        final_agent_state = await self.client.agents.retrieve(agent_id=agent_id, include=["agent.blocks"])
 
-                return TargetResult(
-                    trajectory=trajectory,
-                    agent_id=agent_id,
-                    model_name=model_name,
-                    agent_usage=usage_stats,
-                    agent_state=final_agent_state,
-                )
+                    return TargetResult(
+                        trajectory=trajectory,
+                        agent_id=agent_id,
+                        model_name=model_name,
+                        agent_usage=usage_stats,
+                        agent_state=final_agent_state,
+                    )
 
             except Exception as e:
                 last_error = e
