@@ -42,7 +42,7 @@ nav {
 }
 
 nav a {
-  color: initial;
+  color: inherit;
   text-decoration: overline;
   transition: color 0.2s ease;
 }
