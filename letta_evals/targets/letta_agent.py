@@ -8,7 +8,7 @@ from letta_client.types import LlmConfig, MessageCreateParam
 
 from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.base import AbstractAgentTarget
-from letta_evals.utils import load_object
+from letta_evals.utils import list_all_run_messages, load_object
 from letta_evals.visualization.base import ProgressCallback
 
 logger = logging.getLogger(__name__)
@@ -111,6 +111,7 @@ class LettaAgentTarget(AbstractAgentTarget):
                             streaming=True,
                             background=True,
                             stream_tokens=True,
+                            include_pings=True,
                             max_steps=100,
                         )
 
@@ -149,28 +150,44 @@ class LettaAgentTarget(AbstractAgentTarget):
                                         usage_stats.append(usage_rec)
                                         continue
                                     if chunk.message_type == "error_message":
-                                        raise RuntimeError(f"Error for sample {sample.id}: {chunk.message_type.detail}")
+                                        detail = getattr(chunk, "detail", None) or getattr(chunk, "message", None) or str(chunk)
+                                        raise RuntimeError(f"Error for sample {sample.id}: {detail}")
 
-                        try:
-                            await _consume_stream(stream)
-                        except RuntimeError:
-                            raise
-                        except Exception as stream_err:
-                            if run_id and last_seq_id is not None:
-                                logger.debug(
-                                    f"Stream disconnected for sample {sample.id}, "
-                                    f"resuming from seq_id {last_seq_id}: {stream_err}"
-                                )
-                                resumed_stream = await self.client.runs.messages.stream(run_id, starting_after=last_seq_id)
-                                await _consume_stream(resumed_stream)
-                            else:
+                        # Consume stream, resuming a few times if the connection flakes.
+                        max_resumes = 5
+                        resume_attempt = 0
+                        stream_iter = stream
+                        while True:
+                            try:
+                                await _consume_stream(stream_iter)
+                                break
+                            except RuntimeError:
                                 raise
+                            except Exception as stream_err:
+                                if not (run_id and last_seq_id is not None):
+                                    raise
+
+                                resume_attempt += 1
+                                if resume_attempt > max_resumes:
+                                    raise
+
+                                backoff_s = min(8.0, 0.5 * (2 ** (resume_attempt - 1)))
+                                logger.debug(
+                                    f"Stream disconnected for sample {sample.id}; resuming "
+                                    f"(attempt {resume_attempt}/{max_resumes}) from seq_id {last_seq_id}: {stream_err}"
+                                )
+                                await anyio.sleep(backoff_s)
+                                stream_iter = await self.client.runs.messages.stream(
+                                    run_id,
+                                    starting_after=last_seq_id,
+                                    include_pings=True,
+                                )
 
                         if not run_id:
                             raise RuntimeError("Unexpected error: no run ID was found from background stream")
 
-                        messages_page = await self.client.runs.messages.list(run_id=run_id, limit=1000)
-                        trajectory.append(messages_page.items)
+                        messages = await list_all_run_messages(self.client, run_id)
+                        trajectory.append(messages)
 
                     final_agent_state = None
                     if retrieve_agent_state:
