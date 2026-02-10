@@ -8,7 +8,7 @@ from letta_client.types import LlmConfig, MessageCreateParam
 
 from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.base import AbstractAgentTarget
-from letta_evals.utils import list_all_run_messages, load_object
+from letta_evals.utils import consume_stream_with_resumes, list_all_run_messages, load_object
 from letta_evals.visualization.base import ProgressCallback
 
 logger = logging.getLogger(__name__)
@@ -115,73 +115,51 @@ class LettaAgentTarget(AbstractAgentTarget):
                             max_steps=100,
                         )
 
-                        run_id = None
-                        last_seq_id = None
+                        async def _on_chunk(chunk):
+                            if not hasattr(chunk, "message_type"):
+                                return
 
-                        async def _consume_stream(stream_iter):
-                            """Consume stream chunks, tracking run_id and seq_id for resumability."""
-                            nonlocal run_id, last_seq_id
-                            async for chunk in stream_iter:
-                                if hasattr(chunk, "run_id") and chunk.run_id:
-                                    run_id = chunk.run_id
-                                if hasattr(chunk, "seq_id"):
-                                    last_seq_id = chunk.seq_id
-
-                                if hasattr(chunk, "message_type"):
-                                    if chunk.message_type == "usage_statistics":
+                            if chunk.message_type == "usage_statistics":
+                                usage_rec = None
+                                if hasattr(chunk, "model_dump") and callable(getattr(chunk, "model_dump")):
+                                    try:
+                                        usage_rec = chunk.model_dump()
+                                    except Exception:
                                         usage_rec = None
-                                        if hasattr(chunk, "model_dump") and callable(getattr(chunk, "model_dump")):
-                                            try:
-                                                usage_rec = chunk.model_dump()
-                                            except Exception:
-                                                usage_rec = None
-                                        if usage_rec is None and hasattr(chunk, "dict") and callable(getattr(chunk, "dict")):
-                                            try:
-                                                usage_rec = chunk.dict()  # type: ignore[attr-defined]
-                                            except Exception:
-                                                usage_rec = None
-                                        if usage_rec is None and hasattr(chunk, "__dict__"):
-                                            try:
-                                                usage_rec = dict(chunk.__dict__)
-                                            except Exception:
-                                                usage_rec = None
-                                        if usage_rec is None:
-                                            usage_rec = {"raw": str(chunk)}
-                                        usage_stats.append(usage_rec)
-                                        continue
-                                    if chunk.message_type == "error_message":
-                                        detail = getattr(chunk, "detail", None) or getattr(chunk, "message", None) or str(chunk)
-                                        raise RuntimeError(f"Error for sample {sample.id}: {detail}")
+                                if usage_rec is None and hasattr(chunk, "dict") and callable(getattr(chunk, "dict")):
+                                    try:
+                                        usage_rec = chunk.dict()  # type: ignore[attr-defined]
+                                    except Exception:
+                                        usage_rec = None
+                                if usage_rec is None and hasattr(chunk, "__dict__"):
+                                    try:
+                                        usage_rec = dict(chunk.__dict__)
+                                    except Exception:
+                                        usage_rec = None
+                                if usage_rec is None:
+                                    usage_rec = {"raw": str(chunk)}
+                                usage_stats.append(usage_rec)
+                                return
 
-                        # Consume stream, resuming a few times if the connection flakes.
-                        max_resumes = 5
-                        resume_attempt = 0
-                        stream_iter = stream
-                        while True:
-                            try:
-                                await _consume_stream(stream_iter)
-                                break
-                            except RuntimeError:
-                                raise
-                            except Exception as stream_err:
-                                if not (run_id and last_seq_id is not None):
-                                    raise
+                            if chunk.message_type == "error_message":
+                                detail = getattr(chunk, "detail", None) or getattr(chunk, "message", None) or str(chunk)
+                                raise RuntimeError(f"Error for sample {sample.id}: {detail}")
 
-                                resume_attempt += 1
-                                if resume_attempt > max_resumes:
-                                    raise
+                        async def _resume_stream(rid: str, seq_id: int):
+                            return await self.client.runs.messages.stream(
+                                rid,
+                                starting_after=seq_id,
+                                include_pings=True,
+                            )
 
-                                backoff_s = min(8.0, 0.5 * (2 ** (resume_attempt - 1)))
-                                logger.debug(
-                                    f"Stream disconnected for sample {sample.id}; resuming "
-                                    f"(attempt {resume_attempt}/{max_resumes}) from seq_id {last_seq_id}: {stream_err}"
-                                )
-                                await anyio.sleep(backoff_s)
-                                stream_iter = await self.client.runs.messages.stream(
-                                    run_id,
-                                    starting_after=last_seq_id,
-                                    include_pings=True,
-                                )
+                        run_id, _ = await consume_stream_with_resumes(
+                            stream,
+                            resume_stream=_resume_stream,
+                            on_chunk=_on_chunk,
+                            max_resumes=5,
+                            log=logger,
+                            description=f"Stream for sample {sample.id}",
+                        )
 
                         if not run_id:
                             raise RuntimeError("Unexpected error: no run ID was found from background stream")

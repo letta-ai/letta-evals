@@ -366,6 +366,86 @@ async def list_all_agent_messages(
     return messages
 
 
+async def consume_stream_with_resumes(
+    stream_iter: Any,
+    *,
+    resume_stream: Callable[[str, int], Awaitable[Any]],
+    on_chunk: Optional[Callable[[Any], Awaitable[None]]] = None,
+    max_resumes: int = 5,
+    backoff_base_s: float = 0.5,
+    backoff_max_s: float = 8.0,
+    log: Optional[logging.Logger] = None,
+    description: str = "stream",
+) -> tuple[Optional[str], Optional[int]]:
+    """Consume an SSE stream, resuming from seq_id on transient disconnects.
+
+    This helper is used by both targets and graders.
+
+    Args:
+        stream_iter: The initial async iterator returned by `agents.messages.create(..., streaming=True)`
+        resume_stream: Function that returns a *new* stream iterator given (run_id, last_seq_id)
+        on_chunk: Optional per-chunk handler. Should raise RuntimeError for fatal stream-level errors.
+        max_resumes: Maximum number of resume attempts
+        backoff_base_s: Exponential backoff base
+        backoff_max_s: Maximum backoff sleep
+        log: Logger for debug messages (defaults to this module's logger)
+        description: Human-readable description for log messages
+
+    Returns:
+        (run_id, last_seq_id)
+    """
+
+    log = log or logger
+
+    run_id: Optional[str] = None
+    last_seq_id: Optional[int] = None
+
+    async def _consume(single_iter: Any) -> None:
+        nonlocal run_id, last_seq_id
+        async for chunk in single_iter:
+            rid = getattr(chunk, "run_id", None)
+            if rid:
+                run_id = rid
+            if hasattr(chunk, "seq_id"):
+                last_seq_id = getattr(chunk, "seq_id")
+
+            if on_chunk is not None:
+                await on_chunk(chunk)
+
+    resume_attempt = 0
+    current_iter = stream_iter
+    cancel_exc = anyio.get_cancelled_exc_class()
+
+    while True:
+        try:
+            await _consume(current_iter)
+            break
+        except cancel_exc:
+            raise
+        except RuntimeError:
+            raise
+        except Exception as stream_err:
+            # Only resume on transient network/protocol errors.
+            if not _is_retryable_http_error(stream_err):
+                raise
+            if not (run_id and last_seq_id is not None):
+                raise
+
+            resume_attempt += 1
+            if resume_attempt > max_resumes:
+                raise
+
+            backoff_s = min(backoff_max_s, backoff_base_s * (2 ** (resume_attempt - 1)))
+            log.debug(
+                f"{description} disconnected; resuming (attempt {resume_attempt}/{max_resumes}) "
+                f"from seq_id {last_seq_id}: {stream_err}"
+            )
+            await anyio.sleep(backoff_s)
+            current_iter = await resume_stream(run_id, last_seq_id)
+
+    return run_id, last_seq_id
+
+
 def is_per_turn_evaluation(sample: Sample) -> bool:
     """Check if sample requires per-turn evaluation.
 

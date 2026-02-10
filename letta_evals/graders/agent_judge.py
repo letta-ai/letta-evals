@@ -3,7 +3,6 @@ import logging
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-import anyio
 from letta_client import AsyncLetta
 from letta_client.types import MessageCreateParam
 from letta_client.types.agents import ToolCall, ToolCallMessage
@@ -12,7 +11,7 @@ from letta_evals.extractors import extractor_requires_agent_state, get_extractor
 from letta_evals.graders.base import Grader
 from letta_evals.graders.prompt_utils import build_judge_prompt
 from letta_evals.models import AgentState, GradeResult, LettaMessageUnion, Sample
-from letta_evals.utils import list_all_run_messages
+from letta_evals.utils import consume_stream_with_resumes, list_all_run_messages
 
 logger = logging.getLogger(__name__)
 
@@ -106,47 +105,20 @@ class AgentJudgeGrader(Grader):
                 max_steps=100,
             )
 
-            # consume stream, tracking seq_id for resumability
-            run_id = None
-            last_seq_id = None
+            async def _resume_stream(rid: str, seq_id: int):
+                return await self.client.runs.messages.stream(
+                    rid,
+                    starting_after=seq_id,
+                    include_pings=True,
+                )
 
-            async def _consume_stream(stream_iter):
-                nonlocal run_id, last_seq_id
-                async for chunk in stream_iter:
-                    if hasattr(chunk, "run_id") and chunk.run_id:
-                        run_id = chunk.run_id
-                    if hasattr(chunk, "seq_id"):
-                        last_seq_id = chunk.seq_id
-
-            max_resumes = 5
-            resume_attempt = 0
-            stream_iter = stream
-
-            while True:
-                try:
-                    await _consume_stream(stream_iter)
-                    break
-                except RuntimeError:
-                    raise
-                except Exception as stream_err:
-                    if not (run_id and last_seq_id is not None):
-                        raise
-
-                    resume_attempt += 1
-                    if resume_attempt > max_resumes:
-                        raise
-
-                    backoff_s = min(8.0, 0.5 * (2 ** (resume_attempt - 1)))
-                    logger.debug(
-                        f"Judge stream disconnected; resuming (attempt {resume_attempt}/{max_resumes}) "
-                        f"from seq_id {last_seq_id}: {stream_err}"
-                    )
-                    await anyio.sleep(backoff_s)
-                    stream_iter = await self.client.runs.messages.stream(
-                        run_id,
-                        starting_after=last_seq_id,
-                        include_pings=True,
-                    )
+            run_id, _ = await consume_stream_with_resumes(
+                stream,
+                resume_stream=_resume_stream,
+                max_resumes=5,
+                log=logger,
+                description="Judge stream",
+            )
 
             if not run_id:
                 raise RuntimeError("No run_id received from judge agent stream")
