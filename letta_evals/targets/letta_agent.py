@@ -87,9 +87,6 @@ class LettaAgentTarget(AbstractAgentTarget):
                 else:
                     model_name = agent.llm_config.model
 
-                if progress_callback and (self.agent_file or self.agent_script):
-                    await progress_callback.agent_loading(sample.id, model_name=model_name)
-
                 trajectory = []
                 usage_stats: list[dict] = []
 

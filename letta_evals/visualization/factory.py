@@ -65,7 +65,7 @@ def create_progress_callback(
         grader_kind=grader_kind_label,
         rubric_model=rubric_model,
         max_concurrent=max_concurrent,
-        display_mode=DisplayMode.DETAILED,
+        display_mode=DisplayMode.STANDARD,
         console=console,
         show_samples=True,
         cached_mode=cached_mode,

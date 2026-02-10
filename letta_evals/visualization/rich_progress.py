@@ -1,9 +1,13 @@
+import asyncio
+import logging
 import time
+from collections import Counter, deque
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Deque, Dict, List, Optional
 
+import anyio
 from rich.align import Align
 from rich.box import MINIMAL_DOUBLE_HEAD, ROUNDED
 from rich.console import Console, Group
@@ -26,6 +30,8 @@ from rich.text import Text
 from letta_evals.types import GraderKind
 from letta_evals.utils import build_turn_symbols, calculate_turn_average
 from letta_evals.visualization.base import ProgressCallback
+
+logger = logging.getLogger(__name__)
 
 
 class SampleState(Enum):
@@ -130,6 +136,23 @@ class EvalProgress(ProgressCallback):
         self.error_count = 0
         self.total_score = 0.0
         self.score_count = 0
+
+        # Protect shared mutable state across concurrent callback calls.
+        self._state_lock = anyio.Lock()
+        # Render only from a bounded periodic loop to avoid redraw storms.
+        self._dirty = False
+        self._render_interval = 1.0 / max(1.0, self.update_freq)
+        self._render_loop_running = False
+        self._render_loop_task: Optional[asyncio.Task] = None
+
+        # Performance instrumentation for profiling render pressure.
+        self._perf_start_ts = time.time()
+        self._event_count = 0
+        self._event_counts: Counter[str] = Counter()
+        self._render_count = 0
+        self._render_durations_ms: Deque[float] = deque(maxlen=2048)
+        self._coalesced_render_requests = 0
+        self._noop_state_updates = 0
 
     def _get_state_icon(self, state: SampleState) -> Text:
         """Get icon for sample state"""
@@ -329,13 +352,13 @@ class EvalProgress(ProgressCallback):
         )
 
     def _create_detailed_view(self) -> Table:
-        """Create a modern, height-aware table that prioritizes active and recent samples.
+        """Create a height-aware table prioritizing active and recent samples.
 
         Strategy:
         - Compute how many rows fit in the terminal, accounting for header/progress chrome.
         - Always show currently active samples (loading/sending/grading).
         - Fill remaining space with most-recently updated completed/failed/error samples.
-        - If still space, rotate through queued items to give visibility without overflowing.
+        - Fill final rows with queued items in deterministic order.
         """
         terminal_height = self.console.height
 
@@ -358,10 +381,10 @@ class EvalProgress(ProgressCallback):
         # gather all samples
         samples_list = list(self.samples.values())
         active = [s for s in samples_list if s.state in active_states]
-        active.sort(key=lambda s: (s.model_name or "", s.sample_id))
+        active.sort(key=lambda s: (-last_update_key(s), s.model_name or "", s.sample_id))
 
         recent_done = [s for s in samples_list if s.state in completed_states]
-        recent_done.sort(key=lambda s: (s.model_name or "", s.sample_id))
+        recent_done.sort(key=lambda s: (-last_update_key(s), s.model_name or "", s.sample_id))
 
         queued = [s for s in samples_list if s.state == SampleState.QUEUED]
         queued.sort(key=lambda s: (s.model_name or "", s.sample_id))
@@ -371,23 +394,14 @@ class EvalProgress(ProgressCallback):
         rows.extend(active[:n_rows])
         remaining = n_rows - len(rows)
 
-        # 2) Show a rotating window of recently updated completed items
+        # 2) Show most recently updated completed items
         if remaining > 0 and recent_done:
-            rotation_period = 5
-            page_size = remaining
-            pages = (len(recent_done) + page_size - 1) // page_size
-            page_idx = int(time.time() // rotation_period) % max(1, pages)
-            start = page_idx * page_size
-            rows.extend(recent_done[start : start + page_size])
+            rows.extend(recent_done[:remaining])
             remaining = n_rows - len(rows)
 
-        # 3) Fill any remaining with queued, also rotated
+        # 3) Fill any remaining with queued in deterministic order
         if remaining > 0 and queued:
-            page_size = remaining
-            pages = (len(queued) + page_size - 1) // page_size
-            page_idx = int(time.time() // 7) % max(1, pages)
-            start = page_idx * page_size
-            rows.extend(queued[start : start + page_size])
+            rows.extend(queued[:remaining])
 
         showing = len(rows)
         title = (
@@ -532,6 +546,74 @@ class EvalProgress(ProgressCallback):
 
         return layout
 
+    def _record_event(self, event_name: str) -> None:
+        self._event_count += 1
+        self._event_counts[event_name] += 1
+
+    def _request_render_locked(self) -> None:
+        if self._dirty:
+            self._coalesced_render_requests += 1
+        self._dirty = True
+
+    @staticmethod
+    def _percentile(values: List[float], pct: float) -> float:
+        if not values:
+            return 0.0
+        sorted_values = sorted(values)
+        if len(sorted_values) == 1:
+            return sorted_values[0]
+
+        pos = (pct / 100.0) * (len(sorted_values) - 1)
+        lower = int(pos)
+        upper = min(lower + 1, len(sorted_values) - 1)
+        frac = pos - lower
+        return (sorted_values[lower] * (1.0 - frac)) + (sorted_values[upper] * frac)
+
+    def get_perf_snapshot(self) -> Dict[str, object]:
+        elapsed = max(0.001, time.time() - self._perf_start_ts)
+        render_ms = list(self._render_durations_ms)
+        return {
+            "uptime_sec": round(elapsed, 3),
+            "events_total": self._event_count,
+            "events_per_sec": round(self._event_count / elapsed, 3),
+            "renders_total": self._render_count,
+            "renders_per_sec": round(self._render_count / elapsed, 3),
+            "render_p50_ms": round(self._percentile(render_ms, 50), 3),
+            "render_p95_ms": round(self._percentile(render_ms, 95), 3),
+            "coalesced_render_requests": self._coalesced_render_requests,
+            "noop_state_updates": self._noop_state_updates,
+            "event_counts": dict(self._event_counts),
+        }
+
+    async def _render_if_dirty(self) -> None:
+        if not self.live:
+            return
+
+        async with self._state_lock:
+            if not self._dirty:
+                return
+            self._dirty = False
+            renderable = self._render()
+
+        t0 = time.perf_counter()
+        self.live.update(renderable, refresh=True)
+        self._render_count += 1
+        self._render_durations_ms.append((time.perf_counter() - t0) * 1000.0)
+
+    async def _render_loop(self) -> None:
+        while self._render_loop_running:
+            await anyio.sleep(self._render_interval)
+            await self._render_if_dirty()
+
+    async def _get_existing_from_cache(self, sample_id: int, model_name: Optional[str]) -> bool:
+        async with self._state_lock:
+            key = (sample_id, model_name)
+            if key in self.samples:
+                return self.samples[key].from_cache
+            if model_name is not None and (sample_id, None) in self.samples:
+                return self.samples[(sample_id, None)].from_cache
+            return False
+
     def reset(self):
         """Reset counters and state for a new run"""
         self.completed_count = 0
@@ -541,6 +623,14 @@ class EvalProgress(ProgressCallback):
         self.samples.clear()
         self.metric_totals.clear()
         self.metric_counts.clear()
+        self._dirty = True
+        self._perf_start_ts = time.time()
+        self._event_count = 0
+        self._event_counts.clear()
+        self._render_count = 0
+        self._render_durations_ms.clear()
+        self._coalesced_render_requests = 0
+        self._noop_state_updates = 0
         if self.main_task_id is not None:
             self.main_progress.update(self.main_task_id, completed=0)
 
@@ -560,17 +650,33 @@ class EvalProgress(ProgressCallback):
         self.live = Live(
             self._render(),
             console=self.console,
+            auto_refresh=False,
             refresh_per_second=self.update_freq,
             transient=False,
-            vertical_overflow="visible",
+            vertical_overflow="crop",
         )
         self.live.start()
+        self._render_loop_running = True
+        self._render_loop_task = asyncio.create_task(self._render_loop())
 
     def stop(self):
         """Stop the progress display"""
+        if self._render_loop_task:
+            self._render_loop_running = False
+            self._render_loop_task.cancel()
+            self._render_loop_task = None
+
         if self.live:
+            if self._dirty:
+                t0 = time.perf_counter()
+                self.live.update(self._render(), refresh=True)
+                self._render_count += 1
+                self._render_durations_ms.append((time.perf_counter() - t0) * 1000.0)
             self.live.stop()
             self.console.print()
+            self.live = None
+
+        logger.debug("Rich progress perf snapshot: %s", self.get_perf_snapshot())
 
     async def update_sample_state(
         self,
@@ -579,78 +685,106 @@ class EvalProgress(ProgressCallback):
         agent_id: Optional[str] = None,
         model_name: Optional[str] = None,
         **kwargs,
-    ):
+    ) -> bool:
         """Update state of a sample"""
-        key = (sample_id, model_name)
+        async with self._state_lock:
+            changed = False
+            key = (sample_id, model_name)
 
-        # If we have a model_name and there's an existing entry with None, migrate it
-        if model_name is not None:
-            old_key = (sample_id, None)
-            if old_key in self.samples and key not in self.samples:
-                # Migrate the old entry to the new key
-                self.samples[key] = self.samples[old_key]
-                self.samples[key].model_name = model_name
-                del self.samples[old_key]
+            # If we have a model_name and there's an existing entry with None, migrate it
+            if model_name is not None:
+                old_key = (sample_id, None)
+                if old_key in self.samples and key not in self.samples:
+                    self.samples[key] = self.samples[old_key]
+                    self.samples[key].model_name = model_name
+                    del self.samples[old_key]
+                    changed = True
 
-        if key not in self.samples:
-            self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
+            if key not in self.samples:
+                self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
+                changed = True
 
-        sample = self.samples[key]
-        previous_state = sample.state
-        sample.state = state
+            sample = self.samples[key]
+            previous_state = sample.state
 
-        if agent_id is not None and sample.agent_id != agent_id:
-            sample.agent_id = agent_id
+            if sample.state != state:
+                sample.state = state
+                changed = True
 
-        if model_name is not None and sample.model_name != model_name:
-            sample.model_name = model_name
+            if agent_id is not None and sample.agent_id != agent_id:
+                sample.agent_id = agent_id
+                changed = True
 
-        if state == SampleState.LOADING_AGENT and sample.start_time is None:
-            sample.start_time = time.time()
-        elif state in [SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR]:
-            sample.end_time = time.time()
+            if model_name is not None and sample.model_name != model_name:
+                sample.model_name = model_name
+                changed = True
 
-        for key, value in kwargs.items():
-            if hasattr(sample, key):
-                setattr(sample, key, value)
-        sample.last_update_ts = time.time()
+            now = time.time()
+            if state == SampleState.LOADING_AGENT and sample.start_time is None:
+                sample.start_time = now
+                changed = True
+            elif state in [SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR] and sample.end_time is None:
+                sample.end_time = now
+                changed = True
 
-        terminal_states = {SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR}
-        is_new_completion = previous_state not in terminal_states and state in terminal_states
+            for attr, value in kwargs.items():
+                if hasattr(sample, attr) and getattr(sample, attr) != value:
+                    setattr(sample, attr, value)
+                    changed = True
 
-        if state == SampleState.COMPLETED and is_new_completion:
-            self.completed_count += 1
+            terminal_states = {SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR}
+            is_new_completion = previous_state not in terminal_states and state in terminal_states
 
-            if sample.score is not None:
-                self.total_score += sample.score
-                self.score_count += 1
+            if state == SampleState.COMPLETED and is_new_completion:
+                self.completed_count += 1
 
-            completed = self.completed_count + self.error_count
-            self.main_progress.update(self.main_task_id, completed=completed)
+                if sample.score is not None:
+                    self.total_score += sample.score
+                    self.score_count += 1
 
-        elif state == SampleState.ERROR and is_new_completion:
-            self.error_count += 1
-            completed = self.completed_count + self.error_count
-            self.main_progress.update(self.main_task_id, completed=completed)
+                if self.main_task_id is not None:
+                    completed = self.completed_count + self.error_count
+                    self.main_progress.update(self.main_task_id, completed=completed)
+                changed = True
 
-        if self.live:
-            self.live.update(self._render())
+            elif state == SampleState.ERROR and is_new_completion:
+                self.error_count += 1
+                if self.main_task_id is not None:
+                    completed = self.completed_count + self.error_count
+                    self.main_progress.update(self.main_task_id, completed=completed)
+                changed = True
+
+            if changed:
+                sample.last_update_ts = now
+                self._request_render_locked()
+            else:
+                self._noop_state_updates += 1
+
+            return is_new_completion
 
     async def sample_started(self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None):
         """Mark sample as started"""
-        key = (sample_id, model_name)
-        if key not in self.samples:
-            self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
+        self._record_event("sample_started")
+
+        if self.cached_mode:
+            async with self._state_lock:
+                key = (sample_id, model_name)
+                if key not in self.samples:
+                    self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
+                    self.samples[key].last_update_ts = time.time()
+                    self._request_render_locked()
+                else:
+                    self._noop_state_updates += 1
+            return
+
         # skip loading state if using cached trajectories
-        if not self.cached_mode:
-            await self.update_sample_state(
-                sample_id, SampleState.LOADING_AGENT, agent_id=agent_id, model_name=model_name
-            )
+        await self.update_sample_state(sample_id, SampleState.LOADING_AGENT, agent_id=agent_id, model_name=model_name)
 
     async def agent_loading(
         self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None, from_cache: bool = False
     ):
         """Mark sample as loading agent"""
+        self._record_event("agent_loading")
         await self.update_sample_state(
             sample_id, SampleState.LOADING_AGENT, agent_id=agent_id, model_name=model_name, from_cache=from_cache
         )
@@ -664,6 +798,7 @@ class EvalProgress(ProgressCallback):
         model_name: Optional[str] = None,
     ):
         """Update message sending progress"""
+        self._record_event("message_sending")
         await self.update_sample_state(
             sample_id,
             SampleState.SENDING_MESSAGES,
@@ -675,13 +810,8 @@ class EvalProgress(ProgressCallback):
 
     async def grading_started(self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None):
         """Mark sample as being graded"""
-        key = (sample_id, model_name)
-        # Check both the current key and the None key for from_cache flag
-        existing_from_cache = False
-        if key in self.samples:
-            existing_from_cache = self.samples[key].from_cache
-        elif model_name is not None and (sample_id, None) in self.samples:
-            existing_from_cache = self.samples[(sample_id, None)].from_cache
+        self._record_event("grading_started")
+        existing_from_cache = await self._get_existing_from_cache(sample_id, model_name)
 
         await self.update_sample_state(
             sample_id, SampleState.GRADING, agent_id=agent_id, model_name=model_name, from_cache=existing_from_cache
@@ -698,29 +828,47 @@ class EvalProgress(ProgressCallback):
         model_name: Optional[str] = None,
     ):
         """Update progress for per-turn grading"""
+        self._record_event("turn_graded")
         key = (sample_id, model_name)
-
-        # Get existing from_cache flag
         existing_from_cache = False
-        if key in self.samples:
-            existing_from_cache = self.samples[key].from_cache
-        elif model_name is not None and (sample_id, None) in self.samples:
-            existing_from_cache = self.samples[(sample_id, None)].from_cache
+        turn_changed = False
 
-        # Initialize sample and turn_scores dict BEFORE updating state
-        if key not in self.samples:
-            self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
-        if self.samples[key].turn_scores is None:
-            self.samples[key].turn_scores = {}
+        async with self._state_lock:
+            if model_name is not None:
+                old_key = (sample_id, None)
+                if old_key in self.samples and key not in self.samples:
+                    self.samples[key] = self.samples[old_key]
+                    self.samples[key].model_name = model_name
+                    del self.samples[old_key]
+                    turn_changed = True
 
-        # Initialize this grader's turn scores if needed
-        gk = grader_key or "_default"
-        if gk not in self.samples[key].turn_scores:
-            self.samples[key].turn_scores[gk] = [None] * total_turns
+            if key not in self.samples:
+                self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
+                turn_changed = True
 
-        # Update score at the turn index for this grader
-        if turn_num < len(self.samples[key].turn_scores[gk]):
-            self.samples[key].turn_scores[gk][turn_num] = turn_score
+            sample = self.samples[key]
+            existing_from_cache = sample.from_cache
+
+            if sample.turn_scores is None:
+                sample.turn_scores = {}
+                turn_changed = True
+
+            gk = grader_key or "_default"
+            if gk not in sample.turn_scores:
+                sample.turn_scores[gk] = [None] * total_turns
+                turn_changed = True
+
+            if turn_num < len(sample.turn_scores[gk]):
+                prev_score = sample.turn_scores[gk][turn_num]
+                if prev_score != turn_score:
+                    sample.turn_scores[gk][turn_num] = turn_score
+                    turn_changed = True
+
+            if turn_changed:
+                sample.last_update_ts = time.time()
+                self._request_render_locked()
+            else:
+                self._noop_state_updates += 1
 
         await self.update_sample_state(
             sample_id,
@@ -743,15 +891,10 @@ class EvalProgress(ProgressCallback):
         metric_rationales: Optional[Dict[str, str]] = None,
     ):
         """Mark sample as completed"""
-        # preserve from_cache flag if it was set
-        key = (sample_id, model_name)
-        existing_from_cache = False
-        if key in self.samples:
-            existing_from_cache = self.samples[key].from_cache
-        elif model_name is not None and (sample_id, None) in self.samples:
-            existing_from_cache = self.samples[(sample_id, None)].from_cache
+        self._record_event("sample_completed")
+        existing_from_cache = await self._get_existing_from_cache(sample_id, model_name)
 
-        await self.update_sample_state(
+        is_new_completion = await self.update_sample_state(
             sample_id,
             SampleState.COMPLETED,
             agent_id=agent_id,
@@ -763,15 +906,18 @@ class EvalProgress(ProgressCallback):
             metric_rationales=metric_rationales,
         )
         # update per-metric aggregates
-        if metric_scores:
-            for mkey, mscore in metric_scores.items():
-                self.metric_totals[mkey] = self.metric_totals.get(mkey, 0.0) + (mscore or 0.0)
-                self.metric_counts[mkey] = self.metric_counts.get(mkey, 0) + 1
+        if metric_scores and is_new_completion:
+            async with self._state_lock:
+                for mkey, mscore in metric_scores.items():
+                    self.metric_totals[mkey] = self.metric_totals.get(mkey, 0.0) + (mscore or 0.0)
+                    self.metric_counts[mkey] = self.metric_counts.get(mkey, 0) + 1
+                self._request_render_locked()
 
     async def sample_error(
         self, sample_id: int, error: str, agent_id: Optional[str] = None, model_name: Optional[str] = None
     ):
         """Mark sample as having an error"""
+        self._record_event("sample_error")
         await self.update_sample_state(
             sample_id,
             SampleState.ERROR,
