@@ -1,11 +1,10 @@
 import asyncio
 import logging
 import time
-from collections import Counter, deque
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
-from typing import Deque, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import anyio
 from rich.align import Align
@@ -30,6 +29,7 @@ from rich.text import Text
 from letta_evals.types import GraderKind
 from letta_evals.utils import build_turn_symbols, calculate_turn_average
 from letta_evals.visualization.base import ProgressCallback
+from letta_evals.visualization.perf import RenderPerfTracker
 
 logger = logging.getLogger(__name__)
 
@@ -146,13 +146,7 @@ class EvalProgress(ProgressCallback):
         self._render_loop_task: Optional[asyncio.Task] = None
 
         # Performance instrumentation for profiling render pressure.
-        self._perf_start_ts = time.time()
-        self._event_count = 0
-        self._event_counts: Counter[str] = Counter()
-        self._render_count = 0
-        self._render_durations_ms: Deque[float] = deque(maxlen=2048)
-        self._coalesced_render_requests = 0
-        self._noop_state_updates = 0
+        self._perf = RenderPerfTracker()
 
     def _get_state_icon(self, state: SampleState) -> Text:
         """Get icon for sample state"""
@@ -547,43 +541,14 @@ class EvalProgress(ProgressCallback):
         return layout
 
     def _record_event(self, event_name: str) -> None:
-        self._event_count += 1
-        self._event_counts[event_name] += 1
+        self._perf.record_event(event_name)
 
     def _request_render_locked(self) -> None:
-        if self._dirty:
-            self._coalesced_render_requests += 1
+        self._perf.record_render_request(already_dirty=self._dirty)
         self._dirty = True
 
-    @staticmethod
-    def _percentile(values: List[float], pct: float) -> float:
-        if not values:
-            return 0.0
-        sorted_values = sorted(values)
-        if len(sorted_values) == 1:
-            return sorted_values[0]
-
-        pos = (pct / 100.0) * (len(sorted_values) - 1)
-        lower = int(pos)
-        upper = min(lower + 1, len(sorted_values) - 1)
-        frac = pos - lower
-        return (sorted_values[lower] * (1.0 - frac)) + (sorted_values[upper] * frac)
-
     def get_perf_snapshot(self) -> Dict[str, object]:
-        elapsed = max(0.001, time.time() - self._perf_start_ts)
-        render_ms = list(self._render_durations_ms)
-        return {
-            "uptime_sec": round(elapsed, 3),
-            "events_total": self._event_count,
-            "events_per_sec": round(self._event_count / elapsed, 3),
-            "renders_total": self._render_count,
-            "renders_per_sec": round(self._render_count / elapsed, 3),
-            "render_p50_ms": round(self._percentile(render_ms, 50), 3),
-            "render_p95_ms": round(self._percentile(render_ms, 95), 3),
-            "coalesced_render_requests": self._coalesced_render_requests,
-            "noop_state_updates": self._noop_state_updates,
-            "event_counts": dict(self._event_counts),
-        }
+        return self._perf.snapshot()
 
     async def _render_if_dirty(self) -> None:
         if not self.live:
@@ -597,8 +562,7 @@ class EvalProgress(ProgressCallback):
 
         t0 = time.perf_counter()
         self.live.update(renderable, refresh=True)
-        self._render_count += 1
-        self._render_durations_ms.append((time.perf_counter() - t0) * 1000.0)
+        self._perf.record_render_duration((time.perf_counter() - t0) * 1000.0)
 
     async def _render_loop(self) -> None:
         while self._render_loop_running:
@@ -624,13 +588,7 @@ class EvalProgress(ProgressCallback):
         self.metric_totals.clear()
         self.metric_counts.clear()
         self._dirty = True
-        self._perf_start_ts = time.time()
-        self._event_count = 0
-        self._event_counts.clear()
-        self._render_count = 0
-        self._render_durations_ms.clear()
-        self._coalesced_render_requests = 0
-        self._noop_state_updates = 0
+        self._perf.reset()
         if self.main_task_id is not None:
             self.main_progress.update(self.main_task_id, completed=0)
 
@@ -670,8 +628,7 @@ class EvalProgress(ProgressCallback):
             if self._dirty:
                 t0 = time.perf_counter()
                 self.live.update(self._render(), refresh=True)
-                self._render_count += 1
-                self._render_durations_ms.append((time.perf_counter() - t0) * 1000.0)
+                self._perf.record_render_duration((time.perf_counter() - t0) * 1000.0)
             self.live.stop()
             self.console.print()
             self.live = None
@@ -758,7 +715,7 @@ class EvalProgress(ProgressCallback):
                 sample.last_update_ts = now
                 self._request_render_locked()
             else:
-                self._noop_state_updates += 1
+                self._perf.record_noop_state_update()
 
             return is_new_completion
 
@@ -774,7 +731,7 @@ class EvalProgress(ProgressCallback):
                     self.samples[key].last_update_ts = time.time()
                     self._request_render_locked()
                 else:
-                    self._noop_state_updates += 1
+                    self._perf.record_noop_state_update()
             return
 
         # skip loading state if using cached trajectories
@@ -868,7 +825,7 @@ class EvalProgress(ProgressCallback):
                 sample.last_update_ts = time.time()
                 self._request_render_locked()
             else:
-                self._noop_state_updates += 1
+                self._perf.record_noop_state_update()
 
         await self.update_sample_state(
             sample_id,
