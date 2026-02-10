@@ -164,6 +164,7 @@ class Runner:
                 llm_config=actual_llm_config,
                 model_handle=model_handle,
                 max_retries=self.suite.target.max_retries,
+                timeout=int(self.suite.target.timeout),
             )
         elif self.suite.target.kind == TargetKind.LETTA_CODE:
             model_handle = llm_config if isinstance(llm_config, str) else None

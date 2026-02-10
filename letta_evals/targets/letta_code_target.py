@@ -9,7 +9,7 @@ from letta_client import AsyncLetta
 
 from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.base import AbstractAgentTarget
-from letta_evals.utils import load_object
+from letta_evals.utils import list_all_agent_messages, load_object
 from letta_evals.visualization.base import ProgressCallback
 
 logger = logging.getLogger(__name__)
@@ -184,11 +184,10 @@ class LettaCodeTarget(AbstractAgentTarget):
                 # retrieve the full message history using the agent_id
                 logger.info(f"Retrieving messages for agent {agent_id}")
 
-                # retrieve messages from the agent's last run
-                messages_page = await self.client.agents.messages.list(agent_id=agent_id)
+                messages = await list_all_agent_messages(self.client, agent_id)
 
                 # wrap messages in a single turn
-                trajectory = [messages_page.items] if messages_page.items else []
+                trajectory = [messages] if messages else []
 
                 # CLI returns {prompt_tokens, completion_tokens, total_tokens}.
                 # Wrap in the same format as LettaAgentTarget so

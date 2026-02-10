@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -10,6 +11,9 @@ from letta_evals.extractors import extractor_requires_agent_state, get_extractor
 from letta_evals.graders.base import Grader
 from letta_evals.graders.prompt_utils import build_judge_prompt
 from letta_evals.models import AgentState, GradeResult, LettaMessageUnion, Sample
+from letta_evals.utils import consume_stream_with_resumes, list_all_run_messages
+
+logger = logging.getLogger(__name__)
 
 
 class AgentJudgeGrader(Grader):
@@ -91,23 +95,36 @@ class AgentJudgeGrader(Grader):
                     judge_agent_id = resp.agent_ids[0]
 
             # send prompt to judge agent
-            stream = await self.client.agents.messages.stream(
+            stream = await self.client.agents.messages.create(
                 agent_id=judge_agent_id,
                 messages=[MessageCreateParam(role="user", content=judge_prompt)],
+                streaming=True,
+                background=True,
                 stream_tokens=False,
+                include_pings=True,
+                max_steps=100,
             )
 
-            # consume stream
-            run_id = None
-            async for chunk in stream:
-                if hasattr(chunk, "run_id"):
-                    run_id = chunk.run_id
+            async def _resume_stream(rid: str, seq_id: int):
+                return await self.client.runs.messages.stream(
+                    rid,
+                    starting_after=seq_id,
+                    include_pings=True,
+                )
+
+            run_id, _ = await consume_stream_with_resumes(
+                stream,
+                resume_stream=_resume_stream,
+                max_resumes=5,
+                log=logger,
+                description="Judge stream",
+            )
 
             if not run_id:
                 raise RuntimeError("No run_id received from judge agent stream")
 
-            messages_page = await self.client.runs.messages.list(run_id=run_id)
-            score, rationale = self._parse_tool_calls(messages_page.items)
+            messages = await list_all_run_messages(self.client, run_id)
+            score, rationale = self._parse_tool_calls(messages)
 
             metadata = {"judge_agent_id": judge_agent_id}
             if self.agent_file:

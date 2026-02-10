@@ -8,7 +8,7 @@ from letta_client.types import LlmConfig, MessageCreateParam
 
 from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.base import AbstractAgentTarget
-from letta_evals.utils import load_object
+from letta_evals.utils import consume_stream_with_resumes, list_all_run_messages, load_object
 from letta_evals.visualization.base import ProgressCallback
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,7 @@ class LettaAgentTarget(AbstractAgentTarget):
         llm_config: Optional[LlmConfig] = None,
         model_handle: Optional[str] = None,
         max_retries: int = 0,
+        timeout: Optional[int] = None,
     ):
         self.client = client
         self.agent_id = agent_id
@@ -36,6 +37,7 @@ class LettaAgentTarget(AbstractAgentTarget):
         self.llm_config = llm_config
         self.model_handle = model_handle
         self.max_retries = max_retries
+        self.timeout = timeout
 
     async def run(
         self,
@@ -53,72 +55,70 @@ class LettaAgentTarget(AbstractAgentTarget):
             agent_id_to_cleanup = None
 
             try:
-                if self.agent_file:
-                    with open(self.agent_file, "rb") as f:
-                        resp = await self.client.agents.import_file(
-                            file=f, append_copy_suffix=False, override_existing_tools=False, project_id=project_id
-                        )
-                        if len(resp.agent_ids) > 1:
-                            raise RuntimeError(
-                                f"Expected single agent from .af file, got {len(resp.agent_ids)} agents. We don't support multi-agent evals yet."
+                with anyio.fail_after(self.timeout):
+                    if self.agent_file:
+                        with open(self.agent_file, "rb") as f:
+                            resp = await self.client.agents.import_file(
+                                file=f, append_copy_suffix=False, override_existing_tools=False, project_id=project_id
                             )
+                            if len(resp.agent_ids) > 1:
+                                raise RuntimeError(
+                                    f"Expected single agent from .af file, got {len(resp.agent_ids)} agents. We don't support multi-agent evals yet."
+                                )
 
-                        agent_id = resp.agent_ids[0]
+                            agent_id = resp.agent_ids[0]
+                            agent_id_to_cleanup = agent_id
+
+                    elif self.agent_script:
+                        agent_factory_func = load_object(self.agent_script, self.base_dir)
+                        agent_id = await agent_factory_func(self.client, sample)
                         agent_id_to_cleanup = agent_id
 
-                elif self.agent_script:
-                    agent_factory_func = load_object(self.agent_script, self.base_dir)
-                    agent_id = await agent_factory_func(self.client, sample)
-                    agent_id_to_cleanup = agent_id
+                    if self.llm_config and agent_id:
+                        # Workaround for letta-client SDK bug: serialize with aliases
+                        # The SDK doesn't use by_alias=True, causing model_endpoint_type -> api_model_endpoint_type
+                        llm_config_dict = self.llm_config.model_dump(by_alias=True, exclude_none=True)
+                        await self.client.agents.update(agent_id=agent_id, llm_config=llm_config_dict)
+                    elif self.model_handle and agent_id:
+                        await self.client.agents.update(agent_id=agent_id, model=self.model_handle)
 
-                if self.llm_config and agent_id:
-                    # Workaround for letta-client SDK bug: serialize with aliases
-                    # The SDK doesn't use by_alias=True, causing model_endpoint_type -> api_model_endpoint_type
-                    llm_config_dict = self.llm_config.model_dump(by_alias=True, exclude_none=True)
-                    await self.client.agents.update(agent_id=agent_id, llm_config=llm_config_dict)
-                elif self.model_handle and agent_id:
-                    await self.client.agents.update(agent_id=agent_id, model=self.model_handle)
+                    agent = await self.client.agents.retrieve(agent_id=agent_id, include=[])
+                    if self.llm_config:
+                        model_name = self.llm_config.model
+                    elif self.model_handle:
+                        model_name = self.model_handle
+                    else:
+                        model_name = agent.llm_config.model
 
-                agent = await self.client.agents.retrieve(agent_id=agent_id, include=[])
-                if self.llm_config:
-                    model_name = self.llm_config.model
-                elif self.model_handle:
-                    model_name = self.model_handle
-                else:
-                    model_name = agent.llm_config.model
+                    if progress_callback and (self.agent_file or self.agent_script):
+                        await progress_callback.agent_loading(sample.id, model_name=model_name)
 
-                if progress_callback and (self.agent_file or self.agent_script):
-                    await progress_callback.agent_loading(sample.id, model_name=model_name)
+                    trajectory = []
+                    usage_stats: list[dict] = []
 
-                trajectory = []
-                usage_stats: list[dict] = []
+                    inputs = sample.input if isinstance(sample.input, list) else [sample.input]
+                    total_messages = len(inputs)
 
-                inputs = sample.input if isinstance(sample.input, list) else [sample.input]
-                total_messages = len(inputs)
+                    for i, input_msg in enumerate(inputs):
+                        if progress_callback:
+                            await progress_callback.message_sending(
+                                sample.id, i + 1, total_messages, agent_id=agent_id, model_name=model_name
+                            )
 
-                for i, input_msg in enumerate(inputs):
-                    if progress_callback:
-                        await progress_callback.message_sending(
-                            sample.id, i + 1, total_messages, agent_id=agent_id, model_name=model_name
+                        stream = await self.client.agents.messages.create(
+                            agent_id=agent_id,
+                            messages=[MessageCreateParam(role="user", content=str(input_msg))],
+                            streaming=True,
+                            background=True,
+                            stream_tokens=True,
+                            include_pings=True,
+                            max_steps=100,
                         )
 
-                    stream = await self.client.agents.messages.stream(
-                        agent_id=agent_id,
-                        messages=[MessageCreateParam(role="user", content=str(input_msg))],
-                        stream_tokens=True,
-                    )
+                        async def _on_chunk(chunk):
+                            if not hasattr(chunk, "message_type"):
+                                return
 
-                    run_id = None
-                    chunks = []
-                    async for chunk in stream:
-                        # derive run_id from very first chunk, all should have the same
-                        # defensive for now, letta server needs fix to standardize run_id
-                        chunks.append(chunk)
-
-                        if not run_id and hasattr(chunk, "run_id"):
-                            run_id = chunk.run_id
-
-                        if hasattr(chunk, "message_type"):
                             if chunk.message_type == "usage_statistics":
                                 usage_rec = None
                                 if hasattr(chunk, "model_dump") and callable(getattr(chunk, "model_dump")):
@@ -139,28 +139,47 @@ class LettaAgentTarget(AbstractAgentTarget):
                                 if usage_rec is None:
                                     usage_rec = {"raw": str(chunk)}
                                 usage_stats.append(usage_rec)
-                                continue
+                                return
+
                             if chunk.message_type == "error_message":
-                                raise RuntimeError(f"Error for sample {sample.id}: {chunk.message_type.detail}")
+                                detail = getattr(chunk, "detail", None) or getattr(chunk, "message", None) or str(chunk)
+                                raise RuntimeError(f"Error for sample {sample.id}: {detail}")
 
-                    if not run_id:
-                        raise RuntimeError(f"Unexpected error: no run ID was found from streaming chunks: {chunks}")
+                        async def _resume_stream(rid: str, seq_id: int):
+                            return await self.client.runs.messages.stream(
+                                rid,
+                                starting_after=seq_id,
+                                include_pings=True,
+                            )
 
-                    # TODO: Set limit here potentially, this is capped to 100
-                    messages_page = await self.client.runs.messages.list(run_id=run_id)
-                    trajectory.append(messages_page.items)
+                        run_id, _ = await consume_stream_with_resumes(
+                            stream,
+                            resume_stream=_resume_stream,
+                            on_chunk=_on_chunk,
+                            max_resumes=5,
+                            log=logger,
+                            description=f"Stream for sample {sample.id}",
+                        )
 
-                final_agent_state = None
-                if retrieve_agent_state:
-                    final_agent_state = await self.client.agents.retrieve(agent_id=agent_id, include=["agent.blocks"])
+                        if not run_id:
+                            raise RuntimeError("Unexpected error: no run ID was found from background stream")
 
-                return TargetResult(
-                    trajectory=trajectory,
-                    agent_id=agent_id,
-                    model_name=model_name,
-                    agent_usage=usage_stats,
-                    agent_state=final_agent_state,
-                )
+                        messages = await list_all_run_messages(self.client, run_id)
+                        trajectory.append(messages)
+
+                    final_agent_state = None
+                    if retrieve_agent_state:
+                        final_agent_state = await self.client.agents.retrieve(
+                            agent_id=agent_id, include=["agent.blocks"]
+                        )
+
+                    return TargetResult(
+                        trajectory=trajectory,
+                        agent_id=agent_id,
+                        model_name=model_name,
+                        agent_usage=usage_stats,
+                        agent_state=final_agent_state,
+                    )
 
             except Exception as e:
                 last_error = e

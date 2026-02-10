@@ -3,7 +3,10 @@ import logging
 import re
 import sys
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Awaitable, Callable, List, Optional
+
+import anyio
+import httpx
 
 from letta_evals.constants import (
     MODEL_COSTS,
@@ -221,6 +224,226 @@ def calculate_cost_from_agent_usage(model_name: str, agent_usage: Optional[List[
             total_cost += calculate_cost(model_name, prompt_tokens, completion_tokens)
 
     return total_cost
+
+
+def _is_retryable_http_error(e: Exception) -> bool:
+    """Return True for transient httpx/network errors.
+
+    We intentionally keep this conservative (network/protocol + retriable HTTP statuses)
+    so we don't mask real logic/config errors.
+    """
+
+    if isinstance(e, httpx.HTTPStatusError):
+        status = e.response.status_code
+        return status >= 500 or status in (408, 429)
+
+    return isinstance(e, httpx.HTTPError)
+
+
+async def _retry_async(
+    fn: Callable[[], Awaitable[Any]],
+    *,
+    max_attempts: int,
+    backoff_base_s: float,
+    backoff_max_s: float,
+    description: str,
+) -> Any:
+    """Retry an async function on transient HTTP errors."""
+
+    attempt = 0
+    while True:
+        try:
+            return await fn()
+        except Exception as e:
+            attempt += 1
+            should_retry = _is_retryable_http_error(e)
+
+            if (not should_retry) or attempt >= max_attempts:
+                logger.error(f"{description} failed after {attempt} attempt(s): {type(e).__name__}: {e}")
+                raise
+
+            sleep_s = min(backoff_max_s, backoff_base_s * (2 ** (attempt - 1)))
+            logger.debug(
+                f"{description} failed (attempt {attempt}/{max_attempts}); "
+                f"retrying in {sleep_s:.2f}s: {type(e).__name__}: {e}"
+            )
+            await anyio.sleep(sleep_s)
+
+
+async def list_all_run_messages(
+    client: Any,
+    run_id: str,
+    *,
+    page_limit: int = 200,
+    max_attempts_per_page: int = 5,
+    backoff_base_s: float = 0.5,
+    backoff_max_s: float = 8.0,
+) -> List[Any]:
+    """List all messages for a run using pagination + retries.
+
+    This avoids a single huge `list(limit=1000)` response, which is more prone to
+    `RemoteProtocolError: incomplete chunked read` when message payloads are large.
+
+    Returns a flat list of messages in ascending created_at order.
+    """
+
+    messages: List[Any] = []
+    after: Optional[str] = None
+
+    # Loop until the API returns an empty page.
+    while True:
+
+        async def _list_page() -> Any:
+            kwargs = {"run_id": run_id, "limit": page_limit, "order": "asc"}
+            if after is not None:
+                kwargs["after"] = after
+            return await client.runs.messages.list(**kwargs)
+
+        page = await _retry_async(
+            _list_page,
+            max_attempts=max_attempts_per_page,
+            backoff_base_s=backoff_base_s,
+            backoff_max_s=backoff_max_s,
+            description=f"runs.messages.list(run_id={run_id}, after={after})",
+        )
+
+        items = getattr(page, "items", None) or []
+        if not items:
+            break
+
+        messages.extend(items)
+
+        last_id = getattr(items[-1], "id", None)
+        if not last_id or last_id == after:
+            # No usable cursor (or cursor didn't advance) — avoid infinite loop.
+            break
+        after = last_id
+
+    return messages
+
+
+async def list_all_agent_messages(
+    client: Any,
+    agent_id: str,
+    *,
+    page_limit: int = 200,
+    max_attempts_per_page: int = 5,
+    backoff_base_s: float = 0.5,
+    backoff_max_s: float = 8.0,
+) -> List[Any]:
+    """List all messages for an agent using pagination + retries."""
+
+    messages: List[Any] = []
+    after: Optional[str] = None
+
+    while True:
+
+        async def _list_page() -> Any:
+            kwargs = {"agent_id": agent_id, "limit": page_limit, "order": "asc"}
+            if after is not None:
+                kwargs["after"] = after
+            return await client.agents.messages.list(**kwargs)
+
+        page = await _retry_async(
+            _list_page,
+            max_attempts=max_attempts_per_page,
+            backoff_base_s=backoff_base_s,
+            backoff_max_s=backoff_max_s,
+            description=f"agents.messages.list(agent_id={agent_id}, after={after})",
+        )
+
+        items = getattr(page, "items", None) or []
+        if not items:
+            break
+
+        messages.extend(items)
+
+        last_id = getattr(items[-1], "id", None)
+        if not last_id or last_id == after:
+            break
+        after = last_id
+
+    return messages
+
+
+async def consume_stream_with_resumes(
+    stream_iter: Any,
+    *,
+    resume_stream: Callable[[str, int], Awaitable[Any]],
+    on_chunk: Optional[Callable[[Any], Awaitable[None]]] = None,
+    max_resumes: int = 5,
+    backoff_base_s: float = 0.5,
+    backoff_max_s: float = 8.0,
+    log: Optional[logging.Logger] = None,
+    description: str = "stream",
+) -> tuple[Optional[str], Optional[int]]:
+    """Consume an SSE stream, resuming from seq_id on transient disconnects.
+
+    This helper is used by both targets and graders.
+
+    Args:
+        stream_iter: The initial async iterator returned by `agents.messages.create(..., streaming=True)`
+        resume_stream: Function that returns a *new* stream iterator given (run_id, last_seq_id)
+        on_chunk: Optional per-chunk handler. Should raise RuntimeError for fatal stream-level errors.
+        max_resumes: Maximum number of resume attempts
+        backoff_base_s: Exponential backoff base
+        backoff_max_s: Maximum backoff sleep
+        log: Logger for debug messages (defaults to this module's logger)
+        description: Human-readable description for log messages
+
+    Returns:
+        (run_id, last_seq_id)
+    """
+
+    log = log or logger
+
+    run_id: Optional[str] = None
+    last_seq_id: Optional[int] = None
+
+    async def _consume(single_iter: Any) -> None:
+        nonlocal run_id, last_seq_id
+        async for chunk in single_iter:
+            rid = getattr(chunk, "run_id", None)
+            if rid:
+                run_id = rid
+            if hasattr(chunk, "seq_id"):
+                last_seq_id = getattr(chunk, "seq_id")
+
+            if on_chunk is not None:
+                await on_chunk(chunk)
+
+    resume_attempt = 0
+    current_iter = stream_iter
+    cancel_exc = anyio.get_cancelled_exc_class()
+
+    while True:
+        try:
+            await _consume(current_iter)
+            break
+        except cancel_exc:
+            raise
+        except RuntimeError:
+            raise
+        except Exception as stream_err:
+            # Only resume on transient network/protocol errors.
+            if not _is_retryable_http_error(stream_err):
+                raise
+            if not (run_id and last_seq_id is not None):
+                raise
+
+            resume_attempt += 1
+            if resume_attempt > max_resumes:
+                raise
+
+            backoff_s = min(backoff_max_s, backoff_base_s * (2 ** (resume_attempt - 1)))
+            log.debug(
+                f"{description} disconnected; resuming (attempt {resume_attempt}/{max_resumes}) "
+                f"from seq_id {last_seq_id}: {stream_err}"
+            )
+            await anyio.sleep(backoff_s)
+            current_iter = await resume_stream(run_id, last_seq_id)
+
+    return run_id, last_seq_id
 
 
 def is_per_turn_evaluation(sample: Sample) -> bool:

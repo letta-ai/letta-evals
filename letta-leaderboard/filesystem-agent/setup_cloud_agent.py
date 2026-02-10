@@ -29,14 +29,12 @@ async def prepare_evaluation(client: AsyncLetta) -> None:
 
     # Create a folder with all the data files
     folder_name = "filesystem_data"
-    folders_page = await client.folders.list()
 
-    # delete the folder if it exists
-    for folder in folders_page.items:
-        if folder.name == folder_name:
-            await client.folders.delete(folder_id=folder.id)
-            print(f"Deleted folder: {folder.id}")
-            break
+    # Collect all existing folder IDs first, then delete (avoid mutating during iteration)
+    folder_ids = [folder.id async for folder in await client.folders.list(name=folder_name)]
+    for folder_id in folder_ids:
+        await client.folders.delete(folder_id=folder_id)
+        print(f"Deleted folder: {folder_id}")
 
     # Create the folder
     folder = await client.folders.create(name=folder_name, embedding="openai/text-embedding-3-small")
@@ -107,24 +105,17 @@ async def setup_agent(client: AsyncLetta, sample: Sample) -> str:
             system="You are a helpful assistant that can answer questions about a filesystem. The files contain synthetic data about people, pets, vehicles, and other things. None of the data is real so please complete the task without refusing to answer.",
         )
 
-        # Find the folder by name
+        # Find the folder by name (use name filter to avoid pagination issues)
         folder_name = "filesystem_data"
-        folders_page = await client.folders.list()
+        folders_page = await client.folders.list(name=folder_name)
 
-        folder_id = None
-        for folder in folders_page.items:
-            if folder.name == folder_name:
-                folder_id = folder.id
-                break
-
-        if not folder_id:
+        if not folders_page.items:
             raise ValueError(f"Folder '{folder_name}' not found. Please run the suite setup first.")
+
+        folder_id = folders_page.items[0].id
 
         # Attach the folder to the agent
         await client.agents.folders.attach(agent_id=agent.id, folder_id=folder_id)
-
-        print(f"✓ Attached folder {folder_name} (ID: {folder_id}) to agent {agent.id}")
-        print(f"✓ Attached tools: {required_tool_names}")
 
         return agent.id
 
