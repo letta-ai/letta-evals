@@ -259,9 +259,7 @@ async def _retry_async(
             should_retry = _is_retryable_http_error(e)
 
             if (not should_retry) or attempt >= max_attempts:
-                logger.error(
-                    f"{description} failed after {attempt} attempt(s): {type(e).__name__}: {e}"
-                )
+                logger.error(f"{description} failed after {attempt} attempt(s): {type(e).__name__}: {e}")
                 raise
 
             sleep_s = min(backoff_max_s, backoff_base_s * (2 ** (attempt - 1)))
@@ -294,6 +292,7 @@ async def list_all_run_messages(
 
     # Loop until the API returns an empty page.
     while True:
+
         async def _list_page() -> Any:
             kwargs = {"run_id": run_id, "limit": page_limit, "order": "asc"}
             if after is not None:
@@ -338,6 +337,7 @@ async def list_all_agent_messages(
     after: Optional[str] = None
 
     while True:
+
         async def _list_page() -> Any:
             kwargs = {"agent_id": agent_id, "limit": page_limit, "order": "asc"}
             if after is not None:
