@@ -729,9 +729,11 @@ class Runner:
         error_summary = None
         if error_results:
             category_counts = Counter(r.error.category.value for r in error_results)
+            exception_type_counts = Counter(r.error.exception_type for r in error_results)
             error_summary = ErrorSummary(
                 total_errors=len(error_results),
                 by_category=dict(category_counts),
+                by_exception_type=dict(exception_type_counts),
                 failed_sample_ids=sorted(r.sample.id for r in error_results),
             )
 
@@ -883,9 +885,11 @@ class Runner:
                 model_error_summary = None
                 if model_error_results:
                     model_category_counts = Counter(r.error.category.value for r in model_error_results)
+                    model_exception_type_counts = Counter(r.error.exception_type for r in model_error_results)
                     model_error_summary = ErrorSummary(
                         total_errors=len(model_error_results),
                         by_category=dict(model_category_counts),
+                        by_exception_type=dict(model_exception_type_counts),
                         failed_sample_ids=sorted(r.sample.id for r in model_error_results),
                     )
 

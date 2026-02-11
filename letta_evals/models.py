@@ -508,6 +508,7 @@ class ErrorSummary(BaseModel):
 
     total_errors: int = Field(description="Total number of samples that errored")
     by_category: Dict[str, int] = Field(default_factory=dict, description="Error count by category")
+    by_exception_type: Dict[str, int] = Field(default_factory=dict, description="Error count by exception type")
     failed_sample_ids: List[int] = Field(default_factory=list, description="List of sample IDs that failed")
 
 
