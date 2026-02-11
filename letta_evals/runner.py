@@ -553,7 +553,7 @@ class Runner:
                 # Recover agent_id from TargetError if the target created an agent before failing
                 if isinstance(e, TargetError) and e.agent_id:
                     agent_id = e.agent_id
-                agent_str = f" (agent {agent_id})" if agent_id else ""
+                agent_str = f" ({agent_id})" if agent_id else ""
                 logger.error(f"Error running sample {sample_id + 1}{agent_str} with model {model_name}: {e}")
                 if isinstance(e, TargetError):
                     category = ErrorCategory.TARGET
