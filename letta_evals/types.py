@@ -52,3 +52,12 @@ class LLMProvider(str, Enum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     GOOGLE = "google"
+
+
+class ErrorCategory(str, Enum):
+    """Categories of errors that can occur during evaluation."""
+
+    TARGET = "target"  # Agent/target failed (timeout, API error, connection)
+    EXTRACTION = "extraction"  # Empty trajectory or empty submission
+    GRADING = "grading"  # Grader itself failed (LLM judge error, tool grader exception)
+    UNKNOWN = "unknown"  # Catch-all
