@@ -26,7 +26,16 @@ from letta_evals.models import (
 )
 from letta_evals.runner import Runner, run_suite
 from letta_evals.targets import AbstractAgentTarget, LettaAgentTarget
-from letta_evals.types import Aggregation, ErrorCategory, GateKind, GraderKind, LLMProvider, LogicalOp, MetricOp, TargetKind
+from letta_evals.types import (
+    Aggregation,
+    ErrorCategory,
+    GateKind,
+    GraderKind,
+    LLMProvider,
+    LogicalOp,
+    MetricOp,
+    TargetKind,
+)
 from letta_evals.visualization.factory import ProgressStyle, create_progress_callback
 
 try:

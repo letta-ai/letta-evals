@@ -16,7 +16,16 @@ from letta_client.types.agents import (
 )
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from letta_evals.types import Aggregation, ErrorCategory, GateKind, GraderKind, LLMProvider, LogicalOp, MetricOp, TargetKind
+from letta_evals.types import (
+    Aggregation,
+    ErrorCategory,
+    GateKind,
+    GraderKind,
+    LLMProvider,
+    LogicalOp,
+    MetricOp,
+    TargetKind,
+)
 
 # Type alias for message union (replaces LettaMessageUnion from v0.x SDK)
 LettaMessageUnion = Union[
@@ -526,9 +535,7 @@ class ModelMetrics(BaseModel):
     usage_metrics: Optional[UsageMetrics] = Field(
         default=None, description="token usage and cost metrics for this model"
     )
-    error_summary: Optional[ErrorSummary] = Field(
-        default=None, description="Breakdown of errors for this model"
-    )
+    error_summary: Optional[ErrorSummary] = Field(default=None, description="Breakdown of errors for this model")
 
 
 class MetricAggregate(BaseModel):
@@ -558,9 +565,7 @@ class Metrics(BaseModel):
     usage_metrics: Optional[UsageMetrics] = Field(
         default=None, description="token usage and cost metrics across all samples"
     )
-    error_summary: Optional[ErrorSummary] = Field(
-        default=None, description="Breakdown of errors across samples"
-    )
+    error_summary: Optional[ErrorSummary] = Field(default=None, description="Breakdown of errors across samples")
 
 
 class RunStatistics(BaseModel):

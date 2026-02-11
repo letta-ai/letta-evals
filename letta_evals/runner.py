@@ -480,7 +480,9 @@ class Runner:
                     or not submission
                     or (
                         grade_result.rationale
-                        and ("Empty trajectory" in grade_result.rationale or "Empty submission" in grade_result.rationale)
+                        and (
+                            "Empty trajectory" in grade_result.rationale or "Empty submission" in grade_result.rationale
+                        )
                     )
                 )
                 if is_extraction_error:
@@ -497,9 +499,7 @@ class Runner:
                 else:
                     # Detect grading errors from grader metadata
                     grading_errors = {
-                        k: gr.metadata["error"]
-                        for k, gr in grades_dict.items()
-                        if gr.metadata.get("error")
+                        k: gr.metadata["error"] for k, gr in grades_dict.items() if gr.metadata.get("error")
                     }
                     if grading_errors:
                         details = "; ".join(f"{k}: {v}" for k, v in grading_errors.items())
