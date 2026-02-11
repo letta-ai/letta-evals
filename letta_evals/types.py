@@ -51,3 +51,4 @@ class LogicalOp(str, Enum):
 class LLMProvider(str, Enum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
+    GOOGLE = "google"

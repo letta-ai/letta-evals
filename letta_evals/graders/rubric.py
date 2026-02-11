@@ -5,7 +5,10 @@ from typing import List, Optional, Tuple
 
 from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
+from google import genai
 from openai import AsyncOpenAI
+from pydantic import BaseModel as PydanticBaseModel
+from pydantic import Field as PydanticField
 
 from letta_evals.extractors import extractor_requires_agent_state, get_extractor
 from letta_evals.graders.base import Grader
@@ -14,6 +17,11 @@ from letta_evals.models import AgentState, GradeResult, LettaMessageUnion, Sampl
 from letta_evals.types import LLMProvider
 
 load_dotenv()
+
+
+class _GeminiJudgeResponse(PydanticBaseModel):
+    score: float = PydanticField(description="Score between 0.0 and 1.0")
+    rationale: str = PydanticField(description="Explanation of the grading decision")
 
 
 class RubricGrader(Grader):
@@ -74,6 +82,11 @@ class RubricGrader(Grader):
                 client_kwargs["base_url"] = base_url
 
             self.client = AsyncAnthropic(**client_kwargs)
+        elif provider == LLMProvider.GOOGLE:
+            api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY or GOOGLE_API_KEY not found in environment variables")
+            self.client = genai.Client(api_key=api_key)
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
@@ -145,6 +158,26 @@ class RubricGrader(Grader):
                     "cache_creation_input_tokens": getattr(response.usage, "cache_creation_input_tokens", 0),
                     "cache_read_input_tokens": getattr(response.usage, "cache_read_input_tokens", 0),
                 }
+            elif self.provider == LLMProvider.GOOGLE:
+                response = await self.client.aio.models.generate_content(
+                    model=self.model,
+                    contents=judge_prompt,
+                    config=genai.types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=_GeminiJudgeResponse,
+                        temperature=temperature,
+                        system_instruction=JUDGE_SYSTEM_PROMPT,
+                    ),
+                )
+                result_json = json.loads(response.text)
+                usage = None
+                if response.usage_metadata:
+                    usage = {
+                        "prompt_tokens": response.usage_metadata.prompt_token_count,
+                        "completion_tokens": response.usage_metadata.candidates_token_count,
+                        "total_tokens": response.usage_metadata.total_token_count,
+                        "cached_content_token_count": getattr(response.usage_metadata, "cached_content_token_count", 0),
+                    }
             else:
                 raise ValueError(f"Unsupported provider: {self.provider}")
 
