@@ -7,7 +7,7 @@ from letta_client import AsyncLetta
 from letta_client.types import LlmConfig, MessageCreateParam
 
 from letta_evals.models import Sample, TargetResult
-from letta_evals.targets.base import AbstractAgentTarget
+from letta_evals.targets.base import AbstractAgentTarget, TargetError
 from letta_evals.utils import consume_stream_with_resumes, list_all_run_messages, load_object
 from letta_evals.visualization.base import ProgressCallback
 
@@ -190,7 +190,9 @@ class LettaAgentTarget(AbstractAgentTarget):
                         f"Failed to run agent for sample {sample.id} after {self.max_retries} retries. "
                         f"Final error: {type(e).__name__}: {str(e)}"
                     )
-                    raise
+                    timeout_hint = f"Timed out after {self.timeout}s" if isinstance(e, TimeoutError) else ""
+                    msg = str(e) or timeout_hint or type(e).__name__
+                    raise TargetError(msg, agent_id=agent_id) from e
 
                 if agent_id_to_cleanup:
                     try:

@@ -7,6 +7,8 @@ from letta_evals.decorators import agent_factory, extractor, grader, suite_setup
 from letta_evals.graders import AgentJudgeGrader, Grader, RubricGrader, ToolGrader
 from letta_evals.models import (
     AgentState,
+    ErrorInfo,
+    ErrorSummary,
     GateSpec,
     GradeResult,
     GraderSpec,
@@ -24,7 +26,16 @@ from letta_evals.models import (
 )
 from letta_evals.runner import Runner, run_suite
 from letta_evals.targets import AbstractAgentTarget, LettaAgentTarget
-from letta_evals.types import Aggregation, GateKind, GraderKind, LLMProvider, LogicalOp, MetricOp, TargetKind
+from letta_evals.types import (
+    Aggregation,
+    ErrorCategory,
+    GateKind,
+    GraderKind,
+    LLMProvider,
+    LogicalOp,
+    MetricOp,
+    TargetKind,
+)
 from letta_evals.visualization.factory import ProgressStyle, create_progress_callback
 
 try:
@@ -34,6 +45,9 @@ except PackageNotFoundError:
 
 __all__ = [
     "AgentState",
+    "ErrorInfo",
+    "ErrorSummary",
+    "ErrorCategory",
     "LettaMessageUnion",
     "Sample",
     "SuiteSpec",

@@ -2,7 +2,8 @@ import inspect
 import json
 import logging
 import os
-from collections import defaultdict
+import traceback as tb
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -19,6 +20,8 @@ from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
 from letta_evals.models import (
     AgentState,
+    ErrorInfo,
+    ErrorSummary,
     GradeResult,
     LettaJudgeGraderSpec,
     LettaMessageUnion,
@@ -42,10 +45,10 @@ from letta_evals.models import (
     normalize_weights,
 )
 from letta_evals.streaming import StreamingReader, StreamingWriter
-from letta_evals.targets.base import AbstractAgentTarget
+from letta_evals.targets.base import AbstractAgentTarget, TargetError
 from letta_evals.targets.letta_agent import LettaAgentTarget
 from letta_evals.targets.letta_code_target import LettaCodeTarget
-from letta_evals.types import Aggregation, LogicalOp, TargetKind
+from letta_evals.types import Aggregation, ErrorCategory, LogicalOp, TargetKind
 from letta_evals.utils import (
     build_turn_summary,
     calculate_cost_from_agent_usage,
@@ -470,40 +473,43 @@ class Runner:
                 grade_result = grades_dict[first_key]
                 submission = submissions_dict[first_key]
 
-                # Check if graders detected empty trajectory/submission and trigger error callback
-                if (
-                    grade_result.score == 0.0
-                    and grade_result.rationale
-                    and ("Empty trajectory" in grade_result.rationale or "Empty submission" in grade_result.rationale)
-                ):
+                # Detect extraction errors (empty trajectory/submission)
+                error_info: Optional[ErrorInfo] = None
+                is_extraction_error = grade_result.score == 0.0 and (
+                    not trajectory
+                    or not submission
+                    or (
+                        grade_result.rationale
+                        and (
+                            "Empty trajectory" in grade_result.rationale or "Empty submission" in grade_result.rationale
+                        )
+                    )
+                )
+                if is_extraction_error:
+                    message = grade_result.rationale or "Empty trajectory or submission"
+                    error_info = ErrorInfo(
+                        category=ErrorCategory.EXTRACTION,
+                        exception_type="ExtractionError",
+                        message=message,
+                    )
                     if self.progress_callback:
                         await self.progress_callback.sample_error(
-                            sample_id, grade_result.rationale, agent_id=agent_id, model_name=model_name
+                            sample_id, message, agent_id=agent_id, model_name=model_name
                         )
-                    # Extract token counts even for error cases if agent_usage is available
-                    cost = calculate_cost_from_agent_usage(model_name, agent_usage) if model_name else None
-                    prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
-                        extract_token_counts(agent_usage)
-                    )
-                    return SampleResult(
-                        sample=sample,
-                        submission=submission,
-                        submissions=submissions_dict,
-                        trajectory=trajectory,
-                        agent_id=agent_id,
-                        grade=grade_result,
-                        grades=grades_dict,
-                        model_name=model_name,
-                        agent_usage=agent_usage,
-                        cost=cost,
-                        prompt_tokens=prompt_tokens if prompt_tokens > 0 else None,
-                        completion_tokens=completion_tokens if completion_tokens > 0 else None,
-                        cached_input_tokens=cached_input_tokens if cached_input_tokens > 0 else None,
-                        cache_write_tokens=cache_write_tokens if cache_write_tokens > 0 else None,
-                        reasoning_tokens=reasoning_tokens if reasoning_tokens > 0 else None,
-                    )
+                else:
+                    # Detect grading errors from grader metadata
+                    grading_errors = {
+                        k: gr.metadata["error"] for k, gr in grades_dict.items() if gr.metadata.get("error")
+                    }
+                    if grading_errors:
+                        details = "; ".join(f"{k}: {v}" for k, v in grading_errors.items())
+                        error_info = ErrorInfo(
+                            category=ErrorCategory.GRADING,
+                            exception_type="GradingError",
+                            message=f"Grading failed for: {details}",
+                        )
 
-                if self.progress_callback:
+                if error_info is None and self.progress_callback:
                     metric_scores = None
                     metric_rationales = None
                     if self.graders is not None and grades_dict is not None:
@@ -541,13 +547,48 @@ class Runner:
                     cached_input_tokens=cached_input_tokens if cached_input_tokens > 0 else None,
                     cache_write_tokens=cache_write_tokens if cache_write_tokens > 0 else None,
                     reasoning_tokens=reasoning_tokens if reasoning_tokens > 0 else None,
+                    error=error_info,
                 )
             except Exception as e:
+                # Recover agent_id from TargetError if the target created an agent before failing
+                if isinstance(e, TargetError) and e.agent_id:
+                    agent_id = e.agent_id
+                agent_str = f" ({agent_id})" if agent_id else ""
+                log_message = str(e) or type(e).__name__
+                logger.error(f"Error running sample {sample_id + 1}{agent_str} with model {model_name}: {log_message}")
+                if isinstance(e, TargetError):
+                    category = ErrorCategory.TARGET
+                elif agent_id:
+                    category = ErrorCategory.GRADING
+                else:
+                    category = ErrorCategory.UNKNOWN
+                cause = e.__cause__ if e.__cause__ else e
+                error_message = str(e) or type(cause).__name__
+                error_info = ErrorInfo(
+                    category=category,
+                    exception_type=type(cause).__name__,
+                    message=error_message,
+                    traceback=tb.format_exc(),
+                )
                 if self.progress_callback:
                     await self.progress_callback.sample_error(
-                        sample_id, str(e), agent_id=agent_id, model_name=model_name
+                        sample_id, error_message, agent_id=agent_id, model_name=model_name
                     )
-                raise
+                return SampleResult(
+                    sample=sample,
+                    submission="",
+                    submissions=None,
+                    trajectory=[],
+                    agent_id=agent_id,
+                    grade=GradeResult(score=0.0, rationale=f"Error: {error_message}"),
+                    grades=None,
+                    model_name=model_name,
+                    agent_usage=None,
+                    cost=None,
+                    prompt_tokens=None,
+                    completion_tokens=None,
+                    error=error_info,
+                )
 
     def _validate_rubric_vars(self, samples: List[Sample]) -> None:
         """Validate that all samples have required rubric_vars for configured graders."""
@@ -624,40 +665,10 @@ class Runner:
                     for sample in samples:
 
                         async def run_and_append(s, cfg):
-                            try:
-                                result = await self.run_sample(s, llm_config=cfg)
-                                self.results.append(result)
-                                if self.stream_writer:
-                                    await self.stream_writer.append_result(result)
-                            except Exception as e:
-                                # extract model name from either LlmConfig or string handle
-                                if isinstance(cfg, LlmConfig):
-                                    model_name = cfg.model
-                                elif isinstance(cfg, str):
-                                    model_name = cfg
-                                else:
-                                    model_name = None
-                                logger.error(f"Error running sample {s.id + 1} with model {model_name}: {e}")
-                                if self.progress_callback:
-                                    await self.progress_callback.sample_error(s.id, str(e), model_name=model_name)
-
-                                error_result = SampleResult(
-                                    sample=s,
-                                    submission="",
-                                    submissions=None,
-                                    trajectory=[],
-                                    agent_id=None,
-                                    grade=GradeResult(score=0.0, rationale=f"Error: {str(e)[:200]}"),
-                                    grades=None,
-                                    model_name=model_name,
-                                    agent_usage=None,
-                                    cost=None,
-                                    prompt_tokens=None,
-                                    completion_tokens=None,
-                                )
-                                self.results.append(error_result)
-                                if self.stream_writer:
-                                    await self.stream_writer.append_result(error_result)
+                            result = await self.run_sample(s, llm_config=cfg)
+                            self.results.append(result)
+                            if self.stream_writer:
+                                await self.stream_writer.append_result(result)
 
                         tg.start_soon(run_and_append, sample, llm_config)
 
@@ -701,16 +712,23 @@ class Runner:
                 metrics={},
             )
 
-        # success = completed without error; error results have empty trajectory, missing agent_id, or empty submission
         def is_success(r: SampleResult) -> bool:
-            if r.agent_id is None or not bool(r.trajectory):
-                return False
-            # Exclude empty submissions detected by graders after extraction
-            if r.grade and r.grade.rationale and "Empty submission" in r.grade.rationale:
-                return False
-            return True
+            return r.error is None
 
         attempted = sum(1 for r in self.results if is_success(r))
+
+        # Build error summary
+        error_results = [r for r in self.results if r.error is not None]
+        error_summary = None
+        if error_results:
+            category_counts = Counter(r.error.category.value for r in error_results)
+            exception_type_counts = Counter(r.error.exception_type for r in error_results)
+            error_summary = ErrorSummary(
+                total_errors=len(error_results),
+                by_category=dict(category_counts),
+                by_exception_type=dict(exception_type_counts),
+                failed_sample_ids=sorted(r.sample.id for r in error_results),
+            )
 
         # compute per-metric aggregates if multiple graders
         by_metric: Dict[str, MetricAggregate] = {}
@@ -855,6 +873,19 @@ class Runner:
                         total_reasoning_tokens=model_total_reasoning_tokens,
                     )
 
+                # Build per-model error summary
+                model_error_results = [r for r in results if r.error is not None]
+                model_error_summary = None
+                if model_error_results:
+                    model_category_counts = Counter(r.error.category.value for r in model_error_results)
+                    model_exception_type_counts = Counter(r.error.exception_type for r in model_error_results)
+                    model_error_summary = ErrorSummary(
+                        total_errors=len(model_error_results),
+                        by_category=dict(model_category_counts),
+                        by_exception_type=dict(model_exception_type_counts),
+                        failed_sample_ids=sorted(r.sample.id for r in model_error_results),
+                    )
+
                 per_model.append(
                     ModelMetrics(
                         model_name=model_name,
@@ -864,6 +895,7 @@ class Runner:
                         avg_score_total=model_avg_total,
                         metrics=model_metrics_dict,
                         usage_metrics=model_usage_metrics,
+                        error_summary=model_error_summary,
                     )
                 )
 
@@ -876,6 +908,7 @@ class Runner:
             by_metric=by_metric if by_metric else None,
             metrics=metrics_dict,
             usage_metrics=usage_metrics,
+            error_summary=error_summary,
         )
 
     def _compute_aggregation(

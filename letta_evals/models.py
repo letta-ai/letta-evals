@@ -16,7 +16,16 @@ from letta_client.types.agents import (
 )
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from letta_evals.types import Aggregation, GateKind, GraderKind, LLMProvider, LogicalOp, MetricOp, TargetKind
+from letta_evals.types import (
+    Aggregation,
+    ErrorCategory,
+    GateKind,
+    GraderKind,
+    LLMProvider,
+    LogicalOp,
+    MetricOp,
+    TargetKind,
+)
 
 # Type alias for message union (replaces LettaMessageUnion from v0.x SDK)
 LettaMessageUnion = Union[
@@ -494,6 +503,24 @@ class UsageMetrics(BaseModel):
     total_reasoning_tokens: int = Field(default=0, description="total number of reasoning/thinking tokens generated")
 
 
+class ErrorInfo(BaseModel):
+    """Structured error information for a failed sample."""
+
+    category: ErrorCategory = Field(description="Category of the error")
+    exception_type: str = Field(description="Python exception class name (e.g. 'TimeoutError', 'ConnectionError')")
+    message: str = Field(description="Full error message")
+    traceback: Optional[str] = Field(default=None, description="Full traceback string for debugging")
+
+
+class ErrorSummary(BaseModel):
+    """Summary of errors across an evaluation run."""
+
+    total_errors: int = Field(description="Total number of samples that errored")
+    by_category: Dict[str, int] = Field(default_factory=dict, description="Error count by category")
+    by_exception_type: Dict[str, int] = Field(default_factory=dict, description="Error count by exception type")
+    failed_sample_ids: List[int] = Field(default_factory=list, description="List of sample IDs that failed")
+
+
 class ModelMetrics(BaseModel):
     """metrics for a specific model configuration."""
 
@@ -508,6 +535,7 @@ class ModelMetrics(BaseModel):
     usage_metrics: Optional[UsageMetrics] = Field(
         default=None, description="token usage and cost metrics for this model"
     )
+    error_summary: Optional[ErrorSummary] = Field(default=None, description="Breakdown of errors for this model")
 
 
 class MetricAggregate(BaseModel):
@@ -537,6 +565,7 @@ class Metrics(BaseModel):
     usage_metrics: Optional[UsageMetrics] = Field(
         default=None, description="token usage and cost metrics across all samples"
     )
+    error_summary: Optional[ErrorSummary] = Field(default=None, description="Breakdown of errors across samples")
 
 
 class RunStatistics(BaseModel):
@@ -583,6 +612,7 @@ class SampleResult(BaseModel):
     reasoning_tokens: Optional[int] = Field(
         default=None, description="Total reasoning/thinking tokens generated for this sample"
     )
+    error: Optional[ErrorInfo] = Field(default=None, description="Structured error info if this sample failed")
 
 
 class RunnerResult(BaseModel):

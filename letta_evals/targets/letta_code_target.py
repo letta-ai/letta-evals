@@ -8,7 +8,7 @@ from typing import Optional
 from letta_client import AsyncLetta
 
 from letta_evals.models import Sample, TargetResult
-from letta_evals.targets.base import AbstractAgentTarget
+from letta_evals.targets.base import AbstractAgentTarget, TargetError
 from letta_evals.utils import list_all_agent_messages, load_object
 from letta_evals.visualization.base import ProgressCallback
 
@@ -225,7 +225,8 @@ class LettaCodeTarget(AbstractAgentTarget):
                         f"Failed to run letta command for sample {sample.id} after {self.max_retries} retries. "
                         f"Final error: {type(e).__name__}: {str(e)}"
                     )
-                    raise
+                    msg = str(e) or type(e).__name__
+                    raise TargetError(msg, agent_id=agent_id or factory_agent_id) from e
 
                 backoff_time = 2 ** (attempt - 1)
                 logger.warning(
