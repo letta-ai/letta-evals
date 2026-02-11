@@ -176,9 +176,7 @@ class RubricGrader(Grader):
                         "prompt_tokens": response.usage_metadata.prompt_token_count,
                         "completion_tokens": response.usage_metadata.candidates_token_count,
                         "total_tokens": response.usage_metadata.total_token_count,
-                        "cached_content_token_count": getattr(
-                            response.usage_metadata, "cached_content_token_count", 0
-                        ),
+                        "cached_content_token_count": getattr(response.usage_metadata, "cached_content_token_count", 0),
                     }
             else:
                 raise ValueError(f"Unsupported provider: {self.provider}")
