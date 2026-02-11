@@ -509,7 +509,6 @@ class ErrorInfo(BaseModel):
     category: ErrorCategory = Field(description="Category of the error")
     exception_type: str = Field(description="Python exception class name (e.g. 'TimeoutError', 'ConnectionError')")
     message: str = Field(description="Full error message")
-    traceback: Optional[str] = Field(default=None, description="Full traceback string for debugging")
 
 
 class ErrorSummary(BaseModel):
