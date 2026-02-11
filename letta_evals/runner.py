@@ -562,9 +562,14 @@ class Runner:
                     category = ErrorCategory.GRADING
                 else:
                     category = ErrorCategory.UNKNOWN
-                # Use the original exception type if wrapped in TargetError
+                # Build a descriptive error message
                 cause = e.__cause__ if e.__cause__ else e
-                error_message = str(e) or type(cause).__name__
+                if isinstance(e, TargetError):
+                    # TargetError already has a descriptive message from the target
+                    error_message = str(e)
+                else:
+                    detail = str(e) or type(e).__name__
+                    error_message = f"{type(e).__name__}: {detail}"
                 error_info = ErrorInfo(
                     category=category,
                     exception_type=type(cause).__name__,
