@@ -554,7 +554,8 @@ class Runner:
                 if isinstance(e, TargetError) and e.agent_id:
                     agent_id = e.agent_id
                 agent_str = f" ({agent_id})" if agent_id else ""
-                logger.error(f"Error running sample {sample_id + 1}{agent_str} with model {model_name}: {e}")
+                log_message = str(e) or type(e).__name__
+                logger.error(f"Error running sample {sample_id + 1}{agent_str} with model {model_name}: {log_message}")
                 if isinstance(e, TargetError):
                     category = ErrorCategory.TARGET
                 elif agent_id:
@@ -563,15 +564,16 @@ class Runner:
                     category = ErrorCategory.UNKNOWN
                 # Use the original exception type if wrapped in TargetError
                 cause = e.__cause__ if e.__cause__ else e
+                error_message = str(e) or type(cause).__name__
                 error_info = ErrorInfo(
                     category=category,
                     exception_type=type(cause).__name__,
-                    message=str(e),
+                    message=error_message,
                     traceback=tb.format_exc(),
                 )
                 if self.progress_callback:
                     await self.progress_callback.sample_error(
-                        sample_id, str(e), agent_id=agent_id, model_name=model_name
+                        sample_id, error_message, agent_id=agent_id, model_name=model_name
                     )
                 return SampleResult(
                     sample=sample,
@@ -579,7 +581,7 @@ class Runner:
                     submissions=None,
                     trajectory=[],
                     agent_id=agent_id,
-                    grade=GradeResult(score=0.0, rationale=f"Error: {str(e)}"),
+                    grade=GradeResult(score=0.0, rationale=f"Error: {error_message}"),
                     grades=None,
                     model_name=model_name,
                     agent_usage=None,
