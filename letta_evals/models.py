@@ -175,7 +175,7 @@ class ModelJudgeGraderSpec(BaseGraderSpec):
     kind: Literal[GraderKind.MODEL_JUDGE] = GraderKind.MODEL_JUDGE
     prompt: Optional[str] = Field(default=None, description="Prompt for model judge")
     prompt_path: Optional[Path] = Field(default=None, description="Path to file containing prompt")
-    model: str = Field(default="gpt-4o-mini", description="LLM model to use for model judge")
+    model: str = Field(default="gpt-4o-mini", description="LLM model to use for model judge (e.g., gpt-4o-mini for OpenAI, claude-haiku-4-5-20251001 for Anthropic, gemini-3-flash-preview for Google)")
     temperature: float = Field(default=0.0, description="Temperature for model judge")
     provider: LLMProvider = Field(default=LLMProvider.OPENAI, description="LLM provider for model judge")
     max_retries: int = Field(default=5, description="Maximum number of retries for model judge")

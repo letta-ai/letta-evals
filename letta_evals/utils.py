@@ -95,6 +95,10 @@ def normalize_model_name(model_name: str) -> str:
         prefixed = f"openai/{model_name}"
         if prefixed in MODEL_COSTS:
             return prefixed
+    elif model_name.startswith("gemini"):
+        prefixed = f"google_ai/{model_name}"
+        if prefixed in MODEL_COSTS:
+            return prefixed
 
     # Strip effort-level suffix (e.g. "gpt-5.2-high" -> "gpt-5.2") and retry
     stripped = _EFFORT_PATTERN.sub("", model_name)
