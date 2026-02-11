@@ -562,14 +562,8 @@ class Runner:
                     category = ErrorCategory.GRADING
                 else:
                     category = ErrorCategory.UNKNOWN
-                # Build a descriptive error message
                 cause = e.__cause__ if e.__cause__ else e
-                if isinstance(e, TargetError):
-                    # TargetError already has a descriptive message from the target
-                    error_message = str(e)
-                else:
-                    detail = f": {e}" if str(e) else ""
-                    error_message = f"{type(e).__name__}{detail}"
+                error_message = str(e) or type(cause).__name__
                 error_info = ErrorInfo(
                     category=category,
                     exception_type=type(cause).__name__,
