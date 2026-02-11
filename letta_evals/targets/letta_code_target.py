@@ -198,13 +198,6 @@ class LettaCodeTarget(AbstractAgentTarget):
                         f"Letta command failed with return code {process.returncode}. Stderr: {stderr_text[:500]}"
                     )
 
-                # Extract agent_id from events if not already captured from init
-                if not agent_id:
-                    for event in events:
-                        if event.get("agent_id"):
-                            agent_id = event["agent_id"]
-                            break
-
                 if not agent_id:
                     raise RuntimeError("No agent_id found in letta stream output")
 
@@ -216,20 +209,19 @@ class LettaCodeTarget(AbstractAgentTarget):
                 # wrap messages in a single turn
                 trajectory = [messages] if messages else []
 
-                # Extract usage from the result event.
-                # stream-json emits a final result event with the same structure as json output.
+                # Extract usage from the final result event.
+                # stream-json always emits the result event last.
                 usage_stats = []
-                for event in events:
-                    if event.get("type") == "result" and "usage" in event:
-                        usage_stats.append(
-                            {
-                                "message_type": "usage_statistics",
-                                "prompt_tokens": event["usage"].get("prompt_tokens", 0),
-                                "completion_tokens": event["usage"].get("completion_tokens", 0),
-                                "total_tokens": event["usage"].get("total_tokens", 0),
-                            }
-                        )
-                        break
+                if events and events[-1].get("type") == "result" and "usage" in events[-1]:
+                    usage = events[-1]["usage"]
+                    usage_stats.append(
+                        {
+                            "message_type": "usage_statistics",
+                            "prompt_tokens": usage.get("prompt_tokens", 0),
+                            "completion_tokens": usage.get("completion_tokens", 0),
+                            "total_tokens": usage.get("total_tokens", 0),
+                        }
+                    )
 
                 # Retrieve agent state if needed (e.g., for memory block extractors)
                 agent_state = None
