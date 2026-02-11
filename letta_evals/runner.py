@@ -2,7 +2,6 @@ import inspect
 import json
 import logging
 import os
-import traceback as tb
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -568,7 +567,6 @@ class Runner:
                     category=category,
                     exception_type=type(cause).__name__,
                     message=error_message,
-                    traceback=tb.format_exc(),
                 )
                 if self.progress_callback:
                     await self.progress_callback.sample_error(
