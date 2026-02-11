@@ -165,11 +165,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                         try:
                             event = json.loads(line)
                             events.append(event)
-                            if (
-                                event.get("type") == "system"
-                                and event.get("subtype") == "init"
-                                and not agent_id
-                            ):
+                            if event.get("type") == "system" and event.get("subtype") == "init" and not agent_id:
                                 agent_id = event.get("agent_id")
                                 logger.info(f"Captured agent_id {agent_id} from stream init event")
                         except json.JSONDecodeError:
