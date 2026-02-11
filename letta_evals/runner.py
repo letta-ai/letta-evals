@@ -45,7 +45,7 @@ from letta_evals.models import (
     normalize_weights,
 )
 from letta_evals.streaming import StreamingReader, StreamingWriter
-from letta_evals.targets.base import AbstractAgentTarget
+from letta_evals.targets.base import AbstractAgentTarget, TargetError
 from letta_evals.targets.letta_agent import LettaAgentTarget
 from letta_evals.targets.letta_code_target import LettaCodeTarget
 from letta_evals.types import Aggregation, ErrorCategory, LogicalOp, TargetKind
@@ -560,12 +560,20 @@ class Runner:
                     error=error_info,
                 )
             except Exception as e:
+                # Recover agent_id from TargetError if the target created an agent before failing
+                if isinstance(e, TargetError) and e.agent_id:
+                    agent_id = e.agent_id
                 logger.error(f"Error running sample {sample_id + 1} with model {model_name}: {e}")
-                # If we already have a trajectory, the error likely occurred during grading
-                category = ErrorCategory.GRADING if agent_id else _categorize_exception(e)
+                if isinstance(e, TargetError):
+                    category = ErrorCategory.TARGET
+                else:
+                    # If we already have a trajectory, the error likely occurred during grading
+                    category = ErrorCategory.GRADING if agent_id else _categorize_exception(e)
+                # Use the original exception type if wrapped in TargetError
+                cause = e.__cause__ if e.__cause__ else e
                 error_info = ErrorInfo(
                     category=category,
-                    exception_type=type(e).__name__,
+                    exception_type=type(cause).__name__,
                     message=str(e),
                     traceback=tb.format_exc(),
                 )
