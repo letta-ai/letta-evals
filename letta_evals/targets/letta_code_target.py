@@ -85,6 +85,8 @@ class LettaCodeTarget(AbstractAgentTarget):
 
         while attempt <= self.max_retries:
             try:
+                agent_id = None
+
                 # handle single or multiple inputs
                 inputs = sample.input if isinstance(sample.input, list) else [sample.input]
 
@@ -102,13 +104,12 @@ class LettaCodeTarget(AbstractAgentTarget):
                     factory_agent_id = await agent_factory_func(self.client, sample)
                     logger.info(f"Created agent {factory_agent_id} via agent_factory for sample {sample.id}")
 
-                # construct the letta-code CLI command (headless JSON output)
-                # NOTE: letta-code CLI flags have changed over time; keep to stable, documented flags.
+                # construct the letta-code CLI command (headless streaming JSON output).
                 cmd = [
                     "letta",
                     "--yolo",
                     "--output-format",
-                    "json",
+                    "stream-json",
                     "--model",
                     self.model_handle,
                 ]
@@ -130,9 +131,6 @@ class LettaCodeTarget(AbstractAgentTarget):
 
                 cmd.extend(["-p", prompt])
 
-                # NOTE: older versions of letta-code supported --allowedTools/--disallowedTools.
-                # The current CLI (0.6.x) does not expose these flags; we intentionally do not pass them.
-
                 logger.info(f"Running letta command for sample {sample.id}")
 
                 # Prepare environment variables for the subprocess
@@ -141,6 +139,10 @@ class LettaCodeTarget(AbstractAgentTarget):
                 if self.base_url:
                     env["LETTA_BASE_URL"] = self.base_url
                     logger.info(f"Setting LETTA_BASE_URL={self.base_url} for letta CLI")
+
+                agent_id = factory_agent_id
+                events = []
+                stderr_chunks = []
 
                 # run the letta command
                 process = await asyncio.create_subprocess_exec(
@@ -151,16 +153,43 @@ class LettaCodeTarget(AbstractAgentTarget):
                     env=env,
                 )
 
-                # wait for completion
+                # Read streaming JSON output line by line, capturing agent_id
+                # from the init event as soon as it arrives. This ensures we
+                # have the agent_id even if the process later times out.
+                async def _read_stdout():
+                    nonlocal agent_id
+                    async for raw_line in process.stdout:
+                        line = raw_line.decode().strip()
+                        if not line:
+                            continue
+                        try:
+                            event = json.loads(line)
+                            events.append(event)
+                            if (
+                                event.get("type") == "system"
+                                and event.get("subtype") == "init"
+                                and not agent_id
+                            ):
+                                agent_id = event.get("agent_id")
+                                logger.info(f"Captured agent_id {agent_id} from stream init event")
+                        except json.JSONDecodeError:
+                            logger.warning(f"Non-JSON stream output: {line[:200]}")
+
+                async def _read_stderr():
+                    async for raw_line in process.stderr:
+                        stderr_chunks.append(raw_line.decode())
+
                 try:
-                    stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=self.timeout)
+                    await asyncio.wait_for(
+                        asyncio.gather(_read_stdout(), _read_stderr(), process.wait()),
+                        timeout=self.timeout,
+                    )
                 except asyncio.TimeoutError:
                     process.kill()
                     await process.wait()
                     raise RuntimeError(f"Letta command timed out after {self.timeout} seconds")
 
-                stdout_text = stdout.decode() if stdout else ""
-                stderr_text = stderr.decode() if stderr else ""
+                stderr_text = "".join(stderr_chunks)
 
                 if process.returncode != 0:
                     logger.error(f"Letta command failed with return code {process.returncode}")
@@ -169,17 +198,15 @@ class LettaCodeTarget(AbstractAgentTarget):
                         f"Letta command failed with return code {process.returncode}. Stderr: {stderr_text[:500]}"
                     )
 
-                # parse the json output
-                try:
-                    result = json.loads(stdout_text)
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse JSON output: {stdout_text[:500]}")
-                    raise RuntimeError(f"Failed to parse JSON output from letta command: {e}")
-
-                # extract agent_id and other metadata
-                agent_id = result.get("agent_id")
+                # Extract agent_id from events if not already captured from init
                 if not agent_id:
-                    raise RuntimeError(f"No agent_id found in letta output: {result}")
+                    for event in events:
+                        if event.get("agent_id"):
+                            agent_id = event["agent_id"]
+                            break
+
+                if not agent_id:
+                    raise RuntimeError("No agent_id found in letta stream output")
 
                 # retrieve the full message history using the agent_id
                 logger.info(f"Retrieving messages for agent {agent_id}")
@@ -189,19 +216,20 @@ class LettaCodeTarget(AbstractAgentTarget):
                 # wrap messages in a single turn
                 trajectory = [messages] if messages else []
 
-                # CLI returns {prompt_tokens, completion_tokens, total_tokens}.
-                # Wrap in the same format as LettaAgentTarget so
-                # extract_token_counts() can process them uniformly.
+                # Extract usage from the result event.
+                # stream-json emits a final result event with the same structure as json output.
                 usage_stats = []
-                if "usage" in result:
-                    usage_stats.append(
-                        {
-                            "message_type": "usage_statistics",
-                            "prompt_tokens": result["usage"].get("prompt_tokens", 0),
-                            "completion_tokens": result["usage"].get("completion_tokens", 0),
-                            "total_tokens": result["usage"].get("total_tokens", 0),
-                        }
-                    )
+                for event in events:
+                    if event.get("type") == "result" and "usage" in event:
+                        usage_stats.append(
+                            {
+                                "message_type": "usage_statistics",
+                                "prompt_tokens": event["usage"].get("prompt_tokens", 0),
+                                "completion_tokens": event["usage"].get("completion_tokens", 0),
+                                "total_tokens": event["usage"].get("total_tokens", 0),
+                            }
+                        )
+                        break
 
                 # Retrieve agent state if needed (e.g., for memory block extractors)
                 agent_state = None
@@ -223,6 +251,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                 if attempt > self.max_retries:
                     logger.error(
                         f"Failed to run letta command for sample {sample.id} after {self.max_retries} retries. "
+                        f"Agent: {agent_id or factory_agent_id or 'unknown'}. "
                         f"Final error: {type(e).__name__}: {str(e)}"
                     )
                     msg = str(e) or type(e).__name__
