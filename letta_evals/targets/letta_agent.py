@@ -190,7 +190,10 @@ class LettaAgentTarget(AbstractAgentTarget):
                         f"Failed to run agent for sample {sample.id} after {self.max_retries} retries. "
                         f"Final error: {type(e).__name__}: {str(e)}"
                     )
-                    raise TargetError(str(e), agent_id=agent_id) from e
+                    detail = str(e) or type(e).__name__
+                    timeout_hint = f" (timeout={self.timeout}s)" if isinstance(e, TimeoutError) else ""
+                    msg = f"Sample {sample.id}: {type(e).__name__}: {detail}{timeout_hint}"
+                    raise TargetError(msg, agent_id=agent_id) from e
 
                 if agent_id_to_cleanup:
                     try:
