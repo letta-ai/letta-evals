@@ -62,16 +62,6 @@ from letta_evals.visualization.factory import ProgressStyle, create_progress_cal
 logger = logging.getLogger(__name__)
 
 
-def _categorize_exception(e: Exception) -> ErrorCategory:
-    """Categorize an exception into an ErrorCategory."""
-    if isinstance(e, (TimeoutError, ConnectionError, OSError)):
-        return ErrorCategory.TARGET
-    exc_name = type(e).__name__.lower()
-    if any(kw in exc_name for kw in ("timeout", "connection", "api", "http", "request")):
-        return ErrorCategory.TARGET
-    return ErrorCategory.UNKNOWN
-
-
 class Runner:
     """Main evaluation runner."""
 
@@ -563,12 +553,14 @@ class Runner:
                 # Recover agent_id from TargetError if the target created an agent before failing
                 if isinstance(e, TargetError) and e.agent_id:
                     agent_id = e.agent_id
-                logger.error(f"Error running sample {sample_id + 1} with model {model_name}: {e}")
+                agent_str = f" (agent {agent_id})" if agent_id else ""
+                logger.error(f"Error running sample {sample_id + 1}{agent_str} with model {model_name}: {e}")
                 if isinstance(e, TargetError):
                     category = ErrorCategory.TARGET
+                elif agent_id:
+                    category = ErrorCategory.GRADING
                 else:
-                    # If we already have a trajectory, the error likely occurred during grading
-                    category = ErrorCategory.GRADING if agent_id else _categorize_exception(e)
+                    category = ErrorCategory.UNKNOWN
                 # Use the original exception type if wrapped in TargetError
                 cause = e.__cause__ if e.__cause__ else e
                 error_info = ErrorInfo(
