@@ -225,8 +225,8 @@ class LettaCodeTarget(AbstractAgentTarget):
                         f"Failed to run letta command for sample {sample.id} after {self.max_retries} retries. "
                         f"Final error: {type(e).__name__}: {str(e)}"
                     )
-                    detail = str(e) or type(e).__name__
-                    msg = f"Sample {sample.id}: {type(e).__name__}: {detail}"
+                    detail = f": {e}" if str(e) else ""
+                    msg = f"Sample {sample.id}: {type(e).__name__}{detail}"
                     raise TargetError(msg, agent_id=agent_id or factory_agent_id) from e
 
                 backoff_time = 2 ** (attempt - 1)

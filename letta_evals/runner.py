@@ -568,8 +568,8 @@ class Runner:
                     # TargetError already has a descriptive message from the target
                     error_message = str(e)
                 else:
-                    detail = str(e) or type(e).__name__
-                    error_message = f"{type(e).__name__}: {detail}"
+                    detail = f": {e}" if str(e) else ""
+                    error_message = f"{type(e).__name__}{detail}"
                 error_info = ErrorInfo(
                     category=category,
                     exception_type=type(cause).__name__,
