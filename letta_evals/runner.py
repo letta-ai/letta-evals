@@ -732,7 +732,7 @@ class Runner:
             model_results[result.model_name].append(result)
 
         output: List[ModelMetrics] = []
-        for model_name, results in sorted(model_results.items(), key=lambda x: (x[0] or "")):
+        for model_name, results in sorted(model_results.items(), key=lambda x: x[0] or ""):
             attempted = sum(1 for r in results if r.error is None)
 
             # Per-metric aggregates
