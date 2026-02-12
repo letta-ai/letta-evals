@@ -466,10 +466,9 @@ class Runner:
                         grades_dict[key] = gr
                         submissions_dict[key] = sub
 
-                # Detect extraction errors (empty trajectory/submission)
-                first_key = next(iter(grades_dict.keys()))
-                first_grade = grades_dict[first_key]
-                first_submission = submissions_dict.get(first_key, "")
+                # Detect extraction errors using first grader's result as a proxy
+                first_grade = next(iter(grades_dict.values()))
+                first_submission = next(iter(submissions_dict.values()), "")
                 error_info: Optional[ErrorInfo] = None
                 is_extraction_error = first_grade.score == 0.0 and (
                     not trajectory
