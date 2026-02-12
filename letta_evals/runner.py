@@ -482,7 +482,7 @@ class Runner:
                     )
                 )
                 if is_extraction_error:
-                    message = grade_result.rationale or "Empty trajectory or submission"
+                    message = first_grade.rationale or "Empty trajectory or submission"
                     error_info = ErrorInfo(
                         category=ErrorCategory.EXTRACTION,
                         exception_type="ExtractionError",
