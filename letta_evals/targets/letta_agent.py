@@ -6,7 +6,7 @@ import anyio
 from letta_client import AsyncLetta
 from letta_client.types import LlmConfig, MessageCreateParam
 
-from letta_evals.models import Sample, TargetResult
+from letta_evals.models import Sample, TargetResult, TurnTokenData
 from letta_evals.targets.base import AbstractAgentTarget, TargetError
 from letta_evals.utils import consume_stream_with_resumes, list_all_run_messages, load_object
 from letta_evals.visualization.base import ProgressCallback
@@ -45,6 +45,7 @@ class LettaAgentTarget(AbstractAgentTarget):
         progress_callback: Optional[ProgressCallback] = None,
         project_id: Optional[str] = None,
         retrieve_agent_state: bool = False,
+        return_token_data: bool = False,
     ) -> TargetResult:
         """Run the agent on a sample."""
         attempt = 0
@@ -167,6 +168,11 @@ class LettaAgentTarget(AbstractAgentTarget):
                         messages = await list_all_run_messages(self.client, run_id)
                         trajectory.append(messages)
 
+                    # Fetch token-level data if requested (for RL training)
+                    token_data: Optional[list[TurnTokenData]] = None
+                    if return_token_data and run_id:
+                        token_data = await self._fetch_token_data([run_id])
+
                     final_agent_state = None
                     if retrieve_agent_state:
                         final_agent_state = await self.client.agents.retrieve(
@@ -179,6 +185,7 @@ class LettaAgentTarget(AbstractAgentTarget):
                         model_name=model_name,
                         agent_usage=usage_stats,
                         agent_state=final_agent_state,
+                        token_data=token_data,
                     )
 
             except Exception as e:
@@ -211,3 +218,32 @@ class LettaAgentTarget(AbstractAgentTarget):
                 await anyio.sleep(backoff_time)
 
         raise last_error or RuntimeError("Unexpected failure in agent run retry loop")
+
+    async def _fetch_token_data(self, run_ids: list[str]) -> list[TurnTokenData]:
+        """Fetch token-level data (IDs + logprobs) from the runs API.
+
+        For each run, re-fetches messages with ``return_token_ids=True`` to
+        obtain ``output_ids`` and ``output_token_logprobs`` per message.
+        """
+        token_data: list[TurnTokenData] = []
+        for run_id in run_ids:
+            try:
+                messages = await list_all_run_messages(
+                    self.client,
+                    run_id,
+                    params={"return_token_ids": "true"},
+                )
+                for msg in messages:
+                    output_ids = getattr(msg, "output_ids", None)
+                    output_token_logprobs = getattr(msg, "output_token_logprobs", None)
+                    if output_ids:
+                        token_data.append(
+                            TurnTokenData(
+                                role=getattr(msg, "role", "assistant"),
+                                output_ids=output_ids,
+                                output_token_logprobs=output_token_logprobs,
+                            )
+                        )
+            except Exception as e:
+                logger.warning(f"Could not fetch token data for run {run_id}: {e}")
+        return token_data

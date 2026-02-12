@@ -7,7 +7,7 @@ from typing import Optional
 
 from letta_client import AsyncLetta
 
-from letta_evals.models import Sample, TargetResult
+from letta_evals.models import Sample, TargetResult, TurnTokenData
 from letta_evals.targets.base import AbstractAgentTarget, TargetError
 from letta_evals.utils import list_all_agent_messages, load_object
 from letta_evals.visualization.base import ProgressCallback
@@ -78,6 +78,7 @@ class LettaCodeTarget(AbstractAgentTarget):
         progress_callback: Optional[ProgressCallback] = None,
         project_id: Optional[str] = None,
         retrieve_agent_state: bool = False,
+        return_token_data: bool = False,
     ) -> TargetResult:
         """Run the letta CLI command on a sample."""
         attempt = 0
@@ -222,6 +223,11 @@ class LettaCodeTarget(AbstractAgentTarget):
                         }
                     )
 
+                # Fetch token-level data if requested (for RL training)
+                token_data: Optional[list[TurnTokenData]] = None
+                if return_token_data and agent_id:
+                    token_data = await self._fetch_token_data(agent_id)
+
                 # Retrieve agent state if needed (e.g., for memory block extractors)
                 agent_state = None
                 if retrieve_agent_state:
@@ -233,6 +239,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                     model_name=self.model_handle,
                     agent_usage=usage_stats if usage_stats else None,
                     agent_state=agent_state,
+                    token_data=token_data,
                 )
 
             except Exception as e:
@@ -256,3 +263,43 @@ class LettaCodeTarget(AbstractAgentTarget):
                 await asyncio.sleep(backoff_time)
 
         raise last_error or RuntimeError("Unexpected failure in letta command retry loop")
+
+    async def _fetch_token_data(self, agent_id: str) -> list[TurnTokenData]:
+        """Fetch token-level data (IDs + logprobs) for a letta code agent.
+
+        Retrieves messages with ``return_token_ids=True`` to get
+        ``output_ids`` and ``output_token_logprobs`` per message.
+        """
+        token_data: list[TurnTokenData] = []
+        try:
+            # Try to get run IDs for this agent
+            run_ids: list[str] = []
+            try:
+                runs_page = await self.client.agents.runs.list(agent_id=agent_id)
+                if runs_page.items:
+                    run_ids = [runs_page.items[0].id]
+            except Exception as e:
+                logger.warning(f"Could not fetch run IDs for agent {agent_id}: {e}")
+
+            if run_ids:
+                from letta_evals.utils import list_all_run_messages
+
+                messages = await list_all_run_messages(
+                    self.client,
+                    run_ids[0],
+                    params={"return_token_ids": "true"},
+                )
+                for msg in messages:
+                    output_ids = getattr(msg, "output_ids", None)
+                    output_token_logprobs = getattr(msg, "output_token_logprobs", None)
+                    if output_ids:
+                        token_data.append(
+                            TurnTokenData(
+                                role=getattr(msg, "role", "assistant"),
+                                output_ids=output_ids,
+                                output_token_logprobs=output_token_logprobs,
+                            )
+                        )
+        except Exception as e:
+            logger.warning(f"Could not fetch token data for agent {agent_id}: {e}")
+        return token_data
