@@ -466,9 +466,25 @@ class Runner:
                         grades_dict[key] = gr
                         submissions_dict[key] = sub
 
-                # Detect extraction errors directly from trajectory/submissions
+                # Detect extraction errors: graders return score=0 with a sentinel
+                # rationale rather than raising, so we check for those signals here.
                 error_info: Optional[ErrorInfo] = None
-                is_extraction_error = not trajectory or not any(submissions_dict.values())
+                first_grade = next(iter(grades_dict.values()), None)
+                is_extraction_error = (
+                    first_grade is not None
+                    and first_grade.score == 0.0
+                    and (
+                        not trajectory
+                        or not any(submissions_dict.values())
+                        or (
+                            first_grade.rationale
+                            and (
+                                "Empty trajectory" in first_grade.rationale
+                                or "Empty submission" in first_grade.rationale
+                            )
+                        )
+                    )
+                )
                 if is_extraction_error:
                     message = "Empty trajectory or submission"
                     error_info = ErrorInfo(
@@ -496,7 +512,6 @@ class Runner:
                 if error_info is None and self.progress_callback:
                     metric_scores = {k: v.score for k, v in grades_dict.items()}
                     metric_rationales = {k: (v.rationale or "") for k, v in grades_dict.items()}
-                    first_grade = next(iter(grades_dict.values()), None)
                     await self.progress_callback.sample_completed(
                         sample_id,
                         agent_id=agent_id,
