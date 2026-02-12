@@ -466,11 +466,23 @@ class Runner:
                         grades_dict[key] = gr
                         submissions_dict[key] = sub
 
-                # Detect extraction errors directly from trajectory/submissions
+                # Detect extraction errors using first grader's result as a proxy
+                first_grade = next(iter(grades_dict.values()))
+                first_submission = next(iter(submissions_dict.values()), "")
                 error_info: Optional[ErrorInfo] = None
-                is_extraction_error = not trajectory or not any(submissions_dict.values())
+                is_extraction_error = first_grade.score == 0.0 and (
+                    not trajectory
+                    or not first_submission
+                    or (
+                        first_grade.rationale
+                        and (
+                            "Empty trajectory" in first_grade.rationale
+                            or "Empty submission" in first_grade.rationale
+                        )
+                    )
+                )
                 if is_extraction_error:
-                    message = "Empty trajectory or submission"
+                    message = grade_result.rationale or "Empty trajectory or submission"
                     error_info = ErrorInfo(
                         category=ErrorCategory.EXTRACTION,
                         exception_type="ExtractionError",
@@ -496,14 +508,13 @@ class Runner:
                 if error_info is None and self.progress_callback:
                     metric_scores = {k: v.score for k, v in grades_dict.items()}
                     metric_rationales = {k: (v.rationale or "") for k, v in grades_dict.items()}
-                    first_grade = next(iter(grades_dict.values()), None)
                     await self.progress_callback.sample_completed(
                         sample_id,
                         agent_id=agent_id,
-                        score=first_grade.score if first_grade else None,
+                        score=first_grade.score,
                         model_name=model_name,
                         metric_scores=metric_scores,
-                        rationale=first_grade.rationale if first_grade else None,
+                        rationale=first_grade.rationale,
                         metric_rationales=metric_rationales,
                     )
 
