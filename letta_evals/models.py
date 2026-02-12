@@ -491,11 +491,10 @@ class GradeResult(BaseModel):
 
 
 class UsageMetrics(BaseModel):
-    """Token usage and cost metrics."""
+    """Token usage metrics."""
 
     total_prompt_tokens: int = Field(default=0, description="total number of prompt tokens")
     total_completion_tokens: int = Field(default=0, description="total number of completion tokens")
-    total_cost: Optional[float] = Field(default=None, description="total cost in dollars")
     total_cached_input_tokens: int = Field(
         default=0, description="total number of cached input tokens served from cache"
     )
@@ -526,9 +525,10 @@ class ModelMetrics(BaseModel):
     model_name: str = Field(description="model configuration name")
     total: int = Field(description="total results (success + error)")
     total_attempted: int = Field(description="total successfully attempted (completed without error)")
-    by_metric: Dict[str, "MetricAggregate"] = Field(description="per-metric aggregates for this model")
+    eval_metrics: Dict[str, "MetricAggregate"] = Field(description="per-metric aggregates for this model")
+    total_cost: Optional[float] = Field(default=None, description="total cost in dollars for this model")
     usage_metrics: Optional[UsageMetrics] = Field(
-        default=None, description="token usage and cost metrics for this model"
+        default=None, description="token usage metrics for this model"
     )
     error_summary: Optional[ErrorSummary] = Field(default=None, description="Breakdown of errors for this model")
 
@@ -547,11 +547,13 @@ class RunStatistics(BaseModel):
 
     num_runs: int = Field(description="Total number of runs executed")
     runs_passed: int = Field(description="Number of runs that passed the gate")
-    mean_scores: Dict[str, float] = Field(
-        default_factory=dict, description="Mean score for each metric across all runs"
+    mean_scores_by_model: Dict[str, Dict[str, float]] = Field(
+        default_factory=dict,
+        description="Mean score for each metric across runs, grouped by model",
     )
-    std_scores: Dict[str, float] = Field(
-        default_factory=dict, description="Standard deviation for each metric across all runs"
+    std_scores_by_model: Dict[str, Dict[str, float]] = Field(
+        default_factory=dict,
+        description="Standard deviation for each metric across runs, grouped by model",
     )
     runs: List[List[ModelMetrics]] = Field(description="Model metrics from each individual run")
 

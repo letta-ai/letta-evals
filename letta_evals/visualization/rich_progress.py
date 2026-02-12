@@ -817,7 +817,7 @@ class EvalProgress(ProgressCallback):
             model_table.add_column("Attempted", style="white")
 
             # add a column per metric
-            metric_keys = list(model_metrics[0].by_metric.keys()) if model_metrics else []
+            metric_keys = list(model_metrics[0].eval_metrics.keys()) if model_metrics else []
             for mk in metric_keys:
                 lbl = label_map.get(mk, mk)
                 model_table.add_column(f"{lbl} (attempted)", style="white")
@@ -826,7 +826,7 @@ class EvalProgress(ProgressCallback):
             for m in model_metrics:
                 row = [m.model_name, str(m.total), str(m.total_attempted)]
                 for mk in metric_keys:
-                    agg = m.by_metric.get(mk)
+                    agg = m.eval_metrics.get(mk)
                     row.append(f"{agg.avg_score_attempted:.2f}" if agg else "-")
                     row.append(f"{agg.avg_score_total:.2f}" if agg else "-")
                 model_table.add_row(*row)
@@ -834,7 +834,7 @@ class EvalProgress(ProgressCallback):
             self.console.print(model_table)
 
             # per-model usage metrics
-            has_usage_data = any(m.usage_metrics for m in model_metrics)
+            has_usage_data = any(m.usage_metrics or m.total_cost is not None for m in model_metrics)
             if has_usage_data:
                 self.console.print("\n[bold]Per-Model Usage:[/bold]")
                 usage_table = Table()
@@ -847,16 +847,16 @@ class EvalProgress(ProgressCallback):
                 usage_table.add_column("Reasoning", style="dim white")
 
                 for m in model_metrics:
-                    if m.usage_metrics:
+                    if m.usage_metrics or m.total_cost is not None:
                         u = m.usage_metrics
                         usage_table.add_row(
                             m.model_name,
-                            f"{u.total_prompt_tokens:,}",
-                            f"{u.total_completion_tokens:,}",
-                            f"${u.total_cost:.4f}" if u.total_cost is not None else "-",
-                            f"{u.total_cached_input_tokens:,}" if u.total_cached_input_tokens > 0 else "-",
-                            f"{u.total_cache_write_tokens:,}" if u.total_cache_write_tokens > 0 else "-",
-                            f"{u.total_reasoning_tokens:,}" if u.total_reasoning_tokens > 0 else "-",
+                            f"{u.total_prompt_tokens:,}" if u and u.total_prompt_tokens > 0 else "-",
+                            f"{u.total_completion_tokens:,}" if u and u.total_completion_tokens > 0 else "-",
+                            f"${m.total_cost:.4f}" if m.total_cost is not None else "-",
+                            f"{u.total_cached_input_tokens:,}" if u and u.total_cached_input_tokens > 0 else "-",
+                            f"{u.total_cache_write_tokens:,}" if u and u.total_cache_write_tokens > 0 else "-",
+                            f"{u.total_reasoning_tokens:,}" if u and u.total_reasoning_tokens > 0 else "-",
                         )
 
                 self.console.print(usage_table)

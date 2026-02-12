@@ -283,17 +283,21 @@ def display_aggregate_statistics(run_statistics):
     pass_rate = (stats.runs_passed / stats.num_runs * 100.0) if stats.num_runs > 0 else 0.0
     console.print(f"  Pass rate: {pass_rate:.1f}%")
 
-    if stats.mean_scores:
-        console.print("\n[bold]Per-Metric Statistics:[/bold]")
+    if stats.mean_scores_by_model:
+        console.print("\n[bold]Per-Model Per-Metric Statistics:[/bold]")
         table = Table()
-        table.add_column("Metric", style="cyan")
+        table.add_column("Model", style="cyan")
+        table.add_column("Metric", style="white")
         table.add_column("Mean Score", style="white")
         table.add_column("Std Dev", style="white")
 
-        for metric_key in stats.mean_scores.keys():
-            mean = stats.mean_scores[metric_key]
-            std = stats.std_scores.get(metric_key, 0.0)
-            table.add_row(metric_key, f"{mean:.4f}", f"{std:.4f}")
+        for model_name in sorted(stats.mean_scores_by_model.keys()):
+            mean_scores = stats.mean_scores_by_model[model_name]
+            std_scores = stats.std_scores_by_model.get(model_name, {})
+            for metric_key in sorted(mean_scores.keys()):
+                mean = mean_scores[metric_key]
+                std = std_scores.get(metric_key, 0.0)
+                table.add_row(model_name, metric_key, f"{mean:.4f}", f"{std:.4f}")
 
         console.print(table)
 
