@@ -26,7 +26,6 @@ from letta_evals.models import (
     LettaMessageUnion,
     LogicalGateSpec,
     MetricAggregate,
-    Metrics,
     ModelJudgeGraderSpec,
     ModelMetrics,
     PerTurnGrade,
@@ -467,25 +466,20 @@ class Runner:
                         grades_dict[key] = gr
                         submissions_dict[key] = sub
 
-                # use first grader as primary for legacy grade_result/submission
-                first_key = next(iter(grades_dict.keys()))
-                grade_result = grades_dict[first_key]
-                submission = submissions_dict[first_key]
-
-                # Detect extraction errors (empty trajectory/submission)
+                # Detect extraction errors using first grader's result as a proxy
+                first_grade = next(iter(grades_dict.values()))
+                first_submission = next(iter(submissions_dict.values()), "")
                 error_info: Optional[ErrorInfo] = None
-                is_extraction_error = grade_result.score == 0.0 and (
+                is_extraction_error = first_grade.score == 0.0 and (
                     not trajectory
-                    or not submission
+                    or not first_submission
                     or (
-                        grade_result.rationale
-                        and (
-                            "Empty trajectory" in grade_result.rationale or "Empty submission" in grade_result.rationale
-                        )
+                        first_grade.rationale
+                        and ("Empty trajectory" in first_grade.rationale or "Empty submission" in first_grade.rationale)
                     )
                 )
                 if is_extraction_error:
-                    message = grade_result.rationale or "Empty trajectory or submission"
+                    message = first_grade.rationale or "Empty trajectory or submission"
                     error_info = ErrorInfo(
                         category=ErrorCategory.EXTRACTION,
                         exception_type="ExtractionError",
@@ -509,18 +503,15 @@ class Runner:
                         )
 
                 if error_info is None and self.progress_callback:
-                    metric_scores = None
-                    metric_rationales = None
-                    if self.graders is not None and grades_dict is not None:
-                        metric_scores = {k: v.score for k, v in grades_dict.items()}
-                        metric_rationales = {k: (v.rationale or "") for k, v in grades_dict.items()}
+                    metric_scores = {k: v.score for k, v in grades_dict.items()}
+                    metric_rationales = {k: (v.rationale or "") for k, v in grades_dict.items()}
                     await self.progress_callback.sample_completed(
                         sample_id,
                         agent_id=agent_id,
-                        score=grade_result.score,
+                        score=first_grade.score,
                         model_name=model_name,
                         metric_scores=metric_scores,
-                        rationale=grade_result.rationale,
+                        rationale=first_grade.rationale,
                         metric_rationales=metric_rationales,
                     )
 
@@ -532,11 +523,9 @@ class Runner:
 
                 return SampleResult(
                     sample=sample,
-                    submission=submission,
                     submissions=submissions_dict,
                     trajectory=trajectory,
                     agent_id=agent_id,
-                    grade=grade_result,
                     grades=grades_dict,
                     model_name=model_name,
                     agent_usage=agent_usage,
@@ -574,12 +563,10 @@ class Runner:
                     )
                 return SampleResult(
                     sample=sample,
-                    submission="",
-                    submissions=None,
+                    submissions={},
                     trajectory=[],
                     agent_id=agent_id,
-                    grade=GradeResult(score=0.0, rationale=f"Error: {error_message}"),
-                    grades=None,
+                    grades={},
                     model_name=model_name,
                     agent_usage=None,
                     cost=None,
@@ -670,244 +657,118 @@ class Runner:
 
                         tg.start_soon(run_and_append, sample, llm_config)
 
-            metrics = self._calculate_metrics()
-            gates_passed = self._check_gates(metrics)
+            model_metrics = self._calculate_model_metrics()
+            gates_passed = self._check_gates()
 
             # write final metrics if streaming
             if self.stream_writer:
-                await self.stream_writer.write_metrics(metrics, gates_passed)
+                await self.stream_writer.write_metrics(model_metrics, gates_passed)
 
             return RunnerResult(
-                suite=self.suite.name, config=config, results=self.results, metrics=metrics, gates_passed=gates_passed
+                suite=self.suite.name,
+                config=config,
+                results=self.results,
+                model_metrics=model_metrics,
+                gates_passed=gates_passed,
             )
         except BaseException:
             # On interruption or errors, write a best-effort summary for a valid JSONL
             try:
-                metrics = self._calculate_metrics()
-                gates_passed = self._check_gates(metrics)
+                model_metrics = self._calculate_model_metrics()
+                gates_passed = self._check_gates()
                 if self.stream_writer:
-                    await self.stream_writer.write_metrics(metrics, gates_passed)
+                    await self.stream_writer.write_metrics(model_metrics, gates_passed)
             finally:
                 # Re-raise to preserve original error/interrupt semantics
                 raise
 
-    def _calculate_metrics(self) -> Metrics:
-        """Calculate aggregate metrics from results.
+    @staticmethod
+    def _aggregate_usage_metrics(results: List[SampleResult]) -> Optional[UsageMetrics]:
+        """Aggregate token usage from a list of results. Returns None if no token data."""
+        prompt_tokens = sum(r.prompt_tokens for r in results if r.prompt_tokens is not None)
+        completion_tokens = sum(r.completion_tokens for r in results if r.completion_tokens is not None)
+        cached_input_tokens = sum(r.cached_input_tokens for r in results if r.cached_input_tokens is not None)
+        cache_write_tokens = sum(r.cache_write_tokens for r in results if r.cache_write_tokens is not None)
+        reasoning_tokens = sum(r.reasoning_tokens for r in results if r.reasoning_tokens is not None)
 
-        - total: success + error (all results)
-        - total_attempted: success only (completed without error)
-        - metrics: dict of metric_key -> pass rate percentage
-        - avg_score: mean across all results (including error results)
-        - per_model: same semantics per model (based on gate metric key)
-        """
-        total = len(self.results)
-        if total == 0:
-            return Metrics(
-                total=0,
-                total_attempted=0,
-                avg_score_attempted=0.0,
-                avg_score_total=0.0,
-                metrics={},
+        if (
+            prompt_tokens > 0
+            or completion_tokens > 0
+            or cached_input_tokens > 0
+            or cache_write_tokens > 0
+            or reasoning_tokens > 0
+        ):
+            return UsageMetrics(
+                total_prompt_tokens=prompt_tokens,
+                total_completion_tokens=completion_tokens,
+                total_cached_input_tokens=cached_input_tokens,
+                total_cache_write_tokens=cache_write_tokens,
+                total_reasoning_tokens=reasoning_tokens,
             )
+        return None
 
-        def is_success(r: SampleResult) -> bool:
-            return r.error is None
+    @staticmethod
+    def _aggregate_total_cost(results: List[SampleResult]) -> Optional[float]:
+        """Aggregate cost from a list of results. Returns None if no cost data."""
+        costs = [r.cost for r in results if r.cost is not None]
+        if not costs:
+            return None
+        total_cost = sum(costs)
+        return total_cost if total_cost > 0 else None
 
-        attempted = sum(1 for r in self.results if is_success(r))
-
-        # Build error summary
-        error_results = [r for r in self.results if r.error is not None]
-        error_summary = None
-        if error_results:
-            category_counts = Counter(r.error.category.value for r in error_results)
-            exception_type_counts = Counter(r.error.exception_type for r in error_results)
-            error_summary = ErrorSummary(
-                total_errors=len(error_results),
-                by_category=dict(category_counts),
-                by_exception_type=dict(exception_type_counts),
-                failed_sample_ids=sorted(r.sample.id for r in error_results),
-            )
-
-        # compute per-metric aggregates if multiple graders
-        by_metric: Dict[str, MetricAggregate] = {}
-        if self.graders is not None:
-            for metric_key in self.graders.keys():
-                m_scores = [r.grades[metric_key].score for r in self.results if r.grades and metric_key in r.grades]
-                m_avg_attempted = sum(m_scores) / len(m_scores) if m_scores else 0.0
-                m_avg_total = sum(m_scores) / len(self.results) if m_scores else 0.0
-                # pass_rate is just avg score as percentage
-                m_pass_rate = m_avg_attempted * 100.0
-                by_metric[metric_key] = MetricAggregate(
-                    avg_score_attempted=m_avg_attempted,
-                    avg_score_total=m_avg_total,
-                    pass_rate=m_pass_rate,
-                )
-
-        metrics_dict: Dict[str, float] = {}
-        if self.graders is not None:
-            # use first grader for overall metrics
-            first_key = next(iter(self.graders.keys()))
-            for key, agg in by_metric.items():
-                metrics_dict[key] = agg.pass_rate
-
-            agg = by_metric.get(first_key) if first_key in by_metric else None
-            avg_score_attempted = agg.avg_score_attempted if agg else 0.0
-            avg_score_total = agg.avg_score_total if agg else 0.0
-        else:
-            scores = [r.grade.score for r in self.results]
-            avg_score_attempted = sum(scores) / len(scores) if scores else 0.0
-            avg_score_total = sum(scores) / len(self.results) if scores else 0.0
-            # for single grader case, use a default key
-            default_key = "default"
-            metrics_dict[default_key] = avg_score_attempted * 100.0
-
-        # Calculate overall cost and token aggregates
-        costs = [r.cost for r in self.results if r.cost is not None]
-        total_cost = sum(costs) if costs else None
-
-        prompt_tokens_list = [r.prompt_tokens for r in self.results if r.prompt_tokens is not None]
-        total_prompt_tokens = sum(prompt_tokens_list) if prompt_tokens_list else 0
-
-        completion_tokens_list = [r.completion_tokens for r in self.results if r.completion_tokens is not None]
-        total_completion_tokens = sum(completion_tokens_list) if completion_tokens_list else 0
-
-        cached_input_tokens_list = [r.cached_input_tokens for r in self.results if r.cached_input_tokens is not None]
-        total_cached_input_tokens = sum(cached_input_tokens_list) if cached_input_tokens_list else 0
-
-        cache_write_tokens_list = [r.cache_write_tokens for r in self.results if r.cache_write_tokens is not None]
-        total_cache_write_tokens = sum(cache_write_tokens_list) if cache_write_tokens_list else 0
-
-        reasoning_tokens_list = [r.reasoning_tokens for r in self.results if r.reasoning_tokens is not None]
-        total_reasoning_tokens = sum(reasoning_tokens_list) if reasoning_tokens_list else 0
-
-        # Create UsageMetrics if we have any token or cost data
-        usage_metrics = None
-        if total_prompt_tokens > 0 or total_completion_tokens > 0 or (total_cost is not None and total_cost > 0):
-            usage_metrics = UsageMetrics(
-                total_prompt_tokens=total_prompt_tokens,
-                total_completion_tokens=total_completion_tokens,
-                total_cost=total_cost if total_cost and total_cost > 0 else None,
-                total_cached_input_tokens=total_cached_input_tokens,
-                total_cache_write_tokens=total_cache_write_tokens,
-                total_reasoning_tokens=total_reasoning_tokens,
-            )
-
-        per_model = None
-        if self.suite.target.model_configs or self.suite.target.model_handles:
-            model_results = defaultdict(list)
-            for result in self.results:
-                model_results[result.model_name].append(result)
-
-            per_model = []
-            for model_name, results in sorted(model_results.items()):
-                model_attempted = sum(1 for r in results if is_success(r))
-                model_metrics_dict: Dict[str, float] = {}
-
-                if self.graders is not None:
-                    # use first grader for overall model metrics
-                    first_key = next(iter(self.graders.keys()))
-                    # calculate avg score for each metric
-                    for metric_key in self.graders.keys():
-                        metric_scores = [
-                            r.grades[metric_key].score
-                            for r in results
-                            if is_success(r) and r.grades and metric_key in r.grades
-                        ]
-                        model_metrics_dict[metric_key] = (
-                            (sum(metric_scores) / len(metric_scores)) * 100.0 if metric_scores else 0.0
-                        )
-
-                    model_scores = [r.grades[first_key].score for r in results if r.grades and first_key in r.grades]
-                else:
-                    model_scores = [r.grade.score for r in results]
-                    default_key = "default"
-                    model_metrics_dict[default_key] = (
-                        (sum(model_scores) / len(model_scores)) * 100.0 if model_scores else 0.0
-                    )
-
-                model_avg_attempted = sum(model_scores) / len(model_scores) if model_scores else 0.0
-                model_avg_total = sum(model_scores) / len(results) if model_scores else 0.0
-
-                # Calculate cost and token counts for this model
-                model_costs = [r.cost for r in results if r.cost is not None]
-                model_total_cost = sum(model_costs) if model_costs else None
-
-                model_prompt_tokens_list = [r.prompt_tokens for r in results if r.prompt_tokens is not None]
-                model_total_prompt_tokens = sum(model_prompt_tokens_list) if model_prompt_tokens_list else 0
-
-                model_completion_tokens_list = [r.completion_tokens for r in results if r.completion_tokens is not None]
-                model_total_completion_tokens = sum(model_completion_tokens_list) if model_completion_tokens_list else 0
-
-                model_cached_input_tokens_list = [
-                    r.cached_input_tokens for r in results if r.cached_input_tokens is not None
-                ]
-                model_total_cached_input_tokens = (
-                    sum(model_cached_input_tokens_list) if model_cached_input_tokens_list else 0
-                )
-
-                model_cache_write_tokens_list = [
-                    r.cache_write_tokens for r in results if r.cache_write_tokens is not None
-                ]
-                model_total_cache_write_tokens = (
-                    sum(model_cache_write_tokens_list) if model_cache_write_tokens_list else 0
-                )
-
-                model_reasoning_tokens_list = [r.reasoning_tokens for r in results if r.reasoning_tokens is not None]
-                model_total_reasoning_tokens = sum(model_reasoning_tokens_list) if model_reasoning_tokens_list else 0
-
-                # Create UsageMetrics for this model if we have any token or cost data
-                model_usage_metrics = None
-                if (
-                    model_total_prompt_tokens > 0
-                    or model_total_completion_tokens > 0
-                    or (model_total_cost is not None and model_total_cost > 0)
-                ):
-                    model_usage_metrics = UsageMetrics(
-                        total_prompt_tokens=model_total_prompt_tokens,
-                        total_completion_tokens=model_total_completion_tokens,
-                        total_cost=model_total_cost if model_total_cost and model_total_cost > 0 else None,
-                        total_cached_input_tokens=model_total_cached_input_tokens,
-                        total_cache_write_tokens=model_total_cache_write_tokens,
-                        total_reasoning_tokens=model_total_reasoning_tokens,
-                    )
-
-                # Build per-model error summary
-                model_error_results = [r for r in results if r.error is not None]
-                model_error_summary = None
-                if model_error_results:
-                    model_category_counts = Counter(r.error.category.value for r in model_error_results)
-                    model_exception_type_counts = Counter(r.error.exception_type for r in model_error_results)
-                    model_error_summary = ErrorSummary(
-                        total_errors=len(model_error_results),
-                        by_category=dict(model_category_counts),
-                        by_exception_type=dict(model_exception_type_counts),
-                        failed_sample_ids=sorted(r.sample.id for r in model_error_results),
-                    )
-
-                per_model.append(
-                    ModelMetrics(
-                        model_name=model_name,
-                        total=len(results),
-                        total_attempted=model_attempted,
-                        avg_score_attempted=model_avg_attempted,
-                        avg_score_total=model_avg_total,
-                        metrics=model_metrics_dict,
-                        usage_metrics=model_usage_metrics,
-                        error_summary=model_error_summary,
-                    )
-                )
-
-        return Metrics(
-            total=total,
-            total_attempted=attempted,
-            avg_score_attempted=avg_score_attempted,
-            avg_score_total=avg_score_total,
-            per_model=per_model,
-            by_metric=by_metric if by_metric else None,
-            metrics=metrics_dict,
-            usage_metrics=usage_metrics,
-            error_summary=error_summary,
+    @staticmethod
+    def _build_error_summary(results: List[SampleResult]) -> Optional[ErrorSummary]:
+        """Build an ErrorSummary from a list of results. Returns None if no errors."""
+        error_results = [r for r in results if r.error is not None]
+        if not error_results:
+            return None
+        return ErrorSummary(
+            total_errors=len(error_results),
+            by_category=dict(Counter(r.error.category.value for r in error_results)),
+            by_exception_type=dict(Counter(r.error.exception_type for r in error_results)),
+            failed_sample_ids=sorted(r.sample.id for r in error_results),
         )
+
+    def _calculate_model_metrics(self) -> List[ModelMetrics]:
+        """Calculate per-model metrics from results.
+
+        Groups results by model, computes per-metric aggregates, usage, and error summaries.
+        Returns one ModelMetrics per model (or a single entry when running a single model).
+        """
+        if not self.results:
+            return []
+
+        model_results: Dict[Optional[str], List[SampleResult]] = defaultdict(list)
+        for result in self.results:
+            model_results[result.model_name].append(result)
+
+        output: List[ModelMetrics] = []
+        for model_name, results in sorted(model_results.items(), key=lambda x: x[0] or ""):
+            attempted = sum(1 for r in results if r.error is None)
+
+            # Per-metric aggregates
+            eval_metrics: Dict[str, MetricAggregate] = {}
+            if self.graders:
+                for metric_key in self.graders.keys():
+                    scores = [r.grades[metric_key].score for r in results if metric_key in r.grades]
+                    eval_metrics[metric_key] = MetricAggregate(
+                        avg_score_attempted=sum(scores) / len(scores) if scores else 0.0,
+                        avg_score_total=sum(scores) / len(results) if scores else 0.0,
+                    )
+
+            output.append(
+                ModelMetrics(
+                    model_name=model_name or "default",
+                    total=len(results),
+                    total_attempted=attempted,
+                    eval_metrics=eval_metrics,
+                    total_cost=self._aggregate_total_cost(results),
+                    usage_metrics=self._aggregate_usage_metrics(results),
+                    error_summary=self._build_error_summary(results),
+                )
+            )
+
+        return output
 
     def _compute_aggregation(
         self, metric_key: str, aggregation: Aggregation, pass_threshold: Optional[float] = None
@@ -966,7 +827,7 @@ class Runner:
         else:
             raise ValueError(f"unknown logical operator: {gate.operator}")
 
-    def _check_gates(self, metrics: Metrics) -> bool:
+    def _check_gates(self) -> bool:
         """check if the configured gate passes."""
         gate = self.suite.gate
 
@@ -998,46 +859,79 @@ class Runner:
             raise ValueError(f"unknown gate type: {type(gate)}")
 
 
-def _calculate_run_statistics(all_metrics: List[Metrics], runs_passed: int, suite: SuiteSpec) -> RunStatistics:
+def _calculate_run_statistics(
+    all_run_model_metrics: List[List[ModelMetrics]], runs_passed: int, suite: SuiteSpec
+) -> RunStatistics:
     """Calculate aggregate statistics across multiple runs."""
     import statistics
 
-    num_runs = len(all_metrics)
-
-    avg_scores_attempted = [m.avg_score_attempted for m in all_metrics]
-    avg_scores_total = [m.avg_score_total for m in all_metrics]
-
-    mean_avg_score_attempted = statistics.mean(avg_scores_attempted)
-    std_avg_score_attempted = statistics.stdev(avg_scores_attempted) if num_runs > 1 else 0.0
-
-    mean_avg_score_total = statistics.mean(avg_scores_total)
-    std_avg_score_total = statistics.stdev(avg_scores_total) if num_runs > 1 else 0.0
-
-    mean_scores: Dict[str, float] = {}
-    std_scores: Dict[str, float] = {}
+    num_runs = len(all_run_model_metrics)
+    mean_scores_by_model: Dict[str, Dict[str, float]] = {}
+    std_scores_by_model: Dict[str, Dict[str, float]] = {}
 
     if suite.graders:
-        for metric_key in suite.graders.keys():
-            metric_values = []
-            for m in all_metrics:
-                if m.by_metric and metric_key in m.by_metric:
-                    metric_values.append(m.by_metric[metric_key].avg_score_attempted)
+        values_by_model: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
+        for run_metrics in all_run_model_metrics:
+            for model_metric in run_metrics:
+                for metric_key in suite.graders.keys():
+                    aggregate = model_metric.eval_metrics.get(metric_key)
+                    if aggregate is not None:
+                        values_by_model[model_metric.model_name][metric_key].append(aggregate.avg_score_attempted)
 
-            if metric_values:
-                mean_scores[metric_key] = statistics.mean(metric_values)
-                std_scores[metric_key] = statistics.stdev(metric_values) if len(metric_values) > 1 else 0.0
+        for model_name in sorted(values_by_model.keys()):
+            model_means: Dict[str, float] = {}
+            model_stds: Dict[str, float] = {}
+            for metric_key, metric_values in values_by_model[model_name].items():
+                if not metric_values:
+                    continue
+                model_means[metric_key] = statistics.mean(metric_values)
+                model_stds[metric_key] = statistics.stdev(metric_values) if len(metric_values) > 1 else 0.0
+            if model_means:
+                mean_scores_by_model[model_name] = model_means
+                std_scores_by_model[model_name] = model_stds
 
     return RunStatistics(
         num_runs=num_runs,
         runs_passed=runs_passed,
-        mean_avg_score_attempted=mean_avg_score_attempted,
-        std_avg_score_attempted=std_avg_score_attempted,
-        mean_avg_score_total=mean_avg_score_total,
-        std_avg_score_total=std_avg_score_total,
-        mean_scores=mean_scores,
-        std_scores=std_scores,
-        individual_run_metrics=all_metrics,
+        mean_scores_by_model=mean_scores_by_model,
+        std_scores_by_model=std_scores_by_model,
+        runs=all_run_model_metrics,
     )
+
+
+def _build_aggregate_model_metrics(runs: List[List[ModelMetrics]]) -> Dict[str, Dict[str, Any]]:
+    """Build aggregate per-model metrics for aggregate_stats.json."""
+    import statistics
+
+    cost_values_by_model: Dict[str, List[float]] = defaultdict(list)
+    per_metric_values_by_model: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
+
+    for run_metrics in runs:
+        for model_metric in run_metrics:
+            if model_metric.total_cost is not None:
+                cost_values_by_model[model_metric.model_name].append(model_metric.total_cost)
+
+            for metric_key, aggregate in model_metric.eval_metrics.items():
+                per_metric_values_by_model[model_metric.model_name][metric_key].append(aggregate.avg_score_attempted)
+
+    model_metrics: Dict[str, Dict[str, Any]] = {}
+    model_names = sorted(set(cost_values_by_model.keys()) | set(per_metric_values_by_model.keys()))
+    for model_name in model_names:
+        model_costs = cost_values_by_model.get(model_name, [])
+        per_metric_aggregates: Dict[str, Dict[str, float]] = {}
+        for metric_key, metric_values in per_metric_values_by_model.get(model_name, {}).items():
+            if not metric_values:
+                continue
+            per_metric_aggregates[metric_key] = {
+                "mean_score": statistics.mean(metric_values),
+                "stddev_score": statistics.stdev(metric_values) if len(metric_values) > 1 else 0.0,
+            }
+        model_metrics[model_name] = {
+            "mean_cost": statistics.mean(model_costs) if model_costs else None,
+            "eval_metrics": per_metric_aggregates,
+        }
+
+    return model_metrics
 
 
 async def _write_aggregate_statistics(output_path: Path, run_statistics: RunStatistics) -> None:
@@ -1046,8 +940,13 @@ async def _write_aggregate_statistics(output_path: Path, run_statistics: RunStat
     output_path.mkdir(parents=True, exist_ok=True)
 
     def _write() -> None:
+        aggregate_payload = {
+            "num_runs": run_statistics.num_runs,
+            "runs_passed": run_statistics.runs_passed,
+            "model_metrics": _build_aggregate_model_metrics(run_statistics.runs),
+        }
         with open(stats_file, "w", encoding="utf-8") as f:
-            json.dump(json.loads(run_statistics.model_dump_json()), f, indent=2)
+            json.dump(aggregate_payload, f, indent=2)
 
     await anyio.to_thread.run_sync(_write)
 
@@ -1138,7 +1037,7 @@ async def run_suite(
 
     if actual_num_runs > 1:
         all_run_results: List[RunnerResult] = []
-        all_metrics: List[Metrics] = []
+        all_run_model_metrics: List[List[ModelMetrics]] = []
         runs_passed = 0
 
         for run_idx in range(actual_num_runs):
@@ -1166,20 +1065,20 @@ async def run_suite(
             try:
                 result = await runner.run()
                 all_run_results.append(result)
-                all_metrics.append(result.metrics)
+                all_run_model_metrics.append(result.model_metrics)
                 if result.gates_passed:
                     runs_passed += 1
             finally:
                 if progress_cb is not None and run_idx == actual_num_runs - 1:
                     # stop live display first, then show summary
                     progress_cb.stop()
-                    run_statistics = _calculate_run_statistics(all_metrics, runs_passed, suite)
+                    run_statistics = _calculate_run_statistics(all_run_model_metrics, runs_passed, suite)
                     final_result_temp = all_run_results[-1]
                     final_result_temp.run_statistics = run_statistics
                     final_result_temp.gates_passed = runs_passed > 0
                     await progress_cb.suite_completed(final_result_temp)
 
-        run_statistics = _calculate_run_statistics(all_metrics, runs_passed, suite)
+        run_statistics = _calculate_run_statistics(all_run_model_metrics, runs_passed, suite)
 
         if output_path:
             await _write_aggregate_statistics(output_path, run_statistics)

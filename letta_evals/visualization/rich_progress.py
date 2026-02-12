@@ -790,72 +790,51 @@ class EvalProgress(ProgressCallback):
             self.console.print("[dim]Note: Results re-graded from cached trajectories[/dim]")
         self.console.print("=" * 50)
 
-        # overall metrics
-        metrics = result.metrics
+        model_metrics = result.model_metrics
+
+        # build key->label mapping from config (used throughout)
+        label_map: dict = {}
+        if "graders" in result.config and isinstance(result.config["graders"], dict):
+            for key, gspec in result.config["graders"].items():
+                label_map[key] = gspec.get("display_name") or key
+
+        # overall summary (aggregated across all models)
+        total = sum(m.total for m in model_metrics)
+        total_attempted = sum(m.total_attempted for m in model_metrics)
+        errors = total - total_attempted
+        errors_pct = (errors / total * 100.0) if total > 0 else 0.0
         self.console.print("\n[bold]Overall Metrics:[/bold]")
-        self.console.print(f"  Total samples: {metrics.total}")
-        self.console.print(f"  Total attempted: {metrics.total_attempted}")
-        errors = metrics.total - metrics.total_attempted
-        errors_pct = (errors / metrics.total * 100.0) if metrics.total > 0 else 0.0
-        self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{metrics.total})")
-        self.console.print(f"  Average score (attempted): {metrics.avg_score_attempted:.2f}")
-        self.console.print(f"  Average score (total): {metrics.avg_score_total:.2f}")
+        self.console.print(f"  Total samples: {total}")
+        self.console.print(f"  Total attempted: {total_attempted}")
+        self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{total})")
 
-        # usage metrics
-        if metrics.usage_metrics:
-            self.console.print("\n[bold]Usage:[/bold]")
-            self.console.print(f"  Total prompt tokens: {metrics.usage_metrics.total_prompt_tokens:,}")
-            self.console.print(f"  Total completion tokens: {metrics.usage_metrics.total_completion_tokens:,}")
-            if metrics.usage_metrics.total_cost is not None:
-                self.console.print(f"  Total cost: ${metrics.usage_metrics.total_cost:.4f}")
-            if metrics.usage_metrics.total_cached_input_tokens > 0:
-                self.console.print(f"  Total cached input tokens: {metrics.usage_metrics.total_cached_input_tokens:,}")
-            if metrics.usage_metrics.total_cache_write_tokens > 0:
-                self.console.print(f"  Total cache write tokens: {metrics.usage_metrics.total_cache_write_tokens:,}")
-            if metrics.usage_metrics.total_reasoning_tokens > 0:
-                self.console.print(f"  Total reasoning tokens: {metrics.usage_metrics.total_reasoning_tokens:,}")
-
-        # per-metric aggregates
-        if hasattr(metrics, "by_metric") and metrics.by_metric:
-            self.console.print("\n[bold]Metrics by Metric:[/bold]")
-            metrics_table = Table()
-            metrics_table.add_column("Metric", style="cyan")
-            metrics_table.add_column("Avg Score (Attempted)", style="white")
-            metrics_table.add_column("Avg Score (Total)", style="white")
-            # build key->label mapping from config
-            label_map = {}
-            if "graders" in result.config and isinstance(result.config["graders"], dict):
-                for key, gspec in result.config["graders"].items():
-                    label_map[key] = gspec.get("display_name") or key
-
-            for key, agg in metrics.by_metric.items():
-                label = label_map.get(key, key)
-                metrics_table.add_row(label, f"{agg.avg_score_attempted:.2f}", f"{agg.avg_score_total:.2f}")
-            self.console.print(metrics_table)
-
-        # per-model metrics
-        if metrics.per_model:
+        # per-model metrics table (always shown — single or multi-model)
+        if model_metrics:
             self.console.print("\n[bold]Per-Model Metrics:[/bold]")
             model_table = Table()
             model_table.add_column("Model", style="cyan")
             model_table.add_column("Samples", style="white")
             model_table.add_column("Attempted", style="white")
-            model_table.add_column("Avg Score (Attempted)", style="white")
-            model_table.add_column("Avg Score (Total)", style="white")
 
-            for model_metrics in metrics.per_model:
-                model_table.add_row(
-                    model_metrics.model_name,
-                    str(model_metrics.total),
-                    str(model_metrics.total_attempted),
-                    f"{model_metrics.avg_score_attempted:.2f}",
-                    f"{model_metrics.avg_score_total:.2f}",
-                )
+            # add a column per metric
+            metric_keys = list(model_metrics[0].eval_metrics.keys()) if model_metrics else []
+            for mk in metric_keys:
+                lbl = label_map.get(mk, mk)
+                model_table.add_column(f"{lbl} (attempted)", style="white")
+                model_table.add_column(f"{lbl} (total)", style="white")
+
+            for m in model_metrics:
+                row = [m.model_name, str(m.total), str(m.total_attempted)]
+                for mk in metric_keys:
+                    agg = m.eval_metrics.get(mk)
+                    row.append(f"{agg.avg_score_attempted:.2f}" if agg else "-")
+                    row.append(f"{agg.avg_score_total:.2f}" if agg else "-")
+                model_table.add_row(*row)
 
             self.console.print(model_table)
 
             # per-model usage metrics
-            has_usage_data = any(m.usage_metrics for m in metrics.per_model)
+            has_usage_data = any(m.usage_metrics or m.total_cost is not None for m in model_metrics)
             if has_usage_data:
                 self.console.print("\n[bold]Per-Model Usage:[/bold]")
                 usage_table = Table()
@@ -867,17 +846,17 @@ class EvalProgress(ProgressCallback):
                 usage_table.add_column("Cache Write", style="dim white")
                 usage_table.add_column("Reasoning", style="dim white")
 
-                for model_metrics in metrics.per_model:
-                    if model_metrics.usage_metrics:
-                        u = model_metrics.usage_metrics
+                for m in model_metrics:
+                    if m.usage_metrics or m.total_cost is not None:
+                        u = m.usage_metrics
                         usage_table.add_row(
-                            model_metrics.model_name,
-                            f"{u.total_prompt_tokens:,}",
-                            f"{u.total_completion_tokens:,}",
-                            f"${u.total_cost:.4f}" if u.total_cost is not None else "-",
-                            f"{u.total_cached_input_tokens:,}" if u.total_cached_input_tokens > 0 else "-",
-                            f"{u.total_cache_write_tokens:,}" if u.total_cache_write_tokens > 0 else "-",
-                            f"{u.total_reasoning_tokens:,}" if u.total_reasoning_tokens > 0 else "-",
+                            m.model_name,
+                            f"{u.total_prompt_tokens:,}" if u and u.total_prompt_tokens > 0 else "-",
+                            f"{u.total_completion_tokens:,}" if u and u.total_completion_tokens > 0 else "-",
+                            f"${m.total_cost:.4f}" if m.total_cost is not None else "-",
+                            f"{u.total_cached_input_tokens:,}" if u and u.total_cached_input_tokens > 0 else "-",
+                            f"{u.total_cache_write_tokens:,}" if u and u.total_cache_write_tokens > 0 else "-",
+                            f"{u.total_reasoning_tokens:,}" if u and u.total_reasoning_tokens > 0 else "-",
                         )
 
                 self.console.print(usage_table)
