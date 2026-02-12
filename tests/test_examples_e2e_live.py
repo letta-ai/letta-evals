@@ -44,11 +44,7 @@ async def test_single_suite(request, tmp_path: Path, caplog) -> None:
 
     total = sum(m.total for m in result.model_metrics)
     total_attempted = sum(m.total_attempted for m in result.model_metrics)
-    logger.info(
-        f"\n{'=' * 60}\n"
-        f"Results: {total_attempted}/{total} attempted\n"
-        f"{'=' * 60}"
-    )
+    logger.info(f"\n{'=' * 60}\nResults: {total_attempted}/{total} attempted\n{'=' * 60}")
 
     assert result.gates_passed, f"Gate failed for suite: {suite_path}"
     assert total > 0
