@@ -216,6 +216,9 @@ class LettaCodeTarget(AbstractAgentTarget):
                             "prompt_tokens": usage.get("prompt_tokens", 0),
                             "completion_tokens": usage.get("completion_tokens", 0),
                             "total_tokens": usage.get("total_tokens", 0),
+                            "cached_input_tokens": usage.get("cached_input_tokens", 0),
+                            "cache_write_tokens": usage.get("cache_write_tokens", 0),
+                            "reasoning_tokens": usage.get("reasoning_tokens", 0),
                         }
                     )
 
