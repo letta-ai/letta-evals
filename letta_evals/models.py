@@ -542,7 +542,6 @@ class MetricAggregate(BaseModel):
     avg_score_total: float = Field(description="average score for this metric across all results (0.0 to 1.0)")
 
 
-
 class RunStatistics(BaseModel):
     """Aggregate statistics across multiple evaluation runs."""
 

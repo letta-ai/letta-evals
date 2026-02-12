@@ -475,10 +475,7 @@ class Runner:
                     or not first_submission
                     or (
                         first_grade.rationale
-                        and (
-                            "Empty trajectory" in first_grade.rationale
-                            or "Empty submission" in first_grade.rationale
-                        )
+                        and ("Empty trajectory" in first_grade.rationale or "Empty submission" in first_grade.rationale)
                     )
                 )
                 if is_extraction_error:
@@ -866,9 +863,7 @@ def _calculate_run_statistics(
             metric_values = []
             for run_metrics in all_run_model_metrics:
                 run_scores = [
-                    m.by_metric[metric_key].avg_score_attempted
-                    for m in run_metrics
-                    if metric_key in m.by_metric
+                    m.by_metric[metric_key].avg_score_attempted for m in run_metrics if metric_key in m.by_metric
                 ]
                 if run_scores:
                     metric_values.append(sum(run_scores) / len(run_scores))
