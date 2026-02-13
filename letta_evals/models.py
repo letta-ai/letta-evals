@@ -417,6 +417,26 @@ class SuiteSpec(BaseModel):
                             (base_dir / yaml_data["target"]["working_dir"]).resolve()
                         )
 
+                # resolve path-valued flags (--skills, --import) relative to suite file
+                if "flags" in yaml_data["target"] and yaml_data["target"]["flags"]:
+                    import shlex
+
+                    PATH_FLAGS = {"--skills", "--import"}
+                    tokens = shlex.split(yaml_data["target"]["flags"])
+                    resolved = []
+                    i = 0
+                    while i < len(tokens):
+                        token = tokens[i]
+                        resolved.append(token)
+                        if token in PATH_FLAGS and i + 1 < len(tokens):
+                            i += 1
+                            path_val = tokens[i]
+                            if not Path(path_val).is_absolute():
+                                path_val = str((base_dir / path_val).resolve())
+                            resolved.append(path_val)
+                        i += 1
+                    yaml_data["target"]["flags"] = shlex.join(resolved)
+
                 # store base_dir in target for agent_script resolution
                 yaml_data["target"]["base_dir"] = base_dir
 
