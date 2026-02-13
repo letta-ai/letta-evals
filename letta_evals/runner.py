@@ -187,6 +187,7 @@ class Runner:
                 base_url=self.suite.target.base_url,
                 agent_script=self.suite.target.agent_script,
                 base_dir=self.suite.target.base_dir,
+                flags=self.suite.target.flags,
             )
         else:
             raise ValueError(f"Unknown target kind: {self.suite.target.kind}")

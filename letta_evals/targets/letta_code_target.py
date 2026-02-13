@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import shlex
 from pathlib import Path
 from typing import Optional
 
@@ -32,6 +33,7 @@ class LettaCodeTarget(AbstractAgentTarget):
         base_url: Optional[str] = None,
         agent_script: Optional[str] = None,
         base_dir: Optional[Path] = None,
+        flags: Optional[str] = None,
     ):
         """Initialize the Letta Code target.
 
@@ -51,6 +53,8 @@ class LettaCodeTarget(AbstractAgentTarget):
                 If provided, the factory function is called to create an agent per sample,
                 and --agent is used instead of --new-agent.
             base_dir: Base directory for resolving relative paths in agent_script
+            flags: Additional CLI flags to pass to letta code, parsed with shell quoting
+                rules (e.g., "--memfs --context-window 8000").
         """
         self.client = client
         self.model_handle = model_handle
@@ -62,6 +66,7 @@ class LettaCodeTarget(AbstractAgentTarget):
         self.base_url = base_url
         self.agent_script = agent_script
         self.base_dir = base_dir or Path.cwd()
+        self.flags = shlex.split(flags) if flags else []
 
         # Resolve the working directory, optionally creating a per-model sandbox
         wd_base = working_dir or Path.cwd()
@@ -110,6 +115,8 @@ class LettaCodeTarget(AbstractAgentTarget):
                     "--yolo",
                     "--output-format",
                     "stream-json",
+                    "--memfs",
+                    "--no-skills",
                     "--model",
                     self.model_handle,
                 ]
@@ -128,6 +135,10 @@ class LettaCodeTarget(AbstractAgentTarget):
                 # add skills directory if specified
                 if self.skills_dir:
                     cmd.extend(["--skills", str(self.skills_dir)])
+
+                # append any extra flags from suite config
+                if self.flags:
+                    cmd.extend(self.flags)
 
                 cmd.extend(["-p", prompt])
 
@@ -249,8 +260,9 @@ class LettaCodeTarget(AbstractAgentTarget):
                     raise TargetError(msg, agent_id=agent_id or factory_agent_id) from e
 
                 backoff_time = 2 ** (attempt - 1)
-                logger.warning(
+                logger.error(
                     f"Letta command failed for sample {sample.id} (attempt {attempt}/{self.max_retries + 1}). "
+                    f"Agent: {agent_id or factory_agent_id or 'unknown'}. "
                     f"Error: {type(e).__name__}: {str(e)}. Retrying in {backoff_time}s..."
                 )
                 await asyncio.sleep(backoff_time)
