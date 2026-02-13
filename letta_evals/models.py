@@ -444,6 +444,24 @@ class SuiteSpec(BaseModel):
 # Target/Grader result models
 
 
+class TurnTokenData(BaseModel):
+    """Token-level data for a single message in a turn.
+
+    Used by training pipelines (e.g. GRPO) that need per-token IDs and
+    log-probabilities from the generation model.
+    """
+
+    role: str = Field(description="Message role: assistant, tool, tool_call, tool_return, etc.")
+    content: Optional[str] = Field(default=None, description="Text content of this message")
+    output_ids: Optional[List[int]] = Field(
+        default=None, description="Token IDs produced by the model for this message"
+    )
+    output_token_logprobs: Optional[List[Any]] = Field(
+        default=None,
+        description="Per-token log-probabilities. Each entry is either a float or a list whose first element is the logprob.",
+    )
+
+
 class TargetResult(BaseModel):
     """Result from running a target."""
 
@@ -457,6 +475,16 @@ class TargetResult(BaseModel):
     )
     agent_state: Optional[AgentState] = Field(
         default=None, description="Agent state after running the target (includes memory blocks)"
+    )
+    run_ids: Optional[List[str]] = Field(
+        default=None, description="Run IDs for each input turn (needed for token-level data fetching in training)"
+    )
+    token_data: Optional[List[TurnTokenData]] = Field(
+        default=None,
+        description=(
+            "Token-level data (IDs + logprobs) for each message across all turns. "
+            "Only populated when return_token_data=True is passed to the target."
+        ),
     )
 
 

@@ -23,6 +23,7 @@ from letta_evals.models import (
     SuiteSpec,
     TargetResult,
     TargetSpec,
+    TurnTokenData,
 )
 from letta_evals.runner import Runner, run_suite
 from letta_evals.targets import AbstractAgentTarget, LettaAgentTarget
@@ -66,6 +67,7 @@ __all__ = [
     "GradeResult",
     "SampleResult",
     "TargetResult",
+    "TurnTokenData",
     "Metrics",
     "ModelMetrics",
     "MetricAggregate",
