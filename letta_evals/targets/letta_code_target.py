@@ -99,6 +99,16 @@ class LettaCodeTarget(AbstractAgentTarget):
                 prompt = "\n".join(str(inp) for inp in inputs)
                 prompt = prompt.replace("{pwd}", self.working_dir.resolve().as_posix())
 
+                # construct the letta-code CLI command (headless streaming JSON output).
+                cmd = [
+                    "letta",
+                    "--yolo",
+                    "--output-format",
+                    "stream-json",
+                    "--model",
+                    self.model_handle,
+                ]
+
                 # If agent_script is provided, create agent via factory first
                 factory_agent_id = None
                 if self.agent_script:
@@ -106,19 +116,6 @@ class LettaCodeTarget(AbstractAgentTarget):
                     factory_agent_id = await agent_factory_func(self.client, sample)
                     logger.info(f"Created agent {factory_agent_id} via agent_factory for sample {sample.id}")
 
-                # construct the letta-code CLI command (headless streaming JSON output).
-                cmd = [
-                    "letta",
-                    "--yolo",
-                    "--output-format",
-                    "stream-json",
-                    "--memfs",
-                    "--no-skills",
-                    "--model",
-                    self.model_handle,
-                ]
-
-                # Use existing agent from factory, or create new one
                 if factory_agent_id:
                     cmd.extend(["--agent", factory_agent_id])
                 else:
@@ -127,7 +124,6 @@ class LettaCodeTarget(AbstractAgentTarget):
                 # Use codex system prompt for GPT-style models (matches `letta --help` examples)
                 if "gpt" in self.model_handle:
                     cmd.extend(["--system", "codex"])
-                    cmd.extend(["--init-blocks", "skills,loaded_skills"])
 
                 # append any extra flags from suite config
                 if self.flags:
