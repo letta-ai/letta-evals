@@ -1,3 +1,4 @@
+import shlex
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
@@ -148,11 +149,15 @@ class LettaCodeTargetSpec(BaseTargetSpec):
     sandbox: bool = Field(
         default=True, description="Create a per-model subdirectory under working_dir for isolated sandbox execution."
     )
-    skills_dir: Optional[Path] = Field(default=None, description="Directory containing skills to load")
     allowed_tools: Optional[List[str]] = Field(
         default=None, description="List of allowed tools for letta code (e.g., ['Bash', 'Read'])"
     )
     disallowed_tools: Optional[List[str]] = Field(default=None, description="List of disallowed tools for letta code")
+    flags: Optional[str] = Field(
+        default=None,
+        description="Additional CLI flags to pass to letta code (e.g., '--memfs --context-window 8000'). "
+        "Parsed with shell quoting rules so values with spaces can be quoted.",
+    )
 
 
 TargetSpec = Annotated[
@@ -413,11 +418,23 @@ class SuiteSpec(BaseModel):
                             (base_dir / yaml_data["target"]["working_dir"]).resolve()
                         )
 
-                if "skills_dir" in yaml_data["target"] and yaml_data["target"]["skills_dir"]:
-                    if not Path(yaml_data["target"]["skills_dir"]).is_absolute():
-                        yaml_data["target"]["skills_dir"] = str(
-                            (base_dir / yaml_data["target"]["skills_dir"]).resolve()
-                        )
+                # resolve path-valued flags (--skills, --import) relative to suite file
+                if "flags" in yaml_data["target"] and yaml_data["target"]["flags"]:
+                    PATH_FLAGS = {"--skills", "--import"}
+                    tokens = shlex.split(yaml_data["target"]["flags"])
+                    resolved = []
+                    i = 0
+                    while i < len(tokens):
+                        token = tokens[i]
+                        resolved.append(token)
+                        if token in PATH_FLAGS and i + 1 < len(tokens):
+                            i += 1
+                            path_val = tokens[i]
+                            if not Path(path_val).is_absolute():
+                                path_val = str((base_dir / path_val).resolve())
+                            resolved.append(path_val)
+                        i += 1
+                    yaml_data["target"]["flags"] = shlex.join(resolved)
 
                 # store base_dir in target for agent_script resolution
                 yaml_data["target"]["base_dir"] = base_dir

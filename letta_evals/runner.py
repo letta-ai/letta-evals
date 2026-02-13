@@ -179,7 +179,6 @@ class Runner:
                 model_handle=model_handle,
                 working_dir=self.suite.target.working_dir,
                 sandbox=self.suite.target.sandbox,
-                skills_dir=self.suite.target.skills_dir,
                 allowed_tools=self.suite.target.allowed_tools,
                 disallowed_tools=self.suite.target.disallowed_tools,
                 timeout=int(self.suite.target.timeout),
@@ -187,6 +186,7 @@ class Runner:
                 base_url=self.suite.target.base_url,
                 agent_script=self.suite.target.agent_script,
                 base_dir=self.suite.target.base_dir,
+                flags=self.suite.target.flags,
             )
         else:
             raise ValueError(f"Unknown target kind: {self.suite.target.kind}")
