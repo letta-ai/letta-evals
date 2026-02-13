@@ -1,3 +1,4 @@
+import shlex
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
@@ -419,8 +420,6 @@ class SuiteSpec(BaseModel):
 
                 # resolve path-valued flags (--skills, --import) relative to suite file
                 if "flags" in yaml_data["target"] and yaml_data["target"]["flags"]:
-                    import shlex
-
                     PATH_FLAGS = {"--skills", "--import"}
                     tokens = shlex.split(yaml_data["target"]["flags"])
                     resolved = []
