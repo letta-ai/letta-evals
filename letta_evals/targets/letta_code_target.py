@@ -25,7 +25,6 @@ class LettaCodeTarget(AbstractAgentTarget):
         model_handle: str = "anthropic/claude-sonnet-4-5-20250929",
         working_dir: Optional[Path] = None,
         sandbox: bool = True,
-        skills_dir: Optional[Path] = None,
         allowed_tools: Optional[list[str]] = None,
         disallowed_tools: Optional[list[str]] = None,
         timeout: int = 300,
@@ -43,7 +42,6 @@ class LettaCodeTarget(AbstractAgentTarget):
             working_dir: Working directory for letta command execution
             sandbox: If True, create a per-model subdirectory under working_dir
                 for isolated execution. If False, use working_dir directly.
-            skills_dir: Directory containing skills to load
             allowed_tools: List of allowed tools (e.g., ["Bash", "Read"])
             disallowed_tools: List of disallowed tools
             timeout: Command timeout in seconds (default: 300)
@@ -58,7 +56,6 @@ class LettaCodeTarget(AbstractAgentTarget):
         """
         self.client = client
         self.model_handle = model_handle
-        self.skills_dir = skills_dir
         self.allowed_tools = allowed_tools
         self.disallowed_tools = disallowed_tools
         self.timeout = timeout
@@ -131,10 +128,6 @@ class LettaCodeTarget(AbstractAgentTarget):
                 if "gpt" in self.model_handle:
                     cmd.extend(["--system", "codex"])
                     cmd.extend(["--init-blocks", "skills,loaded_skills"])
-
-                # add skills directory if specified
-                if self.skills_dir:
-                    cmd.extend(["--skills", str(self.skills_dir)])
 
                 # append any extra flags from suite config
                 if self.flags:

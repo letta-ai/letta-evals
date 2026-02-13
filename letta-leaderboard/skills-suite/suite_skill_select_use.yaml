@@ -7,7 +7,7 @@ target:
   base_url: http://localhost:9005  # local
   # base_url: https://api.letta.com/  # cloud
   working_dir: output-select-use
-  skills_dir: .skills
+  flags: "--skills .skills"
   timeout: 600
   max_retries: 1
   model_handles:
