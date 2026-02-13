@@ -507,6 +507,10 @@ class Runner:
                             exception_type="GradingError",
                             message=f"Grading failed for: {details}",
                         )
+                        if self.progress_callback:
+                            await self.progress_callback.sample_error(
+                                sample_id, error_info.message, agent_id=agent_id, model_name=model_name
+                            )
 
                 if error_info is None and self.progress_callback:
                     metric_scores = None
