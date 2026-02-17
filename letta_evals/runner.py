@@ -336,7 +336,9 @@ class Runner:
 
             if cached_result is not None:
                 if self.progress_callback:
-                    await self.progress_callback.agent_loading(sample_id, model_name=model_name, from_cache=True)
+                    await self.progress_callback.agent_created(
+                        sample_id, agent_id=cached_result.agent_id, model_name=model_name, from_cache=True
+                    )
                 return (
                     cached_result.trajectory,
                     cached_result.agent_id,

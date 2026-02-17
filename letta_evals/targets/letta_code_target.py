@@ -116,6 +116,10 @@ class LettaCodeTarget(AbstractAgentTarget):
                     agent_factory_func = load_object(self.agent_script, self.base_dir)
                     factory_agent_id = await agent_factory_func(self.client, sample)
                     logger.info(f"Created agent {factory_agent_id} via agent_factory for sample {sample.id}")
+                    if progress_callback:
+                        await progress_callback.agent_created(
+                            sample.id, agent_id=factory_agent_id, model_name=self.model_handle
+                        )
 
                 if factory_agent_id:
                     cmd.extend(["--agent", factory_agent_id])
@@ -169,6 +173,10 @@ class LettaCodeTarget(AbstractAgentTarget):
                             if event.get("type") == "system" and event.get("subtype") == "init" and not agent_id:
                                 agent_id = event.get("agent_id")
                                 logger.info(f"Captured agent_id {agent_id} from stream init event")
+                                if progress_callback and agent_id:
+                                    await progress_callback.agent_created(
+                                        sample.id, agent_id=agent_id, model_name=self.model_handle
+                                    )
                         except json.JSONDecodeError:
                             logger.warning(f"Non-JSON stream output: {line[:200]}")
 
