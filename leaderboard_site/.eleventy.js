@@ -249,6 +249,20 @@ module.exports = function(eleventyConfig) {
     return [];
   });
 
+  // Custom filter: sort by metric descending, break ties by cost ascending
+  eleventyConfig.addFilter("sort_by_score_then_cost", function(arr, metricKey) {
+    return [...arr].sort((a, b) => {
+      const scoreA = a[metricKey] || 0;
+      const scoreB = b[metricKey] || 0;
+      if (scoreB !== scoreA) {
+        return scoreB - scoreA;
+      }
+      const costA = a.total_cost || Infinity;
+      const costB = b.total_cost || Infinity;
+      return costA - costB;
+    });
+  });
+
   eleventyConfig.addPassthroughCopy("src/icons");
   eleventyConfig.addPassthroughCopy("src/styles.css");
   eleventyConfig.addPassthroughCopy("src/letta-logo.svg");

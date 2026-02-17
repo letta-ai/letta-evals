@@ -29,7 +29,7 @@ results:
   average: 81.0
   leaderboard_filesystem_100: 81.0
   total_cost: 125.6
-- model: google/gemini-3
+- model: google/gemini-3-pro
   average: 72.0
   leaderboard_filesystem_100: 72.0
   total_cost: 100.72
@@ -49,4 +49,3 @@ results:
   average: 83.0
   leaderboard_filesystem_100: 83.0
   total_cost: 83.47
-last_updated: Feb 17, 2026
