@@ -110,10 +110,10 @@ def extract_model_results_from_aggregate(stats: Dict) -> List[Dict]:
                         "metrics": {},
                     }
 
-                # Score is already in percentage (e.g., 77.0)
-                score = model_info.get("avg_score_attempted", 0) * 100
-                cost_data = model_info.get("cost")
-                cost = cost_data.get("total_cost", 0) if cost_data else 0
+                # Leaderboard score uses avg_score_total (penalizes errors/timeouts)
+                score = model_info.get("avg_score_total", 0) * 100
+                cost_data = model_info.get("usage_metrics") or model_info.get("cost")
+                cost = cost_data.get("total_cost", 0) if isinstance(cost_data, dict) else 0
 
                 model_data[model_name]["scores"].append(score)
                 model_data[model_name]["costs"].append(cost)
@@ -163,10 +163,10 @@ def extract_model_results_from_summary(stats: Dict) -> List[Dict]:
         for model_info in stats["metrics"]["per_model"]:
             model_name = normalize_model_name(model_info["model_name"])
 
-            # Score is already in percentage (e.g., 77.0)
-            score = model_info.get("avg_score_attempted", 0) * 100
-            cost_data = model_info.get("cost")
-            cost = cost_data.get("total_cost", 0) if cost_data else 0
+            # Leaderboard score uses avg_score_total (penalizes errors/timeouts)
+            score = model_info.get("avg_score_total", 0) * 100
+            cost_data = model_info.get("usage_metrics") or model_info.get("cost")
+            cost = cost_data.get("total_cost", 0) if isinstance(cost_data, dict) else 0
 
             # Extract individual metrics (e.g., task_completion, skill_use)
             metrics_data = model_info.get("metrics", {})
@@ -224,10 +224,13 @@ def merge_results(existing_results: List[Dict], new_results: List[Dict], metric_
     # Create a dictionary for easy lookup and update
     results_dict = {}
 
-    # Check if existing results include total_cost field
+    # Check if existing results include total_cost field.
+    # If we're creating a brand-new leaderboard (no existing results), include cost by default.
     include_cost = False
     if existing_results:
         include_cost = "total_cost" in existing_results[0]
+    else:
+        include_cost = True
 
     # Add existing results
     for result in existing_results:

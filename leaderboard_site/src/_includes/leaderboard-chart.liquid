@@ -23,7 +23,7 @@
 
 {%- if has_multiple_metrics -%}
     {%- comment -%} Multiple metrics case: show model once with metrics side by side {%- endcomment -%}
-    {%- assign sorted_by_score = leaderboard_data | sort: arrange_by_metric | reverse -%}
+    {%- assign sorted_by_score = leaderboard_data | sort_by_score_then_cost: arrange_by_metric -%}
 
     {%- comment -%} Calculate cost range if costs exist {%- endcomment -%}
     {%- if has_costs -%}
@@ -98,7 +98,7 @@
     {%- endfor -%}
 {%- else -%}
     {%- comment -%} Single metric case: use arrange_by config or default to average {%- endcomment -%}
-    {%- assign sorted_by_score = leaderboard_data | sort: arrange_by_metric | reverse -%}
+    {%- assign sorted_by_score = leaderboard_data | sort_by_score_then_cost: arrange_by_metric -%}
     {%- assign max_score = sorted_by_score[0].average -%}
     {%- if has_costs -%}
         {%- assign sorted_by_cost = leaderboard_data | sort: "total_cost" -%}
