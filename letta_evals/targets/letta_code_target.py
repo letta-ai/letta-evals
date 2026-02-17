@@ -93,9 +93,6 @@ class LettaCodeTarget(AbstractAgentTarget):
                 # handle single or multiple inputs
                 inputs = sample.input if isinstance(sample.input, list) else [sample.input]
 
-                if progress_callback:
-                    await progress_callback.message_sending(sample.id, 1, len(inputs), model_name=self.model_handle)
-
                 # for multiple inputs, concatenate with newlines
                 prompt = "\n".join(str(inp) for inp in inputs)
                 prompt = prompt.replace("{pwd}", self.working_dir.resolve().as_posix())
@@ -176,6 +173,9 @@ class LettaCodeTarget(AbstractAgentTarget):
                                 if progress_callback and agent_id:
                                     await progress_callback.agent_created(
                                         sample.id, agent_id=agent_id, model_name=self.model_handle
+                                    )
+                                    await progress_callback.message_sending(
+                                        sample.id, 1, len(inputs), agent_id=agent_id, model_name=self.model_handle
                                     )
                         except json.JSONDecodeError:
                             logger.warning(f"Non-JSON stream output: {line[:200]}")
