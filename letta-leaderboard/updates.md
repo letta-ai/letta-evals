@@ -1,5 +1,13 @@
 # Leaderboard Updates
 
+### February 17, 20206
+- Filesystem v2 refresh
+  - Letta code agents with real filesystem and client-side tools
+  - Multi-hop navigation and reasoning
+- Sonnet 4.6
+  - #3 on Filesystem and #4 on Skills
+  - 70% improvement in token efficiency with 38% improvement in accuracy over Sonnet 4.5
+
 ### February 5, 2026
 - Opus 4.6
   - #1 on Filesystem and #3 on Skills
