@@ -16,6 +16,7 @@ target:
     - anthropic/claude-sonnet-4-5-20250929
     - anthropic/claude-haiku-4-5-20251001
     - anthropic/claude-opus-4-6
+    - anthropic/claude-sonnet-4-6
     - gemini-3
     - gemini-3-flash
     - gpt-5.2-xhigh

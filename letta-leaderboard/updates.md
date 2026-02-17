@@ -1,6 +1,6 @@
 # Leaderboard Updates
 
-### February 17, 20206
+### February 17, 2026
 - Filesystem v2 refresh
   - Letta code agents with real filesystem and client-side tools
   - Multi-hop navigation and reasoning
