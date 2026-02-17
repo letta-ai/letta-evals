@@ -46,12 +46,12 @@ class SimpleProgress(ProgressCallback):
         agent_text = f" [dim]agent={agent_id}[/]" if agent_id else ""
         self.console.print(f"[bold cyan]▸ Sample [{sample_id}]{model_text}{agent_text}[/]")
 
-    async def agent_loading(
-        self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None, from_cache: bool = False
+    async def agent_created(
+        self, sample_id: int, agent_id: str, model_name: Optional[str] = None, from_cache: bool = False
     ) -> None:
         prefix = self._format_prefix(sample_id, agent_id, model_name)
         cache_text = " [dim](cached)[/]" if from_cache else ""
-        self.console.print(f"{prefix} [dim]•[/] Loading agent{cache_text}")
+        self.console.print(f"{prefix} [dim]•[/] Agent created{cache_text}")
 
     async def message_sending(
         self,

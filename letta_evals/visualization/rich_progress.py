@@ -647,10 +647,10 @@ class EvalProgress(ProgressCallback):
                 sample_id, SampleState.LOADING_AGENT, agent_id=agent_id, model_name=model_name
             )
 
-    async def agent_loading(
-        self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None, from_cache: bool = False
+    async def agent_created(
+        self, sample_id: int, agent_id: str, model_name: Optional[str] = None, from_cache: bool = False
     ):
-        """Mark sample as loading agent"""
+        """Update sample with agent_id once agent is provisioned."""
         await self.update_sample_state(
             sample_id, SampleState.LOADING_AGENT, agent_id=agent_id, model_name=model_name, from_cache=from_cache
         )
