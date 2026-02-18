@@ -738,7 +738,11 @@ class Runner:
         by_metric: Dict[str, MetricAggregate] = {}
         if self.graders is not None:
             for metric_key in self.graders.keys():
-                m_scores = [r.grades[metric_key].score for r in self.results if r.grades and metric_key in r.grades]
+                m_scores = [
+                    r.grades[metric_key].score
+                    for r in self.results
+                    if is_success(r) and r.grades and metric_key in r.grades
+                ]
                 m_avg_attempted = sum(m_scores) / len(m_scores) if m_scores else 0.0
                 m_avg_total = sum(m_scores) / len(self.results) if m_scores else 0.0
                 # pass_rate is just avg score as percentage
@@ -760,7 +764,7 @@ class Runner:
             avg_score_attempted = agg.avg_score_attempted if agg else 0.0
             avg_score_total = agg.avg_score_total if agg else 0.0
         else:
-            scores = [r.grade.score for r in self.results]
+            scores = [r.grade.score for r in self.results if is_success(r)]
             avg_score_attempted = sum(scores) / len(scores) if scores else 0.0
             avg_score_total = sum(scores) / len(self.results) if scores else 0.0
             # for single grader case, use a default key
@@ -823,9 +827,13 @@ class Runner:
                             (sum(metric_scores) / len(metric_scores)) * 100.0 if metric_scores else 0.0
                         )
 
-                    model_scores = [r.grades[first_key].score for r in results if r.grades and first_key in r.grades]
+                    model_scores = [
+                        r.grades[first_key].score
+                        for r in results
+                        if is_success(r) and r.grades and first_key in r.grades
+                    ]
                 else:
-                    model_scores = [r.grade.score for r in results]
+                    model_scores = [r.grade.score for r in results if is_success(r)]
                     default_key = "default"
                     model_metrics_dict[default_key] = (
                         (sum(model_scores) / len(model_scores)) * 100.0 if model_scores else 0.0
