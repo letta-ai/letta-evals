@@ -26,8 +26,6 @@ class _JudgeResponse(PydanticBaseModel):
     rationale: str = PydanticField(description="Explanation of the grading decision")
 
 
-# Anthropic structured output schema, derived from the shared Pydantic model
-_JUDGE_JSON_SCHEMA = transform_schema(_JudgeResponse)
 
 
 class RubricGrader(Grader):
@@ -148,7 +146,7 @@ class RubricGrader(Grader):
                         {"type": "text", "text": JUDGE_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
                     ],
                     messages=[{"role": "user", "content": judge_prompt}],
-                    output_config={"format": {"type": "json_schema", "schema": _JUDGE_JSON_SCHEMA}},
+                    output_config={"format": {"type": "json_schema", "schema": transform_schema(_JudgeResponse)}},
                 )
 
                 result_json = json.loads(response.content[0].text)
