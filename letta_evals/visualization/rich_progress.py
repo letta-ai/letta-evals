@@ -625,6 +625,12 @@ class EvalProgress(ProgressCallback):
                 self.total_score += sample.score
                 self.score_count += 1
 
+            # Update per-metric aggregates before render so the header shows correct averages
+            if sample.metric_scores:
+                for mkey, mscore in sample.metric_scores.items():
+                    self.metric_totals[mkey] = self.metric_totals.get(mkey, 0.0) + (mscore or 0.0)
+                    self.metric_counts[mkey] = self.metric_counts.get(mkey, 0) + 1
+
             completed = self.completed_count + self.error_count
             self.main_progress.update(self.main_task_id, completed=completed)
 
@@ -762,11 +768,6 @@ class EvalProgress(ProgressCallback):
             metric_scores=metric_scores,
             metric_rationales=metric_rationales,
         )
-        # update per-metric aggregates
-        if metric_scores:
-            for mkey, mscore in metric_scores.items():
-                self.metric_totals[mkey] = self.metric_totals.get(mkey, 0.0) + (mscore or 0.0)
-                self.metric_counts[mkey] = self.metric_counts.get(mkey, 0) + 1
 
     async def sample_error(
         self, sample_id: int, error: str, agent_id: Optional[str] = None, model_name: Optional[str] = None
