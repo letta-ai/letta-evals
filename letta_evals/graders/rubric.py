@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropic, transform_schema
 from dotenv import load_dotenv
 from google import genai
 from openai import AsyncOpenAI
@@ -18,21 +18,16 @@ from letta_evals.types import LLMProvider
 
 load_dotenv()
 
-# JSON schema for Anthropic structured output (replaces legacy prefill trick)
-_JUDGE_JSON_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "score": {"type": "number"},
-        "rationale": {"type": "string"},
-    },
-    "required": ["score", "rationale"],
-    "additionalProperties": False,
-}
 
+class _JudgeResponse(PydanticBaseModel):
+    """Shared schema for judge responses across all providers."""
 
-class _GeminiJudgeResponse(PydanticBaseModel):
     score: float = PydanticField(description="Score between 0.0 and 1.0")
     rationale: str = PydanticField(description="Explanation of the grading decision")
+
+
+# Anthropic structured output schema, derived from the shared Pydantic model
+_JUDGE_JSON_SCHEMA = transform_schema(_JudgeResponse)
 
 
 class RubricGrader(Grader):
@@ -169,7 +164,7 @@ class RubricGrader(Grader):
                     contents=judge_prompt,
                     config=genai.types.GenerateContentConfig(
                         response_mime_type="application/json",
-                        response_schema=_GeminiJudgeResponse,
+                        response_schema=_JudgeResponse,
                         temperature=temperature,
                         system_instruction=JUDGE_SYSTEM_PROMPT,
                     ),
