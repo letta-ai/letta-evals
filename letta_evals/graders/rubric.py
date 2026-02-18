@@ -30,12 +30,16 @@ _JUDGE_JSON_SCHEMA = {
 }
 
 
-def _supports_prefill(model: str) -> bool:
-    """Check if an Anthropic model supports assistant message prefill.
+def _supports_structured_output(model: str) -> bool:
+    """Check if an Anthropic model supports output_config structured outputs.
 
-    Claude 4.6+ models return a 400 error on prefilled assistant messages.
+    GA on Haiku 4.5, Sonnet 4.5, Opus 4.5, Sonnet 4.6, and Opus 4.6.
+    Models older than 4.5 fall back to the assistant prefill trick.
     """
-    return "4-6" not in model
+    for version in ("4-5", "4-6"):
+        if version in model:
+            return True
+    return False
 
 
 class _GeminiJudgeResponse(PydanticBaseModel):
@@ -162,34 +166,31 @@ class RubricGrader(Grader):
                     ],
                 }
 
-                if _supports_prefill(self.model):
-                    # Older models: use assistant prefill trick to force JSON output
-                    create_kwargs["messages"] = [
-                        {"role": "user", "content": judge_prompt},
-                        {"role": "assistant", "content": "{"},
-                    ]
-                else:
-                    # Claude 4.6+: use structured output via output_config.format
+                if _supports_structured_output(self.model):
+                    # Haiku 4.5+: use structured output via output_config.format
                     create_kwargs["messages"] = [
                         {"role": "user", "content": judge_prompt},
                     ]
                     create_kwargs["output_config"] = {
                         "format": {"type": "json_schema", "schema": _JUDGE_JSON_SCHEMA}
                     }
+                else:
+                    # Older models: use assistant prefill trick to force JSON output
+                    create_kwargs["messages"] = [
+                        {"role": "user", "content": judge_prompt},
+                        {"role": "assistant", "content": "{"},
+                    ]
 
                 response = await self.client.messages.create(**create_kwargs)
 
                 # extract text from response
-                if _supports_prefill(self.model):
-                    response_text = "{"
-                    for block in response.content:
-                        if hasattr(block, "text"):
-                            response_text += block.text
-                else:
+                if _supports_structured_output(self.model):
                     response_text = ""
-                    for block in response.content:
-                        if hasattr(block, "text"):
-                            response_text += block.text
+                else:
+                    response_text = "{"  # prepend the prefilled "{" for older models
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        response_text += block.text
 
                 result_json = json.loads(response_text)
                 usage = {
