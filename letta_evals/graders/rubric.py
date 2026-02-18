@@ -18,6 +18,25 @@ from letta_evals.types import LLMProvider
 
 load_dotenv()
 
+# JSON schema for structured output on Anthropic 4.6+ models (replaces prefill trick)
+_JUDGE_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "score": {"type": "number"},
+        "rationale": {"type": "string"},
+    },
+    "required": ["score", "rationale"],
+    "additionalProperties": False,
+}
+
+
+def _supports_prefill(model: str) -> bool:
+    """Check if an Anthropic model supports assistant message prefill.
+
+    Claude 4.6+ models return a 400 error on prefilled assistant messages.
+    """
+    return "4-6" not in model
+
 
 class _GeminiJudgeResponse(PydanticBaseModel):
     score: float = PydanticField(description="Score between 0.0 and 1.0")
@@ -134,22 +153,43 @@ class RubricGrader(Grader):
                 usage = response.usage.model_dump() if response.usage else None
 
             elif self.provider == LLMProvider.ANTHROPIC:
-                response = await self.client.messages.create(
-                    model=self.model,
-                    max_tokens=4096,
-                    temperature=temperature,
-                    system=[{"type": "text", "text": JUDGE_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-                    messages=[
-                        {"role": "user", "content": judge_prompt},
-                        {"role": "assistant", "content": "{"},  # prefill trick
+                create_kwargs = {
+                    "model": self.model,
+                    "max_tokens": 4096,
+                    "temperature": temperature,
+                    "system": [
+                        {"type": "text", "text": JUDGE_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
                     ],
-                )
+                }
+
+                if _supports_prefill(self.model):
+                    # Older models: use assistant prefill trick to force JSON output
+                    create_kwargs["messages"] = [
+                        {"role": "user", "content": judge_prompt},
+                        {"role": "assistant", "content": "{"},
+                    ]
+                else:
+                    # Claude 4.6+: use structured output via output_config.format
+                    create_kwargs["messages"] = [
+                        {"role": "user", "content": judge_prompt},
+                    ]
+                    create_kwargs["output_config"] = {
+                        "format": {"type": "json_schema", "schema": _JUDGE_JSON_SCHEMA}
+                    }
+
+                response = await self.client.messages.create(**create_kwargs)
 
                 # extract text from response
-                response_text = "{"
-                for block in response.content:
-                    if hasattr(block, "text"):
-                        response_text += block.text
+                if _supports_prefill(self.model):
+                    response_text = "{"
+                    for block in response.content:
+                        if hasattr(block, "text"):
+                            response_text += block.text
+                else:
+                    response_text = ""
+                    for block in response.content:
+                        if hasattr(block, "text"):
+                            response_text += block.text
 
                 result_json = json.loads(response_text)
                 usage = {
