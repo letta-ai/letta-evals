@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropic, transform_schema
 from dotenv import load_dotenv
 from google import genai
 from openai import AsyncOpenAI
@@ -19,7 +19,9 @@ from letta_evals.types import LLMProvider
 load_dotenv()
 
 
-class _GeminiJudgeResponse(PydanticBaseModel):
+class _JudgeResponse(PydanticBaseModel):
+    """Shared schema for judge responses across all providers."""
+
     score: float = PydanticField(description="Score between 0.0 and 1.0")
     rationale: str = PydanticField(description="Explanation of the grading decision")
 
@@ -139,19 +141,11 @@ class RubricGrader(Grader):
                     max_tokens=4096,
                     temperature=temperature,
                     system=[{"type": "text", "text": JUDGE_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-                    messages=[
-                        {"role": "user", "content": judge_prompt},
-                        {"role": "assistant", "content": "{"},  # prefill trick
-                    ],
+                    messages=[{"role": "user", "content": judge_prompt}],
+                    output_config={"format": {"type": "json_schema", "schema": transform_schema(_JudgeResponse)}},
                 )
 
-                # extract text from response
-                response_text = "{"
-                for block in response.content:
-                    if hasattr(block, "text"):
-                        response_text += block.text
-
-                result_json = json.loads(response_text)
+                result_json = json.loads(response.content[0].text)
                 usage = {
                     "input_tokens": response.usage.input_tokens,
                     "output_tokens": response.usage.output_tokens,
@@ -164,7 +158,7 @@ class RubricGrader(Grader):
                     contents=judge_prompt,
                     config=genai.types.GenerateContentConfig(
                         response_mime_type="application/json",
-                        response_schema=_GeminiJudgeResponse,
+                        response_schema=_JudgeResponse,
                         temperature=temperature,
                         system_instruction=JUDGE_SYSTEM_PROMPT,
                     ),
