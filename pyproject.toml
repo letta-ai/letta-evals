@@ -87,5 +87,6 @@ ignore = [
 include = [
     "letta_evals/**/*.py",
     "letta_evals/**/*.json",
+    "letta_evals/**/*.af",
     "letta_evals/py.typed",
 ]
