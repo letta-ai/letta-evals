@@ -145,31 +145,18 @@ class RubricGrader(Grader):
                 usage = response.usage.model_dump() if response.usage else None
 
             elif self.provider == LLMProvider.ANTHROPIC:
-                create_kwargs = {
-                    "model": self.model,
-                    "max_tokens": 4096,
-                    "temperature": temperature,
-                    "system": [
+                response = await self.client.messages.create(
+                    model=self.model,
+                    max_tokens=4096,
+                    temperature=temperature,
+                    system=[
                         {"type": "text", "text": JUDGE_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
                     ],
-                }
+                    messages=[{"role": "user", "content": judge_prompt}],
+                    output_config={"format": {"type": "json_schema", "schema": _JUDGE_JSON_SCHEMA}},
+                )
 
-                create_kwargs["messages"] = [
-                    {"role": "user", "content": judge_prompt},
-                ]
-                create_kwargs["output_config"] = {
-                    "format": {"type": "json_schema", "schema": _JUDGE_JSON_SCHEMA}
-                }
-
-                response = await self.client.messages.create(**create_kwargs)
-
-                # extract text from response
-                response_text = ""
-                for block in response.content:
-                    if hasattr(block, "text"):
-                        response_text += block.text
-
-                result_json = json.loads(response_text)
+                result_json = json.loads(response.content[0].text)
                 usage = {
                     "input_tokens": response.usage.input_tokens,
                     "output_tokens": response.usage.output_tokens,
