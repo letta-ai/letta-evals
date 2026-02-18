@@ -26,8 +26,6 @@ class _JudgeResponse(PydanticBaseModel):
     rationale: str = PydanticField(description="Explanation of the grading decision")
 
 
-
-
 class RubricGrader(Grader):
     """Grader that uses an LLM judge with custom rubric prompts."""
 
@@ -142,9 +140,7 @@ class RubricGrader(Grader):
                     model=self.model,
                     max_tokens=4096,
                     temperature=temperature,
-                    system=[
-                        {"type": "text", "text": JUDGE_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
-                    ],
+                    system=[{"type": "text", "text": JUDGE_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
                     messages=[{"role": "user", "content": judge_prompt}],
                     output_config={"format": {"type": "json_schema", "schema": transform_schema(_JudgeResponse)}},
                 )
