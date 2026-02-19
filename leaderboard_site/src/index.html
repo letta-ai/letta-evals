@@ -114,24 +114,45 @@
     <script>
         document.documentElement.classList.remove('no-js');
 
-        // Tab switching functionality
+        // Tab switching functionality with hash-based URL routing
         const tabButtons = document.querySelectorAll('.tab-button');
         const tabContents = document.querySelectorAll('.tab-content');
+
+        function activateTab(tabName) {
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+
+            const matchedButton = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
+            const activeContent = document.querySelector(`[data-content="${tabName}"]`);
+
+            if (matchedButton && activeContent) {
+                matchedButton.classList.add('active');
+                activeContent.classList.add('active');
+            } else {
+                // Fallback to first tab
+                const firstButton = document.querySelector('.tab-button');
+                const firstContent = document.querySelector('.tab-content');
+                if (firstButton) firstButton.classList.add('active');
+                if (firstContent) firstContent.classList.add('active');
+            }
+        }
+
+        // On page load, activate tab from hash (e.g. #filesystem)
+        const hashTab = window.location.hash.replace('#', '');
+        if (hashTab) {
+            activateTab(hashTab);
+        }
+
+        // Handle browser back/forward
+        window.addEventListener('hashchange', () => {
+            const tab = window.location.hash.replace('#', '');
+            activateTab(tab);
+        });
 
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
                 const tabName = button.getAttribute('data-tab');
-
-                // Remove active class from all tabs and contents
-                tabButtons.forEach(btn => btn.classList.remove('active'));
-                tabContents.forEach(content => content.classList.remove('active'));
-
-                // Add active class to clicked tab and corresponding content
-                button.classList.add('active');
-                const activeContent = document.querySelector(`[data-content="${tabName}"]`);
-                if (activeContent) {
-                    activeContent.classList.add('active');
-                }
+                window.location.hash = tabName;
             });
         });
 
