@@ -26,9 +26,17 @@ MODEL_COSTS = {
         "prompt_tokens": 3,
         "completion_tokens": 15,
     },
+    "anthropic/claude-sonnet-4-6": {
+        "prompt_tokens": 3,
+        "completion_tokens": 15,
+    },
     "anthropic/claude-haiku-4-5-20251001": {
         "prompt_tokens": 1,
         "completion_tokens": 5,
+    },
+    "google_ai/gemini-3.1-pro-preview": {
+        "prompt_tokens": 2,
+        "completion_tokens": 12,
     },
     "google_ai/gemini-3-pro-preview": {
         "prompt_tokens": 2,
@@ -122,6 +130,18 @@ MODEL_COSTS = {
         "prompt_tokens": 0.6,
         "completion_tokens": 2.2,
     },
+    "z-ai/glm-5": {
+        "prompt_tokens": 1,
+        "completion_tokens": 3.2,
+    },
+    "minimax/minimax-m2.5": {
+        "prompt_tokens": 0.3,
+        "completion_tokens": 1.2,
+    },
+    "moonshotai/kimi-k2.5": {
+        "prompt_tokens": 0.23,
+        "completion_tokens": 3,
+    }, 
 }
 
 
@@ -133,6 +153,7 @@ MODEL_ALIASES = {
     "openai/gpt-5.2-2025-12-11": ["gpt-5.2-xhigh"],
     "moonshotai/kimi-k2-0905": ["kimi-k2"],
     "mistralai/mistral-large-2512": ["mistral-large-3"],
+    "google_ai/gemini-3.1-pro-preview": ["gemini-3.1"],
     "google_ai/gemini-3-pro-preview": ["gemini-3-pro", "gemini-3"],
     "google_ai/gemini-3-flash-preview": ["gemini-3-flash"],
 }
