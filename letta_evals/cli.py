@@ -21,13 +21,18 @@ console = Console()
 def run(
     suite_path: Path = typer.Argument(..., help="Path to suite YAML file"),
     output: Optional[Path] = typer.Option(
-        None, "--output", "-o", help="Stream header, summary, and per-instance results to directory"
+        None,
+        "--output",
+        "-o",
+        help="Stream header, summary, and per-instance results to directory. Overrides suite config if provided.",
     ),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
     display: Optional[str] = typer.Option(
         None, "--display", help="Display style: 'rich' (default), 'simple', or 'none'"
     ),
-    max_concurrent: int = typer.Option(15, "--max-concurrent", help="Maximum concurrent evaluations"),
+    max_concurrent: Optional[int] = typer.Option(
+        None, "--max-concurrent", help="Maximum concurrent evaluations. Overrides suite config if provided."
+    ),
     cached: Optional[Path] = typer.Option(
         None, "--cached", "-c", help="Path to cached results (JSONL) for re-grading trajectories"
     ),
@@ -63,10 +68,18 @@ def run(
         console.print(f"[red]Error: Suite file not found: {suite_path}[/red]")
         raise typer.Exit(1)
 
+    effective_max_concurrent = 15
+    effective_output = output
+
     try:
         with open(suite_path, "r") as f:
             yaml_data = yaml.safe_load(f)
         suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent)
+
+        effective_max_concurrent = (
+            max_concurrent if max_concurrent is not None else (suite.max_concurrent if suite.max_concurrent is not None else 15)
+        )
+        effective_output = output if output is not None else suite.output
 
         samples = list(load_dataset(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
         num_samples = len(samples)
@@ -91,7 +104,7 @@ def run(
             )
         else:
             console.print(f"[cyan]Total samples: {num_samples}[/cyan]")
-        console.print(f"[cyan]Max concurrent: {max_concurrent}[/cyan]")
+        console.print(f"[cyan]Max concurrent: {effective_max_concurrent}[/cyan]")
 
         if cached:
             console.print(f"[yellow]Using cached trajectories from: {cached}[/yellow]")
@@ -128,10 +141,10 @@ def run(
 
         return await run_suite(
             suite_path,
-            max_concurrent=max_concurrent,
+            max_concurrent=effective_max_concurrent,
             progress_style=style,
             cached_results_path=cached,
-            output_path=output,
+            output_path=effective_output,
             letta_api_key=api_key,
             letta_base_url=base_url,
             letta_project_id=project_id,
@@ -146,19 +159,19 @@ def run(
             if result.run_statistics is not None:
                 display_aggregate_statistics(result.run_statistics)
 
-        if output and not quiet:
+        if effective_output and not quiet:
             if result.run_statistics is not None:
                 # Multiple runs - output to subdirectories
                 num_runs_actual = result.run_statistics.num_runs
                 console.print(
-                    f"[green]Individual run results saved to {output}/run_1/ through {output}/run_{num_runs_actual}/[/green]"
+                    f"[green]Individual run results saved to {effective_output}/run_1/ through {effective_output}/run_{num_runs_actual}/[/green]"
                 )
-                console.print(f"[green]Aggregate statistics saved to {output}/aggregate_stats.json[/green]")
+                console.print(f"[green]Aggregate statistics saved to {effective_output}/aggregate_stats.json[/green]")
             else:
                 # Single run - output to main directory
-                console.print(f"[green]Results streamed to {output}/results.jsonl (JSONL)[/green]")
-                console.print(f"[green]Summary saved to {output}/summary.json[/green]")
-                console.print(f"[green]Header saved to {output}/header.json[/green]")
+                console.print(f"[green]Results streamed to {effective_output}/results.jsonl (JSONL)[/green]")
+                console.print(f"[green]Summary saved to {effective_output}/summary.json[/green]")
+                console.print(f"[green]Header saved to {effective_output}/header.json[/green]")
 
         if result.gates_passed:
             if not quiet:

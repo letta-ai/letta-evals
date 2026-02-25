@@ -99,6 +99,16 @@ letta-evals list-extractors
 letta-evals list-graders
 ```
 
+You can also set run defaults directly in `suite.yaml`:
+
+```yaml
+max_concurrent: 5
+output: results/
+```
+
+`output` supports both absolute and relative paths. Relative paths are resolved from the suite file's directory.
+CLI flags (`--max-concurrent`, `--output`) override suite values when provided.
+
 See the [`examples/`](examples/) directory for complete working examples of different eval types.
 
 ## Writing Evals
