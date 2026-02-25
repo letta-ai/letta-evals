@@ -39,11 +39,12 @@ def grade_fruit_preference(sample: Sample, submission: str) -> GradeResult:
             score=0.0, rationale=f"Wrong memory block label: expected 'user_fruit_preferences', got '{label}'"
         )
 
-    # check fruit name is in new_str
+    # check fruit name is in memory content
+    # Support both key names used across tool payload variants.
     fruit = sample.ground_truth.lower()
-    new_str = args.get("new_str", "").lower()
+    memory_content = str(args.get("new_str") or args.get("new_string") or "").lower()
 
-    if fruit not in new_str:
-        return GradeResult(score=0.0, rationale=f"Fruit '{fruit}' not found in new_str")
+    if fruit not in memory_content:
+        return GradeResult(score=0.0, rationale=f"Fruit '{fruit}' not found in memory_insert content")
 
     return GradeResult(score=1.0, rationale="Fruit preference correctly stored")
