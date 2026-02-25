@@ -77,7 +77,9 @@ def run(
         suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent)
 
         effective_max_concurrent = (
-            max_concurrent if max_concurrent is not None else (suite.max_concurrent if suite.max_concurrent is not None else 15)
+            max_concurrent
+            if max_concurrent is not None
+            else (suite.max_concurrent if suite.max_concurrent is not None else 15)
         )
         effective_output = output if output is not None else suite.output
 
