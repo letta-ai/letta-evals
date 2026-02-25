@@ -388,6 +388,8 @@ class SuiteSpec(BaseModel):
     max_samples: Optional[int] = Field(default=None, description="Maximum number of samples to evaluate")
     sample_tags: Optional[List[str]] = Field(default=None, description="Only evaluate samples with these tags")
     num_runs: Optional[int] = Field(default=1, description="Number of times to run the evaluation suite")
+    max_concurrent: Optional[int] = Field(default=None, description="Maximum concurrent evaluations")
+    output: Optional[Path] = Field(default=None, description="Directory where evaluation results are written")
 
     setup_script: Optional[str] = Field(
         default=None, description="Path to Python script with setup function (e.g., setup.py:prepare_evaluation)"
@@ -403,6 +405,10 @@ class SuiteSpec(BaseModel):
             # resolve dataset path
             if "dataset" in yaml_data and not Path(yaml_data["dataset"]).is_absolute():
                 yaml_data["dataset"] = str((base_dir / yaml_data["dataset"]).resolve())
+
+            # resolve output path
+            if "output" in yaml_data and yaml_data["output"] and not Path(yaml_data["output"]).is_absolute():
+                yaml_data["output"] = str((base_dir / yaml_data["output"]).resolve())
 
             # resolve target paths
             if "target" in yaml_data:
