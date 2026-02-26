@@ -103,9 +103,7 @@ def check_server(errors: list[dict]) -> list[dict]:
             items = messages.items
             entry["server_total_messages"] = len(items)
             entry["server_last_message_type"] = items[-1].message_type if items else None
-            entry["server_agent_completed"] = (
-                items[-1].message_type == "assistant_message" if items else False
-            )
+            entry["server_agent_completed"] = items[-1].message_type == "assistant_message" if items else False
 
             # Collect run_ids from messages
             msg_run_ids = set()
@@ -126,18 +124,14 @@ def check_server(errors: list[dict]) -> list[dict]:
                 entry["ghost_run_status"] = ghost.status
                 entry["ghost_run_stop_reason"] = ghost.stop_reason
                 error_meta = ghost.metadata.get("error", {}) if ghost.metadata else {}
-                entry["ghost_run_error"] = error_meta.get(
-                    "detail", error_meta.get("message", "")
-                )
+                entry["ghost_run_error"] = error_meta.get("detail", error_meta.get("message", ""))
 
             # Check for zero-token completions
             if entry["classification"] == "extraction" and len(items) <= 2:
                 try:
                     all_runs = client.runs.list(agent_id=aid, limit=10)
                     if all_runs.items:
-                        steps = client.runs.steps.list(
-                            run_id=all_runs.items[0].id, limit=10
-                        )
+                        steps = client.runs.steps.list(run_id=all_runs.items[0].id, limit=10)
                         if steps.items:
                             step = steps.items[0]
                             entry["step_completion_tokens"] = step.completion_tokens
@@ -166,9 +160,9 @@ def print_summary(errors: list[dict], check_server_flag: bool):
         model = e.get("model_name", "unknown")
         by_model.setdefault(model, []).append(e)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Error Analysis: {len(errors)} total errors")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     for model, model_errors in sorted(by_model.items()):
         classifications = Counter(e["classification"] for e in model_errors)
@@ -180,7 +174,7 @@ def print_summary(errors: list[dict], check_server_flag: bool):
             completed = sum(1 for e in model_errors if e.get("server_agent_completed"))
             ghost = sum(1 for e in model_errors if e.get("ghost_run_count", 0) > 0)
             if completed:
-                print(f"    --- server check ---")
+                print("    --- server check ---")
                 print(f"    agent actually completed: {completed}/{len(model_errors)}")
             if ghost:
                 print(f"    agents with ghost runs: {ghost}/{len(model_errors)}")
