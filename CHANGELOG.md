@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.11.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.10.0...letta-evals-v0.11.0) (2026-02-26)
+
+
+### Features
+
+* Add analyzing-eval-errors skill ([#199](https://github.com/letta-ai/letta-evals/issues/199)) ([f3a9ce6](https://github.com/letta-ai/letta-evals/commit/f3a9ce66ffeb56b750ee3fe5c3e19e320803d89a))
+* Add flags attribute to LettaCodeTargetSpec ([#186](https://github.com/letta-ai/letta-evals/issues/186)) ([0b63014](https://github.com/letta-ai/letta-evals/commit/0b630142c9cc00227d8445c41bbe7f5f58e0a226))
+* Add shareable URLs for leaderboard tabs ([#194](https://github.com/letta-ai/letta-evals/issues/194)) ([cc61f51](https://github.com/letta-ai/letta-evals/commit/cc61f5143be4071b783a8aab805ba26122274bbb))
+* Add token-level data (IDs + logprobs) to TargetResult for training ([#185](https://github.com/letta-ai/letta-evals/issues/185)) ([70950d7](https://github.com/letta-ai/letta-evals/commit/70950d707650942aa840bc0e57a38e90574d85fa))
+* Filesystem leaderboard refresh with code agent results ([#188](https://github.com/letta-ai/letta-evals/issues/188)) ([be3a886](https://github.com/letta-ai/letta-evals/commit/be3a8866c34492965c34d45f02abbb0e964a655c))
+* Replace agent_loading with agent_created callback for earlier agent_id surfacing ([#190](https://github.com/letta-ai/letta-evals/issues/190)) ([288c544](https://github.com/letta-ai/letta-evals/commit/288c544f94ff8e46d82f3a6d7b3e4325d1415ec6))
+* Replace Anthropic prefill trick with structured outputs for rubric grading ([#192](https://github.com/letta-ai/letta-evals/issues/192)) ([1679fee](https://github.com/letta-ai/letta-evals/commit/1679feee3c3f5567f3ac2517a655a230cbc1c47b))
+* Structured error reporting in eval results ([#180](https://github.com/letta-ai/letta-evals/issues/180)) ([56bdd6b](https://github.com/letta-ai/letta-evals/commit/56bdd6bf9823fe2ad2284343d3ea2e420a7f961a))
+
+
+### Bug Fixes
+
+* Capture agent_id on timeout for letta code ([#182](https://github.com/letta-ai/letta-evals/issues/182)) ([a4551c8](https://github.com/letta-ai/letta-evals/commit/a4551c821ff21044c3265b94353e38e2a91de4fb))
+* Include .af agent files in pip package ([#193](https://github.com/letta-ai/letta-evals/issues/193)) ([d12cb72](https://github.com/letta-ai/letta-evals/commit/d12cb72bf3a699eaa02c80008ba5ea63166667a5))
+* Move metric aggregate update before render in rich progress ([#191](https://github.com/letta-ai/letta-evals/issues/191)) ([d40cb0a](https://github.com/letta-ai/letta-evals/commit/d40cb0a880fcaeb8dd2d6a5948c07f0fa8e06341))
+* Report grading errors to progress callback ([#187](https://github.com/letta-ai/letta-evals/issues/187)) ([9584eb7](https://github.com/letta-ai/letta-evals/commit/9584eb7ed35189182cde8197afe153ecbe5ce86d))
+* Sonnet 4.6 configs and leaderboard type ([#189](https://github.com/letta-ai/letta-evals/issues/189)) ([c820105](https://github.com/letta-ai/letta-evals/commit/c8201050732a0b9857d7a7e351cb6aaaff2f21e3))
+* Support `new_string` in custom fruit grader example ([#198](https://github.com/letta-ai/letta-evals/issues/198)) ([bc9266b](https://github.com/letta-ai/letta-evals/commit/bc9266b653cb0f441717f143f4925d50357121c4))
+* Support max_concurrent and output in suite YAML ([#197](https://github.com/letta-ai/letta-evals/issues/197)) ([c838fc0](https://github.com/letta-ai/letta-evals/commit/c838fc0b29af7f84b06dc3252cfd9225c6369868))
+
+
+### Chores
+
+* Track cached tokens with letta code ([#184](https://github.com/letta-ai/letta-evals/issues/184)) ([360d777](https://github.com/letta-ai/letta-evals/commit/360d777a4e0eb499b5a03012544ecbc8a750bbc3))
+
 ## [0.10.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.9.0...letta-evals-v0.10.0) (2026-02-11)
 
 
