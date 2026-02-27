@@ -1,6 +1,5 @@
 import json
 import logging
-import time
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -8,7 +7,6 @@ from letta_client import AsyncLetta
 from letta_client.types import MessageCreateParam
 from letta_client.types.agents import ToolCall, ToolCallMessage
 
-from letta_evals.extractors import extractor_requires_agent_state, get_extractor
 from letta_evals.graders.base import Grader
 from letta_evals.graders.prompt_utils import build_judge_prompt
 from letta_evals.models import AgentState, GradeResult, LettaMessageUnion, Sample
@@ -47,33 +45,19 @@ class AgentJudgeGrader(Grader):
         self.extractor_name = extractor
         self.base_dir = base_dir
         self.rubric_vars = rubric_vars or []
-        self.extractor = get_extractor(extractor, extractor_config, base_dir=base_dir)
-        self._requires_agent_state = extractor_requires_agent_state(extractor, base_dir=base_dir)
+        self._init_extractor(extractor, extractor_config, base_dir=base_dir)
 
         # validate agent file contains the required tool with correct schema (only if agent_file is provided)
         if self.agent_file:
             self._validate_agent_file()
 
-    @property
-    def requires_agent_state(self) -> bool:
-        """Whether this grader's extractor requires agent_state."""
-        return self._requires_agent_state
-
     async def grade(
         self, sample: Sample, trajectory: List[List[LettaMessageUnion]], agent_state: Optional[AgentState] = None
     ) -> Tuple[GradeResult, str]:
         """Grade using agent judge with rubric."""
-        # Validate trajectory before extraction
-        if not trajectory or not any(turn for turn in trajectory if turn):
-            return GradeResult(score=0.0, rationale="Empty trajectory - agent produced no messages"), ""
-
-        t_extract = time.perf_counter()
-        submission = self.extractor(trajectory, agent_state=agent_state)
-        extraction_time = time.perf_counter() - t_extract
-
-        # Validate submission after extraction
-        if not submission:
-            return GradeResult(score=0.0, rationale="Empty submission - extractor found no content"), ""
+        submission, extraction_time, early = self.extract(trajectory, agent_state)
+        if early:
+            return early
 
         judge_prompt = build_judge_prompt(
             self.prompt, sample, submission, self.rubric_vars, judge_tool_name=self.judge_tool_name
