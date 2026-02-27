@@ -721,6 +721,42 @@ class Runner:
                 raise
 
     @staticmethod
+    def _compute_usage_metrics(results: List[SampleResult]) -> Optional[UsageMetrics]:
+        """Compute aggregate usage metrics from a list of sample results."""
+        costs = [r.cost for r in results if r.cost is not None]
+        total_cost = sum(costs) if costs else None
+
+        total_prompt = sum(r.prompt_tokens for r in results if r.prompt_tokens is not None)
+        total_completion = sum(r.completion_tokens for r in results if r.completion_tokens is not None)
+        total_cached = sum(r.cached_input_tokens for r in results if r.cached_input_tokens is not None)
+        total_cache_write = sum(r.cache_write_tokens for r in results if r.cache_write_tokens is not None)
+        total_reasoning = sum(r.reasoning_tokens for r in results if r.reasoning_tokens is not None)
+
+        if total_prompt > 0 or total_completion > 0 or (total_cost is not None and total_cost > 0):
+            return UsageMetrics(
+                total_prompt_tokens=total_prompt,
+                total_completion_tokens=total_completion,
+                total_cost=total_cost if total_cost and total_cost > 0 else None,
+                total_cached_input_tokens=total_cached,
+                total_cache_write_tokens=total_cache_write,
+                total_reasoning_tokens=total_reasoning,
+            )
+        return None
+
+    @staticmethod
+    def _compute_error_summary(results: List[SampleResult]) -> Optional[ErrorSummary]:
+        """Compute error summary from a list of sample results."""
+        error_results = [r for r in results if r.error is not None]
+        if not error_results:
+            return None
+        return ErrorSummary(
+            total_errors=len(error_results),
+            by_category=dict(Counter(r.error.category.value for r in error_results)),
+            by_exception_type=dict(Counter(r.error.exception_type for r in error_results)),
+            failed_sample_ids=sorted(r.sample.id for r in error_results),
+        )
+
+    @staticmethod
     def _compute_timing_metrics(results: List[SampleResult]) -> Optional[TimingMetrics]:
         """Compute aggregate timing statistics from a list of sample results."""
         total_times = [r.total_time for r in results if r.total_time is not None]
@@ -776,18 +812,7 @@ class Runner:
 
         attempted = sum(1 for r in self.results if is_success(r))
 
-        # Build error summary
-        error_results = [r for r in self.results if r.error is not None]
-        error_summary = None
-        if error_results:
-            category_counts = Counter(r.error.category.value for r in error_results)
-            exception_type_counts = Counter(r.error.exception_type for r in error_results)
-            error_summary = ErrorSummary(
-                total_errors=len(error_results),
-                by_category=dict(category_counts),
-                by_exception_type=dict(exception_type_counts),
-                failed_sample_ids=sorted(r.sample.id for r in error_results),
-            )
+        error_summary = self._compute_error_summary(self.results)
 
         # compute per-metric aggregates if multiple graders
         by_metric: Dict[str, MetricAggregate] = {}
@@ -826,37 +851,7 @@ class Runner:
             default_key = "default"
             metrics_dict[default_key] = avg_score_attempted * 100.0
 
-        # Calculate overall cost and token aggregates
-        costs = [r.cost for r in self.results if r.cost is not None]
-        total_cost = sum(costs) if costs else None
-
-        prompt_tokens_list = [r.prompt_tokens for r in self.results if r.prompt_tokens is not None]
-        total_prompt_tokens = sum(prompt_tokens_list) if prompt_tokens_list else 0
-
-        completion_tokens_list = [r.completion_tokens for r in self.results if r.completion_tokens is not None]
-        total_completion_tokens = sum(completion_tokens_list) if completion_tokens_list else 0
-
-        cached_input_tokens_list = [r.cached_input_tokens for r in self.results if r.cached_input_tokens is not None]
-        total_cached_input_tokens = sum(cached_input_tokens_list) if cached_input_tokens_list else 0
-
-        cache_write_tokens_list = [r.cache_write_tokens for r in self.results if r.cache_write_tokens is not None]
-        total_cache_write_tokens = sum(cache_write_tokens_list) if cache_write_tokens_list else 0
-
-        reasoning_tokens_list = [r.reasoning_tokens for r in self.results if r.reasoning_tokens is not None]
-        total_reasoning_tokens = sum(reasoning_tokens_list) if reasoning_tokens_list else 0
-
-        # Create UsageMetrics if we have any token or cost data
-        usage_metrics = None
-        if total_prompt_tokens > 0 or total_completion_tokens > 0 or (total_cost is not None and total_cost > 0):
-            usage_metrics = UsageMetrics(
-                total_prompt_tokens=total_prompt_tokens,
-                total_completion_tokens=total_completion_tokens,
-                total_cost=total_cost if total_cost and total_cost > 0 else None,
-                total_cached_input_tokens=total_cached_input_tokens,
-                total_cache_write_tokens=total_cache_write_tokens,
-                total_reasoning_tokens=total_reasoning_tokens,
-            )
-
+        usage_metrics = self._compute_usage_metrics(self.results)
         timing_metrics = self._compute_timing_metrics(self.results)
 
         per_model = None
@@ -899,63 +894,9 @@ class Runner:
                 model_avg_attempted = sum(model_scores) / len(model_scores) if model_scores else 0.0
                 model_avg_total = sum(model_scores) / len(results) if model_scores else 0.0
 
-                # Calculate cost and token counts for this model
-                model_costs = [r.cost for r in results if r.cost is not None]
-                model_total_cost = sum(model_costs) if model_costs else None
-
-                model_prompt_tokens_list = [r.prompt_tokens for r in results if r.prompt_tokens is not None]
-                model_total_prompt_tokens = sum(model_prompt_tokens_list) if model_prompt_tokens_list else 0
-
-                model_completion_tokens_list = [r.completion_tokens for r in results if r.completion_tokens is not None]
-                model_total_completion_tokens = sum(model_completion_tokens_list) if model_completion_tokens_list else 0
-
-                model_cached_input_tokens_list = [
-                    r.cached_input_tokens for r in results if r.cached_input_tokens is not None
-                ]
-                model_total_cached_input_tokens = (
-                    sum(model_cached_input_tokens_list) if model_cached_input_tokens_list else 0
-                )
-
-                model_cache_write_tokens_list = [
-                    r.cache_write_tokens for r in results if r.cache_write_tokens is not None
-                ]
-                model_total_cache_write_tokens = (
-                    sum(model_cache_write_tokens_list) if model_cache_write_tokens_list else 0
-                )
-
-                model_reasoning_tokens_list = [r.reasoning_tokens for r in results if r.reasoning_tokens is not None]
-                model_total_reasoning_tokens = sum(model_reasoning_tokens_list) if model_reasoning_tokens_list else 0
-
-                # Create UsageMetrics for this model if we have any token or cost data
-                model_usage_metrics = None
-                if (
-                    model_total_prompt_tokens > 0
-                    or model_total_completion_tokens > 0
-                    or (model_total_cost is not None and model_total_cost > 0)
-                ):
-                    model_usage_metrics = UsageMetrics(
-                        total_prompt_tokens=model_total_prompt_tokens,
-                        total_completion_tokens=model_total_completion_tokens,
-                        total_cost=model_total_cost if model_total_cost and model_total_cost > 0 else None,
-                        total_cached_input_tokens=model_total_cached_input_tokens,
-                        total_cache_write_tokens=model_total_cache_write_tokens,
-                        total_reasoning_tokens=model_total_reasoning_tokens,
-                    )
-
+                model_usage_metrics = self._compute_usage_metrics(results)
                 model_timing_metrics = self._compute_timing_metrics(results)
-
-                # Build per-model error summary
-                model_error_results = [r for r in results if r.error is not None]
-                model_error_summary = None
-                if model_error_results:
-                    model_category_counts = Counter(r.error.category.value for r in model_error_results)
-                    model_exception_type_counts = Counter(r.error.exception_type for r in model_error_results)
-                    model_error_summary = ErrorSummary(
-                        total_errors=len(model_error_results),
-                        by_category=dict(model_category_counts),
-                        by_exception_type=dict(model_exception_type_counts),
-                        failed_sample_ids=sorted(r.sample.id for r in model_error_results),
-                    )
+                model_error_summary = self._compute_error_summary(results)
 
                 per_model.append(
                     ModelMetrics(
