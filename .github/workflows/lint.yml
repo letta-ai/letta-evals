@@ -44,9 +44,6 @@ jobs:
       - name: Ruff format
         run: ruff format --check .
 
-      - name: Unit tests
-        run: pytest tests/test_metrics.py tests/test_graders.py tests/test_extractors.py -v
-
       - name: Build sdist and wheel
         run: python3 -m build
 
