@@ -2,6 +2,7 @@ import inspect
 import json
 import logging
 import os
+import time
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -37,6 +38,7 @@ from letta_evals.models import (
     SimpleCondition,
     SimpleGateSpec,
     SuiteSpec,
+    TimingMetrics,
     ToolGraderSpec,
     UsageMetrics,
     WeightedAverageGateSpec,
@@ -379,17 +381,22 @@ class Runner:
                 if self.progress_callback:
                     await self.progress_callback.sample_started(sample_id, model_name=model_name)
 
+                t_sample_start = time.perf_counter()
+
                 # check if any grader needs agent_state
                 retrieve_agent_state = self._requires_agent_state()
                 trajectory, agent_id, model_name, agent_usage, agent_state = await self._get_or_run_trajectory(
                     sample, llm_config, retrieve_agent_state=retrieve_agent_state
                 )
 
+                target_time = time.perf_counter() - t_sample_start
+
                 if self.progress_callback:
                     await self.progress_callback.grading_started(sample_id, agent_id=agent_id, model_name=model_name)
 
                 grades_dict: Optional[Dict[str, GradeResult]] = {}
                 submissions_dict: Optional[Dict[str, str]] = {}
+                per_grader_time: Dict[str, float] = {}
 
                 # Check if this is a per-turn evaluation (both input and ground_truth are lists)
                 if is_per_turn_evaluation(sample):
@@ -399,6 +406,8 @@ class Runner:
 
                     for key, grader in self.graders.items():  # type: ignore[union-attr]
                         per_turn_grades: List[PerTurnGrade] = []
+                        t_grader_start = time.perf_counter()
+                        grader_extraction_time = 0.0
 
                         for turn_idx in range(num_turns):
                             # Create single-turn trajectory for this turn
@@ -418,6 +427,7 @@ class Runner:
                             turn_grade, turn_submission = await grader.grade(
                                 turn_sample, single_turn_trajectory, agent_state=agent_state
                             )
+                            grader_extraction_time += turn_grade.metadata.get("extraction_time", 0.0)
 
                             per_turn_grades.append(
                                 PerTurnGrade(
@@ -441,6 +451,8 @@ class Runner:
                                     model_name=model_name,
                                 )
 
+                        per_grader_time[key] = time.perf_counter() - t_grader_start
+
                         # Calculate proportional score (average across turns)
                         turn_scores = [g.score for g in per_turn_grades]
                         final_score = sum(turn_scores) / num_turns if num_turns > 0 else 0.0
@@ -459,13 +471,16 @@ class Runner:
                             metadata={
                                 "turns_passed": turns_passed,
                                 "turns_total": num_turns,
+                                "extraction_time": grader_extraction_time,
                             },
                         )
                         submissions_dict[key] = combined_submission
                 else:
                     # Standard evaluation: grade the full trajectory against single ground_truth
                     for key, grader in self.graders.items():  # type: ignore[union-attr]
+                        t_grader_start = time.perf_counter()
                         gr, sub = await grader.grade(sample, trajectory, agent_state=agent_state)
+                        per_grader_time[key] = time.perf_counter() - t_grader_start
                         grades_dict[key] = gr
                         submissions_dict[key] = sub
 
@@ -536,6 +551,10 @@ class Runner:
                     extract_token_counts(agent_usage)
                 )
 
+                # Calculate timing
+                total_time = time.perf_counter() - t_sample_start
+                extraction_time = sum(gr.metadata.get("extraction_time", 0.0) for gr in grades_dict.values())
+
                 return SampleResult(
                     sample=sample,
                     submission=submission,
@@ -552,6 +571,10 @@ class Runner:
                     cached_input_tokens=cached_input_tokens if cached_input_tokens > 0 else None,
                     cache_write_tokens=cache_write_tokens if cache_write_tokens > 0 else None,
                     reasoning_tokens=reasoning_tokens if reasoning_tokens > 0 else None,
+                    total_time=total_time,
+                    target_time=target_time,
+                    extraction_time=extraction_time if extraction_time > 0 else None,
+                    per_grader_time=per_grader_time if per_grader_time else None,
                     error=error_info,
                 )
             except Exception as e:
@@ -697,6 +720,38 @@ class Runner:
                 # Re-raise to preserve original error/interrupt semantics
                 raise
 
+    @staticmethod
+    def _compute_timing_metrics(results: List[SampleResult]) -> Optional[TimingMetrics]:
+        """Compute aggregate timing statistics from a list of sample results."""
+        total_times = [r.total_time for r in results if r.total_time is not None]
+        if not total_times:
+            return None
+
+        target_times = [r.target_time for r in results if r.target_time is not None]
+        extraction_times = [r.extraction_time for r in results if r.extraction_time is not None]
+
+        n = len(total_times)
+        sorted_totals = sorted(total_times)
+
+        # Aggregate per-grader times
+        grader_keys: set = set()
+        for r in results:
+            if r.per_grader_time:
+                grader_keys.update(r.per_grader_time.keys())
+        per_grader_mean: Dict[str, float] = {}
+        for k in sorted(grader_keys):
+            vals = [r.per_grader_time[k] for r in results if r.per_grader_time and k in r.per_grader_time]
+            per_grader_mean[k] = sum(vals) / len(vals) if vals else 0.0
+
+        return TimingMetrics(
+            mean_total_seconds=sum(total_times) / n,
+            mean_target_seconds=sum(target_times) / len(target_times) if target_times else 0.0,
+            mean_extraction_seconds=sum(extraction_times) / len(extraction_times) if extraction_times else 0.0,
+            p50_total_seconds=sorted_totals[n // 2],
+            p95_total_seconds=sorted_totals[min(int(n * 0.95), n - 1)],
+            per_grader_mean_seconds=per_grader_mean if per_grader_mean else None,
+        )
+
     def _calculate_metrics(self) -> Metrics:
         """Calculate aggregate metrics from results.
 
@@ -802,6 +857,8 @@ class Runner:
                 total_reasoning_tokens=total_reasoning_tokens,
             )
 
+        timing_metrics = self._compute_timing_metrics(self.results)
+
         per_model = None
         if self.suite.target.model_configs or self.suite.target.model_handles:
             model_results = defaultdict(list)
@@ -885,6 +942,8 @@ class Runner:
                         total_reasoning_tokens=model_total_reasoning_tokens,
                     )
 
+                model_timing_metrics = self._compute_timing_metrics(results)
+
                 # Build per-model error summary
                 model_error_results = [r for r in results if r.error is not None]
                 model_error_summary = None
@@ -907,6 +966,7 @@ class Runner:
                         avg_score_total=model_avg_total,
                         metrics=model_metrics_dict,
                         usage_metrics=model_usage_metrics,
+                        timing_metrics=model_timing_metrics,
                         error_summary=model_error_summary,
                     )
                 )
@@ -920,6 +980,7 @@ class Runner:
             by_metric=by_metric if by_metric else None,
             metrics=metrics_dict,
             usage_metrics=usage_metrics,
+            timing_metrics=timing_metrics,
             error_summary=error_summary,
         )
 
