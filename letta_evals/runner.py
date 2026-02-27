@@ -491,12 +491,14 @@ class Runner:
 
         async with self.semaphore:
             agent_id = None
+            phase = ErrorCategory.UNKNOWN
             t_sample_start = time.perf_counter()
             try:
                 if self.progress_callback:
                     await self.progress_callback.sample_started(sample_id, model_name=model_name)
 
                 # check if any grader needs agent_state
+                phase = ErrorCategory.TARGET
                 retrieve_agent_state = self._requires_agent_state()
                 trajectory, agent_id, model_name, agent_usage, agent_state = await self._get_or_run_trajectory(
                     sample, llm_config, retrieve_agent_state=retrieve_agent_state
@@ -507,6 +509,7 @@ class Runner:
                 if self.progress_callback:
                     await self.progress_callback.grading_started(sample_id, agent_id=agent_id, model_name=model_name)
 
+                phase = ErrorCategory.GRADING
                 grades_dict, submissions_dict, per_grader_time = await self._grade_sample(
                     sample, trajectory, agent_state, sample_id, agent_id, model_name
                 )
@@ -611,12 +614,7 @@ class Runner:
                 agent_str = f" ({agent_id})" if agent_id else ""
                 log_message = str(e) or type(e).__name__
                 logger.error(f"Error running sample {sample_id + 1}{agent_str} with model {model_name}: {log_message}")
-                if isinstance(e, TargetError):
-                    category = ErrorCategory.TARGET
-                elif agent_id:
-                    category = ErrorCategory.GRADING
-                else:
-                    category = ErrorCategory.UNKNOWN
+                category = ErrorCategory.TARGET if isinstance(e, TargetError) else phase
                 cause = e.__cause__ if e.__cause__ else e
                 error_message = str(e) or type(cause).__name__
                 error_info = ErrorInfo(
