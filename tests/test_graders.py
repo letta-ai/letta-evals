@@ -163,3 +163,24 @@ class TestToolGraderEdgeCases:
         result, submission = await grader.grade(sample, trajectory)
         assert result.score == 1.0
         assert submission == "second message"
+
+    @pytest.mark.asyncio
+    async def test_trajectory_with_no_assistant_messages(self, grader):
+        """Trajectory exists but has no assistant messages — extractor returns empty."""
+        from letta_client.types.agents import UserMessage
+
+        sample = _make_sample("answer")
+        trajectory = [[UserMessage(id="msg-0", message_type="user_message", date=_FAKE_DATE, content="hello")]]
+        result, submission = await grader.grade(sample, trajectory)
+        assert result.score == 0.0
+        assert "Empty submission" in result.rationale
+
+
+class TestToolGraderConstructor:
+    def test_invalid_function_name_raises(self):
+        with pytest.raises(ValueError, match="not found in registry"):
+            ToolGrader(function="nonexistent_function")
+
+    def test_invalid_module_path_raises(self):
+        with pytest.raises((ValueError, ImportError, ModuleNotFoundError)):
+            ToolGrader(function="fake_module:fake_func")

@@ -26,6 +26,9 @@ def _make_result(
     cost: float | None = 0.01,
     prompt_tokens: int | None = 100,
     completion_tokens: int | None = 50,
+    cached_input_tokens: int | None = None,
+    cache_write_tokens: int | None = None,
+    reasoning_tokens: int | None = None,
     total_time: float | None = 5.0,
     target_time: float | None = 4.5,
     extraction_time: float | None = 0.001,
@@ -45,6 +48,9 @@ def _make_result(
         cost=cost,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
+        cached_input_tokens=cached_input_tokens,
+        cache_write_tokens=cache_write_tokens,
+        reasoning_tokens=reasoning_tokens,
         total_time=total_time,
         target_time=target_time,
         extraction_time=extraction_time,
@@ -91,6 +97,45 @@ class TestComputeUsageMetrics:
             _make_result(prompt_tokens=None, completion_tokens=None, cost=None),
         ]
         usage = compute_usage_metrics(results)
+        assert usage is None
+
+    def test_cached_and_reasoning_tokens(self):
+        results = [
+            _make_result(
+                prompt_tokens=100,
+                completion_tokens=50,
+                cached_input_tokens=30,
+                cache_write_tokens=20,
+                reasoning_tokens=10,
+            ),
+            _make_result(
+                prompt_tokens=200,
+                completion_tokens=100,
+                cached_input_tokens=60,
+                cache_write_tokens=40,
+                reasoning_tokens=25,
+            ),
+        ]
+        usage = compute_usage_metrics(results)
+        assert usage is not None
+        assert usage.total_cached_input_tokens == 90
+        assert usage.total_cache_write_tokens == 60
+        assert usage.total_reasoning_tokens == 35
+
+    def test_only_cached_tokens_returns_none(self):
+        """When only cached/reasoning tokens are present (no prompt/completion/cost), returns None."""
+        results = [
+            _make_result(
+                prompt_tokens=None,
+                completion_tokens=None,
+                cost=None,
+                cached_input_tokens=100,
+                cache_write_tokens=50,
+                reasoning_tokens=25,
+            ),
+        ]
+        usage = compute_usage_metrics(results)
+        # The condition requires prompt > 0 or completion > 0 or cost > 0
         assert usage is None
 
     def test_empty_results(self):
@@ -280,8 +325,58 @@ class TestCalculateMetrics:
         metrics = calculate_metrics(results, None, has_multi_model=False)
         assert metrics.per_model is None
 
-    def test_usage_and_timing_present(self):
-        results = [_make_result(cost=0.01, prompt_tokens=100, total_time=5.0)]
+    def test_multi_model_multi_grader(self):
+        """Per-model metrics with multiple grader keys."""
+        results = [
+            _make_result(
+                sample_id=0,
+                score=1.0,
+                model_name="gpt-4o",
+                grades={
+                    "accuracy": GradeResult(score=1.0, rationale="ok"),
+                    "quality": GradeResult(score=0.8, rationale="ok"),
+                },
+            ),
+            _make_result(
+                sample_id=1,
+                score=0.6,
+                model_name="claude",
+                grades={
+                    "accuracy": GradeResult(score=0.6, rationale="ok"),
+                    "quality": GradeResult(score=0.4, rationale="ok"),
+                },
+            ),
+        ]
+        metrics = calculate_metrics(results, ["accuracy", "quality"], has_multi_model=True)
+        assert metrics.per_model is not None
+        assert len(metrics.per_model) == 2
+
+        gpt = next(m for m in metrics.per_model if m.model_name == "gpt-4o")
+        claude = next(m for m in metrics.per_model if m.model_name == "claude")
+
+        # per-model metrics dict should have both grader keys as pass rates
+        assert "accuracy" in gpt.metrics
+        assert "quality" in gpt.metrics
+        assert gpt.metrics["accuracy"] == pytest.approx(100.0)  # 1.0 * 100
+        assert gpt.metrics["quality"] == pytest.approx(80.0)  # 0.8 * 100
+        # avg_score uses first grader (accuracy)
+        assert gpt.avg_score_attempted == pytest.approx(1.0)
+
+        assert claude.metrics["accuracy"] == pytest.approx(60.0)
+        assert claude.avg_score_attempted == pytest.approx(0.6)
+
+    def test_usage_and_timing_values(self):
+        results = [
+            _make_result(cost=0.01, prompt_tokens=100, completion_tokens=50, total_time=5.0, target_time=4.0),
+            _make_result(cost=0.02, prompt_tokens=200, completion_tokens=100, total_time=10.0, target_time=9.0),
+        ]
         metrics = calculate_metrics(results, None, False)
+
         assert metrics.usage_metrics is not None
+        assert metrics.usage_metrics.total_prompt_tokens == 300
+        assert metrics.usage_metrics.total_completion_tokens == 150
+        assert metrics.usage_metrics.total_cost == pytest.approx(0.03)
+
         assert metrics.timing_metrics is not None
+        assert metrics.timing_metrics.mean_total_seconds == pytest.approx(7.5)
+        assert metrics.timing_metrics.mean_target_seconds == pytest.approx(6.5)
