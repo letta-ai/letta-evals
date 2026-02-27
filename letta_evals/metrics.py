@@ -123,7 +123,7 @@ def calculate_metrics(
 
     # compute per-metric aggregates if multiple graders
     by_metric: Dict[str, MetricAggregate] = {}
-    if grader_keys is not None:
+    if grader_keys:
         for metric_key in grader_keys:
             m_scores = [
                 r.grades[metric_key].score for r in results if is_success(r) and r.grades and metric_key in r.grades
@@ -139,7 +139,7 @@ def calculate_metrics(
             )
 
     metrics_dict: Dict[str, float] = {}
-    if grader_keys is not None:
+    if grader_keys:
         # use first grader for overall metrics
         first_key = grader_keys[0]
         for key, agg in by_metric.items():
@@ -170,7 +170,7 @@ def calculate_metrics(
             model_attempted = sum(1 for r in m_results if is_success(r))
             model_metrics_dict: Dict[str, float] = {}
 
-            if grader_keys is not None:
+            if grader_keys:
                 # use first grader for overall model metrics
                 first_key = grader_keys[0]
                 # calculate avg score for each metric
