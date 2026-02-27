@@ -360,6 +360,124 @@ class Runner:
             target_result.agent_state,
         )
 
+    async def _grade_per_turn(
+        self,
+        sample: Sample,
+        trajectory: List[List[LettaMessageUnion]],
+        agent_state: Optional[AgentState],
+        grader: Grader,
+        grader_key: str,
+        sample_id: int,
+        agent_id: str,
+        model_name: str,
+    ) -> tuple[GradeResult, str]:
+        """Grade each turn independently and return averaged GradeResult + combined submission."""
+        ground_truths = sample.ground_truth  # type: List[str]
+        num_turns = len(ground_truths)
+        per_turn_grades: List[PerTurnGrade] = []
+        grader_extraction_time = 0.0
+
+        for turn_idx in range(num_turns):
+            # Create single-turn trajectory for this turn
+            single_turn_trajectory = [trajectory[turn_idx]] if turn_idx < len(trajectory) else []
+
+            # Create a modified sample with the turn's ground_truth
+            turn_sample = Sample(
+                id=sample.id,
+                input=sample.input[turn_idx] if isinstance(sample.input, list) else sample.input,
+                ground_truth=ground_truths[turn_idx],
+                agent_args=sample.agent_args,
+                rubric_vars=sample.rubric_vars,
+                extra_vars=sample.extra_vars,
+            )
+
+            # Grade this turn
+            turn_grade, turn_submission = await grader.grade(
+                turn_sample, single_turn_trajectory, agent_state=agent_state
+            )
+            grader_extraction_time += turn_grade.metadata.get("extraction_time", 0.0)
+
+            per_turn_grades.append(
+                PerTurnGrade(
+                    turn=turn_idx,
+                    score=turn_grade.score,
+                    rationale=turn_grade.rationale,
+                    submission=turn_submission,
+                    ground_truth=ground_truths[turn_idx],
+                )
+            )
+
+            # Update progress callback with per-turn grading progress
+            if self.progress_callback:
+                await self.progress_callback.turn_graded(
+                    sample_id=sample_id,
+                    turn_num=turn_idx,
+                    total_turns=num_turns,
+                    turn_score=turn_grade.score,
+                    grader_key=grader_key,
+                    agent_id=agent_id,
+                    model_name=model_name,
+                )
+
+        # Calculate proportional score (average across turns)
+        turn_scores = [g.score for g in per_turn_grades]
+        final_score = sum(turn_scores) / num_turns if num_turns > 0 else 0.0
+        turns_passed = sum(1 for sc in turn_scores if sc >= 1.0)
+
+        # Build summary rationale with turn symbols
+        summary_rationale = build_turn_summary(turn_scores)
+
+        # Combine submissions for display (join all turn submissions)
+        combined_submission = " | ".join(f"[Turn {g.turn}] {g.submission}" for g in per_turn_grades)
+
+        grade = GradeResult(
+            score=final_score,
+            rationale=summary_rationale,
+            per_turn_grades=per_turn_grades,
+            metadata={
+                "turns_passed": turns_passed,
+                "turns_total": num_turns,
+                "extraction_time": grader_extraction_time,
+            },
+        )
+        return grade, combined_submission
+
+    async def _grade_sample(
+        self,
+        sample: Sample,
+        trajectory: List[List[LettaMessageUnion]],
+        agent_state: Optional[AgentState],
+        sample_id: int,
+        agent_id: str,
+        model_name: str,
+    ) -> tuple[Dict[str, GradeResult], Dict[str, str], Dict[str, float]]:
+        """Grade a sample across all graders.
+
+        Handles both standard (full trajectory) and per-turn (turn-by-turn) evaluation.
+        Returns (grades_dict, submissions_dict, per_grader_time).
+        """
+        grades_dict: Dict[str, GradeResult] = {}
+        submissions_dict: Dict[str, str] = {}
+        per_grader_time: Dict[str, float] = {}
+
+        is_per_turn = is_per_turn_evaluation(sample)
+
+        for key, grader in self.graders.items():  # type: ignore[union-attr]
+            t_grader_start = time.perf_counter()
+
+            if is_per_turn:
+                grade, submission = await self._grade_per_turn(
+                    sample, trajectory, agent_state, grader, key, sample_id, agent_id, model_name
+                )
+            else:
+                grade, submission = await grader.grade(sample, trajectory, agent_state=agent_state)
+
+            per_grader_time[key] = time.perf_counter() - t_grader_start
+            grades_dict[key] = grade
+            submissions_dict[key] = submission
+
+        return grades_dict, submissions_dict, per_grader_time
+
     async def run_sample(self, sample: Sample, llm_config: Optional[LlmConfig | str] = None) -> SampleResult:
         """Run a single sample through target and grader."""
         sample_id = sample.id
@@ -389,95 +507,9 @@ class Runner:
                 if self.progress_callback:
                     await self.progress_callback.grading_started(sample_id, agent_id=agent_id, model_name=model_name)
 
-                grades_dict: Optional[Dict[str, GradeResult]] = {}
-                submissions_dict: Optional[Dict[str, str]] = {}
-                per_grader_time: Dict[str, float] = {}
-
-                # Check if this is a per-turn evaluation (both input and ground_truth are lists)
-                if is_per_turn_evaluation(sample):
-                    # Per-turn evaluation: grade each turn against its corresponding ground_truth
-                    ground_truths = sample.ground_truth  # type: List[str]
-                    num_turns = len(ground_truths)
-
-                    for key, grader in self.graders.items():  # type: ignore[union-attr]
-                        per_turn_grades: List[PerTurnGrade] = []
-                        t_grader_start = time.perf_counter()
-                        grader_extraction_time = 0.0
-
-                        for turn_idx in range(num_turns):
-                            # Create single-turn trajectory for this turn
-                            single_turn_trajectory = [trajectory[turn_idx]] if turn_idx < len(trajectory) else []
-
-                            # Create a modified sample with the turn's ground_truth
-                            turn_sample = Sample(
-                                id=sample.id,
-                                input=sample.input[turn_idx] if isinstance(sample.input, list) else sample.input,
-                                ground_truth=ground_truths[turn_idx],
-                                agent_args=sample.agent_args,
-                                rubric_vars=sample.rubric_vars,
-                                extra_vars=sample.extra_vars,
-                            )
-
-                            # Grade this turn
-                            turn_grade, turn_submission = await grader.grade(
-                                turn_sample, single_turn_trajectory, agent_state=agent_state
-                            )
-                            grader_extraction_time += turn_grade.metadata.get("extraction_time", 0.0)
-
-                            per_turn_grades.append(
-                                PerTurnGrade(
-                                    turn=turn_idx,
-                                    score=turn_grade.score,
-                                    rationale=turn_grade.rationale,
-                                    submission=turn_submission,
-                                    ground_truth=ground_truths[turn_idx],
-                                )
-                            )
-
-                            # Update progress callback with per-turn grading progress
-                            if self.progress_callback:
-                                await self.progress_callback.turn_graded(
-                                    sample_id=sample_id,
-                                    turn_num=turn_idx,
-                                    total_turns=num_turns,
-                                    turn_score=turn_grade.score,
-                                    grader_key=key,
-                                    agent_id=agent_id,
-                                    model_name=model_name,
-                                )
-
-                        per_grader_time[key] = time.perf_counter() - t_grader_start
-
-                        # Calculate proportional score (average across turns)
-                        turn_scores = [g.score for g in per_turn_grades]
-                        final_score = sum(turn_scores) / num_turns if num_turns > 0 else 0.0
-                        turns_passed = sum(1 for sc in turn_scores if sc >= 1.0)
-
-                        # Build summary rationale with turn symbols
-                        summary_rationale = build_turn_summary(turn_scores)
-
-                        # Combine submissions for display (join all turn submissions)
-                        combined_submission = " | ".join(f"[Turn {g.turn}] {g.submission}" for g in per_turn_grades)
-
-                        grades_dict[key] = GradeResult(
-                            score=final_score,
-                            rationale=summary_rationale,
-                            per_turn_grades=per_turn_grades,
-                            metadata={
-                                "turns_passed": turns_passed,
-                                "turns_total": num_turns,
-                                "extraction_time": grader_extraction_time,
-                            },
-                        )
-                        submissions_dict[key] = combined_submission
-                else:
-                    # Standard evaluation: grade the full trajectory against single ground_truth
-                    for key, grader in self.graders.items():  # type: ignore[union-attr]
-                        t_grader_start = time.perf_counter()
-                        gr, sub = await grader.grade(sample, trajectory, agent_state=agent_state)
-                        per_grader_time[key] = time.perf_counter() - t_grader_start
-                        grades_dict[key] = gr
-                        submissions_dict[key] = sub
+                grades_dict, submissions_dict, per_grader_time = await self._grade_sample(
+                    sample, trajectory, agent_state, sample_id, agent_id, model_name
+                )
 
                 # use first grader as primary for legacy grade_result/submission
                 first_key = next(iter(grades_dict.keys()))
