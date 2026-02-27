@@ -1,4 +1,4 @@
-"""Unit tests for built-in graders and extractors."""
+"""Unit tests for built-in graders."""
 
 from datetime import datetime, timezone
 

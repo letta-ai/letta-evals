@@ -325,6 +325,15 @@ class TestCalculateMetrics:
         metrics = calculate_metrics(results, None, has_multi_model=False)
         assert metrics.per_model is None
 
+    def test_empty_grader_keys(self):
+        """Empty grader_keys list should not crash — falls through to single-grader path."""
+        results = [_make_result(sample_id=0, score=1.0, grades={})]
+        metrics = calculate_metrics(results, [], False)
+        assert metrics.total == 1
+        # falls through to single-grader path using grade.score
+        assert metrics.avg_score_attempted == pytest.approx(1.0)
+        assert "default" in metrics.metrics
+
     def test_multi_model_multi_grader(self):
         """Per-model metrics with multiple grader keys."""
         results = [

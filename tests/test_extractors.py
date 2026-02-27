@@ -2,15 +2,18 @@
 
 from datetime import datetime, timezone
 
-from letta_client.types.agents import AssistantMessage, ToolCallMessage
+from letta_client.types import ToolReturnMessage
+from letta_client.types.agents import AssistantMessage, ToolCall, ToolCallMessage
 
 from letta_evals.extractors.builtin import (
+    after_marker,
     all_assistant,
     first_assistant,
     last_assistant,
     last_turn,
     pattern,
     tool_arguments,
+    tool_output,
 )
 
 _FAKE_DATE = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -127,27 +130,121 @@ class TestPattern:
         assert pattern([], {"pattern": r"\d+"}) == ""
 
 
+# ── tool helpers ──
+
+
+def _tool_call_singular(tool_name: str, arguments: str, tool_call_id: str = "call-0") -> ToolCallMessage:
+    """ToolCallMessage using singular tool_call field (legacy)."""
+    return ToolCallMessage(
+        id="tc-0",
+        message_type="tool_call_message",
+        date=_FAKE_DATE,
+        tool_call=ToolCall(name=tool_name, arguments=arguments, tool_call_id=tool_call_id),
+    )
+
+
+def _tool_call_array(tool_name: str, arguments: str, tool_call_id: str = "call-0") -> ToolCallMessage:
+    """ToolCallMessage using tool_calls array (SDK v1.0)."""
+    tc = ToolCall(name=tool_name, arguments=arguments, tool_call_id=tool_call_id)
+    return ToolCallMessage(
+        id="tc-0",
+        message_type="tool_call_message",
+        date=_FAKE_DATE,
+        tool_call=tc,
+        tool_calls=[tc],
+    )
+
+
+def _tool_return(tool_call_id: str, tool_return: str) -> ToolReturnMessage:
+    return ToolReturnMessage(
+        id="tr-0",
+        message_type="tool_return_message",
+        date=_FAKE_DATE,
+        tool_call_id=tool_call_id,
+        tool_return=tool_return,
+        status="success",
+    )
+
+
 # ── tool_arguments ──
 
 
 class TestToolArguments:
-    def _tool_call_msg(self, tool_name: str, arguments: str) -> ToolCallMessage:
-        from letta_client.types.agents import ToolCall
+    def test_extracts_matching_tool_singular(self):
+        traj = _traj([_tool_call_singular("search", '{"query": "hello"}')])
+        assert tool_arguments(traj, {"tool_name": "search"}) == '{"query": "hello"}'
 
-        return ToolCallMessage(
-            id="tc-0",
-            message_type="tool_call_message",
-            date=_FAKE_DATE,
-            tool_call=ToolCall(name=tool_name, arguments=arguments, tool_call_id="call-0"),
-        )
-
-    def test_extracts_matching_tool(self):
-        traj = _traj([self._tool_call_msg("search", '{"query": "hello"}')])
+    def test_extracts_matching_tool_array(self):
+        """Tests the SDK v1.0 tool_calls array path."""
+        traj = _traj([_tool_call_array("search", '{"query": "hello"}')])
         assert tool_arguments(traj, {"tool_name": "search"}) == '{"query": "hello"}'
 
     def test_no_matching_tool(self):
-        traj = _traj([self._tool_call_msg("search", '{"q": "hi"}')])
+        traj = _traj([_tool_call_singular("search", '{"q": "hi"}')])
         assert tool_arguments(traj, {"tool_name": "other_tool"}) == "{}"
 
     def test_empty_trajectory(self):
         assert tool_arguments([], {"tool_name": "search"}) == "{}"
+
+
+# ── tool_output ──
+
+
+class TestToolOutput:
+    def test_extracts_return_for_matching_tool(self):
+        traj = _traj(
+            [
+                _tool_call_singular("search", '{"q": "hi"}', tool_call_id="call-1"),
+                _tool_return("call-1", "search result"),
+            ]
+        )
+        assert tool_output(traj, {"tool_name": "search"}) == "search result"
+
+    def test_extracts_return_via_tool_calls_array(self):
+        traj = _traj(
+            [
+                _tool_call_array("search", '{"q": "hi"}', tool_call_id="call-1"),
+                _tool_return("call-1", "search result"),
+            ]
+        )
+        assert tool_output(traj, {"tool_name": "search"}) == "search result"
+
+    def test_no_matching_tool(self):
+        traj = _traj(
+            [
+                _tool_call_singular("search", "{}", tool_call_id="call-1"),
+                _tool_return("call-1", "result"),
+            ]
+        )
+        assert tool_output(traj, {"tool_name": "other_tool"}) == ""
+
+    def test_no_return_message(self):
+        traj = _traj([_tool_call_singular("search", "{}", tool_call_id="call-1")])
+        assert tool_output(traj, {"tool_name": "search"}) == ""
+
+    def test_empty_trajectory(self):
+        assert tool_output([], {"tool_name": "search"}) == ""
+
+
+# ── after_marker ──
+
+
+class TestAfterMarker:
+    def test_extracts_after_marker(self):
+        traj = _traj([_msg("ANSWER: Paris")])
+        assert after_marker(traj, {"marker": "ANSWER: "}) == "Paris"
+
+    def test_include_marker(self):
+        traj = _traj([_msg("ANSWER: Paris")])
+        assert after_marker(traj, {"marker": "ANSWER: ", "include_marker": True}) == "ANSWER: Paris"
+
+    def test_no_marker_found(self):
+        traj = _traj([_msg("no marker here")])
+        assert after_marker(traj, {"marker": "ANSWER: "}) == ""
+
+    def test_searches_from_last_message(self):
+        traj = _traj([_msg("ANSWER: old", "m1"), _msg("ANSWER: new", "m2")])
+        assert after_marker(traj, {"marker": "ANSWER: "}) == "new"
+
+    def test_empty_trajectory(self):
+        assert after_marker([], {"marker": "X"}) == ""
