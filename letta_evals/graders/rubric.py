@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -105,7 +106,9 @@ class RubricGrader(Grader):
         if not trajectory or not any(turn for turn in trajectory if turn):
             return GradeResult(score=0.0, rationale="Empty trajectory - agent produced no messages"), ""
 
+        t_extract = time.perf_counter()
         submission = self.extractor(trajectory, agent_state=agent_state)
+        extraction_time = time.perf_counter() - t_extract
 
         # Validate submission after extraction
         if not submission:
@@ -185,10 +188,12 @@ class RubricGrader(Grader):
             return GradeResult(
                 score=score,
                 rationale=result_json.get("rationale", ""),
-                metadata={"model": self.model, "usage": usage},
+                metadata={"model": self.model, "usage": usage, "extraction_time": extraction_time},
             ), submission
 
         except Exception as e:
             return GradeResult(
-                score=0.0, rationale=f"Error during grading: {str(e)}", metadata={"error": str(e)}
+                score=0.0,
+                rationale=f"Error during grading: {str(e)}",
+                metadata={"error": str(e), "extraction_time": extraction_time},
             ), submission

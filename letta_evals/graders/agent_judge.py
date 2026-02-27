@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -66,7 +67,9 @@ class AgentJudgeGrader(Grader):
         if not trajectory or not any(turn for turn in trajectory if turn):
             return GradeResult(score=0.0, rationale="Empty trajectory - agent produced no messages"), ""
 
+        t_extract = time.perf_counter()
         submission = self.extractor(trajectory, agent_state=agent_state)
+        extraction_time = time.perf_counter() - t_extract
 
         # Validate submission after extraction
         if not submission:
@@ -126,7 +129,7 @@ class AgentJudgeGrader(Grader):
             messages = await list_all_run_messages(self.client, run_id)
             score, rationale = self._parse_tool_calls(messages)
 
-            metadata = {"judge_agent_id": judge_agent_id}
+            metadata = {"judge_agent_id": judge_agent_id, "extraction_time": extraction_time}
             if self.agent_file:
                 metadata["agent_file"] = str(self.agent_file)
             if self.agent_id:
@@ -139,7 +142,7 @@ class AgentJudgeGrader(Grader):
             ), submission
 
         except Exception as e:
-            metadata = {"error": str(e)}
+            metadata = {"error": str(e), "extraction_time": extraction_time}
             if self.agent_file:
                 metadata["agent_file"] = str(self.agent_file)
             if self.agent_id:

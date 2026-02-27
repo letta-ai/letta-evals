@@ -1,4 +1,5 @@
 import inspect
+import time
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -52,7 +53,9 @@ class ToolGrader(Grader):
         if not trajectory or not any(turn for turn in trajectory if turn):
             return GradeResult(score=0.0, rationale="Empty trajectory - agent produced no messages"), ""
 
+        t_extract = time.perf_counter()
         submission = self.extractor(trajectory, agent_state=agent_state)
+        extraction_time = time.perf_counter() - t_extract
 
         # Validate submission after extraction
         if not submission:
@@ -64,4 +67,5 @@ class ToolGrader(Grader):
         else:
             result = self.func(sample, submission)
 
+        result.metadata["extraction_time"] = extraction_time
         return result, submission

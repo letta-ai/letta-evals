@@ -554,6 +554,19 @@ class UsageMetrics(BaseModel):
     total_reasoning_tokens: int = Field(default=0, description="total number of reasoning/thinking tokens generated")
 
 
+class TimingMetrics(BaseModel):
+    """Aggregate timing statistics across samples (in seconds)."""
+
+    mean_total_seconds: float = Field(description="mean total wall time per sample")
+    mean_target_seconds: float = Field(description="mean target execution time per sample")
+    mean_extraction_seconds: float = Field(description="mean extraction time per sample")
+    p50_total_seconds: Optional[float] = Field(default=None, description="median total wall time per sample")
+    p95_total_seconds: Optional[float] = Field(default=None, description="95th percentile total wall time per sample")
+    per_grader_mean_seconds: Optional[Dict[str, float]] = Field(
+        default=None, description="mean wall time per grader key"
+    )
+
+
 class ErrorInfo(BaseModel):
     """Structured error information for a failed sample."""
 
@@ -585,6 +598,7 @@ class ModelMetrics(BaseModel):
     usage_metrics: Optional[UsageMetrics] = Field(
         default=None, description="token usage and cost metrics for this model"
     )
+    timing_metrics: Optional[TimingMetrics] = Field(default=None, description="timing statistics for this model")
     error_summary: Optional[ErrorSummary] = Field(default=None, description="Breakdown of errors for this model")
 
 
@@ -615,6 +629,7 @@ class Metrics(BaseModel):
     usage_metrics: Optional[UsageMetrics] = Field(
         default=None, description="token usage and cost metrics across all samples"
     )
+    timing_metrics: Optional[TimingMetrics] = Field(default=None, description="timing statistics across all samples")
     error_summary: Optional[ErrorSummary] = Field(default=None, description="Breakdown of errors across samples")
 
 
@@ -662,6 +677,14 @@ class SampleResult(BaseModel):
     reasoning_tokens: Optional[int] = Field(
         default=None, description="Total reasoning/thinking tokens generated for this sample"
     )
+    total_time: Optional[float] = Field(default=None, description="Total wall time in seconds for this sample")
+    target_time: Optional[float] = Field(
+        default=None, description="Wall time in seconds for target execution (agent creation + messages)"
+    )
+    extraction_time: Optional[float] = Field(
+        default=None, description="Wall time in seconds for extraction across all graders"
+    )
+    per_grader_time: Optional[Dict[str, float]] = Field(default=None, description="Wall time in seconds per grader key")
     error: Optional[ErrorInfo] = Field(default=None, description="Structured error info if this sample failed")
 
 
