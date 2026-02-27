@@ -6,6 +6,7 @@ import shlex
 from pathlib import Path
 from typing import Optional
 
+import anyio
 from letta_client import AsyncLetta
 
 from letta_evals.models import Sample, TargetResult, TurnTokenData
@@ -262,16 +263,17 @@ class LettaCodeTarget(AbstractAgentTarget):
                         f"Agent: {agent_id or factory_agent_id or 'unknown'}. "
                         f"Final error: {type(e).__name__}: {str(e)}"
                     )
-                    msg = str(e) or type(e).__name__
+                    timeout_hint = f"Timed out after {self.timeout}s" if isinstance(e, TimeoutError) else ""
+                    msg = str(e) or timeout_hint or type(e).__name__
                     raise TargetError(msg, agent_id=agent_id or factory_agent_id) from e
 
                 backoff_time = 2 ** (attempt - 1)
-                logger.error(
+                logger.warning(
                     f"Letta command failed for sample {sample.id} (attempt {attempt}/{self.max_retries + 1}). "
                     f"Agent: {agent_id or factory_agent_id or 'unknown'}. "
                     f"Error: {type(e).__name__}: {str(e)}. Retrying in {backoff_time}s..."
                 )
-                await asyncio.sleep(backoff_time)
+                await anyio.sleep(backoff_time)
 
         raise last_error or RuntimeError("Unexpected failure in letta command retry loop")
 
