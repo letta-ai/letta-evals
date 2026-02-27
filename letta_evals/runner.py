@@ -377,11 +377,10 @@ class Runner:
 
         async with self.semaphore:
             agent_id = None
+            t_sample_start = time.perf_counter()
             try:
                 if self.progress_callback:
                     await self.progress_callback.sample_started(sample_id, model_name=model_name)
-
-                t_sample_start = time.perf_counter()
 
                 # check if any grader needs agent_state
                 retrieve_agent_state = self._requires_agent_state()
@@ -614,6 +613,7 @@ class Runner:
                     cost=None,
                     prompt_tokens=None,
                     completion_tokens=None,
+                    total_time=time.perf_counter() - t_sample_start,
                     error=error_info,
                 )
 
