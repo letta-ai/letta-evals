@@ -59,6 +59,15 @@ from letta_evals.visualization.factory import ProgressStyle, create_progress_cal
 logger = logging.getLogger(__name__)
 
 
+def _extract_model_name(llm_config) -> Optional[str]:
+    """Extract model name from LlmConfig object or string handle."""
+    if isinstance(llm_config, LlmConfig):
+        return llm_config.model
+    elif isinstance(llm_config, str):
+        return llm_config
+    return None
+
+
 class Runner:
     """Main evaluation runner."""
 
@@ -312,13 +321,7 @@ class Runner:
         If cache is enabled and contains an exact match, use it; otherwise run the target.
         """
         sample_id = sample.id
-        # extract model name from either LlmConfig or string handle
-        if isinstance(llm_config, LlmConfig):
-            model_name = llm_config.model
-        elif isinstance(llm_config, str):
-            model_name = llm_config
-        else:
-            model_name = None
+        model_name = _extract_model_name(llm_config)
 
         if self.cached_results:
             cached_result: Optional[SampleResult] = None
@@ -481,13 +484,7 @@ class Runner:
     async def run_sample(self, sample: Sample, llm_config: Optional[LlmConfig | str] = None) -> SampleResult:
         """Run a single sample through target and grader."""
         sample_id = sample.id
-        # extract model name from either LlmConfig or string handle
-        if isinstance(llm_config, LlmConfig):
-            model_name = llm_config.model
-        elif isinstance(llm_config, str):
-            model_name = llm_config
-        else:
-            model_name = None
+        model_name = _extract_model_name(llm_config)
 
         async with self.semaphore:
             agent_id = None
@@ -706,14 +703,7 @@ class Runner:
                 for llm_config in self.model_configs:
                     # If setup needs model name, run it once per model
                     if setup_needs_model:
-                        # extract model name from either LlmConfig or string handle
-                        if isinstance(llm_config, LlmConfig):
-                            model_name = llm_config.model
-                        elif isinstance(llm_config, str):
-                            model_name = llm_config
-                        else:
-                            model_name = None
-                        await self._run_setup(model_name=model_name)
+                        await self._run_setup(model_name=_extract_model_name(llm_config))
 
                     for sample in samples:
 
