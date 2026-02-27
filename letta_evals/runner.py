@@ -3,7 +3,7 @@ import json
 import logging
 import os
 import time
-from collections import Counter, defaultdict
+from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -18,18 +18,16 @@ from letta_evals.graders.agent_judge import AgentJudgeGrader
 from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
+from letta_evals.metrics import calculate_metrics, calculate_run_statistics
 from letta_evals.models import (
     AgentState,
     ErrorInfo,
-    ErrorSummary,
     GradeResult,
     LettaJudgeGraderSpec,
     LettaMessageUnion,
     LogicalGateSpec,
-    MetricAggregate,
     Metrics,
     ModelJudgeGraderSpec,
-    ModelMetrics,
     PerTurnGrade,
     RunnerResult,
     RunStatistics,
@@ -38,9 +36,7 @@ from letta_evals.models import (
     SimpleCondition,
     SimpleGateSpec,
     SuiteSpec,
-    TimingMetrics,
     ToolGraderSpec,
-    UsageMetrics,
     WeightedAverageGateSpec,
     _compare,
     normalize_weights,
@@ -699,7 +695,11 @@ class Runner:
 
                         tg.start_soon(run_and_append, sample, llm_config)
 
-            metrics = self._calculate_metrics()
+            metrics = calculate_metrics(
+                self.results,
+                list(self.graders.keys()) if self.graders else None,
+                bool(self.suite.target.model_configs or self.suite.target.model_handles),
+            )
             gates_passed = self._check_gates(metrics)
 
             # write final metrics if streaming
@@ -712,218 +712,17 @@ class Runner:
         except BaseException:
             # On interruption or errors, write a best-effort summary for a valid JSONL
             try:
-                metrics = self._calculate_metrics()
+                metrics = calculate_metrics(
+                    self.results,
+                    list(self.graders.keys()) if self.graders else None,
+                    bool(self.suite.target.model_configs or self.suite.target.model_handles),
+                )
                 gates_passed = self._check_gates(metrics)
                 if self.stream_writer:
                     await self.stream_writer.write_metrics(metrics, gates_passed)
             finally:
                 # Re-raise to preserve original error/interrupt semantics
                 raise
-
-    @staticmethod
-    def _compute_usage_metrics(results: List[SampleResult]) -> Optional[UsageMetrics]:
-        """Compute aggregate usage metrics from a list of sample results."""
-        costs = [r.cost for r in results if r.cost is not None]
-        total_cost = sum(costs) if costs else None
-
-        total_prompt = sum(r.prompt_tokens for r in results if r.prompt_tokens is not None)
-        total_completion = sum(r.completion_tokens for r in results if r.completion_tokens is not None)
-        total_cached = sum(r.cached_input_tokens for r in results if r.cached_input_tokens is not None)
-        total_cache_write = sum(r.cache_write_tokens for r in results if r.cache_write_tokens is not None)
-        total_reasoning = sum(r.reasoning_tokens for r in results if r.reasoning_tokens is not None)
-
-        if total_prompt > 0 or total_completion > 0 or (total_cost is not None and total_cost > 0):
-            return UsageMetrics(
-                total_prompt_tokens=total_prompt,
-                total_completion_tokens=total_completion,
-                total_cost=total_cost if total_cost and total_cost > 0 else None,
-                total_cached_input_tokens=total_cached,
-                total_cache_write_tokens=total_cache_write,
-                total_reasoning_tokens=total_reasoning,
-            )
-        return None
-
-    @staticmethod
-    def _compute_error_summary(results: List[SampleResult]) -> Optional[ErrorSummary]:
-        """Compute error summary from a list of sample results."""
-        error_results = [r for r in results if r.error is not None]
-        if not error_results:
-            return None
-        return ErrorSummary(
-            total_errors=len(error_results),
-            by_category=dict(Counter(r.error.category.value for r in error_results)),
-            by_exception_type=dict(Counter(r.error.exception_type for r in error_results)),
-            failed_sample_ids=sorted(r.sample.id for r in error_results),
-        )
-
-    @staticmethod
-    def _compute_timing_metrics(results: List[SampleResult]) -> Optional[TimingMetrics]:
-        """Compute aggregate timing statistics from a list of sample results."""
-        total_times = [r.total_time for r in results if r.total_time is not None]
-        if not total_times:
-            return None
-
-        target_times = [r.target_time for r in results if r.target_time is not None]
-        extraction_times = [r.extraction_time for r in results if r.extraction_time is not None]
-
-        n = len(total_times)
-        sorted_totals = sorted(total_times)
-
-        # Aggregate per-grader times
-        grader_keys: set = set()
-        for r in results:
-            if r.per_grader_time:
-                grader_keys.update(r.per_grader_time.keys())
-        per_grader_mean: Dict[str, float] = {}
-        for k in sorted(grader_keys):
-            vals = [r.per_grader_time[k] for r in results if r.per_grader_time and k in r.per_grader_time]
-            per_grader_mean[k] = sum(vals) / len(vals) if vals else 0.0
-
-        return TimingMetrics(
-            mean_total_seconds=sum(total_times) / n,
-            mean_target_seconds=sum(target_times) / len(target_times) if target_times else 0.0,
-            mean_extraction_seconds=sum(extraction_times) / len(extraction_times) if extraction_times else 0.0,
-            p50_total_seconds=sorted_totals[n // 2],
-            p95_total_seconds=sorted_totals[min(int(n * 0.95), n - 1)],
-            per_grader_mean_seconds=per_grader_mean if per_grader_mean else None,
-        )
-
-    def _calculate_metrics(self) -> Metrics:
-        """Calculate aggregate metrics from results.
-
-        - total: success + error (all results)
-        - total_attempted: success only (completed without error)
-        - metrics: dict of metric_key -> pass rate percentage
-        - avg_score: mean across all results (including error results)
-        - per_model: same semantics per model (based on gate metric key)
-        """
-        total = len(self.results)
-        if total == 0:
-            return Metrics(
-                total=0,
-                total_attempted=0,
-                avg_score_attempted=0.0,
-                avg_score_total=0.0,
-                metrics={},
-            )
-
-        def is_success(r: SampleResult) -> bool:
-            return r.error is None
-
-        attempted = sum(1 for r in self.results if is_success(r))
-
-        error_summary = self._compute_error_summary(self.results)
-
-        # compute per-metric aggregates if multiple graders
-        by_metric: Dict[str, MetricAggregate] = {}
-        if self.graders is not None:
-            for metric_key in self.graders.keys():
-                m_scores = [
-                    r.grades[metric_key].score
-                    for r in self.results
-                    if is_success(r) and r.grades and metric_key in r.grades
-                ]
-                m_avg_attempted = sum(m_scores) / len(m_scores) if m_scores else 0.0
-                m_avg_total = sum(m_scores) / len(self.results) if m_scores else 0.0
-                # pass_rate is just avg score as percentage
-                m_pass_rate = m_avg_attempted * 100.0
-                by_metric[metric_key] = MetricAggregate(
-                    avg_score_attempted=m_avg_attempted,
-                    avg_score_total=m_avg_total,
-                    pass_rate=m_pass_rate,
-                )
-
-        metrics_dict: Dict[str, float] = {}
-        if self.graders is not None:
-            # use first grader for overall metrics
-            first_key = next(iter(self.graders.keys()))
-            for key, agg in by_metric.items():
-                metrics_dict[key] = agg.pass_rate
-
-            agg = by_metric.get(first_key) if first_key in by_metric else None
-            avg_score_attempted = agg.avg_score_attempted if agg else 0.0
-            avg_score_total = agg.avg_score_total if agg else 0.0
-        else:
-            scores = [r.grade.score for r in self.results if is_success(r)]
-            avg_score_attempted = sum(scores) / len(scores) if scores else 0.0
-            avg_score_total = sum(scores) / len(self.results) if scores else 0.0
-            # for single grader case, use a default key
-            default_key = "default"
-            metrics_dict[default_key] = avg_score_attempted * 100.0
-
-        usage_metrics = self._compute_usage_metrics(self.results)
-        timing_metrics = self._compute_timing_metrics(self.results)
-
-        per_model = None
-        if self.suite.target.model_configs or self.suite.target.model_handles:
-            model_results = defaultdict(list)
-            for result in self.results:
-                model_results[result.model_name].append(result)
-
-            per_model = []
-            for model_name, results in sorted(model_results.items()):
-                model_attempted = sum(1 for r in results if is_success(r))
-                model_metrics_dict: Dict[str, float] = {}
-
-                if self.graders is not None:
-                    # use first grader for overall model metrics
-                    first_key = next(iter(self.graders.keys()))
-                    # calculate avg score for each metric
-                    for metric_key in self.graders.keys():
-                        metric_scores = [
-                            r.grades[metric_key].score
-                            for r in results
-                            if is_success(r) and r.grades and metric_key in r.grades
-                        ]
-                        model_metrics_dict[metric_key] = (
-                            (sum(metric_scores) / len(metric_scores)) * 100.0 if metric_scores else 0.0
-                        )
-
-                    model_scores = [
-                        r.grades[first_key].score
-                        for r in results
-                        if is_success(r) and r.grades and first_key in r.grades
-                    ]
-                else:
-                    model_scores = [r.grade.score for r in results if is_success(r)]
-                    default_key = "default"
-                    model_metrics_dict[default_key] = (
-                        (sum(model_scores) / len(model_scores)) * 100.0 if model_scores else 0.0
-                    )
-
-                model_avg_attempted = sum(model_scores) / len(model_scores) if model_scores else 0.0
-                model_avg_total = sum(model_scores) / len(results) if model_scores else 0.0
-
-                model_usage_metrics = self._compute_usage_metrics(results)
-                model_timing_metrics = self._compute_timing_metrics(results)
-                model_error_summary = self._compute_error_summary(results)
-
-                per_model.append(
-                    ModelMetrics(
-                        model_name=model_name,
-                        total=len(results),
-                        total_attempted=model_attempted,
-                        avg_score_attempted=model_avg_attempted,
-                        avg_score_total=model_avg_total,
-                        metrics=model_metrics_dict,
-                        usage_metrics=model_usage_metrics,
-                        timing_metrics=model_timing_metrics,
-                        error_summary=model_error_summary,
-                    )
-                )
-
-        return Metrics(
-            total=total,
-            total_attempted=attempted,
-            avg_score_attempted=avg_score_attempted,
-            avg_score_total=avg_score_total,
-            per_model=per_model,
-            by_metric=by_metric if by_metric else None,
-            metrics=metrics_dict,
-            usage_metrics=usage_metrics,
-            timing_metrics=timing_metrics,
-            error_summary=error_summary,
-        )
 
     def _compute_aggregation(
         self, metric_key: str, aggregation: Aggregation, pass_threshold: Optional[float] = None
@@ -1012,48 +811,6 @@ class Runner:
 
         else:
             raise ValueError(f"unknown gate type: {type(gate)}")
-
-
-def _calculate_run_statistics(all_metrics: List[Metrics], runs_passed: int, suite: SuiteSpec) -> RunStatistics:
-    """Calculate aggregate statistics across multiple runs."""
-    import statistics
-
-    num_runs = len(all_metrics)
-
-    avg_scores_attempted = [m.avg_score_attempted for m in all_metrics]
-    avg_scores_total = [m.avg_score_total for m in all_metrics]
-
-    mean_avg_score_attempted = statistics.mean(avg_scores_attempted)
-    std_avg_score_attempted = statistics.stdev(avg_scores_attempted) if num_runs > 1 else 0.0
-
-    mean_avg_score_total = statistics.mean(avg_scores_total)
-    std_avg_score_total = statistics.stdev(avg_scores_total) if num_runs > 1 else 0.0
-
-    mean_scores: Dict[str, float] = {}
-    std_scores: Dict[str, float] = {}
-
-    if suite.graders:
-        for metric_key in suite.graders.keys():
-            metric_values = []
-            for m in all_metrics:
-                if m.by_metric and metric_key in m.by_metric:
-                    metric_values.append(m.by_metric[metric_key].avg_score_attempted)
-
-            if metric_values:
-                mean_scores[metric_key] = statistics.mean(metric_values)
-                std_scores[metric_key] = statistics.stdev(metric_values) if len(metric_values) > 1 else 0.0
-
-    return RunStatistics(
-        num_runs=num_runs,
-        runs_passed=runs_passed,
-        mean_avg_score_attempted=mean_avg_score_attempted,
-        std_avg_score_attempted=std_avg_score_attempted,
-        mean_avg_score_total=mean_avg_score_total,
-        std_avg_score_total=std_avg_score_total,
-        mean_scores=mean_scores,
-        std_scores=std_scores,
-        individual_run_metrics=all_metrics,
-    )
 
 
 async def _write_aggregate_statistics(output_path: Path, run_statistics: RunStatistics) -> None:
@@ -1189,13 +946,13 @@ async def run_suite(
                 if progress_cb is not None and run_idx == actual_num_runs - 1:
                     # stop live display first, then show summary
                     progress_cb.stop()
-                    run_statistics = _calculate_run_statistics(all_metrics, runs_passed, suite)
+                    run_statistics = calculate_run_statistics(all_metrics, runs_passed, suite)
                     final_result_temp = all_run_results[-1]
                     final_result_temp.run_statistics = run_statistics
                     final_result_temp.gates_passed = runs_passed > 0
                     await progress_cb.suite_completed(final_result_temp)
 
-        run_statistics = _calculate_run_statistics(all_metrics, runs_passed, suite)
+        run_statistics = calculate_run_statistics(all_metrics, runs_passed, suite)
 
         if output_path:
             await _write_aggregate_statistics(output_path, run_statistics)
