@@ -91,13 +91,42 @@ class TestStreamingWriterReader:
 
     @pytest.mark.asyncio
     async def test_reader_missing_header(self):
-        """StreamingReader should raise if header is missing."""
+        """StreamingReader should raise FileNotFoundError if header.json is missing."""
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir)
-            # Create summary and results but no header
             (output_path / "summary.json").write_text('{"type":"summary","metrics":{},"gates_passed":false}')
             (output_path / "results.jsonl").write_text("")
-            with pytest.raises(Exception):
+            with pytest.raises(FileNotFoundError):
+                await StreamingReader.to_runner_result(output_path)
+
+    @pytest.mark.asyncio
+    async def test_reader_missing_summary(self):
+        """StreamingReader should raise FileNotFoundError if summary.json is missing."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir)
+            import json
+
+            with open(output_path / "header.json", "w") as f:
+                json.dump({"type": "header", "suite": "s", "config": {}}, f)
+            (output_path / "results.jsonl").write_text("")
+            with pytest.raises(FileNotFoundError):
+                await StreamingReader.to_runner_result(output_path)
+
+    @pytest.mark.asyncio
+    async def test_reader_malformed_result_record(self):
+        """StreamingReader should raise if a result record is malformed."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir)
+
+            writer = StreamingWriter(output_path, "test-suite", {})
+            await writer.initialize()
+            await writer.write_metrics(_make_metrics(), gates_passed=True)
+
+            # Write a malformed record (missing "result" key)
+            with open(output_path / "results.jsonl", "w") as f:
+                f.write('{"type": "result", "bad_key": {}}\n')
+
+            with pytest.raises(KeyError):
                 await StreamingReader.to_runner_result(output_path)
 
     @pytest.mark.asyncio

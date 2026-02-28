@@ -131,6 +131,18 @@ class TestLoadJsonl:
         samples = list(load_jsonl(path))
         assert samples[0].ground_truth is None
 
+    def test_malformed_json_line(self):
+        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False)
+        tmp.write("{bad json}\n")
+        tmp.close()
+        with pytest.raises(json.JSONDecodeError):
+            list(load_jsonl(Path(tmp.name)))
+
+    def test_missing_input_key(self):
+        path = self._write_jsonl([{"ground_truth": "answer"}])
+        with pytest.raises(KeyError):
+            list(load_jsonl(path))
+
 
 # ── load_csv ──
 
@@ -184,6 +196,12 @@ class TestLoadCsv:
         samples = list(load_csv(path))
         assert samples[0].input == ["q1", "q2"]
         assert samples[0].ground_truth == ["a1", "a2"]
+
+    def test_list_length_mismatch(self):
+        """Input and ground_truth lists with different lengths should raise."""
+        path = self._write_csv('input,ground_truth\n"[""q1"",""q2""]","[""a1""]"\n')
+        with pytest.raises(ValueError, match="Failed to create Sample"):
+            list(load_csv(path))
 
 
 # ── load_dataset ──

@@ -67,3 +67,14 @@ class TestNormalizeWeights:
     def test_preserves_keys(self):
         result = normalize_weights({"accuracy": 0.6, "quality": 0.4})
         assert set(result.keys()) == {"accuracy", "quality"}
+
+    def test_negative_weights_accepted(self):
+        """Negative weights are allowed as long as sum is non-zero."""
+        result = normalize_weights({"a": -1.0, "b": 3.0})
+        assert result["a"] == pytest.approx(-0.5)
+        assert result["b"] == pytest.approx(1.5)
+
+    def test_negative_weights_zero_sum_raises(self):
+        """Negative weights that cancel out to zero should raise."""
+        with pytest.raises(ValueError, match="non-zero"):
+            normalize_weights({"a": 1.0, "b": -1.0})
