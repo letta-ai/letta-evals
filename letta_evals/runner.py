@@ -481,6 +481,42 @@ class Runner:
 
         return grades_dict, submissions_dict, per_grader_time
 
+    @staticmethod
+    def _detect_errors(
+        grade_result: GradeResult,
+        trajectory: list,
+        submission: str,
+        grades_dict: Dict[str, GradeResult],
+    ) -> Optional[ErrorInfo]:
+        """Detect extraction or grading errors from results."""
+        # Extraction error: empty trajectory/submission with zero score
+        is_extraction_error = grade_result.score == 0.0 and (
+            not trajectory
+            or not submission
+            or (
+                grade_result.rationale
+                and ("Empty trajectory" in grade_result.rationale or "Empty submission" in grade_result.rationale)
+            )
+        )
+        if is_extraction_error:
+            return ErrorInfo(
+                category=ErrorCategory.EXTRACTION,
+                exception_type="ExtractionError",
+                message=grade_result.rationale or "Empty trajectory or submission",
+            )
+
+        # Grading error: grader reported an error in metadata
+        grading_errors = {k: gr.metadata["error"] for k, gr in grades_dict.items() if gr.metadata.get("error")}
+        if grading_errors:
+            details = "; ".join(f"{k}: {v}" for k, v in grading_errors.items())
+            return ErrorInfo(
+                category=ErrorCategory.GRADING,
+                exception_type="GradingError",
+                message=f"Grading failed for: {details}",
+            )
+
+        return None
+
     async def run_sample(self, sample: Sample, llm_config: Optional[LlmConfig | str] = None) -> SampleResult:
         """Run a single sample through target and grader."""
         sample_id = sample.id
@@ -516,45 +552,11 @@ class Runner:
                 grade_result = grades_dict[first_key]
                 submission = submissions_dict[first_key]
 
-                # Detect extraction errors (empty trajectory/submission)
-                error_info: Optional[ErrorInfo] = None
-                is_extraction_error = grade_result.score == 0.0 and (
-                    not trajectory
-                    or not submission
-                    or (
-                        grade_result.rationale
-                        and (
-                            "Empty trajectory" in grade_result.rationale or "Empty submission" in grade_result.rationale
-                        )
+                error_info = self._detect_errors(grade_result, trajectory, submission, grades_dict)
+                if error_info and self.progress_callback:
+                    await self.progress_callback.sample_error(
+                        sample_id, error_info.message, agent_id=agent_id, model_name=model_name
                     )
-                )
-                if is_extraction_error:
-                    message = grade_result.rationale or "Empty trajectory or submission"
-                    error_info = ErrorInfo(
-                        category=ErrorCategory.EXTRACTION,
-                        exception_type="ExtractionError",
-                        message=message,
-                    )
-                    if self.progress_callback:
-                        await self.progress_callback.sample_error(
-                            sample_id, message, agent_id=agent_id, model_name=model_name
-                        )
-                else:
-                    # Detect grading errors from grader metadata
-                    grading_errors = {
-                        k: gr.metadata["error"] for k, gr in grades_dict.items() if gr.metadata.get("error")
-                    }
-                    if grading_errors:
-                        details = "; ".join(f"{k}: {v}" for k, v in grading_errors.items())
-                        error_info = ErrorInfo(
-                            category=ErrorCategory.GRADING,
-                            exception_type="GradingError",
-                            message=f"Grading failed for: {details}",
-                        )
-                        if self.progress_callback:
-                            await self.progress_callback.sample_error(
-                                sample_id, error_info.message, agent_id=agent_id, model_name=model_name
-                            )
 
                 if error_info is None and self.progress_callback:
                     metric_scores = None
