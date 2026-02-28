@@ -32,4 +32,4 @@ jobs:
           pip install .[dev]
 
       - name: Run unit tests
-        run: pytest tests/test_metrics.py tests/test_graders.py tests/test_extractors.py -v
+        run: pytest tests/test_metrics.py tests/test_graders.py tests/test_extractors.py tests/test_loader.py tests/test_gates.py tests/test_streaming.py -v
