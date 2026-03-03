@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from letta_evals.decorators import GRADER_REGISTRY
-from letta_evals.extractors import extractor_requires_agent_state, get_extractor
 from letta_evals.graders.base import Grader
 from letta_evals.models import AgentState, GradeResult, LettaMessageUnion, Sample
 from letta_evals.utils import load_object
@@ -22,8 +21,7 @@ class ToolGrader(Grader):
         self.function_name = function
         self.extractor_name = extractor
         self.base_dir = base_dir
-        self.extractor = get_extractor(extractor, extractor_config, base_dir=base_dir)
-        self._requires_agent_state = extractor_requires_agent_state(extractor, base_dir=base_dir)
+        self._init_extractor(extractor, extractor_config, base_dir=base_dir)
 
         if function in GRADER_REGISTRY:
             self.func = GRADER_REGISTRY[function]
@@ -39,24 +37,13 @@ class ToolGrader(Grader):
         else:
             raise ValueError(f"Grader function '{function}' not found in registry")
 
-    @property
-    def requires_agent_state(self) -> bool:
-        """Whether this grader's extractor requires agent_state."""
-        return self._requires_agent_state
-
     async def grade(
         self, sample: Sample, trajectory: List[List[LettaMessageUnion]], agent_state: Optional[AgentState] = None
     ) -> Tuple[GradeResult, str]:
         """Grade using the tool function."""
-        # Validate trajectory before extraction
-        if not trajectory or not any(turn for turn in trajectory if turn):
-            return GradeResult(score=0.0, rationale="Empty trajectory - agent produced no messages"), ""
-
-        submission = self.extractor(trajectory, agent_state=agent_state)
-
-        # Validate submission after extraction
-        if not submission:
-            return GradeResult(score=0.0, rationale="Empty submission - extractor found no content"), ""
+        submission, extraction_time, early = self.extract(trajectory, agent_state)
+        if early:
+            return early
 
         # check if grader function is async
         if inspect.iscoroutinefunction(self.func):
@@ -64,4 +51,5 @@ class ToolGrader(Grader):
         else:
             result = self.func(sample, submission)
 
+        result.metadata["extraction_time"] = extraction_time
         return result, submission

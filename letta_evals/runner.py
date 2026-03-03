@@ -2,7 +2,8 @@ import inspect
 import json
 import logging
 import os
-from collections import Counter, defaultdict
+import time
+from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -17,18 +18,16 @@ from letta_evals.graders.agent_judge import AgentJudgeGrader
 from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
+from letta_evals.metrics import calculate_metrics, calculate_run_statistics
 from letta_evals.models import (
     AgentState,
     ErrorInfo,
-    ErrorSummary,
     GradeResult,
     LettaJudgeGraderSpec,
     LettaMessageUnion,
     LogicalGateSpec,
-    MetricAggregate,
     Metrics,
     ModelJudgeGraderSpec,
-    ModelMetrics,
     PerTurnGrade,
     RunnerResult,
     RunStatistics,
@@ -38,7 +37,6 @@ from letta_evals.models import (
     SimpleGateSpec,
     SuiteSpec,
     ToolGraderSpec,
-    UsageMetrics,
     WeightedAverageGateSpec,
     _compare,
     normalize_weights,
@@ -59,6 +57,15 @@ from letta_evals.visualization.base import ProgressCallback
 from letta_evals.visualization.factory import ProgressStyle, create_progress_callback
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_model_name(llm_config) -> Optional[str]:
+    """Extract model name from LlmConfig object or string handle."""
+    if isinstance(llm_config, LlmConfig):
+        return llm_config.model
+    elif isinstance(llm_config, str):
+        return llm_config
+    return None
 
 
 class Runner:
@@ -314,13 +321,7 @@ class Runner:
         If cache is enabled and contains an exact match, use it; otherwise run the target.
         """
         sample_id = sample.id
-        # extract model name from either LlmConfig or string handle
-        if isinstance(llm_config, LlmConfig):
-            model_name = llm_config.model
-        elif isinstance(llm_config, str):
-            model_name = llm_config
-        else:
-            model_name = None
+        model_name = _extract_model_name(llm_config)
 
         if self.cached_results:
             cached_result: Optional[SampleResult] = None
@@ -362,157 +363,200 @@ class Runner:
             target_result.agent_state,
         )
 
+    async def _grade_per_turn(
+        self,
+        sample: Sample,
+        trajectory: List[List[LettaMessageUnion]],
+        agent_state: Optional[AgentState],
+        grader: Grader,
+        grader_key: str,
+        sample_id: int,
+        agent_id: str,
+        model_name: str,
+    ) -> tuple[GradeResult, str]:
+        """Grade each turn independently and return averaged GradeResult + combined submission."""
+        ground_truths = sample.ground_truth  # type: List[str]
+        num_turns = len(ground_truths)
+        per_turn_grades: List[PerTurnGrade] = []
+        grader_extraction_time = 0.0
+
+        for turn_idx in range(num_turns):
+            # Create single-turn trajectory for this turn
+            single_turn_trajectory = [trajectory[turn_idx]] if turn_idx < len(trajectory) else []
+
+            # Create a modified sample with the turn's ground_truth
+            turn_sample = Sample(
+                id=sample.id,
+                input=sample.input[turn_idx] if isinstance(sample.input, list) else sample.input,
+                ground_truth=ground_truths[turn_idx],
+                agent_args=sample.agent_args,
+                rubric_vars=sample.rubric_vars,
+                extra_vars=sample.extra_vars,
+            )
+
+            # Grade this turn
+            turn_grade, turn_submission = await grader.grade(
+                turn_sample, single_turn_trajectory, agent_state=agent_state
+            )
+            grader_extraction_time += turn_grade.metadata.get("extraction_time", 0.0)
+
+            per_turn_grades.append(
+                PerTurnGrade(
+                    turn=turn_idx,
+                    score=turn_grade.score,
+                    rationale=turn_grade.rationale,
+                    submission=turn_submission,
+                    ground_truth=ground_truths[turn_idx],
+                )
+            )
+
+            # Update progress callback with per-turn grading progress
+            if self.progress_callback:
+                await self.progress_callback.turn_graded(
+                    sample_id=sample_id,
+                    turn_num=turn_idx,
+                    total_turns=num_turns,
+                    turn_score=turn_grade.score,
+                    grader_key=grader_key,
+                    agent_id=agent_id,
+                    model_name=model_name,
+                )
+
+        # Calculate proportional score (average across turns)
+        turn_scores = [g.score for g in per_turn_grades]
+        final_score = sum(turn_scores) / num_turns if num_turns > 0 else 0.0
+        turns_passed = sum(1 for sc in turn_scores if sc >= 1.0)
+
+        # Build summary rationale with turn symbols
+        summary_rationale = build_turn_summary(turn_scores)
+
+        # Combine submissions for display (join all turn submissions)
+        combined_submission = " | ".join(f"[Turn {g.turn}] {g.submission}" for g in per_turn_grades)
+
+        grade = GradeResult(
+            score=final_score,
+            rationale=summary_rationale,
+            per_turn_grades=per_turn_grades,
+            metadata={
+                "turns_passed": turns_passed,
+                "turns_total": num_turns,
+                "extraction_time": grader_extraction_time,
+            },
+        )
+        return grade, combined_submission
+
+    async def _grade_sample(
+        self,
+        sample: Sample,
+        trajectory: List[List[LettaMessageUnion]],
+        agent_state: Optional[AgentState],
+        sample_id: int,
+        agent_id: str,
+        model_name: str,
+    ) -> tuple[Dict[str, GradeResult], Dict[str, str], Dict[str, float]]:
+        """Grade a sample across all graders.
+
+        Handles both standard (full trajectory) and per-turn (turn-by-turn) evaluation.
+        Returns (grades_dict, submissions_dict, per_grader_time).
+        """
+        grades_dict: Dict[str, GradeResult] = {}
+        submissions_dict: Dict[str, str] = {}
+        per_grader_time: Dict[str, float] = {}
+
+        is_per_turn = is_per_turn_evaluation(sample)
+
+        for key, grader in self.graders.items():  # type: ignore[union-attr]
+            t_grader_start = time.perf_counter()
+
+            if is_per_turn:
+                grade, submission = await self._grade_per_turn(
+                    sample, trajectory, agent_state, grader, key, sample_id, agent_id, model_name
+                )
+            else:
+                grade, submission = await grader.grade(sample, trajectory, agent_state=agent_state)
+
+            per_grader_time[key] = time.perf_counter() - t_grader_start
+            grades_dict[key] = grade
+            submissions_dict[key] = submission
+
+        return grades_dict, submissions_dict, per_grader_time
+
+    @staticmethod
+    def _detect_errors(
+        grade_result: GradeResult,
+        trajectory: list,
+        submission: str,
+        grades_dict: Dict[str, GradeResult],
+    ) -> Optional[ErrorInfo]:
+        """Detect extraction or grading errors from results."""
+        # Extraction error: empty trajectory/submission with zero score
+        is_extraction_error = grade_result.score == 0.0 and (
+            not trajectory
+            or not submission
+            or (
+                grade_result.rationale
+                and ("Empty trajectory" in grade_result.rationale or "Empty submission" in grade_result.rationale)
+            )
+        )
+        if is_extraction_error:
+            return ErrorInfo(
+                category=ErrorCategory.EXTRACTION,
+                exception_type="ExtractionError",
+                message=grade_result.rationale or "Empty trajectory or submission",
+            )
+
+        # Grading error: grader reported an error in metadata
+        grading_errors = {k: gr.metadata["error"] for k, gr in grades_dict.items() if gr.metadata.get("error")}
+        if grading_errors:
+            details = "; ".join(f"{k}: {v}" for k, v in grading_errors.items())
+            return ErrorInfo(
+                category=ErrorCategory.GRADING,
+                exception_type="GradingError",
+                message=f"Grading failed for: {details}",
+            )
+
+        return None
+
     async def run_sample(self, sample: Sample, llm_config: Optional[LlmConfig | str] = None) -> SampleResult:
         """Run a single sample through target and grader."""
         sample_id = sample.id
-        # extract model name from either LlmConfig or string handle
-        if isinstance(llm_config, LlmConfig):
-            model_name = llm_config.model
-        elif isinstance(llm_config, str):
-            model_name = llm_config
-        else:
-            model_name = None
+        model_name = _extract_model_name(llm_config)
 
         async with self.semaphore:
             agent_id = None
+            phase = ErrorCategory.UNKNOWN
+            t_sample_start = time.perf_counter()
             try:
                 if self.progress_callback:
                     await self.progress_callback.sample_started(sample_id, model_name=model_name)
 
                 # check if any grader needs agent_state
+                phase = ErrorCategory.TARGET
                 retrieve_agent_state = self._requires_agent_state()
                 trajectory, agent_id, model_name, agent_usage, agent_state = await self._get_or_run_trajectory(
                     sample, llm_config, retrieve_agent_state=retrieve_agent_state
                 )
 
+                target_time = time.perf_counter() - t_sample_start
+
                 if self.progress_callback:
                     await self.progress_callback.grading_started(sample_id, agent_id=agent_id, model_name=model_name)
 
-                grades_dict: Optional[Dict[str, GradeResult]] = {}
-                submissions_dict: Optional[Dict[str, str]] = {}
-
-                # Check if this is a per-turn evaluation (both input and ground_truth are lists)
-                if is_per_turn_evaluation(sample):
-                    # Per-turn evaluation: grade each turn against its corresponding ground_truth
-                    ground_truths = sample.ground_truth  # type: List[str]
-                    num_turns = len(ground_truths)
-
-                    for key, grader in self.graders.items():  # type: ignore[union-attr]
-                        per_turn_grades: List[PerTurnGrade] = []
-
-                        for turn_idx in range(num_turns):
-                            # Create single-turn trajectory for this turn
-                            single_turn_trajectory = [trajectory[turn_idx]] if turn_idx < len(trajectory) else []
-
-                            # Create a modified sample with the turn's ground_truth
-                            turn_sample = Sample(
-                                id=sample.id,
-                                input=sample.input[turn_idx] if isinstance(sample.input, list) else sample.input,
-                                ground_truth=ground_truths[turn_idx],
-                                agent_args=sample.agent_args,
-                                rubric_vars=sample.rubric_vars,
-                                extra_vars=sample.extra_vars,
-                            )
-
-                            # Grade this turn
-                            turn_grade, turn_submission = await grader.grade(
-                                turn_sample, single_turn_trajectory, agent_state=agent_state
-                            )
-
-                            per_turn_grades.append(
-                                PerTurnGrade(
-                                    turn=turn_idx,
-                                    score=turn_grade.score,
-                                    rationale=turn_grade.rationale,
-                                    submission=turn_submission,
-                                    ground_truth=ground_truths[turn_idx],
-                                )
-                            )
-
-                            # Update progress callback with per-turn grading progress
-                            if self.progress_callback:
-                                await self.progress_callback.turn_graded(
-                                    sample_id=sample_id,
-                                    turn_num=turn_idx,
-                                    total_turns=num_turns,
-                                    turn_score=turn_grade.score,
-                                    grader_key=key,
-                                    agent_id=agent_id,
-                                    model_name=model_name,
-                                )
-
-                        # Calculate proportional score (average across turns)
-                        turn_scores = [g.score for g in per_turn_grades]
-                        final_score = sum(turn_scores) / num_turns if num_turns > 0 else 0.0
-                        turns_passed = sum(1 for sc in turn_scores if sc >= 1.0)
-
-                        # Build summary rationale with turn symbols
-                        summary_rationale = build_turn_summary(turn_scores)
-
-                        # Combine submissions for display (join all turn submissions)
-                        combined_submission = " | ".join(f"[Turn {g.turn}] {g.submission}" for g in per_turn_grades)
-
-                        grades_dict[key] = GradeResult(
-                            score=final_score,
-                            rationale=summary_rationale,
-                            per_turn_grades=per_turn_grades,
-                            metadata={
-                                "turns_passed": turns_passed,
-                                "turns_total": num_turns,
-                            },
-                        )
-                        submissions_dict[key] = combined_submission
-                else:
-                    # Standard evaluation: grade the full trajectory against single ground_truth
-                    for key, grader in self.graders.items():  # type: ignore[union-attr]
-                        gr, sub = await grader.grade(sample, trajectory, agent_state=agent_state)
-                        grades_dict[key] = gr
-                        submissions_dict[key] = sub
+                phase = ErrorCategory.GRADING
+                grades_dict, submissions_dict, per_grader_time = await self._grade_sample(
+                    sample, trajectory, agent_state, sample_id, agent_id, model_name
+                )
 
                 # use first grader as primary for legacy grade_result/submission
                 first_key = next(iter(grades_dict.keys()))
                 grade_result = grades_dict[first_key]
                 submission = submissions_dict[first_key]
 
-                # Detect extraction errors (empty trajectory/submission)
-                error_info: Optional[ErrorInfo] = None
-                is_extraction_error = grade_result.score == 0.0 and (
-                    not trajectory
-                    or not submission
-                    or (
-                        grade_result.rationale
-                        and (
-                            "Empty trajectory" in grade_result.rationale or "Empty submission" in grade_result.rationale
-                        )
+                error_info = self._detect_errors(grade_result, trajectory, submission, grades_dict)
+                if error_info and self.progress_callback:
+                    await self.progress_callback.sample_error(
+                        sample_id, error_info.message, agent_id=agent_id, model_name=model_name
                     )
-                )
-                if is_extraction_error:
-                    message = grade_result.rationale or "Empty trajectory or submission"
-                    error_info = ErrorInfo(
-                        category=ErrorCategory.EXTRACTION,
-                        exception_type="ExtractionError",
-                        message=message,
-                    )
-                    if self.progress_callback:
-                        await self.progress_callback.sample_error(
-                            sample_id, message, agent_id=agent_id, model_name=model_name
-                        )
-                else:
-                    # Detect grading errors from grader metadata
-                    grading_errors = {
-                        k: gr.metadata["error"] for k, gr in grades_dict.items() if gr.metadata.get("error")
-                    }
-                    if grading_errors:
-                        details = "; ".join(f"{k}: {v}" for k, v in grading_errors.items())
-                        error_info = ErrorInfo(
-                            category=ErrorCategory.GRADING,
-                            exception_type="GradingError",
-                            message=f"Grading failed for: {details}",
-                        )
-                        if self.progress_callback:
-                            await self.progress_callback.sample_error(
-                                sample_id, error_info.message, agent_id=agent_id, model_name=model_name
-                            )
 
                 if error_info is None and self.progress_callback:
                     metric_scores = None
@@ -536,6 +580,10 @@ class Runner:
                     extract_token_counts(agent_usage)
                 )
 
+                # Calculate timing
+                total_time = time.perf_counter() - t_sample_start
+                extraction_time = sum(gr.metadata.get("extraction_time", 0.0) for gr in grades_dict.values())
+
                 return SampleResult(
                     sample=sample,
                     submission=submission,
@@ -552,6 +600,10 @@ class Runner:
                     cached_input_tokens=cached_input_tokens if cached_input_tokens > 0 else None,
                     cache_write_tokens=cache_write_tokens if cache_write_tokens > 0 else None,
                     reasoning_tokens=reasoning_tokens if reasoning_tokens > 0 else None,
+                    total_time=total_time,
+                    target_time=target_time,
+                    extraction_time=extraction_time if extraction_time > 0 else None,
+                    per_grader_time=per_grader_time if per_grader_time else None,
                     error=error_info,
                 )
             except Exception as e:
@@ -561,12 +613,7 @@ class Runner:
                 agent_str = f" ({agent_id})" if agent_id else ""
                 log_message = str(e) or type(e).__name__
                 logger.error(f"Error running sample {sample_id + 1}{agent_str} with model {model_name}: {log_message}")
-                if isinstance(e, TargetError):
-                    category = ErrorCategory.TARGET
-                elif agent_id:
-                    category = ErrorCategory.GRADING
-                else:
-                    category = ErrorCategory.UNKNOWN
+                category = ErrorCategory.TARGET if isinstance(e, TargetError) else phase
                 cause = e.__cause__ if e.__cause__ else e
                 error_message = str(e) or type(cause).__name__
                 error_info = ErrorInfo(
@@ -591,6 +638,7 @@ class Runner:
                     cost=None,
                     prompt_tokens=None,
                     completion_tokens=None,
+                    total_time=time.perf_counter() - t_sample_start,
                     error=error_info,
                 )
 
@@ -657,14 +705,7 @@ class Runner:
                 for llm_config in self.model_configs:
                     # If setup needs model name, run it once per model
                     if setup_needs_model:
-                        # extract model name from either LlmConfig or string handle
-                        if isinstance(llm_config, LlmConfig):
-                            model_name = llm_config.model
-                        elif isinstance(llm_config, str):
-                            model_name = llm_config
-                        else:
-                            model_name = None
-                        await self._run_setup(model_name=model_name)
+                        await self._run_setup(model_name=_extract_model_name(llm_config))
 
                     for sample in samples:
 
@@ -676,7 +717,11 @@ class Runner:
 
                         tg.start_soon(run_and_append, sample, llm_config)
 
-            metrics = self._calculate_metrics()
+            metrics = calculate_metrics(
+                self.results,
+                list(self.graders.keys()) if self.graders else None,
+                bool(self.suite.target.model_configs or self.suite.target.model_handles),
+            )
             gates_passed = self._check_gates(metrics)
 
             # write final metrics if streaming
@@ -689,239 +734,17 @@ class Runner:
         except BaseException:
             # On interruption or errors, write a best-effort summary for a valid JSONL
             try:
-                metrics = self._calculate_metrics()
+                metrics = calculate_metrics(
+                    self.results,
+                    list(self.graders.keys()) if self.graders else None,
+                    bool(self.suite.target.model_configs or self.suite.target.model_handles),
+                )
                 gates_passed = self._check_gates(metrics)
                 if self.stream_writer:
                     await self.stream_writer.write_metrics(metrics, gates_passed)
             finally:
                 # Re-raise to preserve original error/interrupt semantics
                 raise
-
-    def _calculate_metrics(self) -> Metrics:
-        """Calculate aggregate metrics from results.
-
-        - total: success + error (all results)
-        - total_attempted: success only (completed without error)
-        - metrics: dict of metric_key -> pass rate percentage
-        - avg_score: mean across all results (including error results)
-        - per_model: same semantics per model (based on gate metric key)
-        """
-        total = len(self.results)
-        if total == 0:
-            return Metrics(
-                total=0,
-                total_attempted=0,
-                avg_score_attempted=0.0,
-                avg_score_total=0.0,
-                metrics={},
-            )
-
-        def is_success(r: SampleResult) -> bool:
-            return r.error is None
-
-        attempted = sum(1 for r in self.results if is_success(r))
-
-        # Build error summary
-        error_results = [r for r in self.results if r.error is not None]
-        error_summary = None
-        if error_results:
-            category_counts = Counter(r.error.category.value for r in error_results)
-            exception_type_counts = Counter(r.error.exception_type for r in error_results)
-            error_summary = ErrorSummary(
-                total_errors=len(error_results),
-                by_category=dict(category_counts),
-                by_exception_type=dict(exception_type_counts),
-                failed_sample_ids=sorted(r.sample.id for r in error_results),
-            )
-
-        # compute per-metric aggregates if multiple graders
-        by_metric: Dict[str, MetricAggregate] = {}
-        if self.graders is not None:
-            for metric_key in self.graders.keys():
-                m_scores = [
-                    r.grades[metric_key].score
-                    for r in self.results
-                    if is_success(r) and r.grades and metric_key in r.grades
-                ]
-                m_avg_attempted = sum(m_scores) / len(m_scores) if m_scores else 0.0
-                m_avg_total = sum(m_scores) / len(self.results) if m_scores else 0.0
-                # pass_rate is just avg score as percentage
-                m_pass_rate = m_avg_attempted * 100.0
-                by_metric[metric_key] = MetricAggregate(
-                    avg_score_attempted=m_avg_attempted,
-                    avg_score_total=m_avg_total,
-                    pass_rate=m_pass_rate,
-                )
-
-        metrics_dict: Dict[str, float] = {}
-        if self.graders is not None:
-            # use first grader for overall metrics
-            first_key = next(iter(self.graders.keys()))
-            for key, agg in by_metric.items():
-                metrics_dict[key] = agg.pass_rate
-
-            agg = by_metric.get(first_key) if first_key in by_metric else None
-            avg_score_attempted = agg.avg_score_attempted if agg else 0.0
-            avg_score_total = agg.avg_score_total if agg else 0.0
-        else:
-            scores = [r.grade.score for r in self.results if is_success(r)]
-            avg_score_attempted = sum(scores) / len(scores) if scores else 0.0
-            avg_score_total = sum(scores) / len(self.results) if scores else 0.0
-            # for single grader case, use a default key
-            default_key = "default"
-            metrics_dict[default_key] = avg_score_attempted * 100.0
-
-        # Calculate overall cost and token aggregates
-        costs = [r.cost for r in self.results if r.cost is not None]
-        total_cost = sum(costs) if costs else None
-
-        prompt_tokens_list = [r.prompt_tokens for r in self.results if r.prompt_tokens is not None]
-        total_prompt_tokens = sum(prompt_tokens_list) if prompt_tokens_list else 0
-
-        completion_tokens_list = [r.completion_tokens for r in self.results if r.completion_tokens is not None]
-        total_completion_tokens = sum(completion_tokens_list) if completion_tokens_list else 0
-
-        cached_input_tokens_list = [r.cached_input_tokens for r in self.results if r.cached_input_tokens is not None]
-        total_cached_input_tokens = sum(cached_input_tokens_list) if cached_input_tokens_list else 0
-
-        cache_write_tokens_list = [r.cache_write_tokens for r in self.results if r.cache_write_tokens is not None]
-        total_cache_write_tokens = sum(cache_write_tokens_list) if cache_write_tokens_list else 0
-
-        reasoning_tokens_list = [r.reasoning_tokens for r in self.results if r.reasoning_tokens is not None]
-        total_reasoning_tokens = sum(reasoning_tokens_list) if reasoning_tokens_list else 0
-
-        # Create UsageMetrics if we have any token or cost data
-        usage_metrics = None
-        if total_prompt_tokens > 0 or total_completion_tokens > 0 or (total_cost is not None and total_cost > 0):
-            usage_metrics = UsageMetrics(
-                total_prompt_tokens=total_prompt_tokens,
-                total_completion_tokens=total_completion_tokens,
-                total_cost=total_cost if total_cost and total_cost > 0 else None,
-                total_cached_input_tokens=total_cached_input_tokens,
-                total_cache_write_tokens=total_cache_write_tokens,
-                total_reasoning_tokens=total_reasoning_tokens,
-            )
-
-        per_model = None
-        if self.suite.target.model_configs or self.suite.target.model_handles:
-            model_results = defaultdict(list)
-            for result in self.results:
-                model_results[result.model_name].append(result)
-
-            per_model = []
-            for model_name, results in sorted(model_results.items()):
-                model_attempted = sum(1 for r in results if is_success(r))
-                model_metrics_dict: Dict[str, float] = {}
-
-                if self.graders is not None:
-                    # use first grader for overall model metrics
-                    first_key = next(iter(self.graders.keys()))
-                    # calculate avg score for each metric
-                    for metric_key in self.graders.keys():
-                        metric_scores = [
-                            r.grades[metric_key].score
-                            for r in results
-                            if is_success(r) and r.grades and metric_key in r.grades
-                        ]
-                        model_metrics_dict[metric_key] = (
-                            (sum(metric_scores) / len(metric_scores)) * 100.0 if metric_scores else 0.0
-                        )
-
-                    model_scores = [
-                        r.grades[first_key].score
-                        for r in results
-                        if is_success(r) and r.grades and first_key in r.grades
-                    ]
-                else:
-                    model_scores = [r.grade.score for r in results if is_success(r)]
-                    default_key = "default"
-                    model_metrics_dict[default_key] = (
-                        (sum(model_scores) / len(model_scores)) * 100.0 if model_scores else 0.0
-                    )
-
-                model_avg_attempted = sum(model_scores) / len(model_scores) if model_scores else 0.0
-                model_avg_total = sum(model_scores) / len(results) if model_scores else 0.0
-
-                # Calculate cost and token counts for this model
-                model_costs = [r.cost for r in results if r.cost is not None]
-                model_total_cost = sum(model_costs) if model_costs else None
-
-                model_prompt_tokens_list = [r.prompt_tokens for r in results if r.prompt_tokens is not None]
-                model_total_prompt_tokens = sum(model_prompt_tokens_list) if model_prompt_tokens_list else 0
-
-                model_completion_tokens_list = [r.completion_tokens for r in results if r.completion_tokens is not None]
-                model_total_completion_tokens = sum(model_completion_tokens_list) if model_completion_tokens_list else 0
-
-                model_cached_input_tokens_list = [
-                    r.cached_input_tokens for r in results if r.cached_input_tokens is not None
-                ]
-                model_total_cached_input_tokens = (
-                    sum(model_cached_input_tokens_list) if model_cached_input_tokens_list else 0
-                )
-
-                model_cache_write_tokens_list = [
-                    r.cache_write_tokens for r in results if r.cache_write_tokens is not None
-                ]
-                model_total_cache_write_tokens = (
-                    sum(model_cache_write_tokens_list) if model_cache_write_tokens_list else 0
-                )
-
-                model_reasoning_tokens_list = [r.reasoning_tokens for r in results if r.reasoning_tokens is not None]
-                model_total_reasoning_tokens = sum(model_reasoning_tokens_list) if model_reasoning_tokens_list else 0
-
-                # Create UsageMetrics for this model if we have any token or cost data
-                model_usage_metrics = None
-                if (
-                    model_total_prompt_tokens > 0
-                    or model_total_completion_tokens > 0
-                    or (model_total_cost is not None and model_total_cost > 0)
-                ):
-                    model_usage_metrics = UsageMetrics(
-                        total_prompt_tokens=model_total_prompt_tokens,
-                        total_completion_tokens=model_total_completion_tokens,
-                        total_cost=model_total_cost if model_total_cost and model_total_cost > 0 else None,
-                        total_cached_input_tokens=model_total_cached_input_tokens,
-                        total_cache_write_tokens=model_total_cache_write_tokens,
-                        total_reasoning_tokens=model_total_reasoning_tokens,
-                    )
-
-                # Build per-model error summary
-                model_error_results = [r for r in results if r.error is not None]
-                model_error_summary = None
-                if model_error_results:
-                    model_category_counts = Counter(r.error.category.value for r in model_error_results)
-                    model_exception_type_counts = Counter(r.error.exception_type for r in model_error_results)
-                    model_error_summary = ErrorSummary(
-                        total_errors=len(model_error_results),
-                        by_category=dict(model_category_counts),
-                        by_exception_type=dict(model_exception_type_counts),
-                        failed_sample_ids=sorted(r.sample.id for r in model_error_results),
-                    )
-
-                per_model.append(
-                    ModelMetrics(
-                        model_name=model_name,
-                        total=len(results),
-                        total_attempted=model_attempted,
-                        avg_score_attempted=model_avg_attempted,
-                        avg_score_total=model_avg_total,
-                        metrics=model_metrics_dict,
-                        usage_metrics=model_usage_metrics,
-                        error_summary=model_error_summary,
-                    )
-                )
-
-        return Metrics(
-            total=total,
-            total_attempted=attempted,
-            avg_score_attempted=avg_score_attempted,
-            avg_score_total=avg_score_total,
-            per_model=per_model,
-            by_metric=by_metric if by_metric else None,
-            metrics=metrics_dict,
-            usage_metrics=usage_metrics,
-            error_summary=error_summary,
-        )
 
     def _compute_aggregation(
         self, metric_key: str, aggregation: Aggregation, pass_threshold: Optional[float] = None
@@ -1010,48 +833,6 @@ class Runner:
 
         else:
             raise ValueError(f"unknown gate type: {type(gate)}")
-
-
-def _calculate_run_statistics(all_metrics: List[Metrics], runs_passed: int, suite: SuiteSpec) -> RunStatistics:
-    """Calculate aggregate statistics across multiple runs."""
-    import statistics
-
-    num_runs = len(all_metrics)
-
-    avg_scores_attempted = [m.avg_score_attempted for m in all_metrics]
-    avg_scores_total = [m.avg_score_total for m in all_metrics]
-
-    mean_avg_score_attempted = statistics.mean(avg_scores_attempted)
-    std_avg_score_attempted = statistics.stdev(avg_scores_attempted) if num_runs > 1 else 0.0
-
-    mean_avg_score_total = statistics.mean(avg_scores_total)
-    std_avg_score_total = statistics.stdev(avg_scores_total) if num_runs > 1 else 0.0
-
-    mean_scores: Dict[str, float] = {}
-    std_scores: Dict[str, float] = {}
-
-    if suite.graders:
-        for metric_key in suite.graders.keys():
-            metric_values = []
-            for m in all_metrics:
-                if m.by_metric and metric_key in m.by_metric:
-                    metric_values.append(m.by_metric[metric_key].avg_score_attempted)
-
-            if metric_values:
-                mean_scores[metric_key] = statistics.mean(metric_values)
-                std_scores[metric_key] = statistics.stdev(metric_values) if len(metric_values) > 1 else 0.0
-
-    return RunStatistics(
-        num_runs=num_runs,
-        runs_passed=runs_passed,
-        mean_avg_score_attempted=mean_avg_score_attempted,
-        std_avg_score_attempted=std_avg_score_attempted,
-        mean_avg_score_total=mean_avg_score_total,
-        std_avg_score_total=std_avg_score_total,
-        mean_scores=mean_scores,
-        std_scores=std_scores,
-        individual_run_metrics=all_metrics,
-    )
 
 
 async def _write_aggregate_statistics(output_path: Path, run_statistics: RunStatistics) -> None:
@@ -1187,13 +968,13 @@ async def run_suite(
                 if progress_cb is not None and run_idx == actual_num_runs - 1:
                     # stop live display first, then show summary
                     progress_cb.stop()
-                    run_statistics = _calculate_run_statistics(all_metrics, runs_passed, suite)
+                    run_statistics = calculate_run_statistics(all_metrics, runs_passed, suite)
                     final_result_temp = all_run_results[-1]
                     final_result_temp.run_statistics = run_statistics
                     final_result_temp.gates_passed = runs_passed > 0
                     await progress_cb.suite_completed(final_result_temp)
 
-        run_statistics = _calculate_run_statistics(all_metrics, runs_passed, suite)
+        run_statistics = calculate_run_statistics(all_metrics, runs_passed, suite)
 
         if output_path:
             await _write_aggregate_statistics(output_path, run_statistics)

@@ -62,6 +62,19 @@ def _parse_string_or_list(value: str, field_name: str, row_idx: int) -> Union[st
     return value_str
 
 
+def _parse_json_dict_field(df: pd.DataFrame, row, field_name: str, row_idx) -> Optional[dict]:
+    """Parse an optional CSV column that expects a JSON object string."""
+    if field_name not in df.columns or pd.isna(row.get(field_name)):
+        return None
+    try:
+        value = json.loads(str(row[field_name]).strip())
+        if not isinstance(value, dict):
+            raise ValueError(f"Row {row_idx}: '{field_name}' must be a JSON object/dict, got {type(value)}")
+        return value
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Row {row_idx}: '{field_name}' column contains invalid JSON: {e}")
+
+
 def load_csv(
     file_path: Path, max_samples: Optional[int] = None, sample_tags: Optional[List[str]] = None
 ) -> Iterator[Sample]:
@@ -101,38 +114,9 @@ def load_csv(
         if "ground_truth" in df.columns and not pd.isna(row.get("ground_truth")):
             ground_truth = _parse_string_or_list(str(row["ground_truth"]), "ground_truth", idx)
 
-        # parse agent_args field (expects JSON string)
-        agent_args = None
-        if "agent_args" in df.columns and not pd.isna(row.get("agent_args")):
-            try:
-                agent_args_str = str(row["agent_args"]).strip()
-                agent_args = json.loads(agent_args_str)
-                if not isinstance(agent_args, dict):
-                    raise ValueError(f"Row {idx}: 'agent_args' must be a JSON object/dict, got {type(agent_args)}")
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Row {idx}: 'agent_args' column contains invalid JSON: {e}")
-
-        # parse rubric_vars field (expects JSON string)
-        rubric_vars = None
-        if "rubric_vars" in df.columns and not pd.isna(row.get("rubric_vars")):
-            try:
-                rubric_vars_str = str(row["rubric_vars"]).strip()
-                rubric_vars = json.loads(rubric_vars_str)
-                if not isinstance(rubric_vars, dict):
-                    raise ValueError(f"Row {idx}: 'rubric_vars' must be a JSON object/dict, got {type(rubric_vars)}")
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Row {idx}: 'rubric_vars' column contains invalid JSON: {e}")
-
-        # parse extra_vars field (expects JSON string)
-        extra_vars = None
-        if "extra_vars" in df.columns and not pd.isna(row.get("extra_vars")):
-            try:
-                extra_vars_str = str(row["extra_vars"]).strip()
-                extra_vars = json.loads(extra_vars_str)
-                if not isinstance(extra_vars, dict):
-                    raise ValueError(f"Row {idx}: 'extra_vars' must be a JSON object/dict, got {type(extra_vars)}")
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Row {idx}: 'extra_vars' column contains invalid JSON: {e}")
+        agent_args = _parse_json_dict_field(df, row, "agent_args", idx)
+        rubric_vars = _parse_json_dict_field(df, row, "rubric_vars", idx)
+        extra_vars = _parse_json_dict_field(df, row, "extra_vars", idx)
 
         # create sample
         try:

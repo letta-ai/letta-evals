@@ -1,0 +1,35 @@
+name: Unit Tests
+
+on:
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - '**.py'
+      - 'pyproject.toml'
+      - '.github/workflows/unit-tests.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - '**.py'
+      - 'pyproject.toml'
+      - '.github/workflows/unit-tests.yml'
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install .[dev]
+
+      - name: Run unit tests
+        run: pytest tests/test_metrics.py tests/test_graders.py tests/test_extractors.py tests/test_loader.py tests/test_gates.py tests/test_streaming.py -v

@@ -10,7 +10,6 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel as PydanticBaseModel
 from pydantic import Field as PydanticField
 
-from letta_evals.extractors import extractor_requires_agent_state, get_extractor
 from letta_evals.graders.base import Grader
 from letta_evals.graders.prompt_utils import JUDGE_SYSTEM_PROMPT, build_judge_prompt
 from letta_evals.models import AgentState, GradeResult, LettaMessageUnion, Sample
@@ -49,8 +48,7 @@ class RubricGrader(Grader):
         self.extractor_name = extractor
         self.base_dir = base_dir
         self.rubric_vars = rubric_vars or []
-        self.extractor = get_extractor(extractor, extractor_config, base_dir=base_dir)
-        self._requires_agent_state = extractor_requires_agent_state(extractor, base_dir=base_dir)
+        self._init_extractor(extractor, extractor_config, base_dir=base_dir)
 
         if provider == LLMProvider.OPENAI:
             api_key = os.getenv("OPENAI_API_KEY")
@@ -92,24 +90,13 @@ class RubricGrader(Grader):
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
-    @property
-    def requires_agent_state(self) -> bool:
-        """Whether this grader's extractor requires agent_state."""
-        return self._requires_agent_state
-
     async def grade(
         self, sample: Sample, trajectory: List[List[LettaMessageUnion]], agent_state: Optional[AgentState] = None
     ) -> Tuple[GradeResult, str]:
         """Grade using LLM judge with rubric."""
-        # Validate trajectory before extraction
-        if not trajectory or not any(turn for turn in trajectory if turn):
-            return GradeResult(score=0.0, rationale="Empty trajectory - agent produced no messages"), ""
-
-        submission = self.extractor(trajectory, agent_state=agent_state)
-
-        # Validate submission after extraction
-        if not submission:
-            return GradeResult(score=0.0, rationale="Empty submission - extractor found no content"), ""
+        submission, extraction_time, early = self.extract(trajectory, agent_state)
+        if early:
+            return early
 
         judge_prompt = build_judge_prompt(self.prompt, sample, submission, self.rubric_vars)
 
@@ -185,10 +172,12 @@ class RubricGrader(Grader):
             return GradeResult(
                 score=score,
                 rationale=result_json.get("rationale", ""),
-                metadata={"model": self.model, "usage": usage},
+                metadata={"model": self.model, "usage": usage, "extraction_time": extraction_time},
             ), submission
 
         except Exception as e:
             return GradeResult(
-                score=0.0, rationale=f"Error during grading: {str(e)}", metadata={"error": str(e)}
+                score=0.0,
+                rationale=f"Error during grading: {str(e)}",
+                metadata={"error": str(e), "extraction_time": extraction_time},
             ), submission
