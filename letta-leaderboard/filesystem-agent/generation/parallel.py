@@ -22,6 +22,13 @@ class ParallelMixin:
         - self.generate_single_question()
     """
 
+    def _max_failed_slots_allowed(self, target_count: int) -> int:
+        """Cap exhausted slots so generation can top up without looping forever."""
+        configured = self.config.get("max_failed_questions_per_run")
+        if configured is None:
+            return max(target_count, 10)
+        return configured
+
     def generate_questions_parallel(
         self, num_questions: int = 10, num_workers: int = 4, question_type: Optional[str] = None
     ):
@@ -46,8 +53,10 @@ class ParallelMixin:
 
         # Thread-safe progress state
         progress_lock = threading.Lock()
+        stop_event = threading.Event()
+        max_failed_slots = self._max_failed_slots_allowed(num_questions)
         progress = {"success": 0, "failed": 0}
-        type_progress = {qtype: {"done": 0, "ok": 0, "fail": 0, "total": count} for qtype, count in type_counts.items()}
+        type_progress = {qtype: {"attempts": 0, "ok": 0, "fail": 0, "total": count} for qtype, count in type_counts.items()}
 
         max_name_len = max(len(name) for name in type_counts)
 
@@ -62,29 +71,29 @@ class ParallelMixin:
                 total = tp["total"]
                 ok = tp["ok"]
                 fail = tp["fail"]
-                done = tp["done"]
+                attempts = tp["attempts"]
 
                 bar_width = 20
-                filled = int(bar_width * done / total) if total > 0 else 0
+                filled = int(bar_width * ok / total) if total > 0 else 0
                 bar = "█" * filled + "░" * (bar_width - filled)
 
-                if done == 0:
+                if ok == 0 and attempts == 0:
                     color = Colors.DIM
+                elif ok == total:
+                    color = Colors.GREEN
                 elif fail > 0:
                     color = Colors.YELLOW
-                elif done == total:
-                    color = Colors.GREEN
                 else:
                     color = Colors.CYAN
 
                 name_padded = qtype.ljust(max_name_len)
-                fail_str = f" ({fail} failed)" if fail > 0 else ""
-                lines.append(f"  {color}{name_padded}  {bar}  {ok}/{total}{fail_str}{Colors.ENDC}")
+                fail_str = f", {fail} exhausted" if fail > 0 else ""
+                attempt_str = f", {attempts} attempts" if attempts > 0 else ""
+                lines.append(f"  {color}{name_padded}  {bar}  {ok}/{total}{attempt_str}{fail_str}{Colors.ENDC}")
 
-            total_done = progress["success"] + progress["failed"]
             lines.append("")  # blank line
             lines.append(
-                f"  Total: {total_done}/{num_questions} ({progress['success']} ok, {progress['failed']} failed)"
+                f"  Total accepted: {progress['success']}/{num_questions} ({progress['failed']} exhausted slots, cap {max_failed_slots})"
             )
 
             # Move cursor up by render_height, clear to end of screen, print
@@ -99,17 +108,26 @@ class ParallelMixin:
             """Generate `count` questions of `qtype` sequentially."""
             batch_results = {"success": 0, "failed": 0}
             max_iterations = self.config.get("max_iterations_per_question", 20)
+            max_retries = self.config.get("max_retries_per_question", 3)
 
-            for i in range(count):
-                existing_questions = self.get_existing_questions()
-                success, _ = self.generate_single_question(
-                    i + 1,
-                    count,
-                    existing_questions,
-                    max_iterations=max_iterations,
-                    question_type=qtype,
-                )
+            while batch_results["success"] < count and not stop_event.is_set():
+                success = False
+                for _ in range(max_retries):
+                    if stop_event.is_set():
+                        break
+                    existing_questions = self.get_existing_questions()
+                    success, _ = self.generate_single_question(
+                        batch_results["success"] + 1,
+                        count,
+                        existing_questions,
+                        max_iterations=max_iterations,
+                        question_type=qtype,
+                    )
+                    if success:
+                        break
+
                 with progress_lock:
+                    type_progress[qtype]["attempts"] += 1
                     if success:
                         batch_results["success"] += 1
                         progress["success"] += 1
@@ -118,7 +136,8 @@ class ParallelMixin:
                         batch_results["failed"] += 1
                         progress["failed"] += 1
                         type_progress[qtype]["fail"] += 1
-                    type_progress[qtype]["done"] += 1
+                        if progress["failed"] >= max_failed_slots:
+                            stop_event.set()
                     _render_progress()
             return batch_results
 
@@ -135,10 +154,11 @@ class ParallelMixin:
                     future.result()
                 except Exception:
                     with progress_lock:
-                        remaining = type_counts[qtype] - type_progress[qtype]["done"]
+                        stop_event.set()
+                        remaining = type_counts[qtype] - type_progress[qtype]["ok"]
                         progress["failed"] += remaining
                         type_progress[qtype]["fail"] += remaining
-                        type_progress[qtype]["done"] = type_counts[qtype]
+                        type_progress[qtype]["attempts"] += remaining
                         _render_progress()
 
         self.quiet = False
@@ -146,7 +166,9 @@ class ParallelMixin:
         self._print_separator("=")
         print(f"\n{Colors.HEADER}Parallel generation complete!{Colors.ENDC}")
         print(f"  Succeeded: {progress['success']}/{num_questions}")
-        print(f"  Failed: {progress['failed']}/{num_questions}")
+        print(f"  Exhausted slots: {progress['failed']} (cap {max_failed_slots})")
+        if progress["success"] < num_questions:
+            print(f"  {Colors.YELLOW}Stopped before hitting target accepted count.{Colors.ENDC}")
         print(
             f"  {Colors.DIM}Total tokens: {self.total_tokens['input']:,} in, {self.total_tokens['output']:,} out{Colors.ENDC}"
         )

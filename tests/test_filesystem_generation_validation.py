@@ -14,6 +14,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def load_module(name: str, relative_path: str):
     path = ROOT / relative_path
+    module_dir = str(path.parent)
+    if module_dir not in sys.path:
+        sys.path.insert(0, module_dir)
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -29,6 +32,10 @@ register_question_tool = load_module(
 validate_questions = load_module(
     "validate_questions",
     "letta-leaderboard/filesystem-agent/generation/validate_questions.py",
+)
+question_generator = load_module(
+    "question_generator",
+    "letta-leaderboard/filesystem-agent/generation/question_generator.py",
 )
 
 
@@ -244,3 +251,73 @@ def test_run_validation_auto_audits_sibling_parsed_dataset(tmp_path, monkeypatch
     assert len(issues) == 1
     assert issues[0]["type"] == "parsed_dataset_audit"
     assert issues[0]["flags"] == ["wrong"]
+
+
+def test_generate_questions_tops_up_until_target_count(tmp_path):
+    agent = object.__new__(question_generator.QuestionGeneratorAgent)
+    accepted = []
+    outcomes = iter([False, False, True, True])
+    trace = {}
+
+    agent.config = {
+        "max_retries_per_question": 2,
+        "max_iterations_per_question": 1,
+        "max_failed_questions_per_run": 3,
+    }
+    agent.model = "test-model"
+    agent.output_path = tmp_path / "agent_generated_questions.jsonl"
+    agent.total_tokens = {"input": 0, "output": 0}
+    agent._build_type_schedule = lambda n: ["aggregation"] * n
+    agent._print_separator = lambda *args, **kwargs: None
+    agent._save_full_trace = (
+        lambda session_id, conversations, target_count: trace.update(
+            {"conversations": conversations, "target_count": target_count}
+        )
+    )
+    agent.get_existing_questions = lambda: accepted.copy()
+
+    def generate_single_question(question_number, total, existing_questions, max_iterations, question_type=None):
+        success = next(outcomes)
+        if success:
+            accepted.append({"question": f"Q{len(accepted) + 1}", "answer": "A"})
+        return success, [{"success": success, "slot": question_number, "type": question_type}]
+
+    agent.generate_single_question = generate_single_question
+
+    agent.generate_questions(num_questions=2, question_type="aggregation")
+
+    assert len(accepted) == 2
+    assert trace["target_count"] == 2
+    assert len(trace["conversations"]) == 3
+    assert trace["conversations"][0]["success"] is False
+    assert trace["conversations"][-1]["success"] is True
+
+
+def test_generate_questions_parallel_tops_up_until_target_count(tmp_path):
+    agent = object.__new__(question_generator.QuestionGeneratorAgent)
+    accepted = []
+    outcomes = iter([False, False, True, True])
+
+    agent.config = {
+        "max_retries_per_question": 2,
+        "max_iterations_per_question": 1,
+        "max_failed_questions_per_run": 3,
+    }
+    agent.model = "test-model"
+    agent.output_path = tmp_path / "agent_generated_questions.jsonl"
+    agent.total_tokens = {"input": 0, "output": 0}
+    agent.quiet = False
+    agent._print_separator = lambda *args, **kwargs: None
+    agent.get_existing_questions = lambda: accepted.copy()
+
+    def generate_single_question(question_number, total, existing_questions, max_iterations, question_type=None):
+        success = next(outcomes)
+        if success:
+            accepted.append({"question": f"Q{len(accepted) + 1}", "answer": "A"})
+        return success, [{"success": success, "slot": question_number, "type": question_type}]
+
+    agent.generate_single_question = generate_single_question
+
+    agent.generate_questions_parallel(num_questions=2, num_workers=1, question_type="aggregation")
+
+    assert len(accepted) == 2

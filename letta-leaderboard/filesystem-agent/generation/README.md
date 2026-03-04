@@ -81,6 +81,8 @@ python3 question_generator.py \
 - the raw artifact passes `verification_query` validation
 - the sibling parsed JSONL audit also passes
 
+If a candidate question is rejected during registration, the generator now keeps topping up until it reaches the requested number of accepted questions. The only time a run should finish short is if it exhausts the run-level failed-slot safety cap, which defaults to `max(num_questions, 10)` and can be overridden with `agent_question_generator.max_failed_questions_per_run`.
+
 ### Parameters
 
 | Parameter | Default | Description |

@@ -141,7 +141,7 @@ class QuestionGeneratorAgent(DisplayMixin, ContextMixin, ParallelMixin):
         summary.append("Generate a completely different and creative question!")
         return "\n".join(summary)
 
-    def _save_full_trace(self, session_id: str, all_conversations: List[Dict[str, Any]]):
+    def _save_full_trace(self, session_id: str, all_conversations: List[Dict[str, Any]], target_count: int):
         """Save the complete conversation trace."""
         # Save logs in the same directory as the questions
         trace_path = self.output_path.parent / f"agent_trace_{session_id}.json"
@@ -155,7 +155,8 @@ class QuestionGeneratorAgent(DisplayMixin, ContextMixin, ParallelMixin):
                     "session_id": session_id,
                     "model": self.model,
                     "timestamp": datetime.now().isoformat(),
-                    "total_questions_target": len(all_conversations),
+                    "total_questions_target": target_count,
+                    "total_generation_attempts": len(all_conversations),
                     "total_questions_generated": successful_questions,
                     "conversations": all_conversations,
                 },
@@ -521,8 +522,14 @@ class QuestionGeneratorAgent(DisplayMixin, ContextMixin, ParallelMixin):
         self._print_separator("=")
 
         max_retries = self.config.get("max_retries_per_question", 3)
+        max_failed_slots = self._max_failed_slots_allowed(num_questions)
+        successful_count = 0
+        failed_slots = 0
+        slot_attempts = 0
 
-        for question_num in range(num_questions):
+        while successful_count < num_questions and failed_slots < max_failed_slots:
+            question_num = successful_count
+            slot_attempts += 1
             # Get all existing questions for context
             existing_questions = self.get_existing_questions()
             current_type = type_schedule[question_num]
@@ -563,6 +570,7 @@ class QuestionGeneratorAgent(DisplayMixin, ContextMixin, ParallelMixin):
             all_conversations.append(
                 {
                     "question_number": question_num + 1,
+                    "slot_attempt": slot_attempts,
                     "success": success,
                     "attempts": attempt,
                     "conversation": conversation,
@@ -571,6 +579,7 @@ class QuestionGeneratorAgent(DisplayMixin, ContextMixin, ParallelMixin):
 
             self._print_separator()
             if success:
+                successful_count += 1
                 print(
                     f"\n{Colors.GREEN}Successfully generated question {question_num + 1}{' (after ' + str(attempt) + ' attempts)' if attempt > 1 else ''}{Colors.ENDC}"
                 )
@@ -581,17 +590,19 @@ class QuestionGeneratorAgent(DisplayMixin, ContextMixin, ParallelMixin):
                     print(f"   {Colors.BOLD}Question:{Colors.ENDC} {latest['question']}")
                     print(f"   {Colors.BOLD}Answer:{Colors.ENDC} {latest['answer']}")
             else:
+                failed_slots += 1
                 print(
                     f"\n{Colors.RED}Failed to generate question {question_num + 1} after {max_retries} attempts{Colors.ENDC}"
+                )
+                remaining_failures = max_failed_slots - failed_slots
+                print(
+                    f"   {Colors.YELLOW}Continuing to top up this slot. Remaining exhausted-slot budget: {remaining_failures}{Colors.ENDC}"
                 )
 
             self._print_separator("=")
 
         # Save full session trace
-        self._save_full_trace(session_id, all_conversations)
-
-        # Final summary
-        successful_count = sum(1 for conv in all_conversations if conv["success"])
+        self._save_full_trace(session_id, all_conversations, target_count=num_questions)
 
         print(f"\n{Colors.HEADER}Generation complete!{Colors.ENDC}")
         self._print_separator("=")
@@ -599,6 +610,9 @@ class QuestionGeneratorAgent(DisplayMixin, ContextMixin, ParallelMixin):
         print(
             f"   {Colors.GREEN if successful_count == num_questions else Colors.YELLOW}Successfully generated: {successful_count}/{num_questions} questions{Colors.ENDC}"
         )
+        print(f"   Exhausted slots: {failed_slots} (cap {max_failed_slots})")
+        if successful_count < num_questions:
+            print(f"   {Colors.YELLOW}Stopped before hitting target accepted count.{Colors.ENDC}")
         print(f"   Output directory: {self.output_path.parent}")
         print(f"   Questions file: {self.output_path.name}")
         print(f"   Trace file: agent_trace_{session_id}.json")
