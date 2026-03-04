@@ -17,6 +17,7 @@ target:
     - anthropic/claude-haiku-4-5-20251001
     - anthropic/claude-opus-4-6
     - anthropic/claude-sonnet-4-6
+    - gpt-5.3-codex-xhigh
     - gpt-5.2-xhigh
     - gpt-5.2-codex-xhigh
     - gpt-5-mini-high
