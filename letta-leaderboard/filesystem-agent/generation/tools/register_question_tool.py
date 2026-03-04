@@ -59,9 +59,17 @@ WRONG (hardcoded ID): SELECT full_name FROM people WHERE person_id = 'pers-0042'
 CORRECT (end-to-end): 
 SELECT p.full_name FROM people p WHERE p.person_id = (
     SELECT p2.person_id FROM people p2 
-    JOIN addresses a ON a.owner_id = p2.person_id
     JOIN credit_cards c ON c.owner_id = p2.person_id
-    WHERE a.state = (SELECT a2.state FROM pets pet JOIN addresses a2 ON a2.owner_id = pet.owner_id WHERE pet.name = 'Dawn' LIMIT 1)
+    WHERE p2.person_id IN (
+        SELECT DISTINCT owner_id
+        FROM addresses
+        WHERE state = (
+            SELECT state
+            FROM addresses
+            WHERE owner_id = (SELECT owner_id FROM pets WHERE name = 'Dawn' LIMIT 1)
+            LIMIT 1
+        )
+    )
     GROUP BY p2.person_id ORDER BY COUNT(c.card_id) DESC LIMIT 1
 )""",
             },
@@ -125,6 +133,11 @@ def compute_difficulty(question_type: str, required_files: List[str], sql_querie
         return "medium"
     else:
         return "hard"
+
+
+def normalize_verification_value(value: Any) -> str:
+    """Normalize DB/query values for robust comparison."""
+    return str(value).strip()
 
 
 class RegisterQuestionTool:
@@ -271,52 +284,48 @@ class RegisterQuestionTool:
                     "The verification query must compute and return the answer, not embed it in a CASE statement.",
                 }
 
-                try:
-                    cursor.execute(verification_query)
-                    verification_rows = cursor.fetchall()
-                    if len(verification_rows) != 1:
-                        conn.close()
-                        return {
-                            "success": False,
-                            "error": f"Verification query returned {len(verification_rows)} rows, expected exactly 1. "
-                            "The answer is not unique — refine the question conditions.",
-                        }
-                    # Check that the verification query result matches the provided answer
-                    verification_value = str(list(dict(verification_rows[0]).values())[0])
-                    answer_normalized = answer.strip()
-                    # For numeric answers, also try to match formatted versions
-                    if verification_value != answer_normalized:
-                        # Try removing $ and commas for currency
-                        answer_cleaned = answer_normalized.replace("$", "").replace(",", "")
-                        verification_cleaned = verification_value.replace("$", "").replace(",", "")
-                        # Try to compare as numbers if possible
-                        try:
-                            if abs(float(answer_cleaned) - float(verification_cleaned)) < 0.01:
-                                pass  # Close enough for floats
-                            else:
-                                conn.close()
-                                return {
-                                    "success": False,
-                                    "error": f"ANSWER MISMATCH: Verification query returned '{verification_value}' "
-                                    f"but answer field says '{answer}'. The generator's reasoning is wrong. "
-                                    "Re-run the SQL queries and fix the answer.",
-                                }
-                        except (ValueError, TypeError):
-                            # Not numeric, do string comparison
-                            if verification_value.lower() != answer_normalized.lower():
-                                conn.close()
-                                return {
-                                    "success": False,
-                                    "error": f"ANSWER MISMATCH: Verification query returned '{verification_value}' "
-                                    f"but answer field says '{answer}'. The generator's reasoning is wrong. "
-                                    "Re-run the SQL queries and fix the answer.",
-                                }
-                except Exception as e:
+            try:
+                cursor.execute(verification_query)
+                verification_rows = cursor.fetchall()
+                if len(verification_rows) != 1:
                     conn.close()
                     return {
                         "success": False,
-                        "error": f"Verification query failed: {str(e)}. Fix the query and try again.",
+                        "error": f"Verification query returned {len(verification_rows)} rows, expected exactly 1. "
+                        "The answer is not unique — refine the question conditions.",
                     }
+
+                verification_value = normalize_verification_value(list(dict(verification_rows[0]).values())[0])
+                answer_normalized = answer.strip()
+
+                if verification_value != answer_normalized:
+                    answer_cleaned = answer_normalized.replace("$", "").replace(",", "")
+                    verification_cleaned = verification_value.replace("$", "").replace(",", "")
+
+                    try:
+                        if abs(float(answer_cleaned) - float(verification_cleaned)) >= 0.01:
+                            conn.close()
+                            return {
+                                "success": False,
+                                "error": f"ANSWER MISMATCH: Verification query returned '{verification_value}' "
+                                f"but answer field says '{answer}'. The generator's reasoning is wrong. "
+                                "Re-run the SQL queries and fix the answer.",
+                            }
+                    except (ValueError, TypeError):
+                        if verification_value.lower() != answer_normalized.lower():
+                            conn.close()
+                            return {
+                                "success": False,
+                                "error": f"ANSWER MISMATCH: Verification query returned '{verification_value}' "
+                                f"but answer field says '{answer}'. The generator's reasoning is wrong. "
+                                "Re-run the SQL queries and fix the answer.",
+                            }
+            except Exception as e:
+                conn.close()
+                return {
+                    "success": False,
+                    "error": f"Verification query failed: {str(e)}. Fix the query and try again.",
+                }
 
             query_results = []
             for query_info in sql_queries:

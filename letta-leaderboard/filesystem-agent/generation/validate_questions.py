@@ -1,17 +1,10 @@
 #!/usr/bin/env python3
-"""
-Validate generated questions for data quality issues.
+"""Validate generated questions for data quality issues."""
 
-Usage:
-    python validate_questions.py <path_to_agent_generated_questions.jsonl>
-
-Example:
-    python validate_questions.py data/generated_questions/run_20260203_211515/agent_generated_questions.jsonl
-"""
-
+import argparse
 import json
+import re
 import sqlite3
-import sys
 from collections import Counter
 from pathlib import Path
 
@@ -81,6 +74,8 @@ def check_verification_query(questions: list) -> list:
                 flags.append("hardcoded_case_statement")
             if vq.count("SELECT") < 2:
                 flags.append("not_end_to_end")
+            if has_address_join_multiplicity_risk(vq):
+                flags.append("address_join_multiplicity_risk")
 
         if flags:
             issues.append({"id": i, "type": "verification_query", "flags": flags})
@@ -88,8 +83,23 @@ def check_verification_query(questions: list) -> list:
     return issues
 
 
-def validate_gt_against_db(questions: list, db_path: str, sample_size: int = 10) -> list:
-    """Validate ground truths against database for a sample of questions."""
+def has_address_join_multiplicity_risk(query: str) -> bool:
+    """Flag common aggregation patterns that duplicate rows via raw addresses joins."""
+    normalized = " ".join(query.lower().split())
+    if "join addresses" not in normalized:
+        return False
+    if not any(func in normalized for func in ("count(", "sum(", "avg(")):
+        return False
+
+    risky_patterns = [
+        r"(from|join)\s+(credit_cards|bank_accounts|vehicles|insurance_policies|internet_accounts|employments|pets|medical_records)\b.{0,160}join\s+addresses\b.{0,240}(count|sum|avg)\s*\(",
+        r"join\s+addresses\b.{0,160}join\s+(credit_cards|bank_accounts|vehicles|insurance_policies|internet_accounts|employments|pets|medical_records)\b.{0,240}(count|sum|avg)\s*\(",
+    ]
+    return any(re.search(pattern, normalized) for pattern in risky_patterns)
+
+
+def validate_gt_against_db(questions: list, db_path: str, sample_size: int | None = None) -> list:
+    """Validate ground truths against database for all questions or a bounded sample."""
     issues = []
     db = sqlite3.connect(db_path)
 
@@ -99,14 +109,16 @@ def validate_gt_against_db(questions: list, db_path: str, sample_size: int = 10)
     if not questions_with_vq:
         return [{"id": -1, "type": "no_verification_queries", "flags": ["none_found"]}]
 
-    # Sample
-    import random
+    if sample_size is None or sample_size <= 0:
+        sample = questions_with_vq
+    else:
+        import random
 
-    sample = random.sample(questions_with_vq, min(sample_size, len(questions_with_vq)))
+        sample = random.sample(questions_with_vq, min(sample_size, len(questions_with_vq)))
 
     for i, q in sample:
         vq = q.get("verification_query", "")
-        gt = q.get("answer", "")
+        gt = q.get("answer") or q.get("ground_truth", "")
 
         try:
             cursor = db.execute(vq)
@@ -146,11 +158,17 @@ def validate_gt_against_db(questions: list, db_path: str, sample_size: int = 10)
 
 
 def main():
-    if len(sys.argv) < 2:
-        print(__doc__)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("questions_path", help="Path to agent_generated_questions.jsonl")
+    parser.add_argument(
+        "--sample-size",
+        type=int,
+        default=0,
+        help="Validate this many verification queries instead of the full file. 0 means validate all.",
+    )
+    args = parser.parse_args()
 
-    questions_path = sys.argv[1]
+    questions_path = args.questions_path
 
     # Find DB path relative to questions
     script_dir = Path(__file__).parent
@@ -209,10 +227,10 @@ def main():
         print("  ✓ All verification queries valid")
 
     print(f"\n{'=' * 70}")
-    print("Validating GTs against database (sample)...")
+    print("Validating GTs against database...")
     print("=" * 70)
     if db_path.exists():
-        issues = validate_gt_against_db(questions, str(db_path))
+        issues = validate_gt_against_db(questions, str(db_path), sample_size=args.sample_size)
         all_issues.extend(issues)
         if issues:
             for issue in issues:
@@ -220,7 +238,8 @@ def main():
                     f"  Q{issue['id']}: {issue['flags']} - GT='{issue.get('gt', '')}' DB='{issue.get('db_value', '')}'"
                 )
         else:
-            print("  ✓ All sampled GTs match database")
+            checked = "all" if args.sample_size <= 0 else f"{min(args.sample_size, len(questions))} sampled"
+            print(f"  ✓ All {checked} GTs match database")
     else:
         print(f"  ⚠ Database not found at {db_path}")
 
@@ -236,10 +255,10 @@ def main():
         by_type = Counter(i["type"] for i in all_issues)
         for t, c in by_type.most_common():
             print(f"  {t}: {c}")
-        sys.exit(1)
+        raise SystemExit(1)
     else:
         print("\n✅ DATASET LOOKS CLEAN - ready for testing")
-        sys.exit(0)
+        raise SystemExit(0)
 
 
 if __name__ == "__main__":

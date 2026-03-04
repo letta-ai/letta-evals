@@ -223,8 +223,9 @@ class QuestionGeneratorAgent(DisplayMixin, ContextMixin, ParallelMixin):
                 f"1. Start by exploring different tables/attributes than recent questions\n"
                 f"2. Verify exactly ONE correct answer exists (use verification_query)\n"
                 f"3. The answer must be a CONCRETE value (name, number, date) — never 'None' or 'does not own'\n"
-                f"4. If asking about a pet or job, verify the person has exactly 1 of that type\n"
-                f"5. Minimum 3 files required\n\n"
+                f"4. If an anchor implies a derived value (state, provider, blood type, job title, etc.), verify it resolves to exactly ONE relevant value\n"
+                f"5. When using addresses to derive residents, build a DISTINCT owner set before counting cards, balances, vehicles, or policies\n"
+                f"6. Minimum 3 files required\n\n"
                 f"EXPLORATION STRATEGY: Run multiple SQL queries in parallel to explore efficiently!\n"
                 f"Example: Check different tables, test various conditions, explore relationships simultaneously.\n\n"
                 f"When you find a great question with a unique answer, call register_question ALONE (this ends the session).",

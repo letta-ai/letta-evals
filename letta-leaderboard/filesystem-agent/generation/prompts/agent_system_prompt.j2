@@ -118,6 +118,21 @@ email: john.smith@email.com
 The verification_query must NOT just look up a value for a person_id you already determined.
 It must RE-COMPUTE the entire chain from scratch using nested subqueries.
 
+### CRITICAL: dedupe derived resident sets and anchor values
+
+This dataset has multiple records per owner in several tables.
+- `addresses` can contain multiple rows for the same owner
+- `credit_cards`, `bank_accounts`, `vehicles`, etc. all have one-to-many rows per owner
+
+That means a raw join like `people -> addresses -> credit_cards` can DUPLICATE the credit card rows for people with multiple addresses and produce fake winners.
+
+When a question depends on "same state/city/provider/blood type/job title/etc. as X":
+1. First verify the anchor resolves to exactly ONE relevant value, or choose a different anchor.
+2. Then derive a DEDUPED owner set, usually with `SELECT DISTINCT owner_id ...`.
+3. Only after that should you aggregate cards, balances, vehicles, policies, etc.
+
+Never rank or sum people after joining a one-to-many fact table directly to raw `addresses`.
+
 **WRONG (just looks up a person you found):**
 ```sql
 SELECT SUM(balance) FROM bank_accounts WHERE owner_id = 'pers-0108'
@@ -128,12 +143,16 @@ SELECT SUM(balance) FROM bank_accounts WHERE owner_id = 'pers-0108'
 SELECT SUM(b.balance) FROM bank_accounts b
 WHERE b.owner_id = (
     SELECT p.person_id FROM people p 
-    JOIN addresses a ON a.owner_id = p.person_id
     JOIN credit_cards c ON c.owner_id = p.person_id
-    WHERE a.state = (
-        SELECT a2.state FROM pets pet 
-        JOIN addresses a2 ON a2.owner_id = pet.owner_id 
-        WHERE pet.name = 'Dawn' LIMIT 1
+    WHERE p.person_id IN (
+        SELECT DISTINCT owner_id
+        FROM addresses
+        WHERE state = (
+            SELECT state
+            FROM addresses
+            WHERE owner_id = (SELECT owner_id FROM pets WHERE name = 'Dawn' LIMIT 1)
+            LIMIT 1
+        )
     )
     GROUP BY p.person_id
     ORDER BY COUNT(c.card_id) DESC LIMIT 1
@@ -153,6 +172,7 @@ Your questions should be HARD. Test your question with this checklist:
 ## Mandatory Quality Checks Before Registering
 
 1. **Uniqueness**: Run a SQL query that returns EXACTLY 1 row with the answer.
+   Also verify every anchor hop resolves to exactly 1 relevant value (1 state, 1 provider, 1 blood type, etc.).
 2. **Sequential Test**: Write out the step-by-step chain. If any step can be parallelized with another, redesign.
 3. **Indirect Relationship**: At least one hop should involve a derived relationship (coworker, same city, same bank).
 4. **Concrete Answer**: The ground truth must be a specific value (name, number, date). NEVER "None" or negations.
