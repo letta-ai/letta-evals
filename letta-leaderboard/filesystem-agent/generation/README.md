@@ -101,13 +101,16 @@ The `register_question` tool enforces quality checks before accepting a question
 
 - Minimum 3 files required
 - Minimum 3 SQL queries in the reasoning chain
+- Rejects forbidden prompt content like SSNs and neighbor-based questions
 - Answer must be a concrete value (rejects "None", "does not own", etc.)
 - Answer must be short (<100 chars) and not contain question text
 - `verification_query` is **required** and must:
   - Compute the answer **end-to-end** using nested subqueries
   - NOT contain hardcoded person IDs (`pers-XXXX`)
   - NOT contain CASE statements with hardcoded answers
+  - Avoid raw `JOIN addresses` aggregation patterns that can duplicate owners
   - Return exactly 1 row that matches the provided answer
+- Runs the parsed-dataset audit before writing the row, so ambiguous or mis-keyed questions are rejected immediately and the generator keeps retrying that slot
 - `question_type` must be one of the 8 valid types
 
 Additional generator rules that matter for this dataset:

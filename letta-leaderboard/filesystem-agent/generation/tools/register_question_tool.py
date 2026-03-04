@@ -4,11 +4,33 @@ Question registration tool for agent question generation.
 This tool allows the agent to register validated questions with answers.
 """
 
+import importlib.util
 import json
 import sqlite3
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
+
+try:
+    from audit_dataset import audit_dataset_row
+    from validate_questions import has_address_join_multiplicity_risk
+except ModuleNotFoundError:
+    audit_path = Path(__file__).resolve().parents[1] / "audit_dataset.py"
+    audit_spec = importlib.util.spec_from_file_location("audit_dataset", audit_path)
+    audit_dataset = importlib.util.module_from_spec(audit_spec)
+    assert audit_spec.loader is not None
+    sys.modules[audit_spec.name] = audit_dataset
+    audit_spec.loader.exec_module(audit_dataset)
+    audit_dataset_row = audit_dataset.audit_dataset_row
+
+    validate_path = Path(__file__).resolve().parents[1] / "validate_questions.py"
+    validate_spec = importlib.util.spec_from_file_location("validate_questions", validate_path)
+    validate_questions = importlib.util.module_from_spec(validate_spec)
+    assert validate_spec.loader is not None
+    sys.modules[validate_spec.name] = validate_questions
+    validate_spec.loader.exec_module(validate_questions)
+    has_address_join_multiplicity_risk = validate_questions.has_address_join_multiplicity_risk
 
 REGISTER_QUESTION_TOOL_DICT = {
     "name": "register_question",
@@ -233,6 +255,12 @@ class RegisterQuestionTool:
                 "The answer must be a simple value (name, number, date).",
             }
 
+        if "SSN" in question or "neighbor" in question.lower():
+            return {
+                "success": False,
+                "error": f"Question contains forbidden terms: '{question}'. Avoid SSNs and neighbor-based prompts.",
+            }
+
         # Check valid question type
         valid_types = [
             "multi_hop_chain",
@@ -284,6 +312,23 @@ class RegisterQuestionTool:
                     "The verification query must compute and return the answer, not embed it in a CASE statement.",
                 }
 
+            if verification_query.upper().count("SELECT") < 2:
+                conn.close()
+                return {
+                    "success": False,
+                    "error": "INVALID VERIFICATION QUERY: Must compute the answer end-to-end with nested subqueries. "
+                    "A single top-level SELECT is usually just replaying the final answer lookup.",
+                }
+
+            if has_address_join_multiplicity_risk(verification_query):
+                conn.close()
+                return {
+                    "success": False,
+                    "error": "INVALID VERIFICATION QUERY: Raw JOIN addresses aggregation can duplicate owners with "
+                    "multiple addresses. Build a DISTINCT owner set first, then aggregate cards, balances, "
+                    "vehicles, or policies.",
+                }
+
             try:
                 cursor.execute(verification_query)
                 verification_rows = cursor.fetchall()
@@ -327,6 +372,34 @@ class RegisterQuestionTool:
                     "error": f"Verification query failed: {str(e)}. Fix the query and try again.",
                 }
 
+            # Compute difficulty from objective signals
+            difficulty = compute_difficulty(question_type, required_files, sql_queries)
+
+            question_data_formatted = {
+                "input": question,
+                "ground_truth": answer,
+                "agent_args": {
+                    "tags": [],
+                    "extra": {
+                        "required_files": required_files,
+                        "question_type": question_type,
+                        "difficulty": difficulty,
+                    },
+                },
+            }
+            audit_result = audit_dataset_row(question_data_formatted, self.db_path)
+            if audit_result.status != "correct":
+                conn.close()
+                valid = ", ".join(audit_result.valid_answers[:8]) if audit_result.valid_answers else "<none>"
+                note = f" note: {audit_result.note}" if audit_result.note else ""
+                return {
+                    "success": False,
+                    "error": "QUESTION FAILED DATASET AUDIT: "
+                    f"status='{audit_result.status}' valid_answers='{valid}'. "
+                    "Refine the question so it resolves to exactly one unambiguous answer."
+                    f"{note}",
+                }
+
             query_results = []
             for query_info in sql_queries:
                 description = query_info.get("description", "Query")
@@ -355,9 +428,6 @@ class RegisterQuestionTool:
 
             self.registered_count += 1
 
-            # Compute difficulty from objective signals
-            difficulty = compute_difficulty(question_type, required_files, sql_queries)
-
             # Store question, answer and query results
             question_data = {
                 "question": question,
@@ -376,18 +446,6 @@ class RegisterQuestionTool:
                 f.write(json.dumps(question_data) + "\n")
 
             # letta-evals format
-            question_data_formatted = {
-                "input": question,
-                "ground_truth": answer,
-                "agent_args": {
-                    "tags": [],
-                    "extra": {
-                        "required_files": required_files,
-                        "question_type": question_type,
-                        "difficulty": difficulty,
-                    },
-                },
-            }
             with open(self.output_path.parent / "agent_generated_questions_parsed.jsonl", "a") as f:
                 f.write(json.dumps(question_data_formatted) + "\n")
 

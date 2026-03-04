@@ -7,6 +7,7 @@ import json
 import sqlite3
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -68,7 +69,7 @@ def test_register_question_rejects_answer_mismatch(tmp_path):
 
     result = tool.register(
         **kwargs,
-        verification_query="SELECT 1 AS answer",
+        verification_query="SELECT answer FROM (SELECT 1 AS answer)",
     )
 
     assert result["success"] is False
@@ -80,11 +81,53 @@ def test_register_question_rejects_non_unique_verification_query(tmp_path):
 
     result = tool.register(
         **base_register_kwargs(),
-        verification_query="SELECT value FROM numbers",
+        verification_query="SELECT value FROM (SELECT value FROM numbers)",
     )
 
     assert result["success"] is False
     assert "expected exactly 1" in result["error"]
+
+
+def test_register_question_rejects_address_join_multiplicity_risk(tmp_path):
+    tool = make_tool(tmp_path)
+
+    result = tool.register(
+        **base_register_kwargs(),
+        verification_query="""
+        SELECT person_id
+        FROM (
+            SELECT p.person_id
+            FROM people p
+            JOIN addresses a ON a.owner_id = p.person_id
+            JOIN credit_cards c ON c.owner_id = p.person_id
+            WHERE a.state = 'Idaho'
+            GROUP BY p.person_id
+            ORDER BY COUNT(c.card_id) DESC
+            LIMIT 1
+        )
+        """,
+    )
+
+    assert result["success"] is False
+    assert "Raw JOIN addresses aggregation" in result["error"]
+
+
+def test_register_question_rejects_non_correct_dataset_audit(tmp_path, monkeypatch):
+    tool = make_tool(tmp_path)
+    monkeypatch.setattr(
+        register_question_tool,
+        "audit_dataset_row",
+        lambda row, db_path: SimpleNamespace(status="ambiguous", valid_answers=["A", "B"], note="tie"),
+    )
+
+    result = tool.register(
+        **base_register_kwargs(),
+        verification_query="SELECT answer FROM (SELECT 1 AS answer)",
+    )
+
+    assert result["success"] is False
+    assert "QUESTION FAILED DATASET AUDIT" in result["error"]
+    assert "ambiguous" in result["error"]
 
 
 def test_validate_questions_flags_address_join_multiplicity_risk():

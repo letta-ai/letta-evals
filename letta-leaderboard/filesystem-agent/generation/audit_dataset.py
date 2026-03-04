@@ -1090,6 +1090,12 @@ def audit_dataset_rows(rows: list[dict], db_path: str | Path) -> list[AuditResul
     return [auditor.evaluate(index, row) for index, row in enumerate(rows)]
 
 
+def audit_dataset_row(row: dict, db_path: str | Path, index: int = 0) -> AuditResult:
+    """Audit a single parsed dataset row against the benchmark DB."""
+    auditor = DatasetAuditor(FilesystemData(Path(db_path)))
+    return auditor.evaluate(index, row)
+
+
 def summarize_audit_results(results: list[AuditResult]) -> dict[str, int]:
     """Count audit statuses."""
     summary: dict[str, int] = defaultdict(int)
