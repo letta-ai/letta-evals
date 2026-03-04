@@ -76,6 +76,11 @@ python3 question_generator.py \
     --question-type negation
 ```
 
+`question_generator.py` now performs the full post-generation validation automatically before exiting. A run only exits cleanly if:
+- the requested number of new questions were actually registered
+- the raw artifact passes `verification_query` validation
+- the sibling parsed JSONL audit also passes
+
 ### Parameters
 
 | Parameter | Default | Description |
@@ -88,6 +93,7 @@ python3 question_generator.py \
 | `--output-dir` | `data/generated_questions` | Output directory for generated questions |
 | `--new-run` | False | Create a new timestamped run directory |
 | `--append` | True | Append to the latest existing run |
+| `--skip-validation` | False | Skip the automatic end-of-run validation gate |
 
 ## Guardrails
 
@@ -113,15 +119,26 @@ Additional generator rules that matter for this dataset:
 
 If a question fails to generate (API error, validation failure), the generator retries up to `max_retries_per_question` times (default: 3) before moving on.
 
-## Validate Generated Questions
+## Automatic Validation
 
-After generation, **always validate before testing**:
+Generation already runs the release gate for you:
 
 ```bash
-python validate_questions.py data/generated_questions/run_XXXX/agent_generated_questions.jsonl
+python3 question_generator.py --num-questions 100 --new-run
 ```
 
-By default, `validate_questions.py` now checks the full file. Use `--sample-size N` only when you explicitly want a faster spot-check.
+Under the hood, the generator runs the same checks that `validate_questions.py` exposes manually. By default, that validation:
+- checks the full raw generation artifact
+- validates every `verification_query` unless you pass `--sample-size`
+- automatically audits the sibling `agent_generated_questions_parsed.jsonl` if it exists
+
+Use `validate_questions.py` directly only when you want to re-check an existing run or inspect a published dataset outside the generation flow:
+
+```bash
+python3 validate_questions.py data/generated_questions/run_XXXX/agent_generated_questions.jsonl
+```
+
+Use `--sample-size N` only when you explicitly want a faster manual spot-check. Use `--skip-parsed-audit` only when you intentionally want to skip the parsed dataset audit. Use `question_generator.py --skip-validation` only when you intentionally want to bypass the automatic release gate.
 
 The validation script checks:
 - No forbidden terms (SSN, neighbor)
@@ -129,14 +146,9 @@ The validation script checks:
 - Verification query quality (no hardcoded IDs, end-to-end)
 - Verification query structural risks (including duplicate-row address joins during aggregation)
 - GT correctness (runs verification query against DB)
+- Parsed dataset correctness/ambiguity via the sibling parsed JSONL audit
 
-For the checked-in benchmark datasets, also run:
-
-```bash
-python audit_dataset.py ../datasets/filesystem_cloud.jsonl
-```
-
-Use `audit_dataset.py` when you need a release-grade audit of the published dataset rather than a spot-check of raw generation artifacts. It re-derives answers from the benchmark DB with deduped owner semantics and flags ambiguous prompts, which catches failure modes that a sampled `verification_query` check can miss.
+Use `audit_dataset.py` directly only when you need to audit a checked-in published dataset like `datasets/filesystem_cloud.jsonl` outside the generation workflow.
 
 **Exit codes:**
 - `0` = Clean, ready for testing

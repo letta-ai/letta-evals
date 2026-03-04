@@ -1079,33 +1079,31 @@ class DatasetAuditor:
         return AuditResult(index, status, question_type, ground_truth, valid_answers, question, note)
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "dataset",
-        nargs="?",
-        default=str(Path(__file__).resolve().parents[1] / "datasets" / "filesystem_cloud.jsonl"),
-        help="Path to dataset JSONL",
-    )
-    parser.add_argument(
-        "--db",
-        default=str(Path(__file__).resolve().parent / "data" / "letta_file_bench.db"),
-        help="Path to SQLite DB",
-    )
-    args = parser.parse_args()
+def load_dataset_rows(path: str | Path) -> list[dict]:
+    """Load parsed dataset rows from JSONL."""
+    return [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
 
-    rows = [json.loads(line) for line in Path(args.dataset).read_text().splitlines() if line.strip()]
-    auditor = DatasetAuditor(FilesystemData(Path(args.db)))
-    results = [auditor.evaluate(index, row) for index, row in enumerate(rows)]
 
-    summary = defaultdict(int)
+def audit_dataset_rows(rows: list[dict], db_path: str | Path) -> list[AuditResult]:
+    """Audit parsed dataset rows against the benchmark DB."""
+    auditor = DatasetAuditor(FilesystemData(Path(db_path)))
+    return [auditor.evaluate(index, row) for index, row in enumerate(rows)]
+
+
+def summarize_audit_results(results: list[AuditResult]) -> dict[str, int]:
+    """Count audit statuses."""
+    summary: dict[str, int] = defaultdict(int)
     for result in results:
         summary[result.status] += 1
+    return dict(summary)
 
+
+def print_audit_report(results: list[AuditResult], dataset_label: str):
+    """Print a human-readable audit report."""
+    summary = summarize_audit_results(results)
     print("FILESYSTEM DATASET AUDIT")
     print("=" * 80)
-    print(f"Dataset: {args.dataset}")
-    print(f"DB: {args.db}")
+    print(f"Dataset: {dataset_label}")
     print(f"Rows: {len(results)}")
     print()
     for status in sorted(summary):
@@ -1123,7 +1121,26 @@ def main() -> int:
             if result.note:
                 print(f"  note: {result.note}")
 
-    return 0 if not interesting else 1
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "dataset",
+        nargs="?",
+        default=str(Path(__file__).resolve().parents[1] / "datasets" / "filesystem_cloud.jsonl"),
+        help="Path to dataset JSONL",
+    )
+    parser.add_argument(
+        "--db",
+        default=str(Path(__file__).resolve().parent / "data" / "letta_file_bench.db"),
+        help="Path to SQLite DB",
+    )
+    args = parser.parse_args()
+
+    rows = load_dataset_rows(args.dataset)
+    results = audit_dataset_rows(rows, args.db)
+    print_audit_report(results, dataset_label=f"{args.dataset}\nDB: {args.db}")
+    return 0 if all(result.status == "correct" for result in results) else 1
 
 
 if __name__ == "__main__":

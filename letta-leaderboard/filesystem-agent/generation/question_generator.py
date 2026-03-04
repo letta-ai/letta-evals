@@ -27,6 +27,7 @@ from jinja2 import Template
 from parallel import ParallelMixin
 from tools.register_question_tool import REGISTER_QUESTION_TOOL_DICT, RegisterQuestionTool
 from tools.sql_execute_tool import EXECUTE_SQL_TOOL_DICT, SQLExecuteTool
+from validate_questions import run_validation
 
 load_dotenv()
 
@@ -657,6 +658,11 @@ def main():
     parser.add_argument(
         "--new-run", action="store_true", help="Force creation of a new run directory (overrides --append)"
     )
+    parser.add_argument(
+        "--skip-validation",
+        action="store_true",
+        help="Skip automatic validation after generation (not recommended).",
+    )
 
     args = parser.parse_args()
 
@@ -694,11 +700,12 @@ def main():
     if not args.db_path.exists():
         print(f"Error: Database not found at {args.db_path}")
         print("Please run the JSONL to SQLite conversion first.")
-        return
+        return 1
 
     # Create agent and generate questions
     try:
         agent = QuestionGeneratorAgent(db_path=args.db_path, output_path=output_path, model=args.model)
+        starting_count = len(agent.get_existing_questions())
 
         print(f"Starting question generation with {args.model}...")
         print(f"Database: {args.db_path}")
@@ -717,8 +724,38 @@ def main():
 
     except Exception as e:
         print(f"{Colors.RED}Fatal error during initialization: {e}{Colors.ENDC}")
-        return
+        return 1
+
+    final_count = len(agent.get_existing_questions())
+    generated_count = max(final_count - starting_count, 0)
+    generation_complete = generated_count >= args.num_questions
+    if not generation_complete:
+        print(
+            f"{Colors.YELLOW}Generation completed with only {generated_count}/{args.num_questions} new questions registered.{Colors.ENDC}"
+        )
+
+    if args.skip_validation:
+        print(f"{Colors.YELLOW}Skipping automatic validation by request.{Colors.ENDC}")
+        return 0 if generation_complete else 1
+
+    if not output_path.exists():
+        print(f"{Colors.RED}Generation did not produce an output file at {output_path}.{Colors.ENDC}")
+        return 1
+
+    print(f"\n{Colors.HEADER}Running automatic validation...{Colors.ENDC}")
+    try:
+        issues = run_validation(output_path)
+    except Exception as e:
+        print(f"{Colors.RED}Automatic validation failed: {e}{Colors.ENDC}")
+        return 1
+
+    if issues:
+        print(f"{Colors.RED}Automatic validation found issues. This run is not ready to use.{Colors.ENDC}")
+        return 1
+
+    print(f"{Colors.GREEN}Automatic validation passed. This run is ready to use.{Colors.ENDC}")
+    return 0 if generation_complete else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

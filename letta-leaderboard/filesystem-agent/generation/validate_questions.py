@@ -2,14 +2,30 @@
 """Validate generated questions for data quality issues."""
 
 import argparse
+import importlib.util
 import json
 import re
 import sqlite3
+import sys
 from collections import Counter
 from pathlib import Path
 
+try:
+    from audit_dataset import AuditResult, audit_dataset_rows, load_dataset_rows, summarize_audit_results
+except ModuleNotFoundError:
+    audit_path = Path(__file__).with_name("audit_dataset.py")
+    spec = importlib.util.spec_from_file_location("audit_dataset", audit_path)
+    audit_dataset = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = audit_dataset
+    spec.loader.exec_module(audit_dataset)
+    AuditResult = audit_dataset.AuditResult
+    audit_dataset_rows = audit_dataset.audit_dataset_rows
+    load_dataset_rows = audit_dataset.load_dataset_rows
+    summarize_audit_results = audit_dataset.summarize_audit_results
 
-def load_questions(path: str) -> list:
+
+def load_questions(path: str | Path) -> list:
     """Load questions from JSONL file."""
     with open(path) as f:
         return [json.loads(line) for line in f if line.strip()]
@@ -157,22 +173,67 @@ def validate_gt_against_db(questions: list, db_path: str, sample_size: int | Non
     return issues
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("questions_path", help="Path to agent_generated_questions.jsonl")
-    parser.add_argument(
-        "--sample-size",
-        type=int,
-        default=0,
-        help="Validate this many verification queries instead of the full file. 0 means validate all.",
-    )
-    args = parser.parse_args()
+def resolve_parsed_dataset_path(questions_path: Path) -> Path | None:
+    """Find the parsed dataset artifact that corresponds to a raw generation file."""
+    if questions_path.name == "agent_generated_questions.jsonl":
+        candidate = questions_path.with_name("agent_generated_questions_parsed.jsonl")
+        if candidate.exists():
+            return candidate
+    return None
 
-    questions_path = args.questions_path
 
-    # Find DB path relative to questions
-    script_dir = Path(__file__).parent
-    db_path = script_dir / "data" / "letta_file_bench.db"
+def audit_parsed_dataset(parsed_path: Path, db_path: Path) -> list[dict]:
+    """Audit the parsed dataset artifact and convert findings to validator issues."""
+    rows = load_dataset_rows(parsed_path)
+    results = audit_dataset_rows(rows, db_path)
+    summary = summarize_audit_results(results)
+
+    print(f"\n{'=' * 70}")
+    print("Auditing Parsed Dataset...")
+    print("=" * 70)
+    print(f"Parsed file: {parsed_path}")
+    for status in sorted(summary):
+        print(f"  {status:20s} {summary[status]}")
+
+    issues = []
+    for result in results:
+        if result.status == "correct":
+            continue
+        issue = {
+            "id": result.index,
+            "type": "parsed_dataset_audit",
+            "flags": [result.status],
+            "gt": result.ground_truth,
+            "valid_answers": result.valid_answers,
+            "question": result.question,
+        }
+        if result.note:
+            issue["note"] = result.note
+        issues.append(issue)
+
+    if issues:
+        for issue in issues:
+            valid = ", ".join(issue["valid_answers"][:8]) if issue["valid_answers"] else "<none>"
+            note = f" note='{issue['note']}'" if issue.get("note") else ""
+            print(f"  Q{issue['id']}: {issue['flags']} - GT='{issue['gt']}' valid='{valid}'{note}")
+    else:
+        print("  ✓ Parsed dataset audit found no issues")
+
+    return issues
+
+
+def run_validation(
+    questions_path: str | Path,
+    sample_size: int = 0,
+    skip_parsed_audit: bool = False,
+    db_path: str | Path | None = None,
+) -> list[dict]:
+    """Run validation checks for a raw generation artifact and optional sibling parsed dataset audit."""
+    questions_path = Path(questions_path)
+    if db_path is None:
+        db_path = Path(__file__).parent / "data" / "letta_file_bench.db"
+    else:
+        db_path = Path(db_path)
 
     print("=" * 70)
     print("FILESYSTEM EVAL - QUESTION VALIDATION")
@@ -230,7 +291,7 @@ def main():
     print("Validating GTs against database...")
     print("=" * 70)
     if db_path.exists():
-        issues = validate_gt_against_db(questions, str(db_path), sample_size=args.sample_size)
+        issues = validate_gt_against_db(questions, str(db_path), sample_size=sample_size)
         all_issues.extend(issues)
         if issues:
             for issue in issues:
@@ -238,10 +299,20 @@ def main():
                     f"  Q{issue['id']}: {issue['flags']} - GT='{issue.get('gt', '')}' DB='{issue.get('db_value', '')}'"
                 )
         else:
-            checked = "all" if args.sample_size <= 0 else f"{min(args.sample_size, len(questions))} sampled"
+            checked = "all" if sample_size <= 0 else f"{min(sample_size, len(questions))} sampled"
             print(f"  ✓ All {checked} GTs match database")
     else:
         print(f"  ⚠ Database not found at {db_path}")
+
+    parsed_path = None if skip_parsed_audit else resolve_parsed_dataset_path(questions_path)
+    if parsed_path and db_path.exists():
+        issues = audit_parsed_dataset(parsed_path, db_path)
+        all_issues.extend(issues)
+    elif questions_path.name == "agent_generated_questions.jsonl" and not skip_parsed_audit:
+        print(f"\n{'=' * 70}")
+        print("Auditing Parsed Dataset...")
+        print("=" * 70)
+        print("  ⚠ Parsed dataset not found; skipping parsed audit")
 
     # Summary
     print(f"\n{'=' * 70}")
@@ -255,10 +326,34 @@ def main():
         by_type = Counter(i["type"] for i in all_issues)
         for t, c in by_type.most_common():
             print(f"  {t}: {c}")
-        raise SystemExit(1)
     else:
         print("\n✅ DATASET LOOKS CLEAN - ready for testing")
-        raise SystemExit(0)
+
+    return all_issues
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("questions_path", help="Path to agent_generated_questions.jsonl")
+    parser.add_argument(
+        "--sample-size",
+        type=int,
+        default=0,
+        help="Validate this many verification queries instead of the full file. 0 means validate all.",
+    )
+    parser.add_argument(
+        "--skip-parsed-audit",
+        action="store_true",
+        help="Skip auditing the sibling parsed dataset artifact when validating agent_generated_questions.jsonl.",
+    )
+    args = parser.parse_args()
+
+    issues = run_validation(
+        args.questions_path,
+        sample_size=args.sample_size,
+        skip_parsed_audit=args.skip_parsed_audit,
+    )
+    raise SystemExit(1 if issues else 0)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sqlite3
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,6 +16,7 @@ def load_module(name: str, relative_path: str):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -125,3 +128,76 @@ def test_validate_gt_against_db_checks_all_questions_when_sample_size_zero(tmp_p
     assert len(issues) == 1
     assert issues[0]["id"] == 1
     assert issues[0]["flags"] == ["value_mismatch"]
+
+
+def test_resolve_parsed_dataset_path_finds_sibling(tmp_path):
+    raw_path = tmp_path / "agent_generated_questions.jsonl"
+    parsed_path = tmp_path / "agent_generated_questions_parsed.jsonl"
+    raw_path.write_text("{}\n")
+    parsed_path.write_text("{}\n")
+
+    assert validate_questions.resolve_parsed_dataset_path(raw_path) == parsed_path
+
+
+def test_audit_parsed_dataset_converts_non_correct_results_to_issues(tmp_path, monkeypatch):
+    parsed_path = tmp_path / "agent_generated_questions_parsed.jsonl"
+    parsed_path.write_text("{}\n")
+    db_path = tmp_path / "fixture.db"
+    db_path.write_text("")
+
+    monkeypatch.setattr(validate_questions, "load_dataset_rows", lambda path: [{"input": "q"}])
+    monkeypatch.setattr(
+        validate_questions,
+        "audit_dataset_rows",
+        lambda rows, db: [
+            validate_questions.AuditResult(
+                index=3,
+                status="wrong",
+                question_type="aggregation",
+                ground_truth="A",
+                valid_answers=["B"],
+                question="Question?",
+            )
+        ],
+    )
+    monkeypatch.setattr(validate_questions, "summarize_audit_results", lambda results: {"wrong": 1})
+
+    issues = validate_questions.audit_parsed_dataset(parsed_path, db_path)
+
+    assert len(issues) == 1
+    assert issues[0]["type"] == "parsed_dataset_audit"
+    assert issues[0]["flags"] == ["wrong"]
+    assert issues[0]["valid_answers"] == ["B"]
+
+
+def test_run_validation_auto_audits_sibling_parsed_dataset(tmp_path, monkeypatch):
+    raw_path = tmp_path / "agent_generated_questions.jsonl"
+    parsed_path = tmp_path / "agent_generated_questions_parsed.jsonl"
+    raw_question = {
+        "question": "Question?",
+        "answer": "A",
+        "question_type": "aggregation",
+        "verification_query": "SELECT 1",
+    }
+    raw_path.write_text(
+        json.dumps(raw_question) + "\n"
+    )
+    parsed_path.write_text("{}\n")
+    db_path = tmp_path / "fixture.db"
+    db_path.write_text("")
+
+    monkeypatch.setattr(validate_questions, "check_forbidden_terms", lambda questions: [])
+    monkeypatch.setattr(validate_questions, "check_answer_quality", lambda questions: [])
+    monkeypatch.setattr(validate_questions, "check_verification_query", lambda questions: [])
+    monkeypatch.setattr(validate_questions, "validate_gt_against_db", lambda questions, db, sample_size=0: [])
+    monkeypatch.setattr(
+        validate_questions,
+        "audit_parsed_dataset",
+        lambda parsed_path, db_path: [{"id": 0, "type": "parsed_dataset_audit", "flags": ["wrong"]}],
+    )
+
+    issues = validate_questions.run_validation(raw_path, db_path=db_path)
+
+    assert len(issues) == 1
+    assert issues[0]["type"] == "parsed_dataset_audit"
+    assert issues[0]["flags"] == ["wrong"]
