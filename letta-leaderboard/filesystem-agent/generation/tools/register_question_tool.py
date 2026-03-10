@@ -271,52 +271,52 @@ class RegisterQuestionTool:
                     "The verification query must compute and return the answer, not embed it in a CASE statement.",
                 }
 
-                try:
-                    cursor.execute(verification_query)
-                    verification_rows = cursor.fetchall()
-                    if len(verification_rows) != 1:
-                        conn.close()
-                        return {
-                            "success": False,
-                            "error": f"Verification query returned {len(verification_rows)} rows, expected exactly 1. "
-                            "The answer is not unique — refine the question conditions.",
-                        }
-                    # Check that the verification query result matches the provided answer
-                    verification_value = str(list(dict(verification_rows[0]).values())[0])
-                    answer_normalized = answer.strip()
-                    # For numeric answers, also try to match formatted versions
-                    if verification_value != answer_normalized:
-                        # Try removing $ and commas for currency
-                        answer_cleaned = answer_normalized.replace("$", "").replace(",", "")
-                        verification_cleaned = verification_value.replace("$", "").replace(",", "")
-                        # Try to compare as numbers if possible
-                        try:
-                            if abs(float(answer_cleaned) - float(verification_cleaned)) < 0.01:
-                                pass  # Close enough for floats
-                            else:
-                                conn.close()
-                                return {
-                                    "success": False,
-                                    "error": f"ANSWER MISMATCH: Verification query returned '{verification_value}' "
-                                    f"but answer field says '{answer}'. The generator's reasoning is wrong. "
-                                    "Re-run the SQL queries and fix the answer.",
-                                }
-                        except (ValueError, TypeError):
-                            # Not numeric, do string comparison
-                            if verification_value.lower() != answer_normalized.lower():
-                                conn.close()
-                                return {
-                                    "success": False,
-                                    "error": f"ANSWER MISMATCH: Verification query returned '{verification_value}' "
-                                    f"but answer field says '{answer}'. The generator's reasoning is wrong. "
-                                    "Re-run the SQL queries and fix the answer.",
-                                }
-                except Exception as e:
+            try:
+                cursor.execute(verification_query)
+                verification_rows = cursor.fetchall()
+                if len(verification_rows) != 1:
                     conn.close()
                     return {
                         "success": False,
-                        "error": f"Verification query failed: {str(e)}. Fix the query and try again.",
+                        "error": f"Verification query returned {len(verification_rows)} rows, expected exactly 1. "
+                        "The answer is not unique — refine the question conditions.",
                     }
+                # Check that the verification query result matches the provided answer
+                verification_value = str(list(dict(verification_rows[0]).values())[0])
+                answer_normalized = answer.strip()
+                # For numeric answers, also try to match formatted versions
+                if verification_value != answer_normalized:
+                    # Try removing $ and commas for currency
+                    answer_cleaned = answer_normalized.replace("$", "").replace(",", "")
+                    verification_cleaned = verification_value.replace("$", "").replace(",", "")
+                    # Try to compare as numbers if possible
+                    try:
+                        if abs(float(answer_cleaned) - float(verification_cleaned)) < 0.01:
+                            pass  # Close enough for floats
+                        else:
+                            conn.close()
+                            return {
+                                "success": False,
+                                "error": f"ANSWER MISMATCH: Verification query returned '{verification_value}' "
+                                f"but answer field says '{answer}'. The generator's reasoning is wrong. "
+                                "Re-run the SQL queries and fix the answer.",
+                            }
+                    except (ValueError, TypeError):
+                        # Not numeric, do string comparison
+                        if verification_value.lower() != answer_normalized.lower():
+                            conn.close()
+                            return {
+                                "success": False,
+                                "error": f"ANSWER MISMATCH: Verification query returned '{verification_value}' "
+                                f"but answer field says '{answer}'. The generator's reasoning is wrong. "
+                                "Re-run the SQL queries and fix the answer.",
+                            }
+            except Exception as e:
+                conn.close()
+                return {
+                    "success": False,
+                    "error": f"Verification query failed: {str(e)}. Fix the query and try again.",
+                }
 
             query_results = []
             for query_info in sql_queries:
@@ -376,6 +376,7 @@ class RegisterQuestionTool:
                         "required_files": required_files,
                         "question_type": question_type,
                         "difficulty": difficulty,
+                        "verification_query": verification_query,
                     },
                 },
             }
