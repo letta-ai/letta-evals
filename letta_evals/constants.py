@@ -149,7 +149,7 @@ MODEL_COSTS = {
     "moonshotai/kimi-k2.5": {
         "prompt_tokens": 0.23,
         "completion_tokens": 3,
-    }, 
+    },
 }
 
 
