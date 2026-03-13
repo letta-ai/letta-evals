@@ -1,5 +1,5 @@
 benchmark_name: Filesystem Suite
-last_updated: Feb 17, 2026
+last_updated: Mar 13, 2026
 metrics:
   leaderboard_filesystem_100:
     name: Filesystem Rubric
@@ -9,43 +9,63 @@ metrics:
     name: Average
     description: Overall average score across all evaluation metrics
 results:
-- model: anthropic/claude-haiku-4-5-20251001
-  average: 41.0
-  leaderboard_filesystem_100: 41.0
-  total_cost: 129.3
-- model: anthropic/claude-opus-4-5-20251101
-  average: 59.0
-  leaderboard_filesystem_100: 59.0
-  total_cost: 619.54
-- model: anthropic/claude-opus-4-6
-  average: 77.0
-  leaderboard_filesystem_100: 77.0
-  total_cost: 307.6
-- model: anthropic/claude-sonnet-4-5-20250929
+- model: anthropic/claude-haiku-4-5
   average: 43.0
   leaderboard_filesystem_100: 43.0
-  total_cost: 423.03
+  total_cost: 117.55
+- model: anthropic/claude-opus-4-5-20251101
+  average: 63.0
+  leaderboard_filesystem_100: 63.0
+  total_cost: 567.66
+- model: anthropic/claude-opus-4-6
+  average: 84.0
+  leaderboard_filesystem_100: 84.0
+  total_cost: 268.44
+- model: anthropic/claude-sonnet-4-5-20250929
+  average: 48.0
+  leaderboard_filesystem_100: 48.0
+  total_cost: 405.01
 - model: anthropic/claude-sonnet-4-6
-  average: 81.0
-  leaderboard_filesystem_100: 81.0
-  total_cost: 125.6
-- model: google/gemini-3-pro
-  average: 72.0
-  leaderboard_filesystem_100: 72.0
-  total_cost: 100.72
+  average: 88.0
+  leaderboard_filesystem_100: 88.0
+  total_cost: 116.09
 - model: google/gemini-3-flash
-  average: 80.0
-  leaderboard_filesystem_100: 80.0
-  total_cost: 49.06
+  average: 82.0
+  leaderboard_filesystem_100: 82.0
+  total_cost: 37.8
+- model: google/gemini-3.1
+  average: 79.0
+  leaderboard_filesystem_100: 79.0
+  total_cost: 97.68
+- model: minimax/minimax-m2.5
+  average: 37.0
+  leaderboard_filesystem_100: 37.0
+  total_cost: 50.28
+- model: moonshotai/kimi-k2.5
+  average: 57.0
+  leaderboard_filesystem_100: 57.0
+  total_cost: 27.36
 - model: openai/gpt-5-mini-high
-  average: 53.5
-  leaderboard_filesystem_100: 53.5
-  total_cost: 39.25
+  average: 67.0
+  leaderboard_filesystem_100: 67.0
+  total_cost: 35.93
 - model: openai/gpt-5.2-codex-xhigh
-  average: 83.0
-  leaderboard_filesystem_100: 83.0
-  total_cost: 38.75
+  average: 93.0
+  leaderboard_filesystem_100: 93.0
+  total_cost: 44.46
 - model: openai/gpt-5.2-xhigh
-  average: 83.0
-  leaderboard_filesystem_100: 83.0
-  total_cost: 83.47
+  average: 87.0
+  leaderboard_filesystem_100: 87.0
+  total_cost: 76.72
+- model: openai/gpt-5.3-codex-xhigh
+  average: 85.0
+  leaderboard_filesystem_100: 85.0
+  total_cost: 40.83
+- model: openai/gpt-5.4-xhigh
+  average: 89.0
+  leaderboard_filesystem_100: 89.0
+  total_cost: 43.52
+- model: z-ai/glm-5
+  average: 39.0
+  leaderboard_filesystem_100: 39.0
+  total_cost: 85.87

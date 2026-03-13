@@ -40,6 +40,12 @@ def normalize_model_name(model_name: str) -> str:
         return f"mistralai/{model_name}"
     if model_name.startswith("deepseek"):
         return f"deepseek/{model_name}"
+    if model_name.startswith("glm"):
+        return f"z-ai/{model_name}"
+    if model_name.startswith("kimi"):
+        return f"moonshotai/{model_name}"
+    if model_name.startswith("minimax"):
+        return f"minimax/{model_name}"
     return model_name
 
 

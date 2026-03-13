@@ -1,5 +1,12 @@
 # Leaderboard Updates
 
+### March 13, 2026
+- Filesystem v2 full model refresh
+  - Re-ran all models on updated v2 dataset with code-verified ground truths
+  - Added GPT 5.4, GPT 5.3 Codex, GPT 5.2 Codex, Gemini 3.1 Pro, GLM 5, Kimi K2.5, Minimax M2.5
+  - GPT 5.2 Codex takes #1 on Filesystem at 93.0 with only $44.46 total cost
+  - GPT 5.4 at #2 (89.0) and Sonnet 4.6 at #3 (88.0)
+
 ### February 17, 2026
 - Filesystem v2 refresh
   - Letta code agents with real filesystem and client-side tools
