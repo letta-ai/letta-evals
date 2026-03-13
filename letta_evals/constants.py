@@ -46,6 +46,14 @@ MODEL_COSTS = {
         "prompt_tokens": 0.5,
         "completion_tokens": 3,
     },
+    "openai/gpt-5.4": {
+        "prompt_tokens": 2.5,
+        "completion_tokens": 15,
+    },
+    "openai/gpt-5.3-codex": {
+        "prompt_tokens": 1.75,
+        "completion_tokens": 14,
+    },
     "openai/gpt-5.2-codex": {
         "prompt_tokens": 1.75,
         "completion_tokens": 14,
