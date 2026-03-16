@@ -81,7 +81,7 @@ class LettaAgentTarget(AbstractAgentTarget):
                         llm_config_dict = self.llm_config.model_dump(by_alias=True, exclude_none=True)
                         await self.client.agents.update(agent_id=agent_id, llm_config=llm_config_dict)
                     elif self.model_handle and agent_id:
-                        await self.client.agents.update(agent_id=agent_id, model=self.model_handle)
+                        await self.client.agents.update(agent_id=agent_id, model=self.model_handle, parallel_tool_calls=True)
 
                     agent = await self.client.agents.retrieve(agent_id=agent_id, include=[])
                     if self.llm_config:
