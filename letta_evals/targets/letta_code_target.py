@@ -285,32 +285,24 @@ class LettaCodeTarget(AbstractAgentTarget):
         """
         token_data: list[TurnTokenData] = []
         try:
-            # Try to get run IDs for this agent
-            run_ids: list[str] = []
-            try:
-                runs_page = await self.client.agents.runs.list(agent_id=agent_id)
-                if runs_page.items:
-                    run_ids = [runs_page.items[0].id]
-            except Exception as e:
-                logger.warning(f"Could not fetch run IDs for agent {agent_id}: {e}")
+            # Fetch ALL runs for this agent — client tools cause each tool-call
+            # round-trip to be a separate run, so token IDs are scattered.
+            runs_page = await self.client.runs.list(agent_id=agent_id, limit=100)
+            if not runs_page.items:
+                return token_data
 
-            if run_ids:
-                from letta_evals.utils import list_all_run_messages
-
-                messages = await list_all_run_messages(
-                    self.client,
-                    run_ids[0],
-                    params={"return_token_ids": "true"},
-                )
-                for msg in messages:
-                    output_ids = getattr(msg, "output_ids", None)
-                    output_token_logprobs = getattr(msg, "output_token_logprobs", None)
+            # Token IDs are stored in run.metadata.result.turns (populated by SGLang native adapter)
+            for run_summary in runs_page.items:
+                run = await self.client.runs.retrieve(run_id=run_summary.id)
+                result = (run.metadata or {}).get("result", {})
+                for turn in (result.get("turns") or []):
+                    output_ids = turn.get("output_ids")
                     if output_ids:
                         token_data.append(
                             TurnTokenData(
-                                role=getattr(msg, "role", "assistant"),
+                                role=turn.get("role", "assistant"),
                                 output_ids=output_ids,
-                                output_token_logprobs=output_token_logprobs,
+                                output_token_logprobs=turn.get("output_token_logprobs"),
                             )
                         )
         except Exception as e:
