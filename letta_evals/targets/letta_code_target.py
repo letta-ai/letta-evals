@@ -147,13 +147,14 @@ class LettaCodeTarget(AbstractAgentTarget):
                 events = []
                 stderr_chunks = []
 
-                # Use the agent's memory directory as cwd if available,
-                # so Read/Write/Bash tools resolve paths relative to the agent's memory.
+                # Use the agent's memory directory as cwd so Read/Write/Bash tools
+                # resolve paths relative to the agent's memory filesystem.
+                # Create it if needed — the letta CLI will populate it on startup.
                 run_cwd = str(self.working_dir)
                 if factory_agent_id:
-                    agent_mem_dir = Path.home() / ".letta" / "agents" / factory_agent_id / "memory"
-                    if agent_mem_dir.exists():
-                        run_cwd = str(agent_mem_dir)
+                    agent_mem_dir = Path.home() / ".letta" / "agents" / factory_agent_id / "memory" / "system"
+                    agent_mem_dir.mkdir(parents=True, exist_ok=True)
+                    run_cwd = str(agent_mem_dir)
 
                 # run the letta command
                 process = await asyncio.create_subprocess_exec(
