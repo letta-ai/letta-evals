@@ -147,12 +147,21 @@ class LettaCodeTarget(AbstractAgentTarget):
                 events = []
                 stderr_chunks = []
 
+                # Use the agent's memory directory as cwd so Read/Write/Bash tools
+                # resolve paths relative to the agent's memory filesystem.
+                # Create it if needed — the letta CLI will populate it on startup.
+                run_cwd = str(self.working_dir)
+                if factory_agent_id:
+                    agent_mem_dir = Path.home() / ".letta" / "agents" / factory_agent_id / "memory" / "system"
+                    agent_mem_dir.mkdir(parents=True, exist_ok=True)
+                    run_cwd = str(agent_mem_dir)
+
                 # run the letta command
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    cwd=str(self.working_dir),
+                    cwd=run_cwd,
                     env=env,
                 )
 
@@ -285,32 +294,35 @@ class LettaCodeTarget(AbstractAgentTarget):
         """
         token_data: list[TurnTokenData] = []
         try:
-            # Try to get run IDs for this agent
-            run_ids: list[str] = []
-            try:
-                runs_page = await self.client.agents.runs.list(agent_id=agent_id)
-                if runs_page.items:
-                    run_ids = [runs_page.items[0].id]
-            except Exception as e:
-                logger.warning(f"Could not fetch run IDs for agent {agent_id}: {e}")
+            # Fetch ALL runs for this agent — client tools cause each tool-call
+            # round-trip to be a separate run, so token IDs are scattered.
+            runs_page = await self.client.runs.list(agent_id=agent_id, limit=100)
+            if not runs_page.items:
+                return token_data
 
-            if run_ids:
-                from letta_evals.utils import list_all_run_messages
-
-                messages = await list_all_run_messages(
-                    self.client,
-                    run_ids[0],
-                    params={"return_token_ids": "true"},
-                )
-                for msg in messages:
-                    output_ids = getattr(msg, "output_ids", None)
-                    output_token_logprobs = getattr(msg, "output_token_logprobs", None)
+            # Token IDs are stored in run.metadata.result.turns (populated by SGLang native adapter)
+            for run_summary in runs_page.items:
+                run = await self.client.runs.retrieve(run_id=run_summary.id)
+                result = (run.metadata or {}).get("result", {})
+                for turn in (result.get("turns") or []):
+                    output_ids = turn.get("output_ids")
+                    role = turn.get("role", "assistant")
                     if output_ids:
+                        # Assistant turn with token IDs from SGLang
                         token_data.append(
                             TurnTokenData(
-                                role=getattr(msg, "role", "assistant"),
+                                role=role,
                                 output_ids=output_ids,
-                                output_token_logprobs=output_token_logprobs,
+                                output_token_logprobs=turn.get("output_token_logprobs"),
+                            )
+                        )
+                    elif role in ("tool", "tool_return", "tool_return_message") and turn.get("content"):
+                        # Tool return turn — no output_ids, but content is needed
+                        # for proper multi-turn token sequence reconstruction
+                        token_data.append(
+                            TurnTokenData(
+                                role=role,
+                                content=turn.get("content"),
                             )
                         )
         except Exception as e:
