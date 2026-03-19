@@ -306,12 +306,23 @@ class LettaCodeTarget(AbstractAgentTarget):
                 result = (run.metadata or {}).get("result", {})
                 for turn in (result.get("turns") or []):
                     output_ids = turn.get("output_ids")
+                    role = turn.get("role", "assistant")
                     if output_ids:
+                        # Assistant turn with token IDs from SGLang
                         token_data.append(
                             TurnTokenData(
-                                role=turn.get("role", "assistant"),
+                                role=role,
                                 output_ids=output_ids,
                                 output_token_logprobs=turn.get("output_token_logprobs"),
+                            )
+                        )
+                    elif role in ("tool", "tool_return", "tool_return_message") and turn.get("content"):
+                        # Tool return turn — no output_ids, but content is needed
+                        # for proper multi-turn token sequence reconstruction
+                        token_data.append(
+                            TurnTokenData(
+                                role=role,
+                                content=turn.get("content"),
                             )
                         )
         except Exception as e:
