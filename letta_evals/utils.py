@@ -326,7 +326,33 @@ async def list_all_run_messages(
             break
         after = last_id
 
-    return messages
+    # Defensive dedupe in case pages overlap or retries replay a page.
+    deduped_messages: List[Any] = []
+    seen_message_ids: set[str] = set()
+    for msg in messages:
+        msg_id = getattr(msg, "id", None)
+        if msg_id and msg_id in seen_message_ids:
+            continue
+        if msg_id:
+            seen_message_ids.add(msg_id)
+        deduped_messages.append(msg)
+
+    # Keep ordering deterministic across fetches (oldest -> newest).
+    def _sort_key(msg: Any) -> tuple[str, str]:
+        created_at = getattr(msg, "created_at", None) or getattr(msg, "date", None)
+        if created_at is None:
+            created_key = ""
+        elif hasattr(created_at, "isoformat"):
+            try:
+                created_key = created_at.isoformat()
+            except Exception:
+                created_key = str(created_at)
+        else:
+            created_key = str(created_at)
+        return created_key, str(getattr(msg, "id", ""))
+
+    deduped_messages.sort(key=_sort_key)
+    return deduped_messages
 
 
 async def list_all_agent_messages(

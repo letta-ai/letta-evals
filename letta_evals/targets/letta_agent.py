@@ -96,6 +96,7 @@ class LettaAgentTarget(AbstractAgentTarget):
 
                     trajectory = []
                     usage_stats: list[dict] = []
+                    run_ids: list[str] = []
 
                     inputs = sample.input if isinstance(sample.input, list) else [sample.input]
                     total_messages = len(inputs)
@@ -165,13 +166,23 @@ class LettaAgentTarget(AbstractAgentTarget):
                         if not run_id:
                             raise RuntimeError("Unexpected error: no run ID was found from background stream")
 
+                        run_ids.append(run_id)
                         messages = await list_all_run_messages(self.client, run_id)
                         trajectory.append(messages)
 
+                    # Dedupe repeated run IDs while preserving order.
+                    deduped_run_ids: list[str] = []
+                    seen_run_ids: set[str] = set()
+                    for rid in run_ids:
+                        if rid in seen_run_ids:
+                            continue
+                        seen_run_ids.add(rid)
+                        deduped_run_ids.append(rid)
+
                     # Fetch token-level data if requested (for RL training)
                     token_data: Optional[list[TurnTokenData]] = None
-                    if return_token_data and run_id:
-                        token_data = await self._fetch_token_data([run_id])
+                    if return_token_data and deduped_run_ids:
+                        token_data = await self._fetch_token_data(deduped_run_ids)
 
                     final_agent_state = None
                     if retrieve_agent_state:
@@ -185,6 +196,7 @@ class LettaAgentTarget(AbstractAgentTarget):
                         model_name=model_name,
                         agent_usage=usage_stats,
                         agent_state=final_agent_state,
+                        run_ids=deduped_run_ids,
                         token_data=token_data,
                     )
 
@@ -234,14 +246,23 @@ class LettaAgentTarget(AbstractAgentTarget):
                     params={"return_token_ids": "true"},
                 )
                 for msg in messages:
+                    role = getattr(msg, "role", "assistant")
+                    content = getattr(msg, "content", None)
                     output_ids = getattr(msg, "output_ids", None)
                     output_token_logprobs = getattr(msg, "output_token_logprobs", None)
                     if output_ids:
                         token_data.append(
                             TurnTokenData(
-                                role=getattr(msg, "role", "assistant"),
+                                role=role,
                                 output_ids=output_ids,
                                 output_token_logprobs=output_token_logprobs,
+                            )
+                        )
+                    elif role in ("tool", "tool_return", "tool_return_message") and content:
+                        token_data.append(
+                            TurnTokenData(
+                                role=role,
+                                content=content if isinstance(content, str) else str(content),
                             )
                         )
             except Exception as e:
