@@ -181,7 +181,7 @@ class LettaAgentTarget(AbstractAgentTarget):
                     # Fetch token-level data if requested (for RL training)
                     token_data: Optional[list[TurnTokenData]] = None
                     if return_token_data and deduped_run_ids:
-                        token_data = await self._fetch_token_data(deduped_run_ids)
+                        token_data = await fetch_token_data(self.client, deduped_run_ids)
 
                     final_agent_state = None
                     if retrieve_agent_state:
@@ -229,6 +229,3 @@ class LettaAgentTarget(AbstractAgentTarget):
                 await anyio.sleep(backoff_time)
 
         raise last_error or RuntimeError("Unexpected failure in agent run retry loop")
-
-    async def _fetch_token_data(self, run_ids: list[str]) -> list[TurnTokenData]:
-        return await fetch_token_data(self.client, run_ids)

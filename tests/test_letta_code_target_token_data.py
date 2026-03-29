@@ -1,12 +1,11 @@
-"""Unit tests for LettaCodeTarget run/token extraction helpers."""
+"""Unit tests for run-id listing and token-data fetching utils."""
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
 
-from letta_evals.targets.letta_code_target import LettaCodeTarget
-from letta_evals.utils import list_run_ids
+from letta_evals.utils import fetch_token_data, list_run_ids
 
 
 class _FakeRunsAPI:
@@ -43,17 +42,10 @@ class _FakeClient:
 
 
 @pytest.mark.asyncio
-async def test_letta_code_lists_run_ids_and_preserves_tool_turns(tmp_path):
-    target = LettaCodeTarget(
-        client=_FakeClient(),
-        model_handle="openai/gpt-4.1",
-        working_dir=tmp_path,
-        sandbox=False,
-    )
-
+async def test_list_run_ids_and_fetch_token_data_preserves_tool_turns():
     client = _FakeClient()
     run_ids = await list_run_ids(client, "agent-1")
-    token_data = await target._fetch_token_data(run_ids)
+    token_data = await fetch_token_data(client, run_ids)
 
     assert run_ids == ["run-1", "run-2"]
     assert [t.role for t in token_data] == ["assistant", "tool_return", "assistant", "assistant"]

@@ -253,7 +253,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                 token_data: Optional[list[TurnTokenData]] = None
                 if return_token_data and agent_id:
                     run_ids = await list_run_ids(self.client, agent_id)
-                    token_data = await self._fetch_token_data(run_ids)
+                    token_data = await fetch_token_data(self.client, run_ids)
 
                 # Retrieve agent state if needed (e.g., for memory block extractors)
                 agent_state = None
@@ -293,6 +293,3 @@ class LettaCodeTarget(AbstractAgentTarget):
                 await anyio.sleep(backoff_time)
 
         raise last_error or RuntimeError("Unexpected failure in letta command retry loop")
-
-    async def _fetch_token_data(self, run_ids: list[str]) -> list[TurnTokenData]:
-        return await fetch_token_data(self.client, run_ids)
