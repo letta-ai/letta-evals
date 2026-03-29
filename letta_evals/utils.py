@@ -62,20 +62,6 @@ def dedupe_items_by_id(items: List[Any]) -> List[Any]:
     return deduped_items
 
 
-def dedupe_strings_preserve_order(values: List[str]) -> List[str]:
-    """Dedupe string list while preserving order."""
-    deduped_values: List[str] = []
-    seen_values: set[str] = set()
-
-    for value in values:
-        if value in seen_values:
-            continue
-        seen_values.add(value)
-        deduped_values.append(value)
-
-    return deduped_values
-
-
 def extract_run_ids_from_summaries(run_summaries: List[Any]) -> List[str]:
     """Extract deterministic, unique run IDs from run-summary objects."""
     ordered = sort_items_oldest_first(run_summaries)
@@ -117,12 +103,7 @@ def extract_token_data_from_message(msg: Any) -> Optional[TurnTokenData]:
 
 def extract_token_data_from_messages(messages: List[Any]) -> List[TurnTokenData]:
     """Extract token data from a list of message objects."""
-    token_data: List[TurnTokenData] = []
-    for message in messages:
-        turn_token_data = extract_token_data_from_message(message)
-        if turn_token_data is not None:
-            token_data.append(turn_token_data)
-    return token_data
+    return [td for msg in messages if (td := extract_token_data_from_message(msg)) is not None]
 
 
 def extract_token_data_from_turn(turn: Dict[str, Any]) -> Optional[TurnTokenData]:
@@ -137,12 +118,7 @@ def extract_token_data_from_turn(turn: Dict[str, Any]) -> Optional[TurnTokenData
 
 def extract_token_data_from_turns(turns: List[Dict[str, Any]]) -> List[TurnTokenData]:
     """Extract token data from run.metadata.result.turns entries."""
-    token_data: List[TurnTokenData] = []
-    for turn in turns:
-        turn_token_data = extract_token_data_from_turn(turn)
-        if turn_token_data is not None:
-            token_data.append(turn_token_data)
-    return token_data
+    return [td for turn in turns if (td := extract_token_data_from_turn(turn)) is not None]
 
 
 def load_object(spec: str, base_dir: Path = None) -> Any:

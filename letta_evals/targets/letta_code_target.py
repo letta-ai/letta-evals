@@ -309,15 +309,19 @@ class LettaCodeTarget(AbstractAgentTarget):
         """Fetch token-level data (IDs + logprobs) for a letta code agent.
 
         Reads token IDs from ``run.metadata.result.turns`` emitted by
-        native-token adapters (e.g., SGLang), across all provided runs.
+        native-token adapters (e.g., SGLang), across all provided runs in parallel.
         """
+
+        async def _fetch_one(run_id: str) -> list[TurnTokenData]:
+            run = await self.client.runs.retrieve(run_id=run_id)
+            result = (run.metadata or {}).get("result", {})
+            return extract_token_data_from_turns(result.get("turns") or [])
+
+        results = await asyncio.gather(*[_fetch_one(rid) for rid in run_ids], return_exceptions=True)
         token_data: list[TurnTokenData] = []
-        try:
-            # Token IDs are stored in run.metadata.result.turns (populated by native adapters)
-            for run_id in run_ids:
-                run = await self.client.runs.retrieve(run_id=run_id)
-                result = (run.metadata or {}).get("result", {})
-                token_data.extend(extract_token_data_from_turns(result.get("turns") or []))
-        except Exception as e:
-            logger.warning(f"Could not fetch token data for runs {run_ids}: {e}")
+        for rid, result in zip(run_ids, results):
+            if isinstance(result, Exception):
+                logger.warning(f"Could not fetch token data for run {rid}: {result}")
+            else:
+                token_data.extend(result)
         return token_data

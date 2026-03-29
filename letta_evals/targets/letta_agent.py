@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from pathlib import Path
 from typing import Optional
@@ -10,7 +11,6 @@ from letta_evals.models import Sample, TargetResult, TurnTokenData
 from letta_evals.targets.base import AbstractAgentTarget, TargetError
 from letta_evals.utils import (
     consume_stream_with_resumes,
-    dedupe_strings_preserve_order,
     extract_token_data_from_messages,
     list_all_run_messages,
     load_object,
@@ -176,8 +176,8 @@ class LettaAgentTarget(AbstractAgentTarget):
                         messages = await list_all_run_messages(self.client, run_id)
                         trajectory.append(messages)
 
-                    # Dedupe repeated run IDs while preserving order.
-                    deduped_run_ids = dedupe_strings_preserve_order(run_ids)
+                    # Dedupe repeated run IDs while preserving insertion order.
+                    deduped_run_ids = list(dict.fromkeys(run_ids))
 
                     # Fetch token-level data if requested (for RL training)
                     token_data: Optional[list[TurnTokenData]] = None
@@ -236,16 +236,22 @@ class LettaAgentTarget(AbstractAgentTarget):
 
         For each run, re-fetches messages with ``return_token_ids=True`` to
         obtain ``output_ids`` and ``output_token_logprobs`` per message.
+        Fetches all runs in parallel for efficiency.
         """
+
+        async def _fetch_one(run_id: str) -> list[TurnTokenData]:
+            messages = await list_all_run_messages(
+                self.client,
+                run_id,
+                params={"return_token_ids": "true"},
+            )
+            return extract_token_data_from_messages(messages)
+
+        results = await asyncio.gather(*[_fetch_one(rid) for rid in run_ids], return_exceptions=True)
         token_data: list[TurnTokenData] = []
-        for run_id in run_ids:
-            try:
-                messages = await list_all_run_messages(
-                    self.client,
-                    run_id,
-                    params={"return_token_ids": "true"},
-                )
-                token_data.extend(extract_token_data_from_messages(messages))
-            except Exception as e:
-                logger.warning(f"Could not fetch token data for run {run_id}: {e}")
+        for rid, result in zip(run_ids, results):
+            if isinstance(result, Exception):
+                logger.warning(f"Could not fetch token data for run {rid}: {result}")
+            else:
+                token_data.extend(result)
         return token_data

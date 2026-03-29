@@ -7,7 +7,7 @@ from types import MethodType
 import pytest
 from letta_client.types.agents import AssistantMessage
 
-from letta_evals.models import GradeResult, Metrics, RunnerResult, Sample, SampleResult, SuiteSpec, TurnTokenData
+from letta_evals.models import GradeResult, Metrics, RunnerResult, Sample, SampleResult, SuiteSpec, TargetResult, TurnTokenData
 from letta_evals.runner import Runner
 
 _FAKE_DATE = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -43,7 +43,13 @@ async def test_run_sample_includes_run_ids_and_token_data():
     token_data = [TurnTokenData(role="assistant", output_ids=[101], output_token_logprobs=[-0.1])]
 
     async def _fake_get_or_run_trajectory(self, *_args, **_kwargs):
-        return _make_trajectory("hello"), "agent-1", "model-1", None, None, ["run-1", "run-2"], token_data
+        return TargetResult(
+            trajectory=_make_trajectory("hello"),
+            agent_id="agent-1",
+            model_name="model-1",
+            run_ids=["run-1", "run-2"],
+            token_data=token_data,
+        )
 
     async def _fake_grade_sample(self, *_args, **_kwargs):
         grade = GradeResult(score=1.0, rationale="ok")
@@ -93,7 +99,7 @@ async def test_get_or_run_trajectory_uses_cached_run_ids_and_token_data():
         runner,
     )
 
-    _, _, _, _, _, run_ids, returned_token_data = await runner._get_or_run_trajectory(sample, "model-1")
-    assert run_ids == ["run-cached"]
-    assert returned_token_data == token_data
+    tr = await runner._get_or_run_trajectory(sample, "model-1")
+    assert tr.run_ids == ["run-cached"]
+    assert tr.token_data == token_data
 
