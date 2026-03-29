@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from letta_evals.targets.letta_code_target import LettaCodeTarget
+from letta_evals.utils import list_run_ids
 
 
 class _FakeRunsAPI:
@@ -50,7 +51,8 @@ async def test_letta_code_lists_run_ids_and_preserves_tool_turns(tmp_path):
         sandbox=False,
     )
 
-    run_ids = await target._list_run_ids("agent-1")
+    client = _FakeClient()
+    run_ids = await list_run_ids(client, "agent-1")
     token_data = await target._fetch_token_data(run_ids)
 
     assert run_ids == ["run-1", "run-2"]

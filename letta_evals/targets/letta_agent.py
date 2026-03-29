@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from pathlib import Path
 from typing import Optional
@@ -12,6 +11,7 @@ from letta_evals.targets.base import AbstractAgentTarget, TargetError
 from letta_evals.utils import (
     consume_stream_with_resumes,
     extract_token_data_from_messages,
+    fetch_token_data_parallel,
     list_all_run_messages,
     load_object,
 )
@@ -232,26 +232,12 @@ class LettaAgentTarget(AbstractAgentTarget):
         raise last_error or RuntimeError("Unexpected failure in agent run retry loop")
 
     async def _fetch_token_data(self, run_ids: list[str]) -> list[TurnTokenData]:
-        """Fetch token-level data (IDs + logprobs) from the runs API.
-
-        For each run, re-fetches messages with ``return_token_ids=True`` to
-        obtain ``output_ids`` and ``output_token_logprobs`` per message.
-        Fetches all runs in parallel for efficiency.
-        """
+        """Fetch token-level data (IDs + logprobs) from the runs API."""
 
         async def _fetch_one(run_id: str) -> list[TurnTokenData]:
             messages = await list_all_run_messages(
-                self.client,
-                run_id,
-                params={"return_token_ids": "true"},
+                self.client, run_id, params={"return_token_ids": "true"},
             )
             return extract_token_data_from_messages(messages)
 
-        results = await asyncio.gather(*[_fetch_one(rid) for rid in run_ids], return_exceptions=True)
-        token_data: list[TurnTokenData] = []
-        for rid, result in zip(run_ids, results):
-            if isinstance(result, Exception):
-                logger.warning(f"Could not fetch token data for run {rid}: {result}")
-            else:
-                token_data.extend(result)
-        return token_data
+        return await fetch_token_data_parallel(run_ids, _fetch_one)

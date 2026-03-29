@@ -121,6 +121,34 @@ def extract_token_data_from_turns(turns: List[Dict[str, Any]]) -> List[TurnToken
     return [td for turn in turns if (td := extract_token_data_from_turn(turn)) is not None]
 
 
+async def list_run_ids(client: Any, agent_id: str) -> List[str]:
+    """List run IDs for an agent in deterministic oldest->newest order."""
+    try:
+        runs_page = await client.runs.list(agent_id=agent_id, limit=200)
+        run_summaries = list(getattr(runs_page, "items", None) or [])
+    except Exception as e:
+        logger.warning(f"Could not fetch run IDs for agent {agent_id}: {e}")
+        return []
+    return extract_run_ids_from_summaries(run_summaries)
+
+
+async def fetch_token_data_parallel(
+    run_ids: List[str],
+    fetcher: Callable[[str], Awaitable[List[TurnTokenData]]],
+) -> List[TurnTokenData]:
+    """Fetch token data for multiple runs in parallel, logging per-run errors."""
+    import asyncio
+
+    results = await asyncio.gather(*[fetcher(rid) for rid in run_ids], return_exceptions=True)
+    token_data: List[TurnTokenData] = []
+    for rid, result in zip(run_ids, results):
+        if isinstance(result, Exception):
+            logger.warning(f"Could not fetch token data for run {rid}: {result}")
+        else:
+            token_data.extend(result)
+    return token_data
+
+
 def load_object(spec: str, base_dir: Path = None) -> Any:
     """Load a Python object from a file path specification."""
     if not spec:

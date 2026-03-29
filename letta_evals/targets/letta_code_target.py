@@ -12,9 +12,10 @@ from letta_client import AsyncLetta
 from letta_evals.models import Sample, TargetResult, TurnTokenData
 from letta_evals.targets.base import AbstractAgentTarget, TargetError
 from letta_evals.utils import (
-    extract_run_ids_from_summaries,
     extract_token_data_from_turns,
+    fetch_token_data_parallel,
     list_all_agent_messages,
+    list_run_ids,
     load_object,
 )
 from letta_evals.visualization.base import ProgressCallback
@@ -252,7 +253,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                 run_ids: Optional[list[str]] = None
                 token_data: Optional[list[TurnTokenData]] = None
                 if return_token_data and agent_id:
-                    run_ids = await self._list_run_ids(agent_id)
+                    run_ids = await list_run_ids(self.client, agent_id)
                     token_data = await self._fetch_token_data(run_ids)
 
                 # Retrieve agent state if needed (e.g., for memory block extractors)
@@ -294,34 +295,12 @@ class LettaCodeTarget(AbstractAgentTarget):
 
         raise last_error or RuntimeError("Unexpected failure in letta command retry loop")
 
-    async def _list_run_ids(self, agent_id: str) -> list[str]:
-        """List run IDs for an agent in deterministic oldest->newest order."""
-        try:
-            runs_page = await self.client.runs.list(agent_id=agent_id, limit=200)
-            run_summaries = list(getattr(runs_page, "items", None) or [])
-        except Exception as e:
-            logger.warning(f"Could not fetch run IDs for agent {agent_id}: {e}")
-            return []
-
-        return extract_run_ids_from_summaries(run_summaries)
-
     async def _fetch_token_data(self, run_ids: list[str]) -> list[TurnTokenData]:
-        """Fetch token-level data (IDs + logprobs) for a letta code agent.
-
-        Reads token IDs from ``run.metadata.result.turns`` emitted by
-        native-token adapters (e.g., SGLang), across all provided runs in parallel.
-        """
+        """Fetch token-level data from run.metadata.result.turns (native adapters)."""
 
         async def _fetch_one(run_id: str) -> list[TurnTokenData]:
             run = await self.client.runs.retrieve(run_id=run_id)
             result = (run.metadata or {}).get("result", {})
             return extract_token_data_from_turns(result.get("turns") or [])
 
-        results = await asyncio.gather(*[_fetch_one(rid) for rid in run_ids], return_exceptions=True)
-        token_data: list[TurnTokenData] = []
-        for rid, result in zip(run_ids, results):
-            if isinstance(result, Exception):
-                logger.warning(f"Could not fetch token data for run {rid}: {result}")
-            else:
-                token_data.extend(result)
-        return token_data
+        return await fetch_token_data_parallel(run_ids, _fetch_one)
