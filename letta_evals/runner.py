@@ -530,9 +530,7 @@ class Runner:
                 # check if any grader needs agent_state
                 phase = ErrorCategory.TARGET
                 retrieve_agent_state = self._requires_agent_state()
-                tr = await self._get_or_run_trajectory(
-                    sample, llm_config, retrieve_agent_state=retrieve_agent_state
-                )
+                tr = await self._get_or_run_trajectory(sample, llm_config, retrieve_agent_state=retrieve_agent_state)
                 trajectory, agent_id, model_name = tr.trajectory, tr.agent_id, tr.model_name
                 agent_usage, agent_state = tr.agent_usage, tr.agent_state
                 run_ids, token_data = tr.run_ids, tr.token_data

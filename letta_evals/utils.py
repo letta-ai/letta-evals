@@ -150,7 +150,9 @@ async def fetch_token_data(client: Any, run_ids: List[str]) -> List[TurnTokenDat
 
         # Fall back to messages path (used by hosted LLM endpoints)
         messages = await list_all_run_messages(
-            client, run_id, params={"return_token_ids": "true"},
+            client,
+            run_id,
+            params={"return_token_ids": "true"},
         )
         return extract_token_data_from_messages(messages)
 

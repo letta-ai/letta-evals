@@ -48,4 +48,3 @@ async def test_list_all_run_messages_passes_params_and_dedupes_and_sorts():
     assert client.runs.messages.calls[0]["run_id"] == "run-1"
     assert client.runs.messages.calls[0]["order"] == "asc"
     assert client.runs.messages.calls[0]["extra_query"] == {"return_token_ids": "true"}
-

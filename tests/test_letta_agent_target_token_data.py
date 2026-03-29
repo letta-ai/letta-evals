@@ -48,8 +48,8 @@ class _FakeClient:
 
 @pytest.mark.asyncio
 async def test_letta_agent_returns_all_run_ids_and_token_data(monkeypatch):
-    import letta_evals.utils as utils_module
     import letta_evals.targets.letta_agent as agent_module
+    import letta_evals.utils as utils_module
 
     run_id_iter = iter(["run-1", "run-2"])
 

@@ -7,7 +7,16 @@ from types import MethodType
 import pytest
 from letta_client.types.agents import AssistantMessage
 
-from letta_evals.models import GradeResult, Metrics, RunnerResult, Sample, SampleResult, SuiteSpec, TargetResult, TurnTokenData
+from letta_evals.models import (
+    GradeResult,
+    Metrics,
+    RunnerResult,
+    Sample,
+    SampleResult,
+    SuiteSpec,
+    TargetResult,
+    TurnTokenData,
+)
 from letta_evals.runner import Runner
 
 _FAKE_DATE = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -102,4 +111,3 @@ async def test_get_or_run_trajectory_uses_cached_run_ids_and_token_data():
     tr = await runner._get_or_run_trajectory(sample, "model-1")
     assert tr.run_ids == ["run-cached"]
     assert tr.token_data == token_data
-
