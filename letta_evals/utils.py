@@ -15,12 +15,134 @@ from letta_evals.constants import (
     TURN_PASS_SYMBOL,
     TURN_PENDING_SYMBOL,
 )
-from letta_evals.models import Sample
+from letta_evals.models import Sample, TurnTokenData
 
 # Pattern to match reasoning effort suffixes
 _EFFORT_PATTERN = re.compile(r"-(low|medium|high|xhigh|max)$")
+_TOKEN_DATA_TOOL_ROLES = {"tool", "tool_return", "tool_return_message"}
 
 logger = logging.getLogger(__name__)
+
+
+def _timestamp_sort_key(value: Any) -> str:
+    """Normalize timestamp-like values for deterministic sorting."""
+    if value is None:
+        return ""
+    if hasattr(value, "isoformat"):
+        try:
+            return value.isoformat()
+        except Exception:
+            return str(value)
+    return str(value)
+
+
+def sort_items_oldest_first(items: List[Any]) -> List[Any]:
+    """Return items sorted by created_at/date then id (oldest to newest)."""
+
+    def _sort_key(item: Any) -> tuple[str, str]:
+        created_at = getattr(item, "created_at", None) or getattr(item, "date", None)
+        return _timestamp_sort_key(created_at), str(getattr(item, "id", ""))
+
+    return sorted(items, key=_sort_key)
+
+
+def dedupe_items_by_id(items: List[Any]) -> List[Any]:
+    """Dedupe object list by id while preserving first-seen order."""
+    deduped_items: List[Any] = []
+    seen_ids: set[str] = set()
+
+    for item in items:
+        item_id = getattr(item, "id", None)
+        if item_id and item_id in seen_ids:
+            continue
+        if item_id:
+            seen_ids.add(item_id)
+        deduped_items.append(item)
+
+    return deduped_items
+
+
+def dedupe_strings_preserve_order(values: List[str]) -> List[str]:
+    """Dedupe string list while preserving order."""
+    deduped_values: List[str] = []
+    seen_values: set[str] = set()
+
+    for value in values:
+        if value in seen_values:
+            continue
+        seen_values.add(value)
+        deduped_values.append(value)
+
+    return deduped_values
+
+
+def extract_run_ids_from_summaries(run_summaries: List[Any]) -> List[str]:
+    """Extract deterministic, unique run IDs from run-summary objects."""
+    ordered = sort_items_oldest_first(run_summaries)
+    deduped = dedupe_items_by_id(ordered)
+    return [run_id for run_id in (getattr(summary, "id", None) for summary in deduped) if run_id]
+
+
+def _build_turn_token_data(
+    *,
+    role: str,
+    output_ids: Optional[List[int]],
+    output_token_logprobs: Optional[List[Any]],
+    content: Any,
+) -> Optional[TurnTokenData]:
+    if output_ids:
+        return TurnTokenData(
+            role=role,
+            output_ids=output_ids,
+            output_token_logprobs=output_token_logprobs,
+        )
+
+    if role in _TOKEN_DATA_TOOL_ROLES and content is not None:
+        text_content = content if isinstance(content, str) else str(content)
+        if text_content:
+            return TurnTokenData(role=role, content=text_content)
+
+    return None
+
+
+def extract_token_data_from_message(msg: Any) -> Optional[TurnTokenData]:
+    """Extract TurnTokenData from a message object."""
+    return _build_turn_token_data(
+        role=getattr(msg, "role", "assistant"),
+        output_ids=getattr(msg, "output_ids", None),
+        output_token_logprobs=getattr(msg, "output_token_logprobs", None),
+        content=getattr(msg, "content", None),
+    )
+
+
+def extract_token_data_from_messages(messages: List[Any]) -> List[TurnTokenData]:
+    """Extract token data from a list of message objects."""
+    token_data: List[TurnTokenData] = []
+    for message in messages:
+        turn_token_data = extract_token_data_from_message(message)
+        if turn_token_data is not None:
+            token_data.append(turn_token_data)
+    return token_data
+
+
+def extract_token_data_from_turn(turn: Dict[str, Any]) -> Optional[TurnTokenData]:
+    """Extract TurnTokenData from a run.metadata.result.turn entry."""
+    return _build_turn_token_data(
+        role=turn.get("role", "assistant"),
+        output_ids=turn.get("output_ids"),
+        output_token_logprobs=turn.get("output_token_logprobs"),
+        content=turn.get("content"),
+    )
+
+
+def extract_token_data_from_turns(turns: List[Dict[str, Any]]) -> List[TurnTokenData]:
+    """Extract token data from run.metadata.result.turns entries."""
+    token_data: List[TurnTokenData] = []
+    for turn in turns:
+        turn_token_data = extract_token_data_from_turn(turn)
+        if turn_token_data is not None:
+            token_data.append(turn_token_data)
+    return token_data
 
 
 def load_object(spec: str, base_dir: Path = None) -> Any:
@@ -326,33 +448,7 @@ async def list_all_run_messages(
             break
         after = last_id
 
-    # Defensive dedupe in case pages overlap or retries replay a page.
-    deduped_messages: List[Any] = []
-    seen_message_ids: set[str] = set()
-    for msg in messages:
-        msg_id = getattr(msg, "id", None)
-        if msg_id and msg_id in seen_message_ids:
-            continue
-        if msg_id:
-            seen_message_ids.add(msg_id)
-        deduped_messages.append(msg)
-
-    # Keep ordering deterministic across fetches (oldest -> newest).
-    def _sort_key(msg: Any) -> tuple[str, str]:
-        created_at = getattr(msg, "created_at", None) or getattr(msg, "date", None)
-        if created_at is None:
-            created_key = ""
-        elif hasattr(created_at, "isoformat"):
-            try:
-                created_key = created_at.isoformat()
-            except Exception:
-                created_key = str(created_at)
-        else:
-            created_key = str(created_at)
-        return created_key, str(getattr(msg, "id", ""))
-
-    deduped_messages.sort(key=_sort_key)
-    return deduped_messages
+    return sort_items_oldest_first(dedupe_items_by_id(messages))
 
 
 async def list_all_agent_messages(

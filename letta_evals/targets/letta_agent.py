@@ -8,7 +8,13 @@ from letta_client.types import LlmConfig, MessageCreateParam
 
 from letta_evals.models import Sample, TargetResult, TurnTokenData
 from letta_evals.targets.base import AbstractAgentTarget, TargetError
-from letta_evals.utils import consume_stream_with_resumes, list_all_run_messages, load_object
+from letta_evals.utils import (
+    consume_stream_with_resumes,
+    dedupe_strings_preserve_order,
+    extract_token_data_from_messages,
+    list_all_run_messages,
+    load_object,
+)
 from letta_evals.visualization.base import ProgressCallback
 
 logger = logging.getLogger(__name__)
@@ -171,13 +177,7 @@ class LettaAgentTarget(AbstractAgentTarget):
                         trajectory.append(messages)
 
                     # Dedupe repeated run IDs while preserving order.
-                    deduped_run_ids: list[str] = []
-                    seen_run_ids: set[str] = set()
-                    for rid in run_ids:
-                        if rid in seen_run_ids:
-                            continue
-                        seen_run_ids.add(rid)
-                        deduped_run_ids.append(rid)
+                    deduped_run_ids = dedupe_strings_preserve_order(run_ids)
 
                     # Fetch token-level data if requested (for RL training)
                     token_data: Optional[list[TurnTokenData]] = None
@@ -245,26 +245,7 @@ class LettaAgentTarget(AbstractAgentTarget):
                     run_id,
                     params={"return_token_ids": "true"},
                 )
-                for msg in messages:
-                    role = getattr(msg, "role", "assistant")
-                    content = getattr(msg, "content", None)
-                    output_ids = getattr(msg, "output_ids", None)
-                    output_token_logprobs = getattr(msg, "output_token_logprobs", None)
-                    if output_ids:
-                        token_data.append(
-                            TurnTokenData(
-                                role=role,
-                                output_ids=output_ids,
-                                output_token_logprobs=output_token_logprobs,
-                            )
-                        )
-                    elif role in ("tool", "tool_return", "tool_return_message") and content:
-                        token_data.append(
-                            TurnTokenData(
-                                role=role,
-                                content=content if isinstance(content, str) else str(content),
-                            )
-                        )
+                token_data.extend(extract_token_data_from_messages(messages))
             except Exception as e:
                 logger.warning(f"Could not fetch token data for run {run_id}: {e}")
         return token_data

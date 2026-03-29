@@ -11,7 +11,12 @@ from letta_client import AsyncLetta
 
 from letta_evals.models import Sample, TargetResult, TurnTokenData
 from letta_evals.targets.base import AbstractAgentTarget, TargetError
-from letta_evals.utils import list_all_agent_messages, load_object
+from letta_evals.utils import (
+    extract_run_ids_from_summaries,
+    extract_token_data_from_turns,
+    list_all_agent_messages,
+    load_object,
+)
 from letta_evals.visualization.base import ProgressCallback
 
 logger = logging.getLogger(__name__)
@@ -298,30 +303,7 @@ class LettaCodeTarget(AbstractAgentTarget):
             logger.warning(f"Could not fetch run IDs for agent {agent_id}: {e}")
             return []
 
-        def _run_sort_key(run_summary) -> tuple[str, str]:
-            created_at = getattr(run_summary, "created_at", None)
-            if created_at is None:
-                created_key = ""
-            elif hasattr(created_at, "isoformat"):
-                try:
-                    created_key = created_at.isoformat()
-                except Exception:
-                    created_key = str(created_at)
-            else:
-                created_key = str(created_at)
-            return created_key, str(getattr(run_summary, "id", ""))
-
-        run_summaries.sort(key=_run_sort_key)
-
-        run_ids: list[str] = []
-        seen_run_ids: set[str] = set()
-        for run_summary in run_summaries:
-            run_id = getattr(run_summary, "id", None)
-            if not run_id or run_id in seen_run_ids:
-                continue
-            seen_run_ids.add(run_id)
-            run_ids.append(run_id)
-        return run_ids
+        return extract_run_ids_from_summaries(run_summaries)
 
     async def _fetch_token_data(self, run_ids: list[str]) -> list[TurnTokenData]:
         """Fetch token-level data (IDs + logprobs) for a letta code agent.
@@ -335,28 +317,7 @@ class LettaCodeTarget(AbstractAgentTarget):
             for run_id in run_ids:
                 run = await self.client.runs.retrieve(run_id=run_id)
                 result = (run.metadata or {}).get("result", {})
-                for turn in (result.get("turns") or []):
-                    output_ids = turn.get("output_ids")
-                    role = turn.get("role", "assistant")
-                    content = turn.get("content")
-                    if output_ids:
-                        # Assistant turn with token IDs from the rollout backend
-                        token_data.append(
-                            TurnTokenData(
-                                role=role,
-                                output_ids=output_ids,
-                                output_token_logprobs=turn.get("output_token_logprobs"),
-                            )
-                        )
-                    elif role in ("tool", "tool_return", "tool_return_message") and content:
-                        # Tool return turn has no output_ids, but content is needed
-                        # for multi-turn training sequence reconstruction.
-                        token_data.append(
-                            TurnTokenData(
-                                role=role,
-                                content=content if isinstance(content, str) else str(content),
-                            )
-                        )
+                token_data.extend(extract_token_data_from_turns(result.get("turns") or []))
         except Exception as e:
             logger.warning(f"Could not fetch token data for runs {run_ids}: {e}")
         return token_data
