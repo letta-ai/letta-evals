@@ -12,8 +12,7 @@ from letta_client import AsyncLetta
 from letta_evals.models import Sample, TargetResult, TurnTokenData
 from letta_evals.targets.base import AbstractAgentTarget, TargetError
 from letta_evals.utils import (
-    extract_token_data_from_turns,
-    fetch_token_data_parallel,
+    fetch_token_data,
     list_all_agent_messages,
     list_run_ids,
     load_object,
@@ -296,11 +295,4 @@ class LettaCodeTarget(AbstractAgentTarget):
         raise last_error or RuntimeError("Unexpected failure in letta command retry loop")
 
     async def _fetch_token_data(self, run_ids: list[str]) -> list[TurnTokenData]:
-        """Fetch token-level data from run.metadata.result.turns (native adapters)."""
-
-        async def _fetch_one(run_id: str) -> list[TurnTokenData]:
-            run = await self.client.runs.retrieve(run_id=run_id)
-            result = (run.metadata or {}).get("result", {})
-            return extract_token_data_from_turns(result.get("turns") or [])
-
-        return await fetch_token_data_parallel(run_ids, _fetch_one)
+        return await fetch_token_data(self.client, run_ids)

@@ -35,6 +35,10 @@ class _FakeRunsAPI:
     def __init__(self):
         self.messages = _FakeRunsMessagesAPI()
 
+    async def retrieve(self, run_id: str):
+        """Return empty metadata so the unified fetcher falls through to messages."""
+        return SimpleNamespace(metadata={})
+
 
 class _FakeClient:
     def __init__(self, model_name: str = "test-model"):
@@ -44,7 +48,8 @@ class _FakeClient:
 
 @pytest.mark.asyncio
 async def test_letta_agent_returns_all_run_ids_and_token_data(monkeypatch):
-    import letta_evals.targets.letta_agent as module
+    import letta_evals.utils as utils_module
+    import letta_evals.targets.letta_agent as agent_module
 
     run_id_iter = iter(["run-1", "run-2"])
 
@@ -77,8 +82,11 @@ async def test_letta_agent_returns_all_run_ids_and_token_data(monkeypatch):
             SimpleNamespace(id="a2", role="assistant", output_ids=[201], output_token_logprobs=[-0.2]),
         ]
 
-    monkeypatch.setattr(module, "consume_stream_with_resumes", _fake_consume_stream_with_resumes)
-    monkeypatch.setattr(module, "list_all_run_messages", _fake_list_all_run_messages)
+    monkeypatch.setattr(agent_module, "consume_stream_with_resumes", _fake_consume_stream_with_resumes)
+    # Patch list_all_run_messages in both modules (target uses it for trajectory,
+    # utils uses it for the messages fallback in fetch_token_data)
+    monkeypatch.setattr(agent_module, "list_all_run_messages", _fake_list_all_run_messages)
+    monkeypatch.setattr(utils_module, "list_all_run_messages", _fake_list_all_run_messages)
 
     target = LettaAgentTarget(client=_FakeClient(), agent_id="agent-1", timeout=30)
     sample = Sample(id=0, input=["turn-1", "turn-2"])

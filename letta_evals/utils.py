@@ -132,14 +132,29 @@ async def list_run_ids(client: Any, agent_id: str) -> List[str]:
     return extract_run_ids_from_summaries(run_summaries)
 
 
-async def fetch_token_data_parallel(
-    run_ids: List[str],
-    fetcher: Callable[[str], Awaitable[List[TurnTokenData]]],
-) -> List[TurnTokenData]:
-    """Fetch token data for multiple runs in parallel, logging per-run errors."""
+async def fetch_token_data(client: Any, run_ids: List[str]) -> List[TurnTokenData]:
+    """Fetch token data for runs in parallel, trying metadata then messages.
+
+    For each run, first checks ``run.metadata.result.turns`` (populated by
+    native-token adapters like SGLang).  If that's empty, falls back to
+    re-fetching messages with ``return_token_ids=true``.
+    """
     import asyncio
 
-    results = await asyncio.gather(*[fetcher(rid) for rid in run_ids], return_exceptions=True)
+    async def _fetch_one(run_id: str) -> List[TurnTokenData]:
+        # Try metadata path first (single API call, used by native adapters)
+        run = await client.runs.retrieve(run_id=run_id)
+        turns = ((run.metadata or {}).get("result") or {}).get("turns") or []
+        if turns:
+            return extract_token_data_from_turns(turns)
+
+        # Fall back to messages path (used by hosted LLM endpoints)
+        messages = await list_all_run_messages(
+            client, run_id, params={"return_token_ids": "true"},
+        )
+        return extract_token_data_from_messages(messages)
+
+    results = await asyncio.gather(*[_fetch_one(rid) for rid in run_ids], return_exceptions=True)
     token_data: List[TurnTokenData] = []
     for rid, result in zip(run_ids, results):
         if isinstance(result, Exception):

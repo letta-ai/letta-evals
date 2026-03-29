@@ -10,8 +10,7 @@ from letta_evals.models import Sample, TargetResult, TurnTokenData
 from letta_evals.targets.base import AbstractAgentTarget, TargetError
 from letta_evals.utils import (
     consume_stream_with_resumes,
-    extract_token_data_from_messages,
-    fetch_token_data_parallel,
+    fetch_token_data,
     list_all_run_messages,
     load_object,
 )
@@ -232,12 +231,4 @@ class LettaAgentTarget(AbstractAgentTarget):
         raise last_error or RuntimeError("Unexpected failure in agent run retry loop")
 
     async def _fetch_token_data(self, run_ids: list[str]) -> list[TurnTokenData]:
-        """Fetch token-level data (IDs + logprobs) from the runs API."""
-
-        async def _fetch_one(run_id: str) -> list[TurnTokenData]:
-            messages = await list_all_run_messages(
-                self.client, run_id, params={"return_token_ids": "true"},
-            )
-            return extract_token_data_from_messages(messages)
-
-        return await fetch_token_data_parallel(run_ids, _fetch_one)
+        return await fetch_token_data(self.client, run_ids)
