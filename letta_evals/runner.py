@@ -931,6 +931,46 @@ async def run_suite(
             metric_labels=metric_labels,
         )
 
+    # Attach a file handler so logs persist in the output directory
+    file_handler: Optional[logging.FileHandler] = None
+    if output_path:
+        output_path.mkdir(parents=True, exist_ok=True)
+        log_path = output_path / "run.log"
+        file_handler = logging.FileHandler(log_path, mode="w")
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+        logging.getLogger("letta_evals").addHandler(file_handler)
+
+    try:
+        return await _execute_runs(
+            suite=suite,
+            actual_num_runs=actual_num_runs,
+            max_concurrent=max_concurrent,
+            progress_cb=progress_cb,
+            cached_results=cached_results,
+            output_path=output_path,
+            letta_api_key=letta_api_key,
+            letta_base_url=letta_base_url,
+            letta_project_id=letta_project_id,
+        )
+    finally:
+        if file_handler is not None:
+            logging.getLogger("letta_evals").removeHandler(file_handler)
+            file_handler.close()
+
+
+async def _execute_runs(
+    suite: SuiteSpec,
+    actual_num_runs: int,
+    max_concurrent: int,
+    progress_cb: Optional[ProgressCallback],
+    cached_results: Optional[RunnerResult],
+    output_path: Optional[Path],
+    letta_api_key: Optional[str],
+    letta_base_url: Optional[str],
+    letta_project_id: Optional[str],
+) -> RunnerResult:
+    """Execute single or multiple evaluation runs."""
     if actual_num_runs > 1:
         all_run_results: List[RunnerResult] = []
         all_metrics: List[Metrics] = []
