@@ -937,7 +937,7 @@ async def run_suite(
         output_path.mkdir(parents=True, exist_ok=True)
         log_path = output_path / "run.log"
         file_handler = logging.FileHandler(log_path, mode="w")
-        file_handler.setLevel(logging.DEBUG)
+        file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
         logging.getLogger("letta_evals").addHandler(file_handler)
 
