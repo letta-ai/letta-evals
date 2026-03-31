@@ -202,9 +202,22 @@ class LettaCodeTarget(AbstractAgentTarget):
                 if process.returncode != 0:
                     logger.error(f"Letta command failed with return code {process.returncode}")
                     logger.error(f"Stderr: {stderr_text}")
-                    raise RuntimeError(
-                        f"Letta command failed with return code {process.returncode}. Stderr: {stderr_text[:500]}"
-                    )
+
+                    # Surface the last stdout event so the real error isn't lost
+                    last_stdout_event = ""
+                    for ev in reversed(events):
+                        try:
+                            last_stdout_event = json.dumps(ev)[:500]
+                        except Exception:
+                            last_stdout_event = str(ev)[:500]
+                        break
+
+                    parts = [f"Letta command failed with return code {process.returncode}"]
+                    if last_stdout_event:
+                        parts.append(f"Last stdout event: {last_stdout_event}")
+                    if stderr_text:
+                        parts.append(f"Stderr: {stderr_text[:500]}")
+                    raise RuntimeError(". ".join(parts))
 
                 if not agent_id:
                     raise RuntimeError("No agent_id found in letta stream output")
