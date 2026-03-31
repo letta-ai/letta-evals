@@ -937,14 +937,14 @@ async def run_suite(
         output_path.mkdir(parents=True, exist_ok=True)
         log_path = output_path / "run.log"
         file_handler = logging.FileHandler(log_path, mode="w")
-        file_handler.setLevel(logging.INFO)
+        file_handler.setLevel(logging.WARNING)
         file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
         pkg_logger = logging.getLogger("letta_evals")
         pkg_logger.addHandler(file_handler)
-        # Ensure the logger accepts INFO; without this, the default WARNING
-        # threshold silently drops INFO/DEBUG messages before they reach handlers.
-        if pkg_logger.level > logging.INFO or pkg_logger.level == logging.NOTSET:
-            pkg_logger.setLevel(logging.INFO)
+        # Ensure the logger accepts WARNING; without this, the default WARNING
+        # threshold with NOTSET silently drops messages before they reach handlers.
+        if pkg_logger.level == logging.NOTSET:
+            pkg_logger.setLevel(logging.WARNING)
 
     try:
         return await _execute_runs(
