@@ -1,9 +1,7 @@
 """Unit tests for the SuiteSpec cleanup attribute and Runner._should_cleanup_agent."""
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from letta_evals.models import (
     LettaAgentTargetSpec,
