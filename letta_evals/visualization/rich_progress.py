@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 import time
 from dataclasses import dataclass
 from datetime import timedelta
@@ -104,6 +106,7 @@ class EvalProgress(ProgressCallback):
         self.show_samples = show_samples
         self.console = console or Console()
         self.update_freq = update_freq
+        self.min_refresh_interval = (1.0 / update_freq) if update_freq > 0 else 0.0
         self.cached_mode = cached_mode
         self.metric_labels: Dict[str, str] = metric_labels or {}
         # live aggregates per metric key
@@ -130,6 +133,9 @@ class EvalProgress(ProgressCallback):
         self.error_count = 0
         self.total_score = 0.0
         self.score_count = 0
+        self._last_refresh_at = 0.0
+        self._refresh_pending = False
+        self._refresh_task: Optional[asyncio.Task[None]] = None
 
     def _get_state_icon(self, state: SampleState) -> Text:
         """Get icon for sample state"""
@@ -328,21 +334,20 @@ class EvalProgress(ProgressCallback):
             padding=(0, 1),
         )
 
-    def _create_detailed_view(self) -> Table:
-        """Create a modern, height-aware table that prioritizes active and recent samples.
+    def _select_display_rows(self, limit: Optional[int] = None) -> List[SampleProgress]:
+        """Pick a stable set of rows for the detailed table.
 
-        Strategy:
-        - Compute how many rows fit in the terminal, accounting for header/progress chrome.
-        - Always show currently active samples (loading/sending/grading).
-        - Fill remaining space with most-recently updated completed/failed/error samples.
-        - If still space, rotate through queued items to give visibility without overflowing.
+        Active samples stay pinned in a deterministic order, while the remaining
+        space shows the most recently completed samples. This avoids the
+        time-based page rotation that caused the table to jump around even when
+        nothing meaningful changed.
         """
         terminal_height = self.console.height
 
         available_lines = max(5, terminal_height - 10)
         # Account for table chrome (title, headers, borders)
         max_rows = max(1, available_lines - 5)
-        n_rows = min(self.total_samples, max_rows)
+        n_rows = min(self.total_samples, max_rows) if limit is None else min(limit, self.total_samples)
 
         def last_update_key(s: SampleProgress) -> float:
             return s.last_update_ts or s.end_time or s.start_time or 0.0
@@ -361,7 +366,7 @@ class EvalProgress(ProgressCallback):
         active.sort(key=lambda s: (s.model_name or "", s.sample_id))
 
         recent_done = [s for s in samples_list if s.state in completed_states]
-        recent_done.sort(key=lambda s: (s.model_name or "", s.sample_id))
+        recent_done.sort(key=lambda s: (-last_update_key(s), s.model_name or "", s.sample_id))
 
         queued = [s for s in samples_list if s.state == SampleState.QUEUED]
         queued.sort(key=lambda s: (s.model_name or "", s.sample_id))
@@ -371,23 +376,20 @@ class EvalProgress(ProgressCallback):
         rows.extend(active[:n_rows])
         remaining = n_rows - len(rows)
 
-        # 2) Show a rotating window of recently updated completed items
+        # Fill remaining space with the most recent completed/error samples.
         if remaining > 0 and recent_done:
-            rotation_period = 5
-            page_size = remaining
-            pages = (len(recent_done) + page_size - 1) // page_size
-            page_idx = int(time.time() // rotation_period) % max(1, pages)
-            start = page_idx * page_size
-            rows.extend(recent_done[start : start + page_size])
+            rows.extend(recent_done[:remaining])
             remaining = n_rows - len(rows)
 
-        # 3) Fill any remaining with queued, also rotated
+        # Fill any remaining space with queued samples in deterministic order.
         if remaining > 0 and queued:
-            page_size = remaining
-            pages = (len(queued) + page_size - 1) // page_size
-            page_idx = int(time.time() // 7) % max(1, pages)
-            start = page_idx * page_size
-            rows.extend(queued[start : start + page_size])
+            rows.extend(queued[:remaining])
+
+        return rows
+
+    def _create_detailed_view(self) -> Table:
+        """Create a modern, height-aware table that prioritizes active and recent samples."""
+        rows = self._select_display_rows()
 
         showing = len(rows)
         title = (
@@ -538,15 +540,24 @@ class EvalProgress(ProgressCallback):
         self.error_count = 0
         self.total_score = 0.0
         self.score_count = 0
+        self._last_refresh_at = 0.0
+        self._refresh_pending = False
+        self._cancel_refresh_task()
         self.samples.clear()
         self.metric_totals.clear()
         self.metric_counts.clear()
         if self.main_task_id is not None:
             self.main_progress.update(self.main_task_id, completed=0)
+        if self.live:
+            self._refresh_pending = True
+            self._refresh_live()
 
     async def start(self):
         """Start the progress display"""
         self.start_time = time.time()
+        self._last_refresh_at = 0.0
+        self._refresh_pending = False
+        self._cancel_refresh_task()
         task_description = "Re-grading cached trajectories" if self.cached_mode else "Evaluating samples"
         self.main_task_id = self.main_progress.add_task(
             task_description,
@@ -558,19 +569,68 @@ class EvalProgress(ProgressCallback):
         # no longer pre-populate since we need model_name for the key
 
         self.live = Live(
-            self._render(),
             console=self.console,
-            refresh_per_second=self.update_freq,
+            auto_refresh=False,
             transient=False,
-            vertical_overflow="visible",
+            vertical_overflow="ellipsis",
+            get_renderable=self._render,
         )
         self.live.start()
+        await self._request_refresh(force=True)
 
     def stop(self):
         """Stop the progress display"""
+        self._cancel_refresh_task()
         if self.live:
+            if self._refresh_pending:
+                with contextlib.suppress(Exception):
+                    self.live.refresh()
             self.live.stop()
+            self.live = None
             self.console.print()
+
+    def _cancel_refresh_task(self) -> None:
+        if self._refresh_task is not None and not self._refresh_task.done():
+            self._refresh_task.cancel()
+        self._refresh_task = None
+
+    def _refresh_live(self) -> None:
+        if not self.live:
+            return
+        self.live.refresh()
+        self._last_refresh_at = time.monotonic()
+        self._refresh_pending = False
+
+    async def _refresh_after_delay(self, delay: float) -> None:
+        try:
+            await asyncio.sleep(max(0.0, delay))
+            if self._refresh_pending and self.live:
+                self._refresh_live()
+        except asyncio.CancelledError:
+            raise
+        finally:
+            self._refresh_task = None
+
+    async def _request_refresh(self, *, force: bool = False) -> None:
+        if not self.live:
+            return
+
+        self._refresh_pending = True
+        if force or self.min_refresh_interval <= 0:
+            self._cancel_refresh_task()
+            self._refresh_live()
+            return
+
+        now = time.monotonic()
+        elapsed = now - self._last_refresh_at
+        if elapsed >= self.min_refresh_interval:
+            self._cancel_refresh_task()
+            self._refresh_live()
+            return
+
+        if self._refresh_task is None or self._refresh_task.done():
+            delay = self.min_refresh_interval - elapsed
+            self._refresh_task = asyncio.create_task(self._refresh_after_delay(delay))
 
     async def update_sample_state(
         self,
@@ -640,7 +700,7 @@ class EvalProgress(ProgressCallback):
             self.main_progress.update(self.main_task_id, completed=completed)
 
         if self.live:
-            self.live.update(self._render())
+            await self._request_refresh(force=state in terminal_states)
 
     async def sample_started(self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None):
         """Mark sample as started"""
