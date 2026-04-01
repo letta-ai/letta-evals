@@ -23,6 +23,7 @@ from letta_evals.models import (
     AgentState,
     ErrorInfo,
     GradeResult,
+    LettaAgentTargetSpec,
     LettaJudgeGraderSpec,
     LettaMessageUnion,
     LogicalGateSpec,
@@ -259,6 +260,19 @@ class Runner:
         if self.graders:
             return any(grader.requires_agent_state for grader in self.graders.values())
         return False
+
+    def _should_cleanup_agent(self) -> bool:
+        """Check if agents should be deleted after each sample.
+
+        Returns True when cleanup is enabled and the target creates agents per-sample
+        (i.e., not using a pre-existing agent_id).
+        """
+        if not self.suite.cleanup:
+            return False
+        # Never delete a pre-existing agent specified by agent_id
+        if isinstance(self.suite.target, LettaAgentTargetSpec) and self.suite.target.agent_id:
+            return False
+        return True
 
     async def _run_setup(self, model_name: Optional[str] = None) -> None:
         """Execute the setup function if specified.
@@ -526,7 +540,7 @@ class Runner:
             agent_id = None
             phase = ErrorCategory.UNKNOWN
             t_sample_start = time.perf_counter()
-            try:
+            try:  # noqa: SIM105 — outer try/finally for agent cleanup
                 if self.progress_callback:
                     await self.progress_callback.sample_started(sample_id, model_name=model_name)
 
@@ -641,6 +655,13 @@ class Runner:
                     total_time=time.perf_counter() - t_sample_start,
                     error=error_info,
                 )
+            finally:
+                if self._should_cleanup_agent() and agent_id:
+                    try:
+                        await self.client.agents.delete(agent_id=agent_id)
+                        logger.info(f"Cleaned up agent {agent_id} for sample {sample_id}")
+                    except Exception as cleanup_err:
+                        logger.warning(f"Failed to cleanup agent {agent_id}: {cleanup_err}")
 
     def _validate_rubric_vars(self, samples: List[Sample]) -> None:
         """Validate that all samples have required rubric_vars for configured graders."""
