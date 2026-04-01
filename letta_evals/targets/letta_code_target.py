@@ -91,13 +91,6 @@ class LettaCodeTarget(AbstractAgentTarget):
             try:
                 agent_id = None
 
-                # handle single or multiple inputs
-                inputs = sample.input if isinstance(sample.input, list) else [sample.input]
-
-                # for multiple inputs, concatenate with newlines
-                prompt = "\n".join(str(inp) for inp in inputs)
-                prompt = prompt.replace("{pwd}", self.working_dir.resolve().as_posix())
-
                 # construct the letta-code CLI command (headless streaming JSON output).
                 cmd = [
                     "letta",
@@ -118,6 +111,14 @@ class LettaCodeTarget(AbstractAgentTarget):
                         await progress_callback.agent_created(
                             sample.id, agent_id=factory_agent_id, model_name=self.model_handle
                         )
+
+                # construct prompt after factory call so agent_factory can modify sample if needed
+                # handle single or multiple inputs
+                inputs = sample.input if isinstance(sample.input, list) else [sample.input]
+
+                # for multiple inputs, concatenate with newlines
+                prompt = "\n".join(str(inp) for inp in inputs)
+                prompt = prompt.replace("{pwd}", self.working_dir.resolve().as_posix())
 
                 if factory_agent_id:
                     cmd.extend(["--agent", factory_agent_id])
