@@ -1,10 +1,10 @@
 import asyncio
 import contextlib
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from rich.align import Align
 from rich.box import MINIMAL_DOUBLE_HEAD, ROUNDED
@@ -70,6 +70,15 @@ class SampleProgress:
     turn_scores: Optional[Dict[str, List[Optional[float]]]] = None
 
 
+@dataclass
+class ProgressEvent:
+    """Serializable progress update processed by the reducer task."""
+
+    kind: str
+    payload: Dict[str, Any] = field(default_factory=dict)
+    ack: Optional[asyncio.Future[None]] = None
+
+
 class DisplayMode(Enum):
     """Display modes for progress visualization"""
 
@@ -106,7 +115,7 @@ class EvalProgress(ProgressCallback):
         self.show_samples = show_samples
         self.console = console or Console()
         self.update_freq = update_freq
-        self.min_refresh_interval = (1.0 / update_freq) if update_freq > 0 else 0.0
+        self.frame_interval = (1.0 / update_freq) if update_freq > 0 else 0.25
         self.cached_mode = cached_mode
         self.metric_labels: Dict[str, str] = metric_labels or {}
         # live aggregates per metric key
@@ -133,9 +142,12 @@ class EvalProgress(ProgressCallback):
         self.error_count = 0
         self.total_score = 0.0
         self.score_count = 0
-        self._last_refresh_at = 0.0
-        self._refresh_pending = False
-        self._refresh_task: Optional[asyncio.Task[None]] = None
+        self._dirty = False
+        self._event_queue: Optional[asyncio.Queue[ProgressEvent]] = None
+        self._dirty_event: Optional[asyncio.Event] = None
+        self._event_task: Optional[asyncio.Task[None]] = None
+        self._render_task: Optional[asyncio.Task[None]] = None
+        self._background_error: Optional[BaseException] = None
 
     def _get_state_icon(self, state: SampleState) -> Text:
         """Get icon for sample state"""
@@ -536,28 +548,23 @@ class EvalProgress(ProgressCallback):
 
     def reset(self):
         """Reset counters and state for a new run"""
+        self.start_time = time.time()
         self.completed_count = 0
         self.error_count = 0
         self.total_score = 0.0
         self.score_count = 0
-        self._last_refresh_at = 0.0
-        self._refresh_pending = False
-        self._cancel_refresh_task()
+        self._background_error = None
         self.samples.clear()
         self.metric_totals.clear()
         self.metric_counts.clear()
         if self.main_task_id is not None:
             self.main_progress.update(self.main_task_id, completed=0)
-        if self.live:
-            self._refresh_pending = True
-            self._refresh_live()
+        self._mark_dirty()
 
     async def start(self):
         """Start the progress display"""
         self.start_time = time.time()
-        self._last_refresh_at = 0.0
-        self._refresh_pending = False
-        self._cancel_refresh_task()
+        self._background_error = None
         task_description = "Re-grading cached trajectories" if self.cached_mode else "Evaluating samples"
         self.main_task_id = self.main_progress.add_task(
             task_description,
@@ -576,71 +583,118 @@ class EvalProgress(ProgressCallback):
             get_renderable=self._render,
         )
         self.live.start()
-        await self._request_refresh(force=True)
+        self._start_background_tasks()
+        self._mark_dirty()
+        self._refresh_live()
 
     def stop(self):
         """Stop the progress display"""
-        self._cancel_refresh_task()
+        self._stop_background_tasks()
         if self.live:
-            if self._refresh_pending:
+            if self._dirty:
                 with contextlib.suppress(Exception):
-                    self.live.refresh()
+                    self._refresh_live()
             self.live.stop()
             self.live = None
             self.console.print()
 
-    def _cancel_refresh_task(self) -> None:
-        if self._refresh_task is not None and not self._refresh_task.done():
-            self._refresh_task.cancel()
-        self._refresh_task = None
+    def _mark_dirty(self) -> None:
+        self._dirty = True
+        if self._dirty_event is not None:
+            self._dirty_event.set()
 
     def _refresh_live(self) -> None:
-        if not self.live:
+        if not self.live or not self._dirty:
             return
         self.live.refresh()
-        self._last_refresh_at = time.monotonic()
-        self._refresh_pending = False
+        self._dirty = False
 
-    async def _refresh_after_delay(self, delay: float) -> None:
-        try:
-            await asyncio.sleep(max(0.0, delay))
-            if self._refresh_pending and self.live:
-                self._refresh_live()
-        except asyncio.CancelledError:
-            raise
-        finally:
-            self._refresh_task = None
+    def _record_background_error(self, task: asyncio.Task[None]) -> None:
+        with contextlib.suppress(asyncio.CancelledError):
+            exc = task.exception()
+            if exc is not None and self._background_error is None:
+                self._background_error = exc
 
-    async def _request_refresh(self, *, force: bool = False) -> None:
-        if not self.live:
+    def _raise_background_error(self) -> None:
+        if self._background_error is not None:
+            raise RuntimeError("EvalProgress background task failed") from self._background_error
+
+    def _start_background_tasks(self) -> None:
+        self._stop_background_tasks()
+        self._event_queue = asyncio.Queue()
+        self._dirty_event = asyncio.Event()
+        self._event_task = asyncio.create_task(self._event_loop())
+        self._render_task = asyncio.create_task(self._render_loop())
+        self._event_task.add_done_callback(self._record_background_error)
+        self._render_task.add_done_callback(self._record_background_error)
+
+    def _stop_background_tasks(self) -> None:
+        for task in (self._event_task, self._render_task):
+            if task is not None and not task.done():
+                task.cancel()
+        self._event_task = None
+        self._render_task = None
+        self._event_queue = None
+        self._dirty_event = None
+
+    async def _event_loop(self) -> None:
+        queue = self._event_queue
+        if queue is None:
             return
+        while True:
+            event = await queue.get()
+            try:
+                self._apply_event(event)
+            except Exception as exc:
+                if event.ack is not None and not event.ack.done():
+                    event.ack.set_exception(exc)
+                raise
+            else:
+                self._mark_dirty()
+                if event.ack is not None and not event.ack.done():
+                    event.ack.set_result(None)
+            finally:
+                queue.task_done()
 
-        self._refresh_pending = True
-        if force or self.min_refresh_interval <= 0:
-            self._cancel_refresh_task()
+    async def _render_loop(self) -> None:
+        dirty_event = self._dirty_event
+        if dirty_event is None:
+            return
+        while True:
+            await dirty_event.wait()
+            dirty_event.clear()
+            await asyncio.sleep(self.frame_interval)
             self._refresh_live()
+
+    async def _emit_event(self, kind: str, **payload: Any) -> None:
+        self._raise_background_error()
+
+        if self._event_queue is None:
+            self._apply_event(ProgressEvent(kind=kind, payload=payload))
+            self._mark_dirty()
             return
 
-        now = time.monotonic()
-        elapsed = now - self._last_refresh_at
-        if elapsed >= self.min_refresh_interval:
-            self._cancel_refresh_task()
-            self._refresh_live()
+        loop = asyncio.get_running_loop()
+        ack: asyncio.Future[None] = loop.create_future()
+        await self._event_queue.put(ProgressEvent(kind=kind, payload=payload, ack=ack))
+        await ack
+        self._raise_background_error()
+
+    def _apply_event(self, event: ProgressEvent) -> None:
+        if event.kind == "update_sample_state":
+            self._apply_sample_state_update(**event.payload)
             return
+        raise ValueError(f"Unknown progress event kind: {event.kind}")
 
-        if self._refresh_task is None or self._refresh_task.done():
-            delay = self.min_refresh_interval - elapsed
-            self._refresh_task = asyncio.create_task(self._refresh_after_delay(delay))
-
-    async def update_sample_state(
+    def _apply_sample_state_update(
         self,
         sample_id: int,
         state: SampleState,
         agent_id: Optional[str] = None,
         model_name: Optional[str] = None,
         **kwargs,
-    ):
-        """Update state of a sample"""
+    ) -> None:
+        """Apply a state transition inside the single-threaded reducer."""
         key = (sample_id, model_name)
 
         # If we have a model_name and there's an existing entry with None, migrate it
@@ -699,8 +753,23 @@ class EvalProgress(ProgressCallback):
             completed = self.completed_count + self.error_count
             self.main_progress.update(self.main_task_id, completed=completed)
 
-        if self.live:
-            await self._request_refresh(force=state in terminal_states)
+    async def update_sample_state(
+        self,
+        sample_id: int,
+        state: SampleState,
+        agent_id: Optional[str] = None,
+        model_name: Optional[str] = None,
+        **kwargs,
+    ):
+        """Queue a state transition for the reducer task."""
+        await self._emit_event(
+            "update_sample_state",
+            sample_id=sample_id,
+            state=state,
+            agent_id=agent_id,
+            model_name=model_name,
+            **kwargs,
+        )
 
     async def sample_started(self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None):
         """Mark sample as started"""

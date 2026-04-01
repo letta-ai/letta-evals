@@ -21,26 +21,49 @@ class DummyLive:
 
 
 @pytest.mark.asyncio
-async def test_update_sample_state_throttles_refreshes() -> None:
+async def test_event_loop_batches_burst_updates_into_single_refresh() -> None:
     progress = EvalProgress(
         suite_name="demo",
         total_samples=1,
         console=Console(width=120, height=20, force_terminal=False),
-        update_freq=10.0,
+        update_freq=5.0,
     )
     progress.main_task_id = progress.main_progress.add_task("Evaluating samples", total=1, completed=0)
     progress.live = DummyLive()  # type: ignore[assignment]
+    progress._start_background_tasks()
 
     await progress.update_sample_state(0, SampleState.LOADING_AGENT)
-    assert progress.live.refresh_count == 1
-
     await progress.update_sample_state(0, SampleState.SENDING_MESSAGES, messages_sent=1, total_messages=2)
-    assert progress.live.refresh_count == 1
+    await progress.update_sample_state(0, SampleState.COMPLETED, score=1.0)
+    assert progress.live.refresh_count == 0
 
-    await asyncio.sleep(0.12)
-    assert progress.live.refresh_count == 2
+    await asyncio.sleep(0.25)
+    assert progress.live.refresh_count == 1
 
     progress.stop()
+    assert progress.live is None
+
+
+@pytest.mark.asyncio
+async def test_stop_flushes_dirty_state_immediately() -> None:
+    progress = EvalProgress(
+        suite_name="demo",
+        total_samples=1,
+        console=Console(width=120, height=20, force_terminal=False),
+        update_freq=5.0,
+    )
+    progress.main_task_id = progress.main_progress.add_task("Evaluating samples", total=1, completed=0)
+    live = DummyLive()
+    progress.live = live  # type: ignore[assignment]
+    progress._start_background_tasks()
+
+    await progress.update_sample_state(0, SampleState.LOADING_AGENT)
+    assert live.refresh_count == 0
+
+    progress.stop()
+
+    assert live.refresh_count == 1
+    assert live.stopped
     assert progress.live is None
 
 
