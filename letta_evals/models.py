@@ -668,6 +668,12 @@ class SampleResult(BaseModel):
     agent_usage: Optional[List[dict]] = Field(
         default=None, description="Usage statistics emitted by the agent during the run"
     )
+    run_ids: Optional[List[str]] = Field(
+        default=None, description="Run IDs for this sample's target execution (one or more for multi-turn runs)"
+    )
+    token_data: Optional[List[TurnTokenData]] = Field(
+        default=None, description="Token-level turn data (IDs/logprobs/content) for training pipelines"
+    )
     cost: Optional[float] = Field(default=None, description="Total cost in dollars for this sample run")
     prompt_tokens: Optional[int] = Field(default=None, description="Total prompt tokens used for this sample")
     completion_tokens: Optional[int] = Field(default=None, description="Total completion tokens used for this sample")
