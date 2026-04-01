@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.12.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.11.0...letta-evals-v0.12.0) (2026-04-01)
+
+
+### Features
+
+* Add cleanup attribute to SuiteSpec for post-eval agent deletion ([#223](https://github.com/letta-ai/letta-evals/issues/223)) ([eb3d8e9](https://github.com/letta-ai/letta-evals/commit/eb3d8e9df4dded135ba684cfb146faf17193b9e2))
+* Add per-sample and aggregate time tracking to evals ([#201](https://github.com/letta-ai/letta-evals/issues/201)) ([1b78755](https://github.com/letta-ai/letta-evals/commit/1b787553811f8be5d108e898feeb94676e2795d4))
+* Filesystem v2 leaderboard refresh ([#217](https://github.com/letta-ai/letta-evals/issues/217)) ([ace75e3](https://github.com/letta-ai/letta-evals/commit/ace75e3d2fe993b790eb8f42a56f10cdc462e827))
+* Write run logs to output directory for post-run debugging ([#221](https://github.com/letta-ai/letta-evals/issues/221)) ([f728067](https://github.com/letta-ai/letta-evals/commit/f728067b59761014d953d25381a7313008cd343f))
+
+
+### Bug Fixes
+
+* Fix incorrect and ambiguous filesystem agent samples ([#216](https://github.com/letta-ai/letta-evals/issues/216)) ([e614026](https://github.com/letta-ai/letta-evals/commit/e6140262abf970b7ea94bcac548b52a9dd7a7e2b))
+* Include last stdout event in LettaCodeTarget error on rc!=0 ([#220](https://github.com/letta-ai/letta-evals/issues/220)) ([e9d57a9](https://github.com/letta-ai/letta-evals/commit/e9d57a90d6f6f2ccb49fa28c4f097a98c5ce3a52))
+* Normalize retry behavior in LettaCodeTarget ([#210](https://github.com/letta-ai/letta-evals/issues/210)) ([09a0367](https://github.com/letta-ai/letta-evals/commit/09a0367ef72294d512dd7e26fda8e6e5201d027e))
+
+
+### Refactors
+
+* DRY up _calculate_metrics with aggregation helpers ([#204](https://github.com/letta-ai/letta-evals/issues/204)) ([4e2fecd](https://github.com/letta-ai/letta-evals/commit/4e2fecd06023915e9236d406631acb26eb8d493d))
+* Extract _detect_errors from run_sample ([#211](https://github.com/letta-ai/letta-evals/issues/211)) ([7829970](https://github.com/letta-ai/letta-evals/commit/7829970fe960cc3c69c382ed6401b65cb6a483a3))
+* Extract _extract_model_name helper to DRY up 3 blocks ([#209](https://github.com/letta-ai/letta-evals/issues/209)) ([a99b63c](https://github.com/letta-ai/letta-evals/commit/a99b63c60ce42cc40c50562d06460c15288cbe6a))
+* Extract _parse_json_dict_field to DRY up CSV loader ([#212](https://github.com/letta-ai/letta-evals/issues/212)) ([e77c5c8](https://github.com/letta-ai/letta-evals/commit/e77c5c84c593b35b8a1d217e021febcef134ff81))
+* Extract grader boilerplate into base class ([#203](https://github.com/letta-ai/letta-evals/issues/203)) ([2ad19b7](https://github.com/letta-ai/letta-evals/commit/2ad19b75b6eff26792a3f8ff01099559bc81984a))
+* Extract grading logic from run_sample into helper methods ([#206](https://github.com/letta-ai/letta-evals/issues/206)) ([e5b564e](https://github.com/letta-ai/letta-evals/commit/e5b564e927c7e88d424dd3ca8923fa8e6be67f7e))
+* Extract metrics computation into separate module ([#205](https://github.com/letta-ai/letta-evals/issues/205)) ([7788c40](https://github.com/letta-ai/letta-evals/commit/7788c4022419222ef99b719496782ead70eeb20e))
+* Replace error categorization heuristic with phase tracking ([#208](https://github.com/letta-ai/letta-evals/issues/208)) ([341b636](https://github.com/letta-ai/letta-evals/commit/341b636d90b28a336ce2c3516edb066b8cac29ae))
+
 ## [0.11.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.10.0...letta-evals-v0.11.0) (2026-02-26)
 
 
