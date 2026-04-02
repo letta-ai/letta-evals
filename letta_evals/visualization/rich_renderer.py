@@ -387,9 +387,7 @@ class RichProgressRenderer:
                 if sample.metric_rationales and metric_key in sample.metric_rationales:
                     rationale = sample.metric_rationales.get(metric_key) or ""
                 score_cell = (
-                    f"{score_value:.2f}"
-                    if isinstance(score_value, (int, float)) and score_value is not None
-                    else "-"
+                    f"{score_value:.2f}" if isinstance(score_value, (int, float)) and score_value is not None else "-"
                 )
                 cells.extend([self._text_cell(score_cell), self._text_cell(rationale)])
             return cells

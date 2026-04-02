@@ -290,7 +290,9 @@ class EvalProgress(ProgressCallback):
         model_name: Optional[str] = None,
     ):
         """Update message sending progress"""
-        if not self._should_emit_progress_bucket(self._message_progress_buckets, sample_id, model_name, message_num, total_messages):
+        if not self._should_emit_progress_bucket(
+            self._message_progress_buckets, sample_id, model_name, message_num, total_messages
+        ):
             return
         await self.update_sample_state(
             sample_id,
