@@ -367,69 +367,63 @@ class EvalProgress(ProgressCallback):
             padding=(0, 1),
         )
 
-    def _select_display_rows(self, limit: Optional[int] = None) -> List[SampleProgress]:
-        """Pick a stable set of rows for the detailed table.
-
-        Active samples stay pinned in a deterministic order, while the remaining
-        space shows the most recently completed samples. This avoids the
-        time-based page rotation that caused the table to jump around even when
-        nothing meaningful changed.
-        """
-        terminal_height = self.console.height
-
-        available_lines = max(5, terminal_height - 10)
-        # Account for table chrome (title, headers, borders)
-        max_rows = max(1, available_lines - 5)
-        n_rows = min(self.total_samples, max_rows) if limit is None else min(limit, self.total_samples)
-
-        def last_update_key(s: SampleProgress) -> float:
-            return s.last_update_ts or s.end_time or s.start_time or 0.0
-
-        active_states = {
+    def _active_states(self) -> set[SampleState]:
+        return {
             SampleState.LOADING_AGENT,
             SampleState.SENDING_MESSAGES,
             SampleState.GRADING,
             SampleState.GRADING_TURNS,
         }
-        completed_states = {SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR}
 
-        # gather all samples
-        samples_list = list(self.samples.values())
-        active = [s for s in samples_list if s.state in active_states]
-        active.sort(key=lambda s: (s.model_name or "", s.sample_id))
+    def _completed_states(self) -> set[SampleState]:
+        return {SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR}
 
-        recent_done = [s for s in samples_list if s.state in completed_states]
-        recent_done.sort(key=lambda s: (-last_update_key(s), s.model_name or "", s.sample_id))
+    def _last_update_key(self, sample: SampleProgress) -> float:
+        return sample.last_update_ts or sample.end_time or sample.start_time or 0.0
 
-        queued = [s for s in samples_list if s.state == SampleState.QUEUED]
-        queued.sort(key=lambda s: (s.model_name or "", s.sample_id))
+    def _detail_layout_budget(self) -> tuple[int, int]:
+        """Split the available height between active and completed panels."""
+        available_lines = max(12, self.console.height - 10)
+        has_completed = any(sample.state in self._completed_states() for sample in self.samples.values())
 
-        rows: List[SampleProgress] = []
+        if has_completed:
+            completed_panel_size = min(11, max(6, available_lines // 3))
+        else:
+            completed_panel_size = 5
 
-        rows.extend(active[:n_rows])
-        remaining = n_rows - len(rows)
+        active_panel_size = max(7, available_lines - completed_panel_size)
+        return active_panel_size, completed_panel_size
 
-        # Fill remaining space with the most recent completed/error samples.
-        if remaining > 0 and recent_done:
-            rows.extend(recent_done[:remaining])
-            remaining = n_rows - len(rows)
+    def _panel_row_limit(self, panel_size: int) -> int:
+        """Approximate how many table rows fit in a panel of the given size."""
+        return max(1, panel_size - 5)
 
-        # Fill any remaining space with queued samples in deterministic order.
-        if remaining > 0 and queued:
-            rows.extend(queued[:remaining])
+    def _select_active_rows(self, limit: Optional[int] = None) -> List[SampleProgress]:
+        """Select only currently active rows for the live top panel."""
+        rows = [sample for sample in self.samples.values() if sample.state in self._active_states()]
+        rows.sort(key=lambda sample: (sample.model_name or "", sample.sample_id))
+        if limit is None:
+            return rows
+        return rows[:limit]
 
-        return rows
+    def _select_completed_rows(self, limit: Optional[int] = None) -> List[SampleProgress]:
+        """Select the most recent completed or errored rows for the bottom panel."""
+        rows = [sample for sample in self.samples.values() if sample.state in self._completed_states()]
+        rows.sort(key=lambda sample: (-self._last_update_key(sample), sample.model_name or "", sample.sample_id))
+        if limit is None:
+            return rows
+        return rows[:limit]
 
-    def _create_detailed_view(self) -> Table:
-        """Create a modern, height-aware table that prioritizes active and recent samples."""
-        rows = self._select_display_rows()
-
-        showing = len(rows)
-        title = (
-            f"Active + recent · showing {showing} of {self.total_samples}"
-            if showing < self.total_samples
-            else f"All {self.total_samples} samples"
-        )
+    def _create_samples_table(self, rows: List[SampleProgress], title: str, empty_message: str):
+        """Render a table for a specific sample slice."""
+        if not rows:
+            return Panel(
+                Text(empty_message, style="dim"),
+                title=title,
+                border_style="blue",
+                box=ROUNDED,
+                padding=(0, 1),
+            )
 
         table = Table(
             title=f"{title}  (♻ means cached)",
@@ -555,14 +549,35 @@ class EvalProgress(ProgressCallback):
 
         return table
 
+    def _create_active_view(self, limit: int):
+        """Create the top panel with only in-flight work."""
+        rows = self._select_active_rows(limit=limit)
+        title = f"Active Samples · showing {len(rows)}"
+        return self._create_samples_table(rows, title, "No active samples")
+
+    def _create_completed_view(self, limit: int):
+        """Create the bottom panel with the most recent finished work."""
+        rows = self._select_completed_rows(limit=limit)
+        title = f"Recent Completed · showing {len(rows)}"
+        return self._create_samples_table(rows, title, "No completed samples yet")
+
     def _render(self) -> Layout:
         """Render the complete progress display"""
         layout = Layout()
+        active_panel_size, completed_panel_size = self._detail_layout_budget()
+        active_row_limit = self._panel_row_limit(active_panel_size)
+        completed_row_limit = self._panel_row_limit(completed_panel_size)
+
+        details_layout = Layout()
+        details_layout.split_column(
+            Layout(self._create_active_view(active_row_limit), size=active_panel_size),
+            Layout(self._create_completed_view(completed_row_limit), size=completed_panel_size),
+        )
 
         layout.split_column(
             Layout(self._create_header_panel(), size=4),
             Layout(self._create_progress_with_metrics(), size=5),  # increased size to show both progress and metrics
-            Layout(self._create_detailed_view()),
+            Layout(details_layout),
         )
 
         return layout
