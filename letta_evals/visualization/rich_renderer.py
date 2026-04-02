@@ -28,11 +28,11 @@ class RichProgressRenderer:
 
     HEADER_PANEL_SIZE = 4
     STATUS_PANEL_SIZE = 5
-    SAMPLE_NUM_WIDTH = 4
-    AGENT_ID_WIDTH = 10
-    MODEL_WIDTH = 16
-    STATUS_WIDTH = 15
-    TIME_WIDTH = 7
+    SAMPLE_NUM_WIDTH = 3
+    AGENT_ID_WIDTH = 14
+    MODEL_WIDTH = 14
+    STATUS_WIDTH = 11
+    TIME_WIDTH = 6
 
     def __init__(
         self,
@@ -226,14 +226,18 @@ class RichProgressRenderer:
         width: int,
         style: str,
         justify: str = "left",
+        ratio: Optional[int] = None,
+        allow_expand: bool = False,
     ) -> None:
+        max_width = None if allow_expand else width
         table.add_column(
             header,
             style=style,
             justify=justify,
             width=width,
             min_width=width,
-            max_width=width,
+            max_width=max_width,
+            ratio=ratio,
             no_wrap=True,
             overflow="ellipsis",
         )
@@ -258,8 +262,22 @@ class RichProgressRenderer:
         )
 
         self._add_fixed_width_column(table, "#", width=self.SAMPLE_NUM_WIDTH, style="cyan")
-        self._add_fixed_width_column(table, "Agent ID", width=self.AGENT_ID_WIDTH, style="dim cyan")
-        self._add_fixed_width_column(table, "Model", width=self.MODEL_WIDTH, style="yellow")
+        self._add_fixed_width_column(
+            table,
+            "Agent ID",
+            width=self.AGENT_ID_WIDTH,
+            style="dim cyan",
+            ratio=2,
+            allow_expand=True,
+        )
+        self._add_fixed_width_column(
+            table,
+            "Model",
+            width=self.MODEL_WIDTH,
+            style="yellow",
+            ratio=2,
+            allow_expand=True,
+        )
         self._add_fixed_width_column(table, "Status", width=self.STATUS_WIDTH, style="white")
 
         metric_keys = list(self.metric_labels.keys())
@@ -281,12 +299,21 @@ class RichProgressRenderer:
                     f"{label} Rationale",
                     width=rationale_width,
                     style="dim",
+                    ratio=3,
+                    allow_expand=True,
                 )
         else:
             self._add_fixed_width_column(table, "Score", width=8, style="white", justify="right")
-            self._add_fixed_width_column(table, "Rationale", width=18, style="dim")
+            self._add_fixed_width_column(table, "Rationale", width=18, style="dim", ratio=3, allow_expand=True)
         self._add_fixed_width_column(table, "Time", width=self.TIME_WIDTH, style="white", justify="right")
-        self._add_fixed_width_column(table, "Details", width=16 if metric_count == 1 else 12, style="white")
+        self._add_fixed_width_column(
+            table,
+            "Details",
+            width=14 if metric_count == 1 else 10,
+            style="white",
+            ratio=2,
+            allow_expand=True,
+        )
 
         for sample in rows:
             if sample.start_time and sample.end_time:

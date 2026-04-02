@@ -94,7 +94,10 @@ def test_model_judge_renderer_moves_rubric_model_into_header_and_uses_fixed_colu
         "Time",
         "Details",
     ]
-    assert [column.width for column in table.columns] == [4, 10, 16, 15, 10, 20, 7, 16]
+    assert table.expand
+    assert [column.width for column in table.columns] == [3, 14, 14, 11, 10, 20, 6, 14]
+    assert [column.ratio for column in table.columns] == [None, 2, 2, None, None, 3, None, 2]
+    assert [column.max_width for column in table.columns] == [3, None, None, 11, 10, None, 6, None]
     assert all(column.no_wrap for column in table.columns)
     assert all(column.overflow == "ellipsis" for column in table.columns)
 
