@@ -2,7 +2,6 @@ import asyncio
 import contextlib
 import time
 from dataclasses import dataclass, field
-from datetime import timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -239,43 +238,6 @@ class EvalProgress(ProgressCallback):
             padding=(0, 1),
         )
 
-    def _create_samples_grid(self) -> Panel:
-        """Create grid showing sample states"""
-        if not self.show_samples or self.display_mode == DisplayMode.COMPACT:
-            return Panel("")
-
-        # collect all samples by their base sample_id
-        sample_by_id = {}
-        for key, sample in self.samples.items():
-            sample_id, _ = key
-            if sample_id not in sample_by_id or sample.last_update_ts > (sample_by_id[sample_id].last_update_ts or 0):
-                sample_by_id[sample_id] = sample
-
-        rows = []
-        samples_per_row = 15
-
-        for i in range(0, self.total_samples, samples_per_row):
-            row_text = Text(f"[{i + 1:3d}-{min(i + samples_per_row, self.total_samples):3d}] ", style="dim")
-
-            for j in range(i, min(i + samples_per_row, self.total_samples)):
-                sample = sample_by_id.get(j, SampleProgress(j))
-                icon = self._get_state_icon(sample.state)
-                if j > i:
-                    row_text.append(" ")  # space between icons
-                row_text.append(icon)
-
-            rows.append(row_text)
-
-        content = Group(*rows) if rows else Text("No samples", style="dim")
-
-        return Panel(
-            content,
-            title="Samples",
-            border_style="blue",
-            box=ROUNDED,
-            padding=(0, 1),
-        )
-
     def _create_progress_with_metrics(self) -> Panel:
         """Create progress bar with inline metrics"""
         completed = self.completed_count + self.error_count
@@ -315,57 +277,6 @@ class EvalProgress(ProgressCallback):
         content = Group(self.main_progress, Text(""), chips)
 
         return Panel(content, box=ROUNDED, border_style="blue", padding=(0, 1))
-
-    def _create_metrics_panel(self) -> Panel:
-        """Create panel showing live metrics"""
-        completed = self.completed_count + self.error_count
-
-        if completed == 0:
-            errors_text_row = "N/A"
-        else:
-            errors_text_row = f"{(self.error_count / completed * 100.0):.1f}%"
-
-        metrics_table = Table.grid(padding=1)
-        metrics_table.add_column(style="cyan", justify="right")
-        metrics_table.add_column(style="white")
-
-        metrics_table.add_row("🛡️ Errored:", f"{errors_text_row} ({self.error_count}/{completed})")
-
-        if self.score_count > 0:
-            avg_score = self.total_score / self.score_count
-            metrics_table.add_row("📈 Avg Score:", f"{avg_score:.2f}")
-
-        if self.error_count > 0:
-            metrics_table.add_row("⚠️ Errors:", str(self.error_count))
-
-        # Per-metric grid
-        if self.metric_totals:
-            metrics_table.add_row("", "")
-            metrics_table.add_row("[bold]By Metric[/bold]", "")
-            for key in self.metric_labels.keys() or self.metric_totals.keys():
-                if key not in self.metric_totals:
-                    continue
-                total = self.metric_totals.get(key, 0.0)
-                cnt = self.metric_counts.get(key, 0)
-                avg = total / cnt if cnt > 0 else 0.0
-                label = self.metric_labels.get(key, key)
-                metrics_table.add_row(f"• {label}:", f"avg={avg:.2f}")
-
-        if self.start_time and completed > 0 and completed < self.total_samples:
-            elapsed = time.time() - self.start_time
-            rate = completed / elapsed
-            remaining = self.total_samples - completed
-            eta = remaining / rate if rate > 0 else 0
-            eta_text = str(timedelta(seconds=int(eta)))
-            metrics_table.add_row("⏱️ ETA:", eta_text)
-
-        return Panel(
-            metrics_table,
-            title="Metrics",
-            border_style="green",
-            box=ROUNDED,
-            padding=(0, 1),
-        )
 
     def _active_states(self) -> set[SampleState]:
         return {
