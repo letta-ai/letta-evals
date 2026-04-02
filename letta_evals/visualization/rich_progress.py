@@ -494,5 +494,5 @@ class EvalProgress(ProgressCallback):
         self.console.print("\n[bold]Sample Results:[/bold]")
         total_samples, displayed_results = get_displayed_sample_results(result)
         print_truncated_samples_notice(self.console, total_samples, len(displayed_results))
-        self.console.print(build_rich_sample_results_table(result))
+        self.console.print(build_rich_sample_results_table(result.config, displayed_results))
         print_remaining_samples_notice(self.console, total_samples, len(displayed_results))

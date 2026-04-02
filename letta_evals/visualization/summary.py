@@ -115,20 +115,19 @@ def get_displayed_sample_results(result: Any) -> tuple[int, list[Any]]:
     return total_samples, sorted_results[:MAX_SAMPLES_DISPLAY]
 
 
-def build_simple_sample_results_table(result: Any) -> Table:
+def build_simple_sample_results_table(config: Dict[str, Any], displayed_results: list[Any]) -> Table:
     """Build the simple summary sample-results table."""
     table = Table(show_header=True)
     table.add_column("Sample", style="cyan")
     table.add_column("Agent ID", style="dim cyan")
     table.add_column("Model", style="yellow")
 
-    metric_labels = get_metric_labels(result.config)
+    metric_labels = get_metric_labels(config)
     metric_keys = list(metric_labels.keys())
 
     for metric_key in metric_keys:
         table.add_column(f"{metric_labels[metric_key]} score", style="white")
 
-    _, displayed_results = get_displayed_sample_results(result)
     for sample_result in displayed_results:
         cells = []
         for metric_key in metric_keys:
@@ -149,14 +148,14 @@ def build_simple_sample_results_table(result: Any) -> Table:
     return table
 
 
-def build_rich_sample_results_table(result: Any) -> Table:
+def build_rich_sample_results_table(config: Dict[str, Any], displayed_results: list[Any]) -> Table:
     """Build the richer final sample-results table with rationales."""
     table = Table(show_header=True, header_style="bold cyan", border_style="blue", box=ROUNDED)
     table.add_column("Sample", style="cyan", no_wrap=True)
     table.add_column("Agent ID", style="dim cyan", no_wrap=False)
     table.add_column("Model", style="yellow", no_wrap=True)
 
-    metric_labels = get_metric_labels(result.config)
+    metric_labels = get_metric_labels(config)
     metric_keys = list(metric_labels.keys())
 
     for metric_key in metric_keys:
@@ -164,7 +163,6 @@ def build_rich_sample_results_table(result: Any) -> Table:
         table.add_column(f"{label} score", style="white", no_wrap=True)
         table.add_column(f"{label} rationale", style="dim", no_wrap=False)
 
-    _, displayed_results = get_displayed_sample_results(result)
     for sample_result in displayed_results:
         cells = []
         for metric_key in metric_keys:

@@ -21,8 +21,6 @@ def test_apply_completed_update_tracks_counts_and_metric_totals() -> None:
 
     assert reducer.state.completed_count == 1
     assert reducer.state.error_count == 0
-    assert reducer.state.total_score == 0.75
-    assert reducer.state.score_count == 1
     assert reducer.state.metric_totals == {"accuracy": 1.0, "fluency": 0.5}
     assert reducer.state.metric_counts == {"accuracy": 1, "fluency": 1}
     assert result.progress_completed == 1

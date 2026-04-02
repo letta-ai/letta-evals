@@ -82,7 +82,10 @@ def test_get_displayed_sample_results_sorts_by_model_then_sample() -> None:
 
 
 def test_build_simple_sample_results_table_contains_scores_only() -> None:
-    table = build_simple_sample_results_table(_make_result())
+    result = _make_result()
+    _, displayed_results = get_displayed_sample_results(result)
+
+    table = build_simple_sample_results_table(result.config, displayed_results)
 
     assert [column.header for column in table.columns] == [
         "Sample",
@@ -97,7 +100,10 @@ def test_build_simple_sample_results_table_contains_scores_only() -> None:
 
 
 def test_build_rich_sample_results_table_contains_rationales() -> None:
-    table = build_rich_sample_results_table(_make_result())
+    result = _make_result()
+    _, displayed_results = get_displayed_sample_results(result)
+
+    table = build_rich_sample_results_table(result.config, displayed_results)
 
     assert [column.header for column in table.columns] == [
         "Sample",
