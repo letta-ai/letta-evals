@@ -286,7 +286,9 @@ class RichProgressRenderer:
             for metric_key in metric_keys:
                 label = self.metric_labels.get(metric_key, metric_key)
                 score_width = max(8, min(10, len(label) + 2))
-                rationale_width = max(16 if metric_count > 1 else 18, min(24 if metric_count == 1 else 18, len(label) + 12))
+                rationale_width = max(
+                    16 if metric_count > 1 else 18, min(24 if metric_count == 1 else 18, len(label) + 12)
+                )
                 self._add_fixed_width_column(
                     table,
                     f"{label} Score",

@@ -23,10 +23,7 @@ letta server
 
 Set your API keys (required for rubric grader):
 ```bash
-# For suite.yaml (uses Anthropic Claude)
-export ANTHROPIC_API_KEY=your-key
-
-# For suite.ascii-only-accuracy.yaml (uses OpenAI GPT)
+# For both suite.yaml and suite.ascii-only-accuracy.yaml (uses OpenAI GPT)
 export OPENAI_API_KEY=your-key
 ```
 
@@ -43,9 +40,8 @@ Set these environment variables:
 export LETTA_API_KEY=your-api-key
 export LETTA_PROJECT_ID=your-project-id
 
-# Depending on which suite you're running:
-export ANTHROPIC_API_KEY=your-anthropic-key  # for suite.yaml
-export OPENAI_API_KEY=your-openai-key  # for suite.ascii-only-accuracy.yaml
+# Both example suites use OpenAI graders:
+export OPENAI_API_KEY=your-openai-key
 ```
 
 Update `base_url` in `suite.yaml`:
@@ -137,9 +133,9 @@ graders:
   quality:
     kind: model_judge
     prompt_path: rubric.txt
-    model: claude-haiku-4-5-20251001
-    temperature: 0.0
-    provider: anthropic
+  model: gpt-5-mini
+  temperature: 0.0
+  provider: openai
     max_retries: 3
     timeout: 120.0
     extractor: last_assistant
@@ -161,5 +157,5 @@ gate:
 
 ## Variants
 
-- `suite.yaml`: Single rubric grader for quality assessment (uses Claude Haiku via Anthropic)
+- `suite.yaml`: Single rubric grader for quality assessment (uses GPT-5-mini via OpenAI)
 - `suite.ascii-only-accuracy.yaml`: Demonstrates accuracy aggregation with custom per-sample pass threshold (uses GPT-5-mini via OpenAI)
