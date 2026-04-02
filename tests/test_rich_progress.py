@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 import pytest
 from rich.console import Console
@@ -99,5 +100,28 @@ async def test_stats_capture_queue_pressure_under_concurrency() -> None:
     assert stats.events_processed == 15
     assert stats.max_queue_depth >= 1
     assert stats.refreshes < stats.events_processed
+
+    progress.stop()
+
+
+@pytest.mark.asyncio
+async def test_render_loop_refreshes_timer_without_new_events() -> None:
+    progress = EvalProgress(
+        suite_name="demo",
+        total_samples=1,
+        console=Console(width=120, height=20, force_terminal=False),
+        update_freq=5.0,
+    )
+    progress.start_time = time.time()
+    progress.main_task_id = progress.main_progress.add_task("Evaluating samples", total=1, completed=0)
+    live = DummyLive()
+    progress.live = live  # type: ignore[assignment]
+    progress._start_background_tasks()
+
+    await asyncio.sleep(0.25)
+
+    stats = progress.get_stats_snapshot()
+    assert live.refresh_count >= 1
+    assert stats.refreshes_by_reason.get("timer", 0) >= 1
 
     progress.stop()
