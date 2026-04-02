@@ -31,8 +31,12 @@ def get_metric_labels(config: Dict[str, Any]) -> Dict[str, str]:
 
 
 def format_gate_description(
-    config: Dict[str, Any], *, prefer_display_label: bool = False, quote_metric_label: bool = False,
-    default_metric_label: str = "", fixed_decimal_value: bool = False
+    config: Dict[str, Any],
+    *,
+    prefer_display_label: bool = False,
+    quote_metric_label: bool = False,
+    default_metric_label: str = "",
+    fixed_decimal_value: bool = False,
 ) -> str:
     """Format the gate description for final summaries."""
     gate = config["gate"]
@@ -105,7 +109,9 @@ def extract_score_and_rationale(grade: Any) -> tuple[Optional[float], str]:
 def get_displayed_sample_results(result: Any) -> tuple[int, list[Any]]:
     """Sort and truncate sample results for final reporting."""
     total_samples = len(result.results)
-    sorted_results = sorted(result.results, key=lambda sample_result: (sample_result.model_name or "", sample_result.sample.id))
+    sorted_results = sorted(
+        result.results, key=lambda sample_result: (sample_result.model_name or "", sample_result.sample.id)
+    )
     return total_samples, sorted_results[:MAX_SAMPLES_DISPLAY]
 
 
