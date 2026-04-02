@@ -27,6 +27,15 @@ from rich.text import Text
 from letta_evals.types import GraderKind
 from letta_evals.utils import build_turn_symbols, calculate_turn_average
 from letta_evals.visualization.base import ProgressCallback
+from letta_evals.visualization.summary import (
+    build_rich_sample_results_table,
+    format_gate_description,
+    get_displayed_sample_results,
+    get_metric_labels,
+    print_basic_overall_metrics,
+    print_remaining_samples_notice,
+    print_truncated_samples_notice,
+)
 
 
 class SampleState(Enum):
@@ -894,24 +903,14 @@ class EvalProgress(ProgressCallback):
 
     async def suite_completed(self, result):
         """Display summary and detailed results after evaluation completes"""
-        from letta_evals.constants import MAX_SAMPLES_DISPLAY
-
         self.console.print()
         self.console.print(f"[bold]Evaluation Results: {result.suite}[/bold]")
         if self.cached_mode:
             self.console.print("[dim]Note: Results re-graded from cached trajectories[/dim]")
         self.console.print("=" * 50)
 
-        # overall metrics
         metrics = result.metrics
-        self.console.print("\n[bold]Overall Metrics:[/bold]")
-        self.console.print(f"  Total samples: {metrics.total}")
-        self.console.print(f"  Total attempted: {metrics.total_attempted}")
-        errors = metrics.total - metrics.total_attempted
-        errors_pct = (errors / metrics.total * 100.0) if metrics.total > 0 else 0.0
-        self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{metrics.total})")
-        self.console.print(f"  Average score (attempted): {metrics.avg_score_attempted:.2f}")
-        self.console.print(f"  Average score (total): {metrics.avg_score_total:.2f}")
+        print_basic_overall_metrics(self.console, metrics)
 
         # usage metrics
         if metrics.usage_metrics:
@@ -934,11 +933,7 @@ class EvalProgress(ProgressCallback):
             metrics_table.add_column("Metric", style="cyan")
             metrics_table.add_column("Avg Score (Attempted)", style="white")
             metrics_table.add_column("Avg Score (Total)", style="white")
-            # build key->label mapping from config
-            label_map = {}
-            if "graders" in result.config and isinstance(result.config["graders"], dict):
-                for key, gspec in result.config["graders"].items():
-                    label_map[key] = gspec.get("display_name") or key
+            label_map = get_metric_labels(result.config)
 
             for key, agg in metrics.by_metric.items():
                 label = label_map.get(key, key)
@@ -995,110 +990,19 @@ class EvalProgress(ProgressCallback):
                 self.console.print(usage_table)
 
         # gate status
-        gate = result.config["gate"]
-        gate_kind = gate.get("kind", "simple")
         status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
-
-        op_symbols = {"gt": ">", "gte": "≥", "lt": "<", "lte": "≤", "eq": "="}
-
-        # format gate description based on kind
-        if gate_kind == "simple":
-            gate_op = gate["op"]
-            gate_value = gate["value"]
-            gate_aggregation = gate.get("aggregation", "avg_score")
-            gate_metric_key = gate.get("metric_key")
-            op_symbol = op_symbols.get(gate_op, gate_op)
-
-            # get display name
-            display_label = None
-            if gate_metric_key and "graders" in result.config and isinstance(result.config["graders"], dict):
-                gspec = result.config["graders"].get(gate_metric_key)
-                if gspec:
-                    display_label = gspec.get("display_name")
-            metric_label = display_label or gate_metric_key or "metric"
-
-            gate_desc = f"'{metric_label}' {gate_aggregation} {op_symbol} {gate_value}"
-
-        elif gate_kind == "weighted_average":
-            weights = gate.get("weights", {})
-            gate_op = gate["op"]
-            gate_value = gate["value"]
-            gate_aggregation = gate.get("aggregation", "avg_score")
-            op_symbol = op_symbols.get(gate_op, gate_op)
-
-            weight_strs = [f"{k}({w})" for k, w in weights.items()]
-            gate_desc = f"weighted_average[{', '.join(weight_strs)}] {gate_aggregation} {op_symbol} {gate_value}"
-
-        elif gate_kind == "logical":
-            operator = gate.get("operator", "and").upper()
-            num_conditions = len(gate.get("conditions", []))
-            gate_desc = f"logical {operator} with {num_conditions} conditions"
-
-        else:
-            gate_desc = f"unknown gate kind: {gate_kind}"
+        gate_desc = format_gate_description(
+            result.config,
+            prefer_display_label=True,
+            quote_metric_label=True,
+            default_metric_label="metric",
+        )
 
         self.console.print(f"\n[bold]Gate:[/bold] {gate_desc} → {status}")
 
         # sample results table
         self.console.print("\n[bold]Sample Results:[/bold]")
-
-        total_samples = len(result.results)
-        sorted_results = sorted(result.results, key=lambda r: (r.model_name or "", r.sample.id))
-        samples_to_display = sorted_results[:MAX_SAMPLES_DISPLAY]
-
-        if total_samples > MAX_SAMPLES_DISPLAY:
-            self.console.print(f"[dim]Showing first {MAX_SAMPLES_DISPLAY} of {total_samples} samples[/dim]")
-
-        table = Table(show_header=True, header_style="bold cyan", border_style="blue", box=ROUNDED)
-        table.add_column("Sample", style="cyan", no_wrap=True)
-        table.add_column("Agent ID", style="dim cyan", no_wrap=False)
-        table.add_column("Model", style="yellow", no_wrap=True)
-
-        # determine available metrics and display labels
-        metric_keys = []
-        metric_labels = {}
-        if "graders" in result.config and isinstance(result.config["graders"], dict):
-            for k, gspec in result.config["graders"].items():
-                metric_keys.append(k)
-                metric_labels[k] = gspec.get("display_name") or k
-
-        # add two sub-columns per metric: score + rationale
-        for mk in metric_keys:
-            lbl = metric_labels.get(mk, mk)
-            table.add_column(f"{lbl} score", style="white", no_wrap=True)
-            table.add_column(f"{lbl} rationale", style="dim", no_wrap=False)
-
-        for sample_result in samples_to_display:
-            # build per-metric cells in config order
-            cells = []
-            for mk in metric_keys:
-                g = sample_result.grades.get(mk) if sample_result.grades else None
-                if g is None:
-                    cells.extend(["-", ""])
-                else:
-                    try:
-                        s_val = float(getattr(g, "score", None))
-                        r_text = getattr(g, "rationale", None) or ""
-                    except Exception:
-                        try:
-                            s_val = float(g.get("score"))
-                            r_text = g.get("rationale", "")
-                        except Exception:
-                            s_val = None
-                            r_text = ""
-                    score_cell = f"{s_val:.2f}" if s_val is not None else "-"
-                    cells.extend([score_cell, r_text])
-
-            table.add_row(
-                f"Sample {sample_result.sample.id + 1}",
-                sample_result.agent_id or "-",
-                sample_result.model_name or "-",
-                *cells,
-            )
-
-        self.console.print(table)
-
-        if total_samples > MAX_SAMPLES_DISPLAY:
-            self.console.print(
-                f"[dim]... and {total_samples - MAX_SAMPLES_DISPLAY} more samples (see output file for complete results)[/dim]"
-            )
+        total_samples, displayed_results = get_displayed_sample_results(result)
+        print_truncated_samples_notice(self.console, total_samples, len(displayed_results))
+        self.console.print(build_rich_sample_results_table(result))
+        print_remaining_samples_notice(self.console, total_samples, len(displayed_results))
