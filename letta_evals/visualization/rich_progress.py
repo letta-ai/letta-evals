@@ -52,17 +52,11 @@ class EvalProgress(ProgressCallback):
         cached_mode: bool = False,
         metric_labels: Optional[Dict[str, str]] = None,
     ):
-        self.suite_name = suite_name
         self.total_samples = total_samples
-        self.target_kind = target_kind
-        self.grader_kind = grader_kind
-        self.rubric_model = rubric_model
-        self.max_concurrent = max_concurrent
         self.console = console or Console()
-        self.update_freq = update_freq
         self.frame_interval = (1.0 / update_freq) if update_freq > 0 else 0.25
         self.cached_mode = cached_mode
-        self.metric_labels: Dict[str, str] = metric_labels or {}
+        renderer_metric_labels: Dict[str, str] = metric_labels or {}
         self._runtime_state = ProgressRuntimeState()
         self._reducer = ProgressStateReducer(self._runtime_state)
         self._renderer = RichProgressRenderer(
@@ -72,7 +66,7 @@ class EvalProgress(ProgressCallback):
             grader_kind=grader_kind,
             rubric_model=rubric_model,
             max_concurrent=max_concurrent,
-            metric_labels=self.metric_labels,
+            metric_labels=renderer_metric_labels,
         )
         self.start_time = None
         self.live: Optional[Live] = None
