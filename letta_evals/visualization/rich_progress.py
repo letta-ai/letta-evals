@@ -88,6 +88,9 @@ class EvalProgress(ProgressCallback):
         self._event_task: Optional[asyncio.Task[None]] = None
         self._render_task: Optional[asyncio.Task[None]] = None
         self._background_error: Optional[BaseException] = None
+        self._last_visible_snapshot: Optional[tuple] = None
+        self._message_progress_buckets: Dict[tuple[int, Optional[str]], tuple[int, int]] = {}
+        self._turn_progress_buckets: Dict[tuple[int, Optional[str]], tuple[int, int]] = {}
         self._reset_visualization_stats()
 
     def _render(self):
@@ -98,6 +101,7 @@ class EvalProgress(ProgressCallback):
         """Reset counters and state for a new run"""
         self.start_time = time.time()
         self._background_error = None
+        self._reset_refresh_tracking()
         self._reset_visualization_stats()
         self._reducer.reset()
         if self.main_task_id is not None:
@@ -108,6 +112,7 @@ class EvalProgress(ProgressCallback):
         """Start the progress display"""
         self.start_time = time.time()
         self._background_error = None
+        self._reset_refresh_tracking()
         task_description = "Re-grading cached trajectories" if self.cached_mode else "Evaluating samples"
         self.main_task_id = self.main_progress.add_task(
             task_description,
@@ -150,9 +155,14 @@ class EvalProgress(ProgressCallback):
     def _refresh_live(self, reason: str = "tick") -> None:
         if not self.live or not self._dirty:
             return
+        visible_snapshot = self._renderer.build_visible_snapshot(self._runtime_state)
+        if visible_snapshot == self._last_visible_snapshot:
+            self._dirty = False
+            return
         self.live.refresh()
         self._refresh_count += 1
         self._refresh_reasons[reason] = self._refresh_reasons.get(reason, 0) + 1
+        self._last_visible_snapshot = visible_snapshot
         self._dirty = False
 
     def _record_background_error(self, task: asyncio.Task[None]) -> None:
@@ -280,6 +290,8 @@ class EvalProgress(ProgressCallback):
         model_name: Optional[str] = None,
     ):
         """Update message sending progress"""
+        if not self._should_emit_progress_bucket(self._message_progress_buckets, sample_id, model_name, message_num, total_messages):
+            return
         await self.update_sample_state(
             sample_id,
             SampleState.SENDING_MESSAGES,
@@ -318,6 +330,11 @@ class EvalProgress(ProgressCallback):
             model_name=model_name,
         )
 
+        if not self._should_emit_progress_bucket(
+            self._turn_progress_buckets, sample_id, model_name, turn_num + 1, total_turns
+        ):
+            return
+
         await self.update_sample_state(
             sample_id,
             SampleState.GRADING_TURNS,
@@ -352,6 +369,7 @@ class EvalProgress(ProgressCallback):
             metric_scores=metric_scores,
             metric_rationales=metric_rationales,
         )
+        self._clear_progress_buckets(sample_id, model_name)
 
     async def sample_error(
         self, sample_id: int, error: str, agent_id: Optional[str] = None, model_name: Optional[str] = None
@@ -364,6 +382,7 @@ class EvalProgress(ProgressCallback):
             model_name=model_name,
             error=error,
         )
+        self._clear_progress_buckets(sample_id, model_name)
 
     def get_stats_snapshot(self) -> VisualizationStats:
         """Return instrumentation counters for tuning the live renderer."""
@@ -390,6 +409,41 @@ class EvalProgress(ProgressCallback):
         self._render_wakeup_count = 0
         self._dirty_mark_count = 0
         self._max_queue_depth = 0
+
+    def _reset_refresh_tracking(self) -> None:
+        self._last_visible_snapshot = None
+        self._message_progress_buckets.clear()
+        self._turn_progress_buckets.clear()
+
+    def _should_emit_progress_bucket(
+        self,
+        bucket_store: Dict[tuple[int, Optional[str]], tuple[int, int]],
+        sample_id: int,
+        model_name: Optional[str],
+        current: int,
+        total: int,
+    ) -> bool:
+        if total <= 0:
+            return True
+
+        key = (sample_id, model_name)
+        bucket = self._progress_bucket(current, total)
+        previous_bucket, previous_total = bucket_store.get(key, (-1, -1))
+
+        if current == 1 or current >= total or total != previous_total or bucket != previous_bucket:
+            bucket_store[key] = (bucket, total)
+            return True
+        return False
+
+    def _progress_bucket(self, current: int, total: int, bucket_count: int = 10) -> int:
+        if total <= 1:
+            return total
+        return min(bucket_count, int((current * bucket_count) / total))
+
+    def _clear_progress_buckets(self, sample_id: int, model_name: Optional[str]) -> None:
+        key = (sample_id, model_name)
+        self._message_progress_buckets.pop(key, None)
+        self._turn_progress_buckets.pop(key, None)
 
     async def suite_completed(self, result):
         """Display summary and detailed results after evaluation completes"""

@@ -56,6 +56,8 @@ class SampleProgress:
     turns_graded: int = 0
     total_turns: int = 0
     turn_scores: Optional[Dict[str, List[Optional[float]]]] = None
+    active_sort_sequence: int = 0
+    completion_sequence: Optional[int] = None
 
 
 @dataclass

@@ -8,6 +8,7 @@ from letta_evals.visualization.state import (
     ProgressEvent,
     SampleProgress,
     SampleState,
+    is_active_state,
     is_terminal_state,
 )
 
@@ -23,6 +24,8 @@ class ProgressRuntimeState:
     metric_counts: Dict[str, int] = field(default_factory=dict)
     completed_count: int = 0
     error_count: int = 0
+    next_active_sort_sequence: int = 1
+    next_completion_sequence: int = 1
 
 
 @dataclass(frozen=True)
@@ -44,6 +47,8 @@ class ProgressStateReducer:
         self.state.metric_counts.clear()
         self.state.completed_count = 0
         self.state.error_count = 0
+        self.state.next_active_sort_sequence = 1
+        self.state.next_completion_sequence = 1
 
     def ensure_sample(
         self,
@@ -135,7 +140,15 @@ class ProgressStateReducer:
                 setattr(sample, key, value)
         sample.last_update_ts = now
 
+        if previous_state != state and is_active_state(state):
+            sample.active_sort_sequence = self.state.next_active_sort_sequence
+            self.state.next_active_sort_sequence += 1
+
         is_new_completion = not is_terminal_state(previous_state) and is_terminal_state(state)
+
+        if is_new_completion:
+            sample.completion_sequence = self.state.next_completion_sequence
+            self.state.next_completion_sequence += 1
 
         if state == SampleState.COMPLETED and is_new_completion:
             self.state.completed_count += 1

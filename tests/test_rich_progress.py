@@ -101,3 +101,56 @@ async def test_stats_capture_queue_pressure_under_concurrency() -> None:
     assert stats.refreshes < stats.events_processed
 
     progress.stop()
+
+
+@pytest.mark.asyncio
+async def test_offscreen_updates_do_not_force_refresh() -> None:
+    progress = EvalProgress(
+        suite_name="demo",
+        total_samples=3,
+        console=Console(width=120, height=12, force_terminal=False),
+        update_freq=20.0,
+    )
+    progress.main_task_id = progress.main_progress.add_task("Evaluating samples", total=3, completed=0)
+    live = DummyLive()
+    progress.live = live  # type: ignore[assignment]
+    progress._start_background_tasks()
+
+    await progress.update_sample_state(0, SampleState.LOADING_AGENT)
+    await progress.update_sample_state(1, SampleState.LOADING_AGENT)
+    await progress.update_sample_state(2, SampleState.LOADING_AGENT)
+    await asyncio.sleep(0.1)
+
+    assert live.refresh_count == 1
+
+    await progress.update_sample_state(2, SampleState.LOADING_AGENT, agent_id="agent-offscreen")
+    await asyncio.sleep(0.1)
+
+    assert live.refresh_count == 1
+
+    progress.stop()
+
+
+@pytest.mark.asyncio
+async def test_message_progress_is_bucketed_before_emitting_events() -> None:
+    progress = EvalProgress(
+        suite_name="demo",
+        total_samples=1,
+        console=Console(width=120, height=20, force_terminal=False),
+        update_freq=20.0,
+    )
+    progress.main_task_id = progress.main_progress.add_task("Evaluating samples", total=1, completed=0)
+    progress.live = DummyLive()  # type: ignore[assignment]
+    progress._start_background_tasks()
+
+    for message_num in range(1, 21):
+        await progress.message_sending(0, message_num, 20, model_name="gpt-5")
+
+    await asyncio.sleep(0.1)
+    stats = progress.get_stats_snapshot()
+
+    assert stats.events_emitted < 20
+    assert stats.events_processed < 20
+    assert progress._runtime_state.samples[(0, "gpt-5")].messages_sent == 20  # noqa: SLF001
+
+    progress.stop()

@@ -77,3 +77,62 @@ def test_record_turn_grade_initializes_and_updates_turn_scores() -> None:
     assert sample.agent_id == "agent-4"
     assert sample.model_name == "gpt-5"
     assert sample.turn_scores == {"safety": [None, 0.8, None]}
+
+
+def test_active_sort_sequence_changes_only_on_state_transition() -> None:
+    reducer = ProgressStateReducer(ProgressRuntimeState())
+
+    reducer.apply_event(
+        ProgressEvent(
+            kind="update_sample_state",
+            payload={"sample_id": 5, "state": SampleState.LOADING_AGENT},
+        )
+    )
+    first_sequence = reducer.state.samples[(5, None)].active_sort_sequence
+
+    reducer.apply_event(
+        ProgressEvent(
+            kind="update_sample_state",
+            payload={"sample_id": 5, "state": SampleState.LOADING_AGENT, "agent_id": "agent-5"},
+        )
+    )
+
+    assert reducer.state.samples[(5, None)].active_sort_sequence == first_sequence
+
+    reducer.apply_event(
+        ProgressEvent(
+            kind="update_sample_state",
+            payload={"sample_id": 5, "state": SampleState.GRADING},
+        )
+    )
+
+    assert reducer.state.samples[(5, None)].active_sort_sequence > first_sequence
+
+
+def test_completion_sequence_tracks_first_terminal_transition() -> None:
+    reducer = ProgressStateReducer(ProgressRuntimeState())
+
+    reducer.apply_event(
+        ProgressEvent(
+            kind="update_sample_state",
+            payload={"sample_id": 6, "state": SampleState.LOADING_AGENT},
+        )
+    )
+    reducer.apply_event(
+        ProgressEvent(
+            kind="update_sample_state",
+            payload={"sample_id": 6, "state": SampleState.COMPLETED},
+        )
+    )
+
+    sample = reducer.state.samples[(6, None)]
+    first_completion_sequence = sample.completion_sequence
+
+    reducer.apply_event(
+        ProgressEvent(
+            kind="update_sample_state",
+            payload={"sample_id": 6, "state": SampleState.COMPLETED, "score": 1.0},
+        )
+    )
+
+    assert sample.completion_sequence == first_completion_sequence
