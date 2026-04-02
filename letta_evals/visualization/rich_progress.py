@@ -79,6 +79,26 @@ class ProgressEvent:
     ack: Optional[asyncio.Future[None]] = None
 
 
+@dataclass(frozen=True)
+class VisualizationStats:
+    """Snapshot of visualization runtime behavior for tuning."""
+
+    events_emitted: int
+    events_processed: int
+    refreshes: int
+    refreshes_by_reason: Dict[str, int]
+    render_wakeups: int
+    dirty_marks: int
+    max_queue_depth: int
+    pending_events: int
+    frame_interval: float
+    runtime_seconds: float
+
+    @property
+    def avg_events_per_refresh(self) -> float:
+        return self.events_processed / self.refreshes if self.refreshes > 0 else 0.0
+
+
 class DisplayMode(Enum):
     """Display modes for progress visualization"""
 
@@ -148,6 +168,7 @@ class EvalProgress(ProgressCallback):
         self._event_task: Optional[asyncio.Task[None]] = None
         self._render_task: Optional[asyncio.Task[None]] = None
         self._background_error: Optional[BaseException] = None
+        self._reset_visualization_stats()
 
     def _get_state_icon(self, state: SampleState) -> Text:
         """Get icon for sample state"""
@@ -554,6 +575,7 @@ class EvalProgress(ProgressCallback):
         self.total_score = 0.0
         self.score_count = 0
         self._background_error = None
+        self._reset_visualization_stats()
         self.samples.clear()
         self.metric_totals.clear()
         self.metric_counts.clear()
@@ -585,7 +607,7 @@ class EvalProgress(ProgressCallback):
         self.live.start()
         self._start_background_tasks()
         self._mark_dirty()
-        self._refresh_live()
+        self._refresh_live(reason="start")
 
     def stop(self):
         """Stop the progress display"""
@@ -593,20 +615,23 @@ class EvalProgress(ProgressCallback):
         if self.live:
             if self._dirty:
                 with contextlib.suppress(Exception):
-                    self._refresh_live()
+                    self._refresh_live(reason="stop")
             self.live.stop()
             self.live = None
             self.console.print()
 
     def _mark_dirty(self) -> None:
         self._dirty = True
+        self._dirty_mark_count += 1
         if self._dirty_event is not None:
             self._dirty_event.set()
 
-    def _refresh_live(self) -> None:
+    def _refresh_live(self, reason: str = "tick") -> None:
         if not self.live or not self._dirty:
             return
         self.live.refresh()
+        self._refresh_count += 1
+        self._refresh_reasons[reason] = self._refresh_reasons.get(reason, 0) + 1
         self._dirty = False
 
     def _record_background_error(self, task: asyncio.Task[None]) -> None:
@@ -645,6 +670,7 @@ class EvalProgress(ProgressCallback):
             event = await queue.get()
             try:
                 self._apply_event(event)
+                self._events_processed += 1
             except Exception as exc:
                 if event.ack is not None and not event.ack.done():
                     event.ack.set_exception(exc)
@@ -663,20 +689,24 @@ class EvalProgress(ProgressCallback):
         while True:
             await dirty_event.wait()
             dirty_event.clear()
+            self._render_wakeup_count += 1
             await asyncio.sleep(self.frame_interval)
             self._refresh_live()
 
     async def _emit_event(self, kind: str, **payload: Any) -> None:
         self._raise_background_error()
+        self._events_emitted += 1
 
         if self._event_queue is None:
             self._apply_event(ProgressEvent(kind=kind, payload=payload))
+            self._events_processed += 1
             self._mark_dirty()
             return
 
         loop = asyncio.get_running_loop()
         ack: asyncio.Future[None] = loop.create_future()
         await self._event_queue.put(ProgressEvent(kind=kind, payload=payload, ack=ack))
+        self._max_queue_depth = max(self._max_queue_depth, self._event_queue.qsize())
         await ack
         self._raise_background_error()
 
@@ -909,6 +939,32 @@ class EvalProgress(ProgressCallback):
             model_name=model_name,
             error=error,
         )
+
+    def get_stats_snapshot(self) -> VisualizationStats:
+        """Return instrumentation counters for tuning the live renderer."""
+        runtime_seconds = (time.time() - self.start_time) if self.start_time is not None else 0.0
+        pending_events = self._event_queue.qsize() if self._event_queue is not None else 0
+        return VisualizationStats(
+            events_emitted=self._events_emitted,
+            events_processed=self._events_processed,
+            refreshes=self._refresh_count,
+            refreshes_by_reason=dict(self._refresh_reasons),
+            render_wakeups=self._render_wakeup_count,
+            dirty_marks=self._dirty_mark_count,
+            max_queue_depth=self._max_queue_depth,
+            pending_events=pending_events,
+            frame_interval=self.frame_interval,
+            runtime_seconds=runtime_seconds,
+        )
+
+    def _reset_visualization_stats(self) -> None:
+        self._events_emitted = 0
+        self._events_processed = 0
+        self._refresh_count = 0
+        self._refresh_reasons: Dict[str, int] = {}
+        self._render_wakeup_count = 0
+        self._dirty_mark_count = 0
+        self._max_queue_depth = 0
 
     async def suite_completed(self, result):
         """Display summary and detailed results after evaluation completes"""

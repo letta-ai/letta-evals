@@ -39,6 +39,11 @@ async def test_event_loop_batches_burst_updates_into_single_refresh() -> None:
 
     await asyncio.sleep(0.25)
     assert progress.live.refresh_count == 1
+    stats = progress.get_stats_snapshot()
+    assert stats.events_emitted == 3
+    assert stats.events_processed == 3
+    assert stats.refreshes == 1
+    assert stats.avg_events_per_refresh == 3.0
 
     progress.stop()
     assert progress.live is None
@@ -65,6 +70,36 @@ async def test_stop_flushes_dirty_state_immediately() -> None:
     assert live.refresh_count == 1
     assert live.stopped
     assert progress.live is None
+    stats = progress.get_stats_snapshot()
+    assert stats.refreshes == 1
+    assert stats.refreshes_by_reason == {"stop": 1}
+
+
+@pytest.mark.asyncio
+async def test_stats_capture_queue_pressure_under_concurrency() -> None:
+    progress = EvalProgress(
+        suite_name="demo",
+        total_samples=15,
+        console=Console(width=120, height=20, force_terminal=False),
+        update_freq=20.0,
+    )
+    progress.main_task_id = progress.main_progress.add_task("Evaluating samples", total=15, completed=0)
+    progress.live = DummyLive()  # type: ignore[assignment]
+    progress._start_background_tasks()
+
+    await asyncio.gather(
+        *[progress.update_sample_state(i, SampleState.LOADING_AGENT) for i in range(15)],
+    )
+
+    await asyncio.sleep(0.1)
+    stats = progress.get_stats_snapshot()
+
+    assert stats.events_emitted == 15
+    assert stats.events_processed == 15
+    assert stats.max_queue_depth >= 1
+    assert stats.refreshes < stats.events_processed
+
+    progress.stop()
 
 
 def test_select_display_rows_is_stable_and_recent() -> None:
