@@ -34,7 +34,6 @@ COMPLETED_SAMPLE_STATES = frozenset(
         SampleState.ERROR,
     }
 )
-TERMINAL_SAMPLE_STATES = COMPLETED_SAMPLE_STATES
 
 
 @dataclass
@@ -99,7 +98,7 @@ def is_completed_state(state: SampleState) -> bool:
 
 
 def is_terminal_state(state: SampleState) -> bool:
-    return state in TERMINAL_SAMPLE_STATES
+    return state in COMPLETED_SAMPLE_STATES
 
 
 def get_last_update_key(sample: SampleProgress) -> float:
