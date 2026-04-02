@@ -26,7 +26,6 @@ class SimpleProgress(ProgressCallback):
         self.suite_name = suite_name
         self.total_samples = total_samples
         self.console = console or Console()
-        self._current_sample = None
 
     async def start(self) -> None:
         self.console.print("━" * 60)
@@ -42,14 +41,11 @@ class SimpleProgress(ProgressCallback):
         self.console.print("━" * 60)
 
     def reset(self) -> None:
-        """Reset state for a new run"""
-        self._current_sample = None
+        """Reset state for a new run."""
 
     async def sample_started(
         self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None
     ) -> None:
-        # track current sample to avoid printing header multiple times
-        self._current_sample = (sample_id, model_name)
         model_text = f" [dim]({model_name})[/]" if model_name else ""
         agent_text = f" [dim]agent={agent_id}[/]" if agent_id else ""
         self.console.print(f"[bold cyan]▸ Sample [{sample_id}]{model_text}{agent_text}[/]")
@@ -125,7 +121,7 @@ class SimpleProgress(ProgressCallback):
         self.console.print("\n[bold]Sample Results:[/bold]")
         total_samples, displayed_results = get_displayed_sample_results(result)
         print_truncated_samples_notice(self.console, total_samples, len(displayed_results))
-        self.console.print(build_simple_sample_results_table(result))
+        self.console.print(build_simple_sample_results_table(result.config, displayed_results))
         print_remaining_samples_notice(self.console, total_samples, len(displayed_results))
 
     def _format_prefix(self, sample_id: int, agent_id: Optional[str], model_name: Optional[str]) -> str:

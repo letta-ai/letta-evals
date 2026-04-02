@@ -23,8 +23,6 @@ class ProgressRuntimeState:
     metric_counts: Dict[str, int] = field(default_factory=dict)
     completed_count: int = 0
     error_count: int = 0
-    total_score: float = 0.0
-    score_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -46,8 +44,6 @@ class ProgressStateReducer:
         self.state.metric_counts.clear()
         self.state.completed_count = 0
         self.state.error_count = 0
-        self.state.total_score = 0.0
-        self.state.score_count = 0
 
     def ensure_sample(
         self,
@@ -131,7 +127,7 @@ class ProgressStateReducer:
         now = time.time()
         if state == SampleState.LOADING_AGENT and sample.start_time is None:
             sample.start_time = now
-        elif state in [SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR]:
+        elif state in [SampleState.COMPLETED, SampleState.ERROR]:
             sample.end_time = now
 
         for key, value in kwargs.items():
@@ -143,10 +139,6 @@ class ProgressStateReducer:
 
         if state == SampleState.COMPLETED and is_new_completion:
             self.state.completed_count += 1
-
-            if sample.score is not None:
-                self.state.total_score += sample.score
-                self.state.score_count += 1
 
             if sample.metric_scores:
                 for metric_key, metric_score in sample.metric_scores.items():

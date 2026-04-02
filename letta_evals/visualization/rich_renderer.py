@@ -95,7 +95,6 @@ class RichProgressRenderer:
             SampleState.GRADING: ("🔍", "magenta"),
             SampleState.GRADING_TURNS: ("🔍", "magenta"),
             SampleState.COMPLETED: ("✓", "green"),
-            SampleState.FAILED: ("✗", "red"),
             SampleState.ERROR: ("⚠", "red"),
         }
         icon, style = icons.get(state, ("?", "white"))

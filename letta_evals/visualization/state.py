@@ -15,7 +15,6 @@ class SampleState(Enum):
     GRADING = "grading"
     GRADING_TURNS = "grading_turns"
     COMPLETED = "completed"
-    FAILED = "failed"
     ERROR = "error"
 
 
@@ -30,7 +29,6 @@ ACTIVE_SAMPLE_STATES = frozenset(
 COMPLETED_SAMPLE_STATES = frozenset(
     {
         SampleState.COMPLETED,
-        SampleState.FAILED,
         SampleState.ERROR,
     }
 )
