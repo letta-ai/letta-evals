@@ -26,6 +26,7 @@ from rich.text import Text
 from letta_evals.types import GraderKind
 from letta_evals.utils import build_turn_symbols, calculate_turn_average
 from letta_evals.visualization.base import ProgressCallback
+from letta_evals.visualization.reducer import ProgressRuntimeState, ProgressStateReducer
 from letta_evals.visualization.state import (
     ProgressEvent,
     SampleProgress,
@@ -34,7 +35,6 @@ from letta_evals.visualization.state import (
     get_last_update_key,
     is_active_state,
     is_completed_state,
-    is_terminal_state,
 )
 from letta_evals.visualization.summary import (
     build_rich_sample_results_table,
@@ -86,11 +86,8 @@ class EvalProgress(ProgressCallback):
         self.frame_interval = (1.0 / update_freq) if update_freq > 0 else 0.25
         self.cached_mode = cached_mode
         self.metric_labels: Dict[str, str] = metric_labels or {}
-        # live aggregates per metric key
-        self.metric_totals: Dict[str, float] = {}
-        self.metric_counts: Dict[str, int] = {}
-
-        self.samples: Dict[tuple, SampleProgress] = {}  # key: (sample_id, model_name)
+        self._runtime_state = ProgressRuntimeState()
+        self._reducer = ProgressStateReducer(self._runtime_state)
         self.start_time = None
         self.live: Optional[Live] = None
         self.main_progress = Progress(
@@ -105,11 +102,6 @@ class EvalProgress(ProgressCallback):
             expand=True,
         )
         self.main_task_id = None
-
-        self.completed_count = 0
-        self.error_count = 0
-        self.total_score = 0.0
-        self.score_count = 0
         self._dirty = False
         self._event_queue: Optional[asyncio.Queue[ProgressEvent]] = None
         self._dirty_event: Optional[asyncio.Event] = None
@@ -117,6 +109,62 @@ class EvalProgress(ProgressCallback):
         self._render_task: Optional[asyncio.Task[None]] = None
         self._background_error: Optional[BaseException] = None
         self._reset_visualization_stats()
+
+    @property
+    def samples(self) -> Dict[tuple[int, Optional[str]], SampleProgress]:
+        return self._runtime_state.samples
+
+    @samples.setter
+    def samples(self, value: Dict[tuple[int, Optional[str]], SampleProgress]) -> None:
+        self._runtime_state.samples = value
+
+    @property
+    def metric_totals(self) -> Dict[str, float]:
+        return self._runtime_state.metric_totals
+
+    @metric_totals.setter
+    def metric_totals(self, value: Dict[str, float]) -> None:
+        self._runtime_state.metric_totals = value
+
+    @property
+    def metric_counts(self) -> Dict[str, int]:
+        return self._runtime_state.metric_counts
+
+    @metric_counts.setter
+    def metric_counts(self, value: Dict[str, int]) -> None:
+        self._runtime_state.metric_counts = value
+
+    @property
+    def completed_count(self) -> int:
+        return self._runtime_state.completed_count
+
+    @completed_count.setter
+    def completed_count(self, value: int) -> None:
+        self._runtime_state.completed_count = value
+
+    @property
+    def error_count(self) -> int:
+        return self._runtime_state.error_count
+
+    @error_count.setter
+    def error_count(self, value: int) -> None:
+        self._runtime_state.error_count = value
+
+    @property
+    def total_score(self) -> float:
+        return self._runtime_state.total_score
+
+    @total_score.setter
+    def total_score(self, value: float) -> None:
+        self._runtime_state.total_score = value
+
+    @property
+    def score_count(self) -> int:
+        return self._runtime_state.score_count
+
+    @score_count.setter
+    def score_count(self, value: int) -> None:
+        self._runtime_state.score_count = value
 
     def _get_state_icon(self, state: SampleState) -> Text:
         """Get icon for sample state"""
@@ -431,15 +479,9 @@ class EvalProgress(ProgressCallback):
     def reset(self):
         """Reset counters and state for a new run"""
         self.start_time = time.time()
-        self.completed_count = 0
-        self.error_count = 0
-        self.total_score = 0.0
-        self.score_count = 0
         self._background_error = None
         self._reset_visualization_stats()
-        self.samples.clear()
-        self.metric_totals.clear()
-        self.metric_counts.clear()
+        self._reducer.reset()
         if self.main_task_id is not None:
             self.main_progress.update(self.main_task_id, completed=0)
         self._mark_dirty()
@@ -572,10 +614,9 @@ class EvalProgress(ProgressCallback):
         self._raise_background_error()
 
     def _apply_event(self, event: ProgressEvent) -> None:
-        if event.kind == "update_sample_state":
-            self._apply_sample_state_update(**event.payload)
-            return
-        raise ValueError(f"Unknown progress event kind: {event.kind}")
+        result = self._reducer.apply_event(event)
+        if result.progress_completed is not None:
+            self.main_progress.update(self.main_task_id, completed=result.progress_completed)
 
     def _apply_sample_state_update(
         self,
@@ -585,63 +626,18 @@ class EvalProgress(ProgressCallback):
         model_name: Optional[str] = None,
         **kwargs,
     ) -> None:
-        """Apply a state transition inside the single-threaded reducer."""
-        key = (sample_id, model_name)
-
-        # If we have a model_name and there's an existing entry with None, migrate it
-        if model_name is not None:
-            old_key = (sample_id, None)
-            if old_key in self.samples and key not in self.samples:
-                # Migrate the old entry to the new key
-                self.samples[key] = self.samples[old_key]
-                self.samples[key].model_name = model_name
-                del self.samples[old_key]
-
-        if key not in self.samples:
-            self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
-
-        sample = self.samples[key]
-        previous_state = sample.state
-        sample.state = state
-
-        if agent_id is not None and sample.agent_id != agent_id:
-            sample.agent_id = agent_id
-
-        if model_name is not None and sample.model_name != model_name:
-            sample.model_name = model_name
-
-        if state == SampleState.LOADING_AGENT and sample.start_time is None:
-            sample.start_time = time.time()
-        elif state in [SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR]:
-            sample.end_time = time.time()
-
-        for key, value in kwargs.items():
-            if hasattr(sample, key):
-                setattr(sample, key, value)
-        sample.last_update_ts = time.time()
-
-        is_new_completion = not is_terminal_state(previous_state) and is_terminal_state(state)
-
-        if state == SampleState.COMPLETED and is_new_completion:
-            self.completed_count += 1
-
-            if sample.score is not None:
-                self.total_score += sample.score
-                self.score_count += 1
-
-            # Update per-metric aggregates before render so the header shows correct averages
-            if sample.metric_scores:
-                for mkey, mscore in sample.metric_scores.items():
-                    self.metric_totals[mkey] = self.metric_totals.get(mkey, 0.0) + (mscore or 0.0)
-                    self.metric_counts[mkey] = self.metric_counts.get(mkey, 0) + 1
-
-            completed = self.completed_count + self.error_count
-            self.main_progress.update(self.main_task_id, completed=completed)
-
-        elif state == SampleState.ERROR and is_new_completion:
-            self.error_count += 1
-            completed = self.completed_count + self.error_count
-            self.main_progress.update(self.main_task_id, completed=completed)
+        self._apply_event(
+            ProgressEvent(
+                kind="update_sample_state",
+                payload={
+                    "sample_id": sample_id,
+                    "state": state,
+                    "agent_id": agent_id,
+                    "model_name": model_name,
+                    **kwargs,
+                },
+            )
+        )
 
     async def update_sample_state(
         self,
@@ -663,9 +659,7 @@ class EvalProgress(ProgressCallback):
 
     async def sample_started(self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None):
         """Mark sample as started"""
-        key = (sample_id, model_name)
-        if key not in self.samples:
-            self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
+        self._reducer.ensure_sample(sample_id, agent_id=agent_id, model_name=model_name)
         # skip loading state if using cached trajectories
         if not self.cached_mode:
             await self.update_sample_state(
@@ -700,13 +694,7 @@ class EvalProgress(ProgressCallback):
 
     async def grading_started(self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None):
         """Mark sample as being graded"""
-        key = (sample_id, model_name)
-        # Check both the current key and the None key for from_cache flag
-        existing_from_cache = False
-        if key in self.samples:
-            existing_from_cache = self.samples[key].from_cache
-        elif model_name is not None and (sample_id, None) in self.samples:
-            existing_from_cache = self.samples[(sample_id, None)].from_cache
+        existing_from_cache = self._reducer.get_from_cache(sample_id, model_name)
 
         await self.update_sample_state(
             sample_id, SampleState.GRADING, agent_id=agent_id, model_name=model_name, from_cache=existing_from_cache
@@ -723,36 +711,22 @@ class EvalProgress(ProgressCallback):
         model_name: Optional[str] = None,
     ):
         """Update progress for per-turn grading"""
-        key = (sample_id, model_name)
-
-        # Get existing from_cache flag
-        existing_from_cache = False
-        if key in self.samples:
-            existing_from_cache = self.samples[key].from_cache
-        elif model_name is not None and (sample_id, None) in self.samples:
-            existing_from_cache = self.samples[(sample_id, None)].from_cache
-
-        # Initialize sample and turn_scores dict BEFORE updating state
-        if key not in self.samples:
-            self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
-        if self.samples[key].turn_scores is None:
-            self.samples[key].turn_scores = {}
-
-        # Initialize this grader's turn scores if needed
-        gk = grader_key or "_default"
-        if gk not in self.samples[key].turn_scores:
-            self.samples[key].turn_scores[gk] = [None] * total_turns
-
-        # Update score at the turn index for this grader
-        if turn_num < len(self.samples[key].turn_scores[gk]):
-            self.samples[key].turn_scores[gk][turn_num] = turn_score
+        sample = self._reducer.record_turn_grade(
+            sample_id,
+            turn_num=turn_num,
+            total_turns=total_turns,
+            turn_score=turn_score,
+            grader_key=grader_key,
+            agent_id=agent_id,
+            model_name=model_name,
+        )
 
         await self.update_sample_state(
             sample_id,
             SampleState.GRADING_TURNS,
             agent_id=agent_id,
             model_name=model_name,
-            from_cache=existing_from_cache,
+            from_cache=sample.from_cache,
             turns_graded=turn_num + 1,  # turn_num is 0-indexed
             total_turns=total_turns,
         )
@@ -768,13 +742,7 @@ class EvalProgress(ProgressCallback):
         metric_rationales: Optional[Dict[str, str]] = None,
     ):
         """Mark sample as completed"""
-        # preserve from_cache flag if it was set
-        key = (sample_id, model_name)
-        existing_from_cache = False
-        if key in self.samples:
-            existing_from_cache = self.samples[key].from_cache
-        elif model_name is not None and (sample_id, None) in self.samples:
-            existing_from_cache = self.samples[(sample_id, None)].from_cache
+        existing_from_cache = self._reducer.get_from_cache(sample_id, model_name)
 
         await self.update_sample_state(
             sample_id,
