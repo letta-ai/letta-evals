@@ -5,7 +5,8 @@ import asyncio
 import pytest
 from rich.console import Console
 
-from letta_evals.visualization.rich_progress import EvalProgress, SampleProgress, SampleState
+from letta_evals.visualization.rich_progress import EvalProgress
+from letta_evals.visualization.state import SampleProgress, SampleState
 
 
 class DummyLive:
@@ -108,7 +109,7 @@ def test_select_active_rows_excludes_completed_and_queued() -> None:
         total_samples=8,
         console=Console(width=120, height=20, force_terminal=False),
     )
-    progress.samples = {
+    progress._runtime_state.samples = {
         (0, None): SampleProgress(sample_id=0, state=SampleState.GRADING, last_update_ts=30.0),
         (3, None): SampleProgress(sample_id=3, state=SampleState.SENDING_MESSAGES, last_update_ts=10.0),
         (5, None): SampleProgress(sample_id=5, state=SampleState.COMPLETED, last_update_ts=80.0),
@@ -128,7 +129,7 @@ def test_select_completed_rows_is_recent_first() -> None:
         total_samples=8,
         console=Console(width=120, height=20, force_terminal=False),
     )
-    progress.samples = {
+    progress._runtime_state.samples = {
         (0, None): SampleProgress(sample_id=0, state=SampleState.GRADING, last_update_ts=30.0),
         (3, None): SampleProgress(sample_id=3, state=SampleState.SENDING_MESSAGES, last_update_ts=10.0),
         (5, None): SampleProgress(sample_id=5, state=SampleState.COMPLETED, last_update_ts=80.0),
