@@ -110,62 +110,6 @@ class EvalProgress(ProgressCallback):
         self._background_error: Optional[BaseException] = None
         self._reset_visualization_stats()
 
-    @property
-    def samples(self) -> Dict[tuple[int, Optional[str]], SampleProgress]:
-        return self._runtime_state.samples
-
-    @samples.setter
-    def samples(self, value: Dict[tuple[int, Optional[str]], SampleProgress]) -> None:
-        self._runtime_state.samples = value
-
-    @property
-    def metric_totals(self) -> Dict[str, float]:
-        return self._runtime_state.metric_totals
-
-    @metric_totals.setter
-    def metric_totals(self, value: Dict[str, float]) -> None:
-        self._runtime_state.metric_totals = value
-
-    @property
-    def metric_counts(self) -> Dict[str, int]:
-        return self._runtime_state.metric_counts
-
-    @metric_counts.setter
-    def metric_counts(self, value: Dict[str, int]) -> None:
-        self._runtime_state.metric_counts = value
-
-    @property
-    def completed_count(self) -> int:
-        return self._runtime_state.completed_count
-
-    @completed_count.setter
-    def completed_count(self, value: int) -> None:
-        self._runtime_state.completed_count = value
-
-    @property
-    def error_count(self) -> int:
-        return self._runtime_state.error_count
-
-    @error_count.setter
-    def error_count(self, value: int) -> None:
-        self._runtime_state.error_count = value
-
-    @property
-    def total_score(self) -> float:
-        return self._runtime_state.total_score
-
-    @total_score.setter
-    def total_score(self, value: float) -> None:
-        self._runtime_state.total_score = value
-
-    @property
-    def score_count(self) -> int:
-        return self._runtime_state.score_count
-
-    @score_count.setter
-    def score_count(self, value: int) -> None:
-        self._runtime_state.score_count = value
-
     def _get_state_icon(self, state: SampleState) -> Text:
         """Get icon for sample state"""
         icons = {
@@ -237,26 +181,28 @@ class EvalProgress(ProgressCallback):
 
     def _create_progress_with_metrics(self) -> Panel:
         """Create progress bar with inline metrics"""
-        completed = self.completed_count + self.error_count
+        completed = self._runtime_state.completed_count + self._runtime_state.error_count
 
         if completed == 0:
             errors_text = "Errored: N/A"
         else:
-            errors_pct = (self.error_count / completed * 100.0) if completed > 0 else 0.0
+            errors_pct = (self._runtime_state.error_count / completed * 100.0) if completed > 0 else 0.0
             errors_text = f"Errored: {errors_pct:.1f}%"
 
         chips = Text()
         chips.append(f"  {errors_text}", style="bold white")
         # add per-metric aggregates if available
-        if self.metric_totals:
+        if self._runtime_state.metric_totals:
             chips.append("   ")
             first = True
-            keys = list(self.metric_labels.keys()) if self.metric_labels else list(self.metric_totals.keys())
+            keys = (
+                list(self.metric_labels.keys()) if self.metric_labels else list(self._runtime_state.metric_totals.keys())
+            )
             for key in keys:
-                if key not in self.metric_totals:
+                if key not in self._runtime_state.metric_totals:
                     continue
-                total = self.metric_totals[key]
-                cnt = self.metric_counts.get(key, 0)
+                total = self._runtime_state.metric_totals[key]
+                cnt = self._runtime_state.metric_counts.get(key, 0)
                 if cnt == 0:
                     continue
                 avg = total / cnt if cnt > 0 else 0.0
@@ -266,10 +212,10 @@ class EvalProgress(ProgressCallback):
                 chips.append(f"{label}: {avg:.2f}", style="bold white")
                 first = False
         chips.append("   ")
-        chips.append(f"✓ {self.completed_count}", style="green")
-        if self.error_count:
+        chips.append(f"✓ {self._runtime_state.completed_count}", style="green")
+        if self._runtime_state.error_count:
             chips.append("   ")
-            chips.append(f"⚠ {self.error_count}", style="yellow")
+            chips.append(f"⚠ {self._runtime_state.error_count}", style="yellow")
 
         content = Group(self.main_progress, Text(""), chips)
 
@@ -278,7 +224,7 @@ class EvalProgress(ProgressCallback):
     def _detail_layout_budget(self) -> tuple[int, int]:
         """Split the available height between active and completed panels."""
         available_lines = max(12, self.console.height - 10)
-        has_completed = any(is_completed_state(sample.state) for sample in self.samples.values())
+        has_completed = any(is_completed_state(sample.state) for sample in self._runtime_state.samples.values())
 
         if has_completed:
             completed_panel_size = min(11, max(6, available_lines // 3))
@@ -294,7 +240,7 @@ class EvalProgress(ProgressCallback):
 
     def _select_active_rows(self, limit: Optional[int] = None) -> List[SampleProgress]:
         """Select only currently active rows for the live top panel."""
-        rows = [sample for sample in self.samples.values() if is_active_state(sample.state)]
+        rows = [sample for sample in self._runtime_state.samples.values() if is_active_state(sample.state)]
         rows.sort(key=lambda sample: (sample.model_name or "", sample.sample_id))
         if limit is None:
             return rows
@@ -302,7 +248,7 @@ class EvalProgress(ProgressCallback):
 
     def _select_completed_rows(self, limit: Optional[int] = None) -> List[SampleProgress]:
         """Select the most recent completed or errored rows for the bottom panel."""
-        rows = [sample for sample in self.samples.values() if is_completed_state(sample.state)]
+        rows = [sample for sample in self._runtime_state.samples.values() if is_completed_state(sample.state)]
         rows.sort(key=lambda sample: (-get_last_update_key(sample), sample.model_name or "", sample.sample_id))
         if limit is None:
             return rows
