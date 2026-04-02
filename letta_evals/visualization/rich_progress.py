@@ -1,8 +1,10 @@
+import asyncio
+import contextlib
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from rich.align import Align
 from rich.box import MINIMAL_DOUBLE_HEAD, ROUNDED
@@ -68,6 +70,35 @@ class SampleProgress:
     turn_scores: Optional[Dict[str, List[Optional[float]]]] = None
 
 
+@dataclass
+class ProgressEvent:
+    """Serializable progress update processed by the reducer task."""
+
+    kind: str
+    payload: Dict[str, Any] = field(default_factory=dict)
+    ack: Optional[asyncio.Future[None]] = None
+
+
+@dataclass(frozen=True)
+class VisualizationStats:
+    """Snapshot of visualization runtime behavior for tuning."""
+
+    events_emitted: int
+    events_processed: int
+    refreshes: int
+    refreshes_by_reason: Dict[str, int]
+    render_wakeups: int
+    dirty_marks: int
+    max_queue_depth: int
+    pending_events: int
+    frame_interval: float
+    runtime_seconds: float
+
+    @property
+    def avg_events_per_refresh(self) -> float:
+        return self.events_processed / self.refreshes if self.refreshes > 0 else 0.0
+
+
 class DisplayMode(Enum):
     """Display modes for progress visualization"""
 
@@ -104,6 +135,7 @@ class EvalProgress(ProgressCallback):
         self.show_samples = show_samples
         self.console = console or Console()
         self.update_freq = update_freq
+        self.frame_interval = (1.0 / update_freq) if update_freq > 0 else 0.25
         self.cached_mode = cached_mode
         self.metric_labels: Dict[str, str] = metric_labels or {}
         # live aggregates per metric key
@@ -130,6 +162,13 @@ class EvalProgress(ProgressCallback):
         self.error_count = 0
         self.total_score = 0.0
         self.score_count = 0
+        self._dirty = False
+        self._event_queue: Optional[asyncio.Queue[ProgressEvent]] = None
+        self._dirty_event: Optional[asyncio.Event] = None
+        self._event_task: Optional[asyncio.Task[None]] = None
+        self._render_task: Optional[asyncio.Task[None]] = None
+        self._background_error: Optional[BaseException] = None
+        self._reset_visualization_stats()
 
     def _get_state_icon(self, state: SampleState) -> Text:
         """Get icon for sample state"""
@@ -328,73 +367,63 @@ class EvalProgress(ProgressCallback):
             padding=(0, 1),
         )
 
-    def _create_detailed_view(self) -> Table:
-        """Create a modern, height-aware table that prioritizes active and recent samples.
-
-        Strategy:
-        - Compute how many rows fit in the terminal, accounting for header/progress chrome.
-        - Always show currently active samples (loading/sending/grading).
-        - Fill remaining space with most-recently updated completed/failed/error samples.
-        - If still space, rotate through queued items to give visibility without overflowing.
-        """
-        terminal_height = self.console.height
-
-        available_lines = max(5, terminal_height - 10)
-        # Account for table chrome (title, headers, borders)
-        max_rows = max(1, available_lines - 5)
-        n_rows = min(self.total_samples, max_rows)
-
-        def last_update_key(s: SampleProgress) -> float:
-            return s.last_update_ts or s.end_time or s.start_time or 0.0
-
-        active_states = {
+    def _active_states(self) -> set[SampleState]:
+        return {
             SampleState.LOADING_AGENT,
             SampleState.SENDING_MESSAGES,
             SampleState.GRADING,
             SampleState.GRADING_TURNS,
         }
-        completed_states = {SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR}
 
-        # gather all samples
-        samples_list = list(self.samples.values())
-        active = [s for s in samples_list if s.state in active_states]
-        active.sort(key=lambda s: (s.model_name or "", s.sample_id))
+    def _completed_states(self) -> set[SampleState]:
+        return {SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR}
 
-        recent_done = [s for s in samples_list if s.state in completed_states]
-        recent_done.sort(key=lambda s: (s.model_name or "", s.sample_id))
+    def _last_update_key(self, sample: SampleProgress) -> float:
+        return sample.last_update_ts or sample.end_time or sample.start_time or 0.0
 
-        queued = [s for s in samples_list if s.state == SampleState.QUEUED]
-        queued.sort(key=lambda s: (s.model_name or "", s.sample_id))
+    def _detail_layout_budget(self) -> tuple[int, int]:
+        """Split the available height between active and completed panels."""
+        available_lines = max(12, self.console.height - 10)
+        has_completed = any(sample.state in self._completed_states() for sample in self.samples.values())
 
-        rows: List[SampleProgress] = []
+        if has_completed:
+            completed_panel_size = min(11, max(6, available_lines // 3))
+        else:
+            completed_panel_size = 5
 
-        rows.extend(active[:n_rows])
-        remaining = n_rows - len(rows)
+        active_panel_size = max(7, available_lines - completed_panel_size)
+        return active_panel_size, completed_panel_size
 
-        # 2) Show a rotating window of recently updated completed items
-        if remaining > 0 and recent_done:
-            rotation_period = 5
-            page_size = remaining
-            pages = (len(recent_done) + page_size - 1) // page_size
-            page_idx = int(time.time() // rotation_period) % max(1, pages)
-            start = page_idx * page_size
-            rows.extend(recent_done[start : start + page_size])
-            remaining = n_rows - len(rows)
+    def _panel_row_limit(self, panel_size: int) -> int:
+        """Approximate how many table rows fit in a panel of the given size."""
+        return max(1, panel_size - 5)
 
-        # 3) Fill any remaining with queued, also rotated
-        if remaining > 0 and queued:
-            page_size = remaining
-            pages = (len(queued) + page_size - 1) // page_size
-            page_idx = int(time.time() // 7) % max(1, pages)
-            start = page_idx * page_size
-            rows.extend(queued[start : start + page_size])
+    def _select_active_rows(self, limit: Optional[int] = None) -> List[SampleProgress]:
+        """Select only currently active rows for the live top panel."""
+        rows = [sample for sample in self.samples.values() if sample.state in self._active_states()]
+        rows.sort(key=lambda sample: (sample.model_name or "", sample.sample_id))
+        if limit is None:
+            return rows
+        return rows[:limit]
 
-        showing = len(rows)
-        title = (
-            f"Active + recent · showing {showing} of {self.total_samples}"
-            if showing < self.total_samples
-            else f"All {self.total_samples} samples"
-        )
+    def _select_completed_rows(self, limit: Optional[int] = None) -> List[SampleProgress]:
+        """Select the most recent completed or errored rows for the bottom panel."""
+        rows = [sample for sample in self.samples.values() if sample.state in self._completed_states()]
+        rows.sort(key=lambda sample: (-self._last_update_key(sample), sample.model_name or "", sample.sample_id))
+        if limit is None:
+            return rows
+        return rows[:limit]
+
+    def _create_samples_table(self, rows: List[SampleProgress], title: str, empty_message: str):
+        """Render a table for a specific sample slice."""
+        if not rows:
+            return Panel(
+                Text(empty_message, style="dim"),
+                title=title,
+                border_style="blue",
+                box=ROUNDED,
+                padding=(0, 1),
+            )
 
         table = Table(
             title=f"{title}  (♻ means cached)",
@@ -520,33 +549,59 @@ class EvalProgress(ProgressCallback):
 
         return table
 
+    def _create_active_view(self, limit: int):
+        """Create the top panel with only in-flight work."""
+        rows = self._select_active_rows(limit=limit)
+        title = f"Active Samples · showing {len(rows)}"
+        return self._create_samples_table(rows, title, "No active samples")
+
+    def _create_completed_view(self, limit: int):
+        """Create the bottom panel with the most recent finished work."""
+        rows = self._select_completed_rows(limit=limit)
+        title = f"Recent Completed · showing {len(rows)}"
+        return self._create_samples_table(rows, title, "No completed samples yet")
+
     def _render(self) -> Layout:
         """Render the complete progress display"""
         layout = Layout()
+        active_panel_size, completed_panel_size = self._detail_layout_budget()
+        active_row_limit = self._panel_row_limit(active_panel_size)
+        completed_row_limit = self._panel_row_limit(completed_panel_size)
+
+        details_layout = Layout()
+        details_layout.split_column(
+            Layout(self._create_active_view(active_row_limit), size=active_panel_size),
+            Layout(self._create_completed_view(completed_row_limit), size=completed_panel_size),
+        )
 
         layout.split_column(
             Layout(self._create_header_panel(), size=4),
             Layout(self._create_progress_with_metrics(), size=5),  # increased size to show both progress and metrics
-            Layout(self._create_detailed_view()),
+            Layout(details_layout),
         )
 
         return layout
 
     def reset(self):
         """Reset counters and state for a new run"""
+        self.start_time = time.time()
         self.completed_count = 0
         self.error_count = 0
         self.total_score = 0.0
         self.score_count = 0
+        self._background_error = None
+        self._reset_visualization_stats()
         self.samples.clear()
         self.metric_totals.clear()
         self.metric_counts.clear()
         if self.main_task_id is not None:
             self.main_progress.update(self.main_task_id, completed=0)
+        self._mark_dirty()
 
     async def start(self):
         """Start the progress display"""
         self.start_time = time.time()
+        self._background_error = None
         task_description = "Re-grading cached trajectories" if self.cached_mode else "Evaluating samples"
         self.main_task_id = self.main_progress.add_task(
             task_description,
@@ -558,29 +613,133 @@ class EvalProgress(ProgressCallback):
         # no longer pre-populate since we need model_name for the key
 
         self.live = Live(
-            self._render(),
             console=self.console,
-            refresh_per_second=self.update_freq,
+            auto_refresh=False,
             transient=False,
-            vertical_overflow="visible",
+            vertical_overflow="ellipsis",
+            get_renderable=self._render,
         )
         self.live.start()
+        self._start_background_tasks()
+        self._mark_dirty()
+        self._refresh_live(reason="start")
 
     def stop(self):
         """Stop the progress display"""
+        self._stop_background_tasks()
         if self.live:
+            if self._dirty:
+                with contextlib.suppress(Exception):
+                    self._refresh_live(reason="stop")
             self.live.stop()
+            self.live = None
             self.console.print()
 
-    async def update_sample_state(
+    def _mark_dirty(self) -> None:
+        self._dirty = True
+        self._dirty_mark_count += 1
+        if self._dirty_event is not None:
+            self._dirty_event.set()
+
+    def _refresh_live(self, reason: str = "tick") -> None:
+        if not self.live or not self._dirty:
+            return
+        self.live.refresh()
+        self._refresh_count += 1
+        self._refresh_reasons[reason] = self._refresh_reasons.get(reason, 0) + 1
+        self._dirty = False
+
+    def _record_background_error(self, task: asyncio.Task[None]) -> None:
+        with contextlib.suppress(asyncio.CancelledError):
+            exc = task.exception()
+            if exc is not None and self._background_error is None:
+                self._background_error = exc
+
+    def _raise_background_error(self) -> None:
+        if self._background_error is not None:
+            raise RuntimeError("EvalProgress background task failed") from self._background_error
+
+    def _start_background_tasks(self) -> None:
+        self._stop_background_tasks()
+        self._event_queue = asyncio.Queue()
+        self._dirty_event = asyncio.Event()
+        self._event_task = asyncio.create_task(self._event_loop())
+        self._render_task = asyncio.create_task(self._render_loop())
+        self._event_task.add_done_callback(self._record_background_error)
+        self._render_task.add_done_callback(self._record_background_error)
+
+    def _stop_background_tasks(self) -> None:
+        for task in (self._event_task, self._render_task):
+            if task is not None and not task.done():
+                task.cancel()
+        self._event_task = None
+        self._render_task = None
+        self._event_queue = None
+        self._dirty_event = None
+
+    async def _event_loop(self) -> None:
+        queue = self._event_queue
+        if queue is None:
+            return
+        while True:
+            event = await queue.get()
+            try:
+                self._apply_event(event)
+                self._events_processed += 1
+            except Exception as exc:
+                if event.ack is not None and not event.ack.done():
+                    event.ack.set_exception(exc)
+                raise
+            else:
+                self._mark_dirty()
+                if event.ack is not None and not event.ack.done():
+                    event.ack.set_result(None)
+            finally:
+                queue.task_done()
+
+    async def _render_loop(self) -> None:
+        dirty_event = self._dirty_event
+        if dirty_event is None:
+            return
+        while True:
+            await dirty_event.wait()
+            dirty_event.clear()
+            self._render_wakeup_count += 1
+            await asyncio.sleep(self.frame_interval)
+            self._refresh_live()
+
+    async def _emit_event(self, kind: str, **payload: Any) -> None:
+        self._raise_background_error()
+        self._events_emitted += 1
+
+        if self._event_queue is None:
+            self._apply_event(ProgressEvent(kind=kind, payload=payload))
+            self._events_processed += 1
+            self._mark_dirty()
+            return
+
+        loop = asyncio.get_running_loop()
+        ack: asyncio.Future[None] = loop.create_future()
+        await self._event_queue.put(ProgressEvent(kind=kind, payload=payload, ack=ack))
+        self._max_queue_depth = max(self._max_queue_depth, self._event_queue.qsize())
+        await ack
+        self._raise_background_error()
+
+    def _apply_event(self, event: ProgressEvent) -> None:
+        if event.kind == "update_sample_state":
+            self._apply_sample_state_update(**event.payload)
+            return
+        raise ValueError(f"Unknown progress event kind: {event.kind}")
+
+    def _apply_sample_state_update(
         self,
         sample_id: int,
         state: SampleState,
         agent_id: Optional[str] = None,
         model_name: Optional[str] = None,
         **kwargs,
-    ):
-        """Update state of a sample"""
+    ) -> None:
+        """Apply a state transition inside the single-threaded reducer."""
         key = (sample_id, model_name)
 
         # If we have a model_name and there's an existing entry with None, migrate it
@@ -639,8 +798,23 @@ class EvalProgress(ProgressCallback):
             completed = self.completed_count + self.error_count
             self.main_progress.update(self.main_task_id, completed=completed)
 
-        if self.live:
-            self.live.update(self._render())
+    async def update_sample_state(
+        self,
+        sample_id: int,
+        state: SampleState,
+        agent_id: Optional[str] = None,
+        model_name: Optional[str] = None,
+        **kwargs,
+    ):
+        """Queue a state transition for the reducer task."""
+        await self._emit_event(
+            "update_sample_state",
+            sample_id=sample_id,
+            state=state,
+            agent_id=agent_id,
+            model_name=model_name,
+            **kwargs,
+        )
 
     async def sample_started(self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None):
         """Mark sample as started"""
@@ -780,6 +954,32 @@ class EvalProgress(ProgressCallback):
             model_name=model_name,
             error=error,
         )
+
+    def get_stats_snapshot(self) -> VisualizationStats:
+        """Return instrumentation counters for tuning the live renderer."""
+        runtime_seconds = (time.time() - self.start_time) if self.start_time is not None else 0.0
+        pending_events = self._event_queue.qsize() if self._event_queue is not None else 0
+        return VisualizationStats(
+            events_emitted=self._events_emitted,
+            events_processed=self._events_processed,
+            refreshes=self._refresh_count,
+            refreshes_by_reason=dict(self._refresh_reasons),
+            render_wakeups=self._render_wakeup_count,
+            dirty_marks=self._dirty_mark_count,
+            max_queue_depth=self._max_queue_depth,
+            pending_events=pending_events,
+            frame_interval=self.frame_interval,
+            runtime_seconds=runtime_seconds,
+        )
+
+    def _reset_visualization_stats(self) -> None:
+        self._events_emitted = 0
+        self._events_processed = 0
+        self._refresh_count = 0
+        self._refresh_reasons: Dict[str, int] = {}
+        self._render_wakeup_count = 0
+        self._dirty_mark_count = 0
+        self._max_queue_depth = 0
 
     async def suite_completed(self, result):
         """Display summary and detailed results after evaluation completes"""
