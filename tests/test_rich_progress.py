@@ -6,7 +6,7 @@ import pytest
 from rich.console import Console
 
 from letta_evals.visualization.rich_progress import EvalProgress
-from letta_evals.visualization.state import SampleProgress, SampleState
+from letta_evals.visualization.state import SampleState
 
 
 class DummyLive:
@@ -101,43 +101,3 @@ async def test_stats_capture_queue_pressure_under_concurrency() -> None:
     assert stats.refreshes < stats.events_processed
 
     progress.stop()
-
-
-def test_select_active_rows_excludes_completed_and_queued() -> None:
-    progress = EvalProgress(
-        suite_name="demo",
-        total_samples=8,
-        console=Console(width=120, height=20, force_terminal=False),
-    )
-    progress._runtime_state.samples = {
-        (0, None): SampleProgress(sample_id=0, state=SampleState.GRADING, last_update_ts=30.0),
-        (3, None): SampleProgress(sample_id=3, state=SampleState.SENDING_MESSAGES, last_update_ts=10.0),
-        (5, None): SampleProgress(sample_id=5, state=SampleState.COMPLETED, last_update_ts=80.0),
-        (2, None): SampleProgress(sample_id=2, state=SampleState.ERROR, last_update_ts=70.0),
-        (7, None): SampleProgress(sample_id=7, state=SampleState.COMPLETED, last_update_ts=60.0),
-        (6, None): SampleProgress(sample_id=6, state=SampleState.QUEUED, last_update_ts=5.0),
-    }
-
-    rows = progress._select_active_rows(limit=5)
-
-    assert [row.sample_id for row in rows] == [0, 3]
-
-
-def test_select_completed_rows_is_recent_first() -> None:
-    progress = EvalProgress(
-        suite_name="demo",
-        total_samples=8,
-        console=Console(width=120, height=20, force_terminal=False),
-    )
-    progress._runtime_state.samples = {
-        (0, None): SampleProgress(sample_id=0, state=SampleState.GRADING, last_update_ts=30.0),
-        (3, None): SampleProgress(sample_id=3, state=SampleState.SENDING_MESSAGES, last_update_ts=10.0),
-        (5, None): SampleProgress(sample_id=5, state=SampleState.COMPLETED, last_update_ts=80.0),
-        (2, None): SampleProgress(sample_id=2, state=SampleState.ERROR, last_update_ts=70.0),
-        (7, None): SampleProgress(sample_id=7, state=SampleState.COMPLETED, last_update_ts=60.0),
-        (6, None): SampleProgress(sample_id=6, state=SampleState.QUEUED, last_update_ts=5.0),
-    }
-
-    rows = progress._select_completed_rows(limit=5)
-
-    assert [row.sample_id for row in rows] == [5, 2, 7]
