@@ -1,7 +1,6 @@
 import asyncio
 import contextlib
 import time
-from enum import Enum
 from typing import Any, Dict, Optional
 
 from rich.console import Console
@@ -37,14 +36,6 @@ from letta_evals.visualization.summary import (
 )
 
 
-class DisplayMode(Enum):
-    """Display modes for progress visualization"""
-
-    COMPACT = "compact"
-    STANDARD = "standard"
-    DETAILED = "detailed"
-
-
 class EvalProgress(ProgressCallback):
     """Beautiful progress visualization for evaluation runs"""
 
@@ -56,26 +47,16 @@ class EvalProgress(ProgressCallback):
         grader_kind: str = "tool",
         rubric_model: Optional[str] = None,
         max_concurrent: int = 15,
-        display_mode: DisplayMode = DisplayMode.STANDARD,
         console: Optional[Console] = None,
         update_freq: float = 2.0,
-        show_samples: bool = True,
         cached_mode: bool = False,
         metric_labels: Optional[Dict[str, str]] = None,
     ):
-        self.suite_name = suite_name
         self.total_samples = total_samples
-        self.target_kind = target_kind
-        self.grader_kind = grader_kind
-        self.rubric_model = rubric_model
-        self.max_concurrent = max_concurrent
-        self.display_mode = display_mode
-        self.show_samples = show_samples
         self.console = console or Console()
-        self.update_freq = update_freq
         self.frame_interval = (1.0 / update_freq) if update_freq > 0 else 0.25
         self.cached_mode = cached_mode
-        self.metric_labels: Dict[str, str] = metric_labels or {}
+        renderer_metric_labels: Dict[str, str] = metric_labels or {}
         self._runtime_state = ProgressRuntimeState()
         self._reducer = ProgressStateReducer(self._runtime_state)
         self._renderer = RichProgressRenderer(
@@ -85,7 +66,7 @@ class EvalProgress(ProgressCallback):
             grader_kind=grader_kind,
             rubric_model=rubric_model,
             max_concurrent=max_concurrent,
-            metric_labels=self.metric_labels,
+            metric_labels=renderer_metric_labels,
         )
         self.start_time = None
         self.live: Optional[Live] = None
@@ -254,27 +235,6 @@ class EvalProgress(ProgressCallback):
         result = self._reducer.apply_event(event)
         if result.progress_completed is not None:
             self.main_progress.update(self.main_task_id, completed=result.progress_completed)
-
-    def _apply_sample_state_update(
-        self,
-        sample_id: int,
-        state: SampleState,
-        agent_id: Optional[str] = None,
-        model_name: Optional[str] = None,
-        **kwargs,
-    ) -> None:
-        self._apply_event(
-            ProgressEvent(
-                kind="update_sample_state",
-                payload={
-                    "sample_id": sample_id,
-                    "state": state,
-                    "agent_id": agent_id,
-                    "model_name": model_name,
-                    **kwargs,
-                },
-            )
-        )
 
     async def update_sample_state(
         self,
