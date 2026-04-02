@@ -12,7 +12,6 @@ from rich.progress import Progress
 from rich.table import Table
 from rich.text import Text
 
-from letta_evals.types import GraderKind
 from letta_evals.utils import build_turn_symbols, calculate_turn_average
 from letta_evals.visualization.reducer import ProgressRuntimeState
 from letta_evals.visualization.state import (
@@ -26,6 +25,14 @@ from letta_evals.visualization.state import (
 
 class RichProgressRenderer:
     """Render the live Rich layout for evaluation progress."""
+
+    HEADER_PANEL_SIZE = 4
+    STATUS_PANEL_SIZE = 5
+    SAMPLE_NUM_WIDTH = 3
+    AGENT_ID_WIDTH = 14
+    MODEL_WIDTH = 14
+    STATUS_WIDTH = 11
+    TIME_WIDTH = 6
 
     def __init__(
         self,
@@ -53,16 +60,20 @@ class RichProgressRenderer:
         active_row_limit = self._panel_row_limit(active_panel_size)
         completed_row_limit = self._panel_row_limit(completed_panel_size)
 
-        details_layout = Layout()
+        details_layout = Layout(name="details")
         details_layout.split_column(
-            Layout(self._create_active_view(runtime_state, limit=active_row_limit), size=active_panel_size),
-            Layout(self._create_completed_view(runtime_state, limit=completed_row_limit), size=completed_panel_size),
+            Layout(self._create_active_view(runtime_state, limit=active_row_limit), name="active", ratio=1),
+            Layout(self._create_completed_view(runtime_state, limit=completed_row_limit), name="completed", ratio=1),
         )
 
         layout.split_column(
-            Layout(self._create_header_panel(), size=4),
-            Layout(self._create_progress_with_metrics(runtime_state, main_progress), size=5),
-            Layout(details_layout),
+            Layout(self._create_header_panel(), name="header", size=self.HEADER_PANEL_SIZE),
+            Layout(
+                self._create_progress_with_metrics(runtime_state, main_progress),
+                name="status",
+                size=self.STATUS_PANEL_SIZE,
+            ),
+            details_layout,
         )
 
         return layout
@@ -127,20 +138,29 @@ class RichProgressRenderer:
         return text
 
     def _create_header_panel(self) -> Panel:
-        header_title = Text(f"🧪 Evaluation: {self.suite_name}", style="bold white")
+        header_title = Text(
+            f"🧪 Evaluation: {self.suite_name}",
+            style="bold white",
+            no_wrap=True,
+            overflow="ellipsis",
+        )
         try:
             header_title.apply_gradient("#00D1FF", "#7C3AED")
         except Exception:
             pass
 
-        subtitle = Text()
+        subtitle = Text(no_wrap=True, overflow="ellipsis")
         subtitle.append(f"Target: {self.target_kind}  •  ", style="dim")
         subtitle.append(f"Grader: {self.grader_kind}  •  ", style="dim")
+        if self.rubric_model:
+            subtitle.append("Rubric: ", style="dim")
+            subtitle.append(self.rubric_model, style="magenta")
+            subtitle.append("  •  ", style="dim")
         subtitle.append(f"Concurrent: {self.max_concurrent}", style="dim")
 
-        rows: List[Text] = [Align.center(header_title), Align.center(subtitle)]
+        rows = [Align.center(header_title), Align.center(subtitle)]
         if self.metric_labels:
-            metrics_line = Text("Metrics: ", style="dim")
+            metrics_line = Text("Metrics: ", style="dim", no_wrap=True, overflow="ellipsis")
             metrics_line.append(", ".join(self.metric_labels.values()), style="white")
             rows.append(Align.center(metrics_line))
 
@@ -190,19 +210,37 @@ class RichProgressRenderer:
         return Panel(Group(main_progress, Text(""), chips), box=ROUNDED, border_style="blue", padding=(0, 1))
 
     def _detail_layout_budget(self, runtime_state: ProgressRuntimeState) -> tuple[int, int]:
-        available_lines = max(12, self.console.height - 10)
-        has_completed = any(is_completed_state(sample.state) for sample in runtime_state.samples.values())
-
-        if has_completed:
-            completed_panel_size = min(11, max(6, available_lines // 3))
-        else:
-            completed_panel_size = 5
-
-        active_panel_size = max(7, available_lines - completed_panel_size)
-        return active_panel_size, completed_panel_size
+        del runtime_state
+        available_lines = max(12, self.console.height - (self.HEADER_PANEL_SIZE + self.STATUS_PANEL_SIZE + 1))
+        panel_size = max(6, available_lines // 2)
+        return panel_size, panel_size
 
     def _panel_row_limit(self, panel_size: int) -> int:
         return max(1, panel_size - 5)
+
+    def _add_fixed_width_column(
+        self,
+        table: Table,
+        header: str,
+        *,
+        width: int,
+        style: str,
+        justify: str = "left",
+        ratio: Optional[int] = None,
+        allow_expand: bool = False,
+    ) -> None:
+        max_width = None if allow_expand else width
+        table.add_column(
+            header,
+            style=style,
+            justify=justify,
+            width=width,
+            min_width=width,
+            max_width=max_width,
+            ratio=ratio,
+            no_wrap=True,
+            overflow="ellipsis",
+        )
 
     def _create_samples_table(self, rows: List[SampleProgress], title: str, empty_message: str):
         if not rows:
@@ -223,24 +261,61 @@ class RichProgressRenderer:
             expand=True,
         )
 
-        table.add_column("#", style="cyan", width=5)
-        table.add_column("Agent ID", style="dim cyan", no_wrap=False)
-        table.add_column("Model", style="yellow", width=27)
-        if self.grader_kind == GraderKind.MODEL_JUDGE.value and self.rubric_model:
-            table.add_column("Rubric Model", style="magenta", width=27)
-        table.add_column("Status", width=20)
+        self._add_fixed_width_column(table, "#", width=self.SAMPLE_NUM_WIDTH, style="cyan")
+        self._add_fixed_width_column(
+            table,
+            "Agent ID",
+            width=self.AGENT_ID_WIDTH,
+            style="dim cyan",
+            ratio=2,
+            allow_expand=True,
+        )
+        self._add_fixed_width_column(
+            table,
+            "Model",
+            width=self.MODEL_WIDTH,
+            style="yellow",
+            ratio=2,
+            allow_expand=True,
+        )
+        self._add_fixed_width_column(table, "Status", width=self.STATUS_WIDTH, style="white")
 
         metric_keys = list(self.metric_labels.keys())
+        metric_count = len(metric_keys) if metric_keys else 1
         if metric_keys:
             for metric_key in metric_keys:
                 label = self.metric_labels.get(metric_key, metric_key)
-                table.add_column(f"{label} Score", width=10, justify="right")
-                table.add_column(f"{label} Rationale", width=45, justify="left")
+                score_width = max(8, min(10, len(label) + 2))
+                rationale_width = max(
+                    16 if metric_count > 1 else 18, min(24 if metric_count == 1 else 18, len(label) + 12)
+                )
+                self._add_fixed_width_column(
+                    table,
+                    f"{label} Score",
+                    width=score_width,
+                    style="white",
+                    justify="right",
+                )
+                self._add_fixed_width_column(
+                    table,
+                    f"{label} Rationale",
+                    width=rationale_width,
+                    style="dim",
+                    ratio=3,
+                    allow_expand=True,
+                )
         else:
-            table.add_column("Score", width=10, justify="right")
-            table.add_column("Rationale", width=45, justify="left")
-        table.add_column("Time", width=8, justify="right")
-        table.add_column("Details", justify="left")
+            self._add_fixed_width_column(table, "Score", width=8, style="white", justify="right")
+            self._add_fixed_width_column(table, "Rationale", width=18, style="dim", ratio=3, allow_expand=True)
+        self._add_fixed_width_column(table, "Time", width=self.TIME_WIDTH, style="white", justify="right")
+        self._add_fixed_width_column(
+            table,
+            "Details",
+            width=14 if metric_count == 1 else 10,
+            style="white",
+            ratio=2,
+            allow_expand=True,
+        )
 
         for sample in rows:
             if sample.start_time and sample.end_time:
@@ -286,14 +361,10 @@ class RichProgressRenderer:
                         if isinstance(score_value, (int, float)) and score_value is not None
                         else "-"
                     )
-                    if rationale and len(rationale) > 50:
-                        rationale = rationale[:47] + "..."
                     cells.extend([score_cell, rationale])
             else:
                 score_cell = f"{sample.score:.2f}" if sample.score is not None else "-"
                 rationale = sample.rationale or ""
-                if rationale and len(rationale) > 50:
-                    rationale = rationale[:47] + "..."
                 cells.extend([score_cell, rationale])
 
             if sample.state == SampleState.SENDING_MESSAGES and sample.total_messages > 0:
@@ -309,15 +380,15 @@ class RichProgressRenderer:
                 bar = "▰" * filled + "▱" * (bar_width - filled)
                 details = f"{bar}  turn {sample.turns_graded}/{sample.total_turns}"
             elif sample.state == SampleState.LOADING_AGENT:
-                details = "Loading from cache…" if sample.from_cache else "Loading agent…"
+                details = Text("Loading from cache..." if sample.from_cache else "Loading agent...", style="white")
             elif sample.state == SampleState.GRADING:
-                details = "Grading response…"
+                details = Text("Grading response...", style="white")
             elif sample.state == SampleState.COMPLETED:
-                details = "[green]✓ Completed[/green]"
+                details = Text("✓ Completed", style="green")
             elif sample.state == SampleState.ERROR:
-                details = f"[red]Error: {sample.error[:25]}…[/red]" if sample.error else "[red]Error[/red]"
+                details = Text(f"Error: {sample.error}" if sample.error else "Error", style="red")
             elif sample.state == SampleState.QUEUED:
-                details = "[dim]Waiting…[/dim]"
+                details = Text("Waiting...", style="dim")
             else:
                 details = ""
 
@@ -330,8 +401,6 @@ class RichProgressRenderer:
                 sample.agent_id or "-",
                 sample.model_name or "-",
             ]
-            if self.grader_kind == GraderKind.MODEL_JUDGE.value and self.rubric_model:
-                row_data.append(self.rubric_model)
             row_data.extend([self._get_state_text(sample), *cells, time_text, details])
             table.add_row(*row_data)
 

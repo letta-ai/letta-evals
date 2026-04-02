@@ -147,8 +147,8 @@ class EvalProgress(ProgressCallback):
         if self._dirty_event is not None:
             self._dirty_event.set()
 
-    def _refresh_live(self, reason: str = "tick") -> None:
-        if not self.live or not self._dirty:
+    def _refresh_live(self, reason: str = "tick", *, force: bool = False) -> None:
+        if not self.live or (not force and not self._dirty):
             return
         self.live.refresh()
         self._refresh_count += 1
@@ -208,11 +208,18 @@ class EvalProgress(ProgressCallback):
         if dirty_event is None:
             return
         while True:
-            await dirty_event.wait()
-            dirty_event.clear()
+            if not self._dirty:
+                try:
+                    await asyncio.wait_for(dirty_event.wait(), timeout=self.frame_interval)
+                except asyncio.TimeoutError:
+                    self._render_wakeup_count += 1
+                    self._refresh_live(reason="timer", force=True)
+                    continue
+                dirty_event.clear()
+
             self._render_wakeup_count += 1
             await asyncio.sleep(self.frame_interval)
-            self._refresh_live()
+            self._refresh_live(reason="dirty")
 
     async def _emit_event(self, kind: str, **payload: Any) -> None:
         self._raise_background_error()
