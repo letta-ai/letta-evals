@@ -5,7 +5,8 @@ import asyncio
 import pytest
 from rich.console import Console
 
-from letta_evals.visualization.rich_progress import EvalProgress, SampleProgress, SampleState
+from letta_evals.visualization.rich_progress import EvalProgress
+from letta_evals.visualization.state import SampleProgress, SampleState
 
 
 class DummyLive:

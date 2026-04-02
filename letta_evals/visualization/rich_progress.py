@@ -1,7 +1,6 @@
 import asyncio
 import contextlib
 import time
-from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -27,6 +26,16 @@ from rich.text import Text
 from letta_evals.types import GraderKind
 from letta_evals.utils import build_turn_symbols, calculate_turn_average
 from letta_evals.visualization.base import ProgressCallback
+from letta_evals.visualization.state import (
+    ProgressEvent,
+    SampleProgress,
+    SampleState,
+    VisualizationStats,
+    get_last_update_key,
+    is_active_state,
+    is_completed_state,
+    is_terminal_state,
+)
 from letta_evals.visualization.summary import (
     build_rich_sample_results_table,
     format_gate_description,
@@ -36,75 +45,6 @@ from letta_evals.visualization.summary import (
     print_remaining_samples_notice,
     print_truncated_samples_notice,
 )
-
-
-class SampleState(Enum):
-    """States a sample can be in during evaluation"""
-
-    QUEUED = "queued"
-    LOADING_AGENT = "loading"
-    SENDING_MESSAGES = "sending"
-    GRADING = "grading"
-    GRADING_TURNS = "grading_turns"  # Per-turn grading in progress
-    COMPLETED = "completed"
-    FAILED = "failed"
-    ERROR = "error"
-
-
-@dataclass
-class SampleProgress:
-    """Track progress of individual sample"""
-
-    sample_id: int
-    state: SampleState = SampleState.QUEUED
-    agent_id: Optional[str] = None
-    model_name: Optional[str] = None
-    score: Optional[float] = None
-    rationale: Optional[str] = None
-    error: Optional[str] = None
-    messages_sent: int = 0
-    total_messages: int = 0
-    start_time: Optional[float] = None
-    end_time: Optional[float] = None
-    last_update_ts: Optional[float] = None
-    from_cache: bool = False
-    # Per-metric live data (for multi-grader runs)
-    metric_scores: Optional[Dict[str, float]] = None
-    metric_rationales: Optional[Dict[str, str]] = None
-    # Per-turn grading progress
-    turns_graded: int = 0
-    total_turns: int = 0
-    # Per-grader turn scores: grader_key -> list of scores (None for ungraded)
-    turn_scores: Optional[Dict[str, List[Optional[float]]]] = None
-
-
-@dataclass
-class ProgressEvent:
-    """Serializable progress update processed by the reducer task."""
-
-    kind: str
-    payload: Dict[str, Any] = field(default_factory=dict)
-    ack: Optional[asyncio.Future[None]] = None
-
-
-@dataclass(frozen=True)
-class VisualizationStats:
-    """Snapshot of visualization runtime behavior for tuning."""
-
-    events_emitted: int
-    events_processed: int
-    refreshes: int
-    refreshes_by_reason: Dict[str, int]
-    render_wakeups: int
-    dirty_marks: int
-    max_queue_depth: int
-    pending_events: int
-    frame_interval: float
-    runtime_seconds: float
-
-    @property
-    def avg_events_per_refresh(self) -> float:
-        return self.events_processed / self.refreshes if self.refreshes > 0 else 0.0
 
 
 class DisplayMode(Enum):
@@ -287,24 +227,10 @@ class EvalProgress(ProgressCallback):
 
         return Panel(content, box=ROUNDED, border_style="blue", padding=(0, 1))
 
-    def _active_states(self) -> set[SampleState]:
-        return {
-            SampleState.LOADING_AGENT,
-            SampleState.SENDING_MESSAGES,
-            SampleState.GRADING,
-            SampleState.GRADING_TURNS,
-        }
-
-    def _completed_states(self) -> set[SampleState]:
-        return {SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR}
-
-    def _last_update_key(self, sample: SampleProgress) -> float:
-        return sample.last_update_ts or sample.end_time or sample.start_time or 0.0
-
     def _detail_layout_budget(self) -> tuple[int, int]:
         """Split the available height between active and completed panels."""
         available_lines = max(12, self.console.height - 10)
-        has_completed = any(sample.state in self._completed_states() for sample in self.samples.values())
+        has_completed = any(is_completed_state(sample.state) for sample in self.samples.values())
 
         if has_completed:
             completed_panel_size = min(11, max(6, available_lines // 3))
@@ -320,7 +246,7 @@ class EvalProgress(ProgressCallback):
 
     def _select_active_rows(self, limit: Optional[int] = None) -> List[SampleProgress]:
         """Select only currently active rows for the live top panel."""
-        rows = [sample for sample in self.samples.values() if sample.state in self._active_states()]
+        rows = [sample for sample in self.samples.values() if is_active_state(sample.state)]
         rows.sort(key=lambda sample: (sample.model_name or "", sample.sample_id))
         if limit is None:
             return rows
@@ -328,8 +254,8 @@ class EvalProgress(ProgressCallback):
 
     def _select_completed_rows(self, limit: Optional[int] = None) -> List[SampleProgress]:
         """Select the most recent completed or errored rows for the bottom panel."""
-        rows = [sample for sample in self.samples.values() if sample.state in self._completed_states()]
-        rows.sort(key=lambda sample: (-self._last_update_key(sample), sample.model_name or "", sample.sample_id))
+        rows = [sample for sample in self.samples.values() if is_completed_state(sample.state)]
+        rows.sort(key=lambda sample: (-get_last_update_key(sample), sample.model_name or "", sample.sample_id))
         if limit is None:
             return rows
         return rows[:limit]
@@ -694,8 +620,7 @@ class EvalProgress(ProgressCallback):
                 setattr(sample, key, value)
         sample.last_update_ts = time.time()
 
-        terminal_states = {SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR}
-        is_new_completion = previous_state not in terminal_states and state in terminal_states
+        is_new_completion = not is_terminal_state(previous_state) and is_terminal_state(state)
 
         if state == SampleState.COMPLETED and is_new_completion:
             self.completed_count += 1
