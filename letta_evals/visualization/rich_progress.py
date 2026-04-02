@@ -196,7 +196,9 @@ class EvalProgress(ProgressCallback):
             chips.append("   ")
             first = True
             keys = (
-                list(self.metric_labels.keys()) if self.metric_labels else list(self._runtime_state.metric_totals.keys())
+                list(self.metric_labels.keys())
+                if self.metric_labels
+                else list(self._runtime_state.metric_totals.keys())
             )
             for key in keys:
                 if key not in self._runtime_state.metric_totals:
