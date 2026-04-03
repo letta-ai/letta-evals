@@ -243,6 +243,7 @@ class Runner:
                         client=self.client,
                         agent_file=agent_file,
                         agent_id=agent_id,
+                        cleanup=self.suite.cleanup,
                         project_id=self.project_id,
                         judge_tool_name=judge_tool_name,
                         extractor=gspec.extractor,
