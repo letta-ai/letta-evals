@@ -14,6 +14,7 @@ def test_apply_completed_update_tracks_counts_and_metric_totals() -> None:
                 "sample_id": 0,
                 "state": SampleState.COMPLETED,
                 "score": 0.75,
+                "target_cost": 0.0123,
                 "metric_scores": {"accuracy": 1.0, "fluency": 0.5},
             },
         )
@@ -21,6 +22,7 @@ def test_apply_completed_update_tracks_counts_and_metric_totals() -> None:
 
     assert reducer.state.completed_count == 1
     assert reducer.state.error_count == 0
+    assert reducer.state.total_target_cost == 0.0123
     assert reducer.state.metric_totals == {"accuracy": 1.0, "fluency": 0.5}
     assert reducer.state.metric_counts == {"accuracy": 1, "fluency": 1}
     assert result.progress_completed == 1
@@ -32,13 +34,34 @@ def test_apply_error_update_tracks_progress_without_incrementing_completed() -> 
     result = reducer.apply_event(
         ProgressEvent(
             kind="update_sample_state",
-            payload={"sample_id": 1, "state": SampleState.ERROR, "error": "boom"},
+            payload={"sample_id": 1, "state": SampleState.ERROR, "error": "boom", "target_cost": 0.0456},
         )
     )
 
     assert reducer.state.completed_count == 0
     assert reducer.state.error_count == 1
+    assert reducer.state.total_target_cost == 0.0456
     assert result.progress_completed == 1
+
+
+def test_duplicate_terminal_updates_do_not_double_count_target_cost() -> None:
+    reducer = ProgressStateReducer(ProgressRuntimeState())
+
+    reducer.apply_event(
+        ProgressEvent(
+            kind="update_sample_state",
+            payload={"sample_id": 9, "state": SampleState.COMPLETED, "target_cost": 0.02},
+        )
+    )
+    reducer.apply_event(
+        ProgressEvent(
+            kind="update_sample_state",
+            payload={"sample_id": 9, "state": SampleState.COMPLETED, "target_cost": 0.03},
+        )
+    )
+
+    assert reducer.state.completed_count == 1
+    assert reducer.state.total_target_cost == 0.02
 
 
 def test_ensure_sample_migrates_placeholder_when_model_name_arrives() -> None:
