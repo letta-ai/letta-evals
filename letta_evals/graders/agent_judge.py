@@ -24,6 +24,7 @@ class AgentJudgeGrader(Grader):
         client: AsyncLetta,
         agent_file: Optional[Path] = None,
         agent_id: Optional[str] = None,
+        cleanup: bool = False,
         project_id: Optional[str] = None,
         judge_tool_name: str = "submit_grade",
         extractor: str = "last_assistant",
@@ -40,6 +41,7 @@ class AgentJudgeGrader(Grader):
         self.agent_id = agent_id
         self.prompt = prompt
         self.client = client
+        self.cleanup = cleanup
         self.project_id = project_id
         self.judge_tool_name = judge_tool_name
         self.extractor_name = extractor
@@ -137,6 +139,13 @@ class AgentJudgeGrader(Grader):
                 rationale=f"Error during agent judge grading: {str(e)}",
                 metadata=metadata,
             ), submission
+        finally:
+            if self.cleanup and self.agent_file and judge_agent_id:
+                try:
+                    await self.client.agents.delete(agent_id=judge_agent_id)
+                    logger.info(f"Cleaned up judge agent {judge_agent_id}")
+                except Exception as cleanup_err:
+                    logger.warning(f"Failed to cleanup judge agent {judge_agent_id}: {cleanup_err}")
 
     def _validate_agent_file(self) -> None:
         """Validate that the agent file contains the required tool with correct schema.
