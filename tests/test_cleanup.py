@@ -65,7 +65,9 @@ class TestRunnerCleanupPropagation:
             name="test-letta-judge-cleanup",
             dataset=Path("fake.jsonl"),
             target=LettaAgentTargetSpec(kind=TargetKind.LETTA_AGENT, agent_id="existing-agent"),
-            graders={"quality": LettaJudgeGraderSpec(kind=GraderKind.LETTA_JUDGE, prompt="Judge this", agent_id="judge")},
+            graders={
+                "quality": LettaJudgeGraderSpec(kind=GraderKind.LETTA_JUDGE, prompt="Judge this", agent_id="judge")
+            },
             gate=SimpleGateSpec(kind=GateKind.SIMPLE, metric_key="quality", op=MetricOp.GTE, value=0.5),
             cleanup=True,
         )
@@ -121,7 +123,10 @@ class TestAgentJudgeCleanup:
         grader = self._make_grader(client, cleanup=True, agent_file=self.JUDGE_AGENT_FILE)
 
         with (
-            patch("letta_evals.graders.agent_judge.consume_stream_with_resumes", new=AsyncMock(return_value=("run-1", None))),
+            patch(
+                "letta_evals.graders.agent_judge.consume_stream_with_resumes",
+                new=AsyncMock(return_value=("run-1", None)),
+            ),
             patch("letta_evals.graders.agent_judge.list_all_run_messages", new=AsyncMock(return_value=[])),
         ):
             grade, submission = await grader.grade(Sample(id=0, input="hello"), trajectory=[["message"]])
@@ -135,7 +140,10 @@ class TestAgentJudgeCleanup:
         grader = self._make_grader(client, cleanup=False, agent_file=self.JUDGE_AGENT_FILE)
 
         with (
-            patch("letta_evals.graders.agent_judge.consume_stream_with_resumes", new=AsyncMock(return_value=("run-1", None))),
+            patch(
+                "letta_evals.graders.agent_judge.consume_stream_with_resumes",
+                new=AsyncMock(return_value=("run-1", None)),
+            ),
             patch("letta_evals.graders.agent_judge.list_all_run_messages", new=AsyncMock(return_value=[])),
         ):
             await grader.grade(Sample(id=0, input="hello"), trajectory=[["message"]])
@@ -147,7 +155,10 @@ class TestAgentJudgeCleanup:
         grader = self._make_grader(client, cleanup=True, agent_id="judge-existing")
 
         with (
-            patch("letta_evals.graders.agent_judge.consume_stream_with_resumes", new=AsyncMock(return_value=("run-1", None))),
+            patch(
+                "letta_evals.graders.agent_judge.consume_stream_with_resumes",
+                new=AsyncMock(return_value=("run-1", None)),
+            ),
             patch("letta_evals.graders.agent_judge.list_all_run_messages", new=AsyncMock(return_value=[])),
         ):
             await grader.grade(Sample(id=0, input="hello"), trajectory=[["message"]])
