@@ -21,6 +21,7 @@ class ProgressRuntimeState:
     samples: Dict[SampleKey, SampleProgress] = field(default_factory=dict)
     metric_totals: Dict[str, float] = field(default_factory=dict)
     metric_counts: Dict[str, int] = field(default_factory=dict)
+    total_target_cost: float = 0.0
     completed_count: int = 0
     error_count: int = 0
 
@@ -42,6 +43,7 @@ class ProgressStateReducer:
         self.state.samples.clear()
         self.state.metric_totals.clear()
         self.state.metric_counts.clear()
+        self.state.total_target_cost = 0.0
         self.state.completed_count = 0
         self.state.error_count = 0
 
@@ -139,6 +141,7 @@ class ProgressStateReducer:
 
         if state == SampleState.COMPLETED and is_new_completion:
             self.state.completed_count += 1
+            self.state.total_target_cost += sample.target_cost or 0.0
 
             if sample.metric_scores:
                 for metric_key, metric_score in sample.metric_scores.items():
@@ -151,6 +154,7 @@ class ProgressStateReducer:
 
         if state == SampleState.ERROR and is_new_completion:
             self.state.error_count += 1
+            self.state.total_target_cost += sample.target_cost or 0.0
             return ReducerResult(progress_completed=self.state.completed_count + self.state.error_count)
 
         return ReducerResult()

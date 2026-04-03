@@ -83,6 +83,7 @@ class ProgressCallback(ABC):
         sample_id: int,
         agent_id: Optional[str] = None,
         score: Optional[float] = None,
+        target_cost: Optional[float] = None,
         model_name: Optional[str] = None,
         metric_scores: Optional[Dict[str, float]] = None,
         rationale: Optional[str] = None,
@@ -93,7 +94,12 @@ class ProgressCallback(ABC):
 
     @abstractmethod
     async def sample_error(
-        self, sample_id: int, error: str, agent_id: Optional[str] = None, model_name: Optional[str] = None
+        self,
+        sample_id: int,
+        error: str,
+        agent_id: Optional[str] = None,
+        model_name: Optional[str] = None,
+        target_cost: Optional[float] = None,
     ) -> None:
         """Called when a sample evaluation encounters an error."""
         ...

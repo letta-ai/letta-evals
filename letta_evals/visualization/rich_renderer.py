@@ -183,6 +183,10 @@ class RichProgressRenderer:
         chips = Text()
         chips.append(f"  {errors_text}", style="bold white")
 
+        if runtime_state.total_target_cost > 0:
+            chips.append("   ")
+            chips.append(f"Target cost: ${runtime_state.total_target_cost:.4f}", style="bold white")
+
         if runtime_state.metric_totals:
             chips.append("   ")
             first = True
