@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.13.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.12.0...letta-evals-v0.13.0) (2026-04-03)
+
+
+### Features
+
+* Improve Rich progress stability under concurrency ([#224](https://github.com/letta-ai/letta-evals/issues/224)) ([c816825](https://github.com/letta-ai/letta-evals/commit/c8168258de94cb4a0f93a3b062ee5ee9eb7407c0))
+
+
+### Bug Fixes
+
+* Clean up imported letta judge agents ([#235](https://github.com/letta-ai/letta-evals/issues/235)) ([f90bfe5](https://github.com/letta-ai/letta-evals/commit/f90bfe555345dedc199d1ac87fdfd5c58d30d11a))
+* **examples:** Use OpenAI for simple rubric grader ([#234](https://github.com/letta-ai/letta-evals/issues/234)) ([54e0ff2](https://github.com/letta-ai/letta-evals/commit/54e0ff207032496c58eef6adf49683ac72c621c0))
+* **visualization:** Improve rich progress visualization layout ([#233](https://github.com/letta-ai/letta-evals/issues/233)) ([9ac3bef](https://github.com/letta-ai/letta-evals/commit/9ac3bef7b3e3b82d3a0f4d045b7ce8231b0fb6e4))
+
+
+### Refactors
+
+* Cleanup dead Rich progress paths ([#226](https://github.com/letta-ai/letta-evals/issues/226)) ([fcb5571](https://github.com/letta-ai/letta-evals/commit/fcb55711fcdb60fdefaeca306d3e43e9e191d900))
+* Extract rich progress renderer ([#229](https://github.com/letta-ai/letta-evals/issues/229)) ([433a150](https://github.com/letta-ai/letta-evals/commit/433a1500f5e6b17114285c5f9be7d7fa26ceddc8))
+* Extract rich progress state reducer ([#228](https://github.com/letta-ai/letta-evals/issues/228)) ([5f7a1c6](https://github.com/letta-ai/letta-evals/commit/5f7a1c6ebf0c7aebd77f9452fcd37499b35d4f86))
+* extract visualization summary helpers ([#227](https://github.com/letta-ai/letta-evals/issues/227)) ([7d0dbe1](https://github.com/letta-ai/letta-evals/commit/7d0dbe1503911b08617e628a79ca7457f96d0e55))
+* Remove dead visualization code ([#231](https://github.com/letta-ai/letta-evals/issues/231)) ([d82d0dc](https://github.com/letta-ai/letta-evals/commit/d82d0dc4308bfeeab09886a68fa4aa2c483c1f3e))
+* Remove stale rich progress api ([#230](https://github.com/letta-ai/letta-evals/issues/230)) ([a624c70](https://github.com/letta-ai/letta-evals/commit/a624c70d11e0ba22f043a8ffeb0770a38ef756dd))
+
 ## [0.12.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.11.0...letta-evals-v0.12.0) (2026-04-01)
 
 
