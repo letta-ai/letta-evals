@@ -138,7 +138,9 @@ class LettaCodeTarget(AbstractAgentTarget):
                 cmd.append("-p")
                 prompt_bytes = prompt.encode("utf-8")
 
-                logger.info(f"Running letta command for sample {sample.id} (prompt via stdin, {len(prompt_bytes)} bytes)")
+                logger.info(
+                    f"Running letta command for sample {sample.id} (prompt via stdin, {len(prompt_bytes)} bytes)"
+                )
 
                 # Prepare environment variables for the subprocess
                 # Pass base_url to letta CLI if specified
