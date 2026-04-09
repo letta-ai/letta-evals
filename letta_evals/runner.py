@@ -23,6 +23,7 @@ from letta_evals.models import (
     AgentState,
     ErrorInfo,
     GradeResult,
+    LettaAgentTargetSpec,
     LettaJudgeGraderSpec,
     LettaMessageUnion,
     LogicalGateSpec,
@@ -194,6 +195,7 @@ class Runner:
                 agent_script=self.suite.target.agent_script,
                 base_dir=self.suite.target.base_dir,
                 flags=self.suite.target.flags,
+                permission_mode=self.suite.target.permission_mode,
             )
         else:
             raise ValueError(f"Unknown target kind: {self.suite.target.kind}")
@@ -242,6 +244,7 @@ class Runner:
                         client=self.client,
                         agent_file=agent_file,
                         agent_id=agent_id,
+                        cleanup=self.suite.cleanup,
                         project_id=self.project_id,
                         judge_tool_name=judge_tool_name,
                         extractor=gspec.extractor,
@@ -259,6 +262,19 @@ class Runner:
         if self.graders:
             return any(grader.requires_agent_state for grader in self.graders.values())
         return False
+
+    def _should_cleanup_agent(self) -> bool:
+        """Check if agents should be deleted after each sample.
+
+        Returns True when cleanup is enabled and the target creates agents per-sample
+        (i.e., not using a pre-existing agent_id).
+        """
+        if not self.suite.cleanup:
+            return False
+        # Never delete a pre-existing agent specified by agent_id
+        if isinstance(self.suite.target, LettaAgentTargetSpec) and self.suite.target.agent_id:
+            return False
+        return True
 
     async def _run_setup(self, model_name: Optional[str] = None) -> None:
         """Execute the setup function if specified.
@@ -526,7 +542,7 @@ class Runner:
             agent_id = None
             phase = ErrorCategory.UNKNOWN
             t_sample_start = time.perf_counter()
-            try:
+            try:  # noqa: SIM105 — outer try/finally for agent cleanup
                 if self.progress_callback:
                     await self.progress_callback.sample_started(sample_id, model_name=model_name)
 
@@ -641,6 +657,13 @@ class Runner:
                     total_time=time.perf_counter() - t_sample_start,
                     error=error_info,
                 )
+            finally:
+                if self._should_cleanup_agent() and agent_id:
+                    try:
+                        await self.client.agents.delete(agent_id=agent_id)
+                        logger.info(f"Cleaned up agent {agent_id} for sample {sample_id}")
+                    except Exception as cleanup_err:
+                        logger.warning(f"Failed to cleanup agent {agent_id}: {cleanup_err}")
 
     def _validate_rubric_vars(self, samples: List[Sample]) -> None:
         """Validate that all samples have required rubric_vars for configured graders."""
@@ -931,6 +954,51 @@ async def run_suite(
             metric_labels=metric_labels,
         )
 
+    # Attach a file handler so logs persist in the output directory
+    file_handler: Optional[logging.FileHandler] = None
+    if output_path:
+        output_path.mkdir(parents=True, exist_ok=True)
+        log_path = output_path / "run.log"
+        file_handler = logging.FileHandler(log_path, mode="w")
+        file_handler.setLevel(logging.WARNING)
+        file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+        pkg_logger = logging.getLogger("letta_evals")
+        pkg_logger.addHandler(file_handler)
+        # Ensure the logger accepts WARNING; without this, the default WARNING
+        # threshold with NOTSET silently drops messages before they reach handlers.
+        if pkg_logger.level == logging.NOTSET:
+            pkg_logger.setLevel(logging.WARNING)
+
+    try:
+        return await _execute_runs(
+            suite=suite,
+            actual_num_runs=actual_num_runs,
+            max_concurrent=max_concurrent,
+            progress_cb=progress_cb,
+            cached_results=cached_results,
+            output_path=output_path,
+            letta_api_key=letta_api_key,
+            letta_base_url=letta_base_url,
+            letta_project_id=letta_project_id,
+        )
+    finally:
+        if file_handler is not None:
+            logging.getLogger("letta_evals").removeHandler(file_handler)
+            file_handler.close()
+
+
+async def _execute_runs(
+    suite: SuiteSpec,
+    actual_num_runs: int,
+    max_concurrent: int,
+    progress_cb: Optional[ProgressCallback],
+    cached_results: Optional[RunnerResult],
+    output_path: Optional[Path],
+    letta_api_key: Optional[str],
+    letta_base_url: Optional[str],
+    letta_project_id: Optional[str],
+) -> RunnerResult:
+    """Execute single or multiple evaluation runs."""
     if actual_num_runs > 1:
         all_run_results: List[RunnerResult] = []
         all_metrics: List[Metrics] = []

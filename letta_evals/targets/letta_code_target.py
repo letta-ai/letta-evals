@@ -34,6 +34,7 @@ class LettaCodeTarget(AbstractAgentTarget):
         agent_script: Optional[str] = None,
         base_dir: Optional[Path] = None,
         flags: Optional[str] = None,
+        permission_mode: Optional[str] = None,
     ):
         """Initialize the Letta Code target.
 
@@ -54,11 +55,14 @@ class LettaCodeTarget(AbstractAgentTarget):
             base_dir: Base directory for resolving relative paths in agent_script
             flags: Additional CLI flags to pass to letta code, parsed with shell quoting
                 rules (e.g., "--memfs --context-window 8000").
+            permission_mode: Permission mode for letta code (e.g., "memory" to scope
+                writes to memory roots). When "memory", sets MEMORY_DIR env var.
         """
         self.client = client
         self.model_handle = model_handle
         self.allowed_tools = allowed_tools
         self.disallowed_tools = disallowed_tools
+        self.permission_mode = permission_mode
         self.timeout = timeout
         self.max_retries = max_retries
         self.base_url = base_url
@@ -94,12 +98,16 @@ class LettaCodeTarget(AbstractAgentTarget):
                 # construct the letta-code CLI command (headless streaming JSON output).
                 cmd = [
                     "letta",
-                    "--yolo",
                     "--output-format",
                     "stream-json",
                     "--model",
                     self.model_handle,
                 ]
+
+                # Only use --yolo when no explicit permission_mode is set,
+                # since --yolo overrides --permission-mode (sets bypassPermissions).
+                if not self.permission_mode:
+                    cmd.append("--yolo")
 
                 # If agent_script is provided, create agent via factory first
                 factory_agent_id = None
@@ -133,6 +141,10 @@ class LettaCodeTarget(AbstractAgentTarget):
                 if self.flags:
                     cmd.extend(self.flags)
 
+                # permission mode (e.g., "memory" to scope writes to MEMORY_DIR)
+                if self.permission_mode:
+                    cmd.extend(["--permission-mode", self.permission_mode])
+
                 # Pass prompt via stdin to avoid OS ARG_MAX limits on large inputs.
                 # letta-code headless mode reads from stdin when no positional prompt given.
                 cmd.append("-p")
@@ -153,13 +165,23 @@ class LettaCodeTarget(AbstractAgentTarget):
                 events = []
                 stderr_chunks = []
 
+                # When using memory permission mode, set MEMORY_DIR and cwd to the
+                # agent's memory root so relative file paths resolve correctly.
+                if self.permission_mode == "memory" and factory_agent_id:
+                    memory_dir = Path.home() / ".letta" / "agents" / factory_agent_id / "memory"
+                    memory_dir.mkdir(parents=True, exist_ok=True)
+                    env["MEMORY_DIR"] = str(memory_dir)
+                    run_cwd = str(memory_dir)
+                else:
+                    run_cwd = str(self.working_dir)
+
                 # run the letta command with prompt piped via stdin
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    cwd=str(self.working_dir),
+                    cwd=run_cwd,
                     env=env,
                 )
                 # Write prompt to stdin and close it
@@ -214,9 +236,22 @@ class LettaCodeTarget(AbstractAgentTarget):
                 if process.returncode != 0:
                     logger.error(f"Letta command failed with return code {process.returncode}")
                     logger.error(f"Stderr: {stderr_text}")
-                    raise RuntimeError(
-                        f"Letta command failed with return code {process.returncode}. Stderr: {stderr_text[:500]}"
-                    )
+
+                    # Surface the last stdout event so the real error isn't lost
+                    last_stdout_event = ""
+                    for ev in reversed(events):
+                        try:
+                            last_stdout_event = json.dumps(ev)[:500]
+                        except Exception:
+                            last_stdout_event = str(ev)[:500]
+                        break
+
+                    parts = [f"Letta command failed with return code {process.returncode}"]
+                    if last_stdout_event:
+                        parts.append(f"Last stdout event: {last_stdout_event}")
+                    if stderr_text:
+                        parts.append(f"Stderr: {stderr_text[:500]}")
+                    raise RuntimeError(". ".join(parts))
 
                 if not agent_id:
                     raise RuntimeError("No agent_id found in letta stream output")
@@ -297,32 +332,35 @@ class LettaCodeTarget(AbstractAgentTarget):
         """
         token_data: list[TurnTokenData] = []
         try:
-            # Try to get run IDs for this agent
-            run_ids: list[str] = []
-            try:
-                runs_page = await self.client.agents.runs.list(agent_id=agent_id)
-                if runs_page.items:
-                    run_ids = [runs_page.items[0].id]
-            except Exception as e:
-                logger.warning(f"Could not fetch run IDs for agent {agent_id}: {e}")
+            # Fetch ALL runs for this agent — client tools cause each tool-call
+            # round-trip to be a separate run, so token IDs are scattered.
+            runs_page = await self.client.runs.list(agent_id=agent_id, limit=100)
+            if not runs_page.items:
+                return token_data
 
-            if run_ids:
-                from letta_evals.utils import list_all_run_messages
-
-                messages = await list_all_run_messages(
-                    self.client,
-                    run_ids[0],
-                    params={"return_token_ids": "true"},
-                )
-                for msg in messages:
-                    output_ids = getattr(msg, "output_ids", None)
-                    output_token_logprobs = getattr(msg, "output_token_logprobs", None)
+            # Token IDs are stored in run.metadata.result.turns (populated by SGLang native adapter)
+            for run_summary in runs_page.items:
+                run = await self.client.runs.retrieve(run_id=run_summary.id)
+                result = (run.metadata or {}).get("result", {})
+                for turn in result.get("turns") or []:
+                    output_ids = turn.get("output_ids")
+                    role = turn.get("role", "assistant")
                     if output_ids:
+                        # Assistant turn with token IDs from SGLang
                         token_data.append(
                             TurnTokenData(
-                                role=getattr(msg, "role", "assistant"),
+                                role=role,
                                 output_ids=output_ids,
-                                output_token_logprobs=output_token_logprobs,
+                                output_token_logprobs=turn.get("output_token_logprobs"),
+                            )
+                        )
+                    elif role in ("tool", "tool_return", "tool_return_message") and turn.get("content"):
+                        # Tool return turn — no output_ids, but content is needed
+                        # for proper multi-turn token sequence reconstruction
+                        token_data.append(
+                            TurnTokenData(
+                                role=role,
+                                content=turn.get("content"),
                             )
                         )
         except Exception as e:

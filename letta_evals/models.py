@@ -158,6 +158,10 @@ class LettaCodeTargetSpec(BaseTargetSpec):
         description="Additional CLI flags to pass to letta code (e.g., '--memfs --context-window 8000'). "
         "Parsed with shell quoting rules so values with spaces can be quoted.",
     )
+    permission_mode: Optional[str] = Field(
+        default=None,
+        description="Permission mode for letta code (e.g., 'memory' to scope writes to memory roots).",
+    )
 
 
 TargetSpec = Annotated[
@@ -390,6 +394,9 @@ class SuiteSpec(BaseModel):
     num_runs: Optional[int] = Field(default=1, description="Number of times to run the evaluation suite")
     max_concurrent: Optional[int] = Field(default=None, description="Maximum concurrent evaluations")
     output: Optional[Path] = Field(default=None, description="Directory where evaluation results are written")
+    cleanup: bool = Field(
+        default=False, description="Delete agents created during evaluation after each sample completes"
+    )
 
     setup_script: Optional[str] = Field(
         default=None, description="Path to Python script with setup function (e.g., setup.py:prepare_evaluation)"
