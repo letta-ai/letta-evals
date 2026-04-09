@@ -158,6 +158,10 @@ class LettaCodeTargetSpec(BaseTargetSpec):
         description="Additional CLI flags to pass to letta code (e.g., '--memfs --context-window 8000'). "
         "Parsed with shell quoting rules so values with spaces can be quoted.",
     )
+    permission_mode: Optional[str] = Field(
+        default=None,
+        description="Permission mode for letta code (e.g., 'memory' to scope writes to memory roots).",
+    )
 
 
 TargetSpec = Annotated[

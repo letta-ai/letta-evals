@@ -25,13 +25,14 @@ def load_jsonl(
                 # tags filtering no longer supported without metadata
                 pass
 
+            metadata = data.get("metadata") or {}
             sample = Sample(
                 id=line_index,
-                input=data["input"],
+                input=data.get("input") or data["prompt"],
                 ground_truth=data.get("ground_truth"),
-                agent_args=data.get("agent_args"),
-                rubric_vars=data.get("rubric_vars"),
-                extra_vars=data.get("extra_vars"),
+                agent_args=data.get("agent_args") or metadata.get("agent_args"),
+                rubric_vars=data.get("rubric_vars") or metadata.get("rubric_vars"),
+                extra_vars=data.get("extra_vars") or metadata.get("extra_vars"),
             )
 
             line_index += 1

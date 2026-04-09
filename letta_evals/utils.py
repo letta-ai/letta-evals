@@ -3,7 +3,7 @@ import logging
 import re
 import sys
 from pathlib import Path
-from typing import Any, Awaitable, Callable, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 import anyio
 import httpx
@@ -282,6 +282,7 @@ async def list_all_run_messages(
     max_attempts_per_page: int = 5,
     backoff_base_s: float = 0.5,
     backoff_max_s: float = 8.0,
+    params: Optional[Dict[str, str]] = None,
 ) -> List[Any]:
     """List all messages for a run using pagination + retries.
 
@@ -298,9 +299,11 @@ async def list_all_run_messages(
     while True:
 
         async def _list_page() -> Any:
-            kwargs = {"run_id": run_id, "limit": page_limit, "order": "asc"}
+            kwargs: Dict[str, Any] = {"run_id": run_id, "limit": page_limit, "order": "asc"}
             if after is not None:
                 kwargs["after"] = after
+            if params:
+                kwargs["extra_query"] = params
             return await client.runs.messages.list(**kwargs)
 
         page = await _retry_async(
