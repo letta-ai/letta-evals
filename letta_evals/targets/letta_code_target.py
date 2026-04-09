@@ -95,13 +95,6 @@ class LettaCodeTarget(AbstractAgentTarget):
             try:
                 agent_id = None
 
-                # handle single or multiple inputs
-                inputs = sample.input if isinstance(sample.input, list) else [sample.input]
-
-                # for multiple inputs, concatenate with newlines
-                prompt = "\n".join(str(inp) for inp in inputs)
-                prompt = prompt.replace("{pwd}", self.working_dir.resolve().as_posix())
-
                 # construct the letta-code CLI command (headless streaming JSON output).
                 cmd = [
                     "letta",
@@ -127,6 +120,14 @@ class LettaCodeTarget(AbstractAgentTarget):
                             sample.id, agent_id=factory_agent_id, model_name=self.model_handle
                         )
 
+                # construct prompt after factory call so agent_factory can modify sample if needed
+                # handle single or multiple inputs
+                inputs = sample.input if isinstance(sample.input, list) else [sample.input]
+
+                # for multiple inputs, concatenate with newlines
+                prompt = "\n".join(str(inp) for inp in inputs)
+                prompt = prompt.replace("{pwd}", self.working_dir.resolve().as_posix())
+
                 if factory_agent_id:
                     cmd.extend(["--agent", factory_agent_id])
                 else:
@@ -144,9 +145,14 @@ class LettaCodeTarget(AbstractAgentTarget):
                 if self.permission_mode:
                     cmd.extend(["--permission-mode", self.permission_mode])
 
-                cmd.extend(["-p", prompt])
+                # Pass prompt via stdin to avoid OS ARG_MAX limits on large inputs.
+                # letta-code headless mode reads from stdin when no positional prompt given.
+                cmd.append("-p")
+                prompt_bytes = prompt.encode("utf-8")
 
-                logger.info(f"Running letta command for sample {sample.id}")
+                logger.info(
+                    f"Running letta command for sample {sample.id} (prompt via stdin, {len(prompt_bytes)} bytes)"
+                )
 
                 # Prepare environment variables for the subprocess
                 # Pass base_url to letta CLI if specified
@@ -169,14 +175,20 @@ class LettaCodeTarget(AbstractAgentTarget):
                 else:
                     run_cwd = str(self.working_dir)
 
-                # run the letta command
+                # run the letta command with prompt piped via stdin
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
+                    stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=run_cwd,
                     env=env,
                 )
+                # Write prompt to stdin and close it
+                process.stdin.write(prompt_bytes)
+                await process.stdin.drain()
+                process.stdin.close()
+                await process.stdin.wait_closed()
 
                 # Read streaming JSON output line by line, capturing agent_id
                 # from the init event as soon as it arrives. This ensures we
