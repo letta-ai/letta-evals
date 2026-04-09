@@ -155,15 +155,15 @@ class LettaCodeTarget(AbstractAgentTarget):
                 events = []
                 stderr_chunks = []
 
-                # When using memory permission mode, set MEMORY_DIR so the agent
-                # (and letta-code's memory scope checker) know the memory root.
-                # The agent's instructions reference $MEMORY_DIR for all file ops.
+                # When using memory permission mode, set MEMORY_DIR and cwd to the
+                # agent's memory root so relative file paths resolve correctly.
                 if self.permission_mode == "memory" and factory_agent_id:
                     memory_dir = Path.home() / ".letta" / "agents" / factory_agent_id / "memory"
                     memory_dir.mkdir(parents=True, exist_ok=True)
                     env["MEMORY_DIR"] = str(memory_dir)
-
-                run_cwd = str(self.working_dir)
+                    run_cwd = str(memory_dir)
+                else:
+                    run_cwd = str(self.working_dir)
 
                 # run the letta command
                 process = await asyncio.create_subprocess_exec(
