@@ -105,12 +105,16 @@ class LettaCodeTarget(AbstractAgentTarget):
                 # construct the letta-code CLI command (headless streaming JSON output).
                 cmd = [
                     "letta",
-                    "--yolo",
                     "--output-format",
                     "stream-json",
                     "--model",
                     self.model_handle,
                 ]
+
+                # Only use --yolo when no explicit permission_mode is set,
+                # since --yolo overrides --permission-mode (sets bypassPermissions).
+                if not self.permission_mode:
+                    cmd.append("--yolo")
 
                 # If agent_script is provided, create agent via factory first
                 factory_agent_id = None
