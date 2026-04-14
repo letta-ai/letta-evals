@@ -79,6 +79,7 @@ class SimpleProgress(ProgressCallback):
         sample_id: int,
         agent_id: Optional[str] = None,
         score: Optional[float] = None,
+        target_cost: Optional[float] = None,
         model_name: Optional[str] = None,
         metric_scores: Optional[Dict[str, float]] = None,
         rationale: Optional[str] = None,
@@ -98,7 +99,12 @@ class SimpleProgress(ProgressCallback):
         self.console.print("  ".join(parts))
 
     async def sample_error(
-        self, sample_id: int, error: str, agent_id: Optional[str] = None, model_name: Optional[str] = None
+        self,
+        sample_id: int,
+        error: str,
+        agent_id: Optional[str] = None,
+        model_name: Optional[str] = None,
+        target_cost: Optional[float] = None,
     ) -> None:
         prefix = self._format_prefix(sample_id, agent_id, model_name)
         self.console.print(f"{prefix} [bold yellow]⚠ ERROR[/]: {error}")

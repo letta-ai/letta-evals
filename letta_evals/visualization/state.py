@@ -43,6 +43,7 @@ class SampleProgress:
     agent_id: Optional[str] = None
     model_name: Optional[str] = None
     score: Optional[float] = None
+    target_cost: Optional[float] = None
     rationale: Optional[str] = None
     error: Optional[str] = None
     messages_sent: int = 0

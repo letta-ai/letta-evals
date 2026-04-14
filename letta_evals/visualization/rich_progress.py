@@ -340,6 +340,7 @@ class EvalProgress(ProgressCallback):
         sample_id: int,
         agent_id: Optional[str] = None,
         score: Optional[float] = None,
+        target_cost: Optional[float] = None,
         model_name: Optional[str] = None,
         metric_scores: Optional[Dict[str, float]] = None,
         rationale: Optional[str] = None,
@@ -354,6 +355,7 @@ class EvalProgress(ProgressCallback):
             agent_id=agent_id,
             model_name=model_name,
             score=score,
+            target_cost=target_cost,
             rationale=rationale,
             from_cache=existing_from_cache,
             metric_scores=metric_scores,
@@ -361,7 +363,12 @@ class EvalProgress(ProgressCallback):
         )
 
     async def sample_error(
-        self, sample_id: int, error: str, agent_id: Optional[str] = None, model_name: Optional[str] = None
+        self,
+        sample_id: int,
+        error: str,
+        agent_id: Optional[str] = None,
+        model_name: Optional[str] = None,
+        target_cost: Optional[float] = None,
     ):
         """Mark sample as having an error"""
         await self.update_sample_state(
@@ -370,6 +377,7 @@ class EvalProgress(ProgressCallback):
             agent_id=agent_id,
             model_name=model_name,
             error=error,
+            target_cost=target_cost,
         )
 
     def get_stats_snapshot(self) -> VisualizationStats:

@@ -105,3 +105,21 @@ def test_model_judge_renderer_moves_rubric_model_into_header_and_uses_fixed_colu
     assert isinstance(header_panel.renderable, Group)
     console.print(header_panel)
     assert "Rubric: judge-model-v1" in console.export_text()
+
+
+def test_progress_panel_renders_live_target_cost() -> None:
+    console = Console(width=120, height=20, force_terminal=False, record=True)
+    renderer = RichProgressRenderer(
+        console=console,
+        suite_name="demo",
+        target_kind="agent",
+        grader_kind="tool",
+        rubric_model=None,
+        max_concurrent=8,
+    )
+    runtime_state = ProgressRuntimeState(total_target_cost=0.0342, completed_count=2, error_count=1)
+    progress = Progress()
+
+    console.print(renderer._create_progress_with_metrics(runtime_state, progress))
+
+    assert "Target cost: $0.0342" in console.export_text()

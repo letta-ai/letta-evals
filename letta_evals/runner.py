@@ -540,6 +540,7 @@ class Runner:
 
         async with self.semaphore:
             agent_id = None
+            agent_usage = None
             phase = ErrorCategory.UNKNOWN
             t_sample_start = time.perf_counter()
             try:  # noqa: SIM105 — outer try/finally for agent cleanup
@@ -553,6 +554,10 @@ class Runner:
                     sample, llm_config, retrieve_agent_state=retrieve_agent_state
                 )
 
+                cost = calculate_cost_from_agent_usage(model_name, agent_usage) if model_name else None
+                prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
+                    extract_token_counts(agent_usage)
+                )
                 target_time = time.perf_counter() - t_sample_start
 
                 if self.progress_callback:
@@ -571,7 +576,11 @@ class Runner:
                 error_info = self._detect_errors(grade_result, trajectory, submission, grades_dict)
                 if error_info and self.progress_callback:
                     await self.progress_callback.sample_error(
-                        sample_id, error_info.message, agent_id=agent_id, model_name=model_name
+                        sample_id,
+                        error_info.message,
+                        agent_id=agent_id,
+                        model_name=model_name,
+                        target_cost=cost if cost and cost > 0 else None,
                     )
 
                 if error_info is None and self.progress_callback:
@@ -584,17 +593,12 @@ class Runner:
                         sample_id,
                         agent_id=agent_id,
                         score=grade_result.score,
+                        target_cost=cost if cost and cost > 0 else None,
                         model_name=model_name,
                         metric_scores=metric_scores,
                         rationale=grade_result.rationale,
                         metric_rationales=metric_rationales,
                     )
-
-                # Calculate cost and extract token counts from agent usage
-                cost = calculate_cost_from_agent_usage(model_name, agent_usage) if model_name else None
-                prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
-                    extract_token_counts(agent_usage)
-                )
 
                 # Calculate timing
                 total_time = time.perf_counter() - t_sample_start
@@ -637,9 +641,17 @@ class Runner:
                     exception_type=type(cause).__name__,
                     message=error_message,
                 )
+                cost = calculate_cost_from_agent_usage(model_name, agent_usage) if model_name and agent_usage else None
+                prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
+                    extract_token_counts(agent_usage)
+                )
                 if self.progress_callback:
                     await self.progress_callback.sample_error(
-                        sample_id, error_message, agent_id=agent_id, model_name=model_name
+                        sample_id,
+                        error_message,
+                        agent_id=agent_id,
+                        model_name=model_name,
+                        target_cost=cost if cost and cost > 0 else None,
                     )
                 return SampleResult(
                     sample=sample,
@@ -650,10 +662,13 @@ class Runner:
                     grade=GradeResult(score=0.0, rationale=f"Error: {error_message}"),
                     grades=None,
                     model_name=model_name,
-                    agent_usage=None,
-                    cost=None,
-                    prompt_tokens=None,
-                    completion_tokens=None,
+                    agent_usage=agent_usage,
+                    cost=cost if cost and cost > 0 else None,
+                    prompt_tokens=prompt_tokens if prompt_tokens > 0 else None,
+                    completion_tokens=completion_tokens if completion_tokens > 0 else None,
+                    cached_input_tokens=cached_input_tokens if cached_input_tokens > 0 else None,
+                    cache_write_tokens=cache_write_tokens if cache_write_tokens > 0 else None,
+                    reasoning_tokens=reasoning_tokens if reasoning_tokens > 0 else None,
                     total_time=time.perf_counter() - t_sample_start,
                     error=error_info,
                 )
