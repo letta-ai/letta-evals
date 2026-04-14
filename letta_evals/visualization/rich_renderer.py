@@ -175,17 +175,16 @@ class RichProgressRenderer:
         completed = runtime_state.completed_count + runtime_state.error_count
 
         if completed == 0:
-            errors_text = "Errored: N/A"
+            errors_text = "Errors: N/A"
         else:
             errors_pct = (runtime_state.error_count / completed * 100.0) if completed > 0 else 0.0
-            errors_text = f"Errored: {errors_pct:.1f}%"
+            errors_text = f"Errors: {errors_pct:.1f}%"
 
         chips = Text()
         chips.append(f"  {errors_text}", style="bold white")
 
-        if runtime_state.total_target_cost > 0:
-            chips.append("   ")
-            chips.append(f"Target cost: ${runtime_state.total_target_cost:.4f}", style="bold white")
+        chips.append("   ")
+        chips.append(f"Target cost: ${runtime_state.total_target_cost:.4f}", style="bold white")
 
         if runtime_state.metric_totals:
             chips.append("   ")
