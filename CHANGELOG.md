@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.14.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.13.0...letta-evals-v0.14.0) (2026-04-14)
+
+
+### Features
+
+* Training-loop improvements for letta-code target ([#237](https://github.com/letta-ai/letta-evals/issues/237)) ([e6f6946](https://github.com/letta-ai/letta-evals/commit/e6f69462abc61b815670e987fcef11d8c7fc922c))
+* **visualization:** Add live target cost to rich progress ([#236](https://github.com/letta-ai/letta-evals/issues/236)) ([d7740dc](https://github.com/letta-ai/letta-evals/commit/d7740dcb8af543f32c1b92b64a3a97609421e5f2))
+
+
+### Bug Fixes
+
+* Allow for longer inputs to letta code target by piping from stdin ([#222](https://github.com/letta-ai/letta-evals/issues/222)) ([3179b1f](https://github.com/letta-ai/letta-evals/commit/3179b1fc0d2a622bdfe4ca64dc516888fa1fb245))
+* Don't use --yolo when permission_mode is set ([#238](https://github.com/letta-ai/letta-evals/issues/238)) ([57491f7](https://github.com/letta-ai/letta-evals/commit/57491f72f34e8339e9a218545bc9695b3b408988))
+* Remove duplicate error logs and use consistent 0-indexed sample IDs ([#242](https://github.com/letta-ai/letta-evals/issues/242)) ([857a993](https://github.com/letta-ai/letta-evals/commit/857a993e23690ab90ddf1ffc990678e4d6ae3d42))
+* Set decorator metadata attributes on wrapper instead of original function ([#241](https://github.com/letta-ai/letta-evals/issues/241)) ([dac8faa](https://github.com/letta-ai/letta-evals/commit/dac8faa7f2797a74e79c239beba4e01ab8571383))
+
 ## [0.13.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.12.0...letta-evals-v0.13.0) (2026-04-03)
 
 
