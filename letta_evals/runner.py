@@ -628,7 +628,7 @@ class Runner:
                     agent_id = e.agent_id
                 agent_str = f" ({agent_id})" if agent_id else ""
                 log_message = str(e) or type(e).__name__
-                logger.error(f"Error running sample {sample_id + 1}{agent_str} with model {model_name}: {log_message}")
+                logger.error(f"Error running sample {sample_id}{agent_str} with model {model_name}: {log_message}")
                 category = ErrorCategory.TARGET if isinstance(e, TargetError) else phase
                 cause = e.__cause__ if e.__cause__ else e
                 error_message = str(e) or type(cause).__name__

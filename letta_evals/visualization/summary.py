@@ -139,7 +139,7 @@ def build_simple_sample_results_table(config: Dict[str, Any], displayed_results:
                 cells.append(f"{score:.2f}" if score is not None else "-")
 
         table.add_row(
-            f"Sample {sample_result.sample.id + 1}",
+            f"Sample {sample_result.sample.id}",
             sample_result.agent_id or "-",
             sample_result.model_name or "-",
             *cells,
@@ -174,7 +174,7 @@ def build_rich_sample_results_table(config: Dict[str, Any], displayed_results: l
                 cells.extend([f"{score:.2f}" if score is not None else "-", rationale])
 
         table.add_row(
-            f"Sample {sample_result.sample.id + 1}",
+            f"Sample {sample_result.sample.id}",
             sample_result.agent_id or "-",
             sample_result.model_name or "-",
             *cells,

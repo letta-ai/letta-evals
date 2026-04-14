@@ -392,7 +392,7 @@ class RichProgressRenderer:
             else:
                 details = ""
 
-            sample_num = str(sample.sample_id + 1)
+            sample_num = str(sample.sample_id)
             if sample.from_cache:
                 sample_num = f"{sample_num} ♻"
 
