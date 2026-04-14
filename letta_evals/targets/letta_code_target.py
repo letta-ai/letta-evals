@@ -234,9 +234,6 @@ class LettaCodeTarget(AbstractAgentTarget):
                 stderr_text = "".join(stderr_chunks)
 
                 if process.returncode != 0:
-                    logger.error(f"Letta command failed with return code {process.returncode}")
-                    logger.error(f"Stderr: {stderr_text}")
-
                     # Surface the last stdout event so the real error isn't lost
                     last_stdout_event = ""
                     for ev in reversed(events):
@@ -305,11 +302,6 @@ class LettaCodeTarget(AbstractAgentTarget):
                 attempt += 1
 
                 if attempt > self.max_retries:
-                    logger.error(
-                        f"Failed to run letta command for sample {sample.id} after {self.max_retries} retries. "
-                        f"Agent: {agent_id or factory_agent_id or 'unknown'}. "
-                        f"Final error: {type(e).__name__}: {str(e)}"
-                    )
                     timeout_hint = f"Timed out after {self.timeout}s" if isinstance(e, TimeoutError) else ""
                     msg = str(e) or timeout_hint or type(e).__name__
                     raise TargetError(msg, agent_id=agent_id or factory_agent_id) from e
