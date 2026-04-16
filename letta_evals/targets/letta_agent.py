@@ -8,7 +8,12 @@ from letta_client.types import LlmConfig, MessageCreateParam
 
 from letta_evals.models import Sample, TargetResult, TurnTokenData
 from letta_evals.targets.base import AbstractAgentTarget, TargetError
-from letta_evals.utils import consume_stream_with_resumes, list_all_run_messages, load_object
+from letta_evals.utils import (
+    consume_stream_with_resumes,
+    fetch_token_data,
+    list_all_run_messages,
+    load_object,
+)
 from letta_evals.visualization.base import ProgressCallback
 
 logger = logging.getLogger(__name__)
@@ -96,6 +101,7 @@ class LettaAgentTarget(AbstractAgentTarget):
 
                     trajectory = []
                     usage_stats: list[dict] = []
+                    run_ids: list[str] = []
 
                     inputs = sample.input if isinstance(sample.input, list) else [sample.input]
                     total_messages = len(inputs)
@@ -165,13 +171,17 @@ class LettaAgentTarget(AbstractAgentTarget):
                         if not run_id:
                             raise RuntimeError("Unexpected error: no run ID was found from background stream")
 
+                        run_ids.append(run_id)
                         messages = await list_all_run_messages(self.client, run_id)
                         trajectory.append(messages)
 
+                    # Dedupe repeated run IDs while preserving insertion order.
+                    deduped_run_ids = list(dict.fromkeys(run_ids))
+
                     # Fetch token-level data if requested (for RL training)
                     token_data: Optional[list[TurnTokenData]] = None
-                    if return_token_data and run_id:
-                        token_data = await self._fetch_token_data([run_id])
+                    if return_token_data and deduped_run_ids:
+                        token_data = await fetch_token_data(self.client, deduped_run_ids)
 
                     final_agent_state = None
                     if retrieve_agent_state:
@@ -185,6 +195,7 @@ class LettaAgentTarget(AbstractAgentTarget):
                         model_name=model_name,
                         agent_usage=usage_stats,
                         agent_state=final_agent_state,
+                        run_ids=deduped_run_ids,
                         token_data=token_data,
                     )
 
@@ -214,32 +225,3 @@ class LettaAgentTarget(AbstractAgentTarget):
                 await anyio.sleep(backoff_time)
 
         raise last_error or RuntimeError("Unexpected failure in agent run retry loop")
-
-    async def _fetch_token_data(self, run_ids: list[str]) -> list[TurnTokenData]:
-        """Fetch token-level data (IDs + logprobs) from the runs API.
-
-        For each run, re-fetches messages with ``return_token_ids=True`` to
-        obtain ``output_ids`` and ``output_token_logprobs`` per message.
-        """
-        token_data: list[TurnTokenData] = []
-        for run_id in run_ids:
-            try:
-                messages = await list_all_run_messages(
-                    self.client,
-                    run_id,
-                    params={"return_token_ids": "true"},
-                )
-                for msg in messages:
-                    output_ids = getattr(msg, "output_ids", None)
-                    output_token_logprobs = getattr(msg, "output_token_logprobs", None)
-                    if output_ids:
-                        token_data.append(
-                            TurnTokenData(
-                                role=getattr(msg, "role", "assistant"),
-                                output_ids=output_ids,
-                                output_token_logprobs=output_token_logprobs,
-                            )
-                        )
-            except Exception as e:
-                logger.warning(f"Could not fetch token data for run {run_id}: {e}")
-        return token_data

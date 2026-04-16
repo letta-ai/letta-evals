@@ -94,7 +94,7 @@ def test_build_simple_sample_results_table_contains_scores_only() -> None:
         "Accuracy score",
         "Quality score",
     ]
-    assert table.columns[0]._cells == ["Sample 1", "Sample 2"]
+    assert table.columns[0]._cells == ["Sample 0", "Sample 1"]
     assert table.columns[3]._cells == ["1.00", "0.25"]
     assert table.columns[4]._cells == ["0.50", "0.75"]
 

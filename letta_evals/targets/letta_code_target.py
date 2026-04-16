@@ -11,7 +11,12 @@ from letta_client import AsyncLetta
 
 from letta_evals.models import Sample, TargetResult, TurnTokenData
 from letta_evals.targets.base import AbstractAgentTarget, TargetError
-from letta_evals.utils import list_all_agent_messages, load_object
+from letta_evals.utils import (
+    fetch_token_data,
+    list_all_agent_messages,
+    list_run_ids,
+    load_object,
+)
 from letta_evals.visualization.base import ProgressCallback
 
 logger = logging.getLogger(__name__)
@@ -279,9 +284,11 @@ class LettaCodeTarget(AbstractAgentTarget):
                     )
 
                 # Fetch token-level data if requested (for RL training)
+                run_ids: Optional[list[str]] = None
                 token_data: Optional[list[TurnTokenData]] = None
                 if return_token_data and agent_id:
-                    token_data = await self._fetch_token_data(agent_id)
+                    run_ids = await list_run_ids(self.client, agent_id)
+                    token_data = await fetch_token_data(self.client, run_ids)
 
                 # Retrieve agent state if needed (e.g., for memory block extractors)
                 agent_state = None
@@ -294,6 +301,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                     model_name=self.model_handle,
                     agent_usage=usage_stats if usage_stats else None,
                     agent_state=agent_state,
+                    run_ids=run_ids,
                     token_data=token_data,
                 )
 
@@ -315,46 +323,3 @@ class LettaCodeTarget(AbstractAgentTarget):
                 await anyio.sleep(backoff_time)
 
         raise last_error or RuntimeError("Unexpected failure in letta command retry loop")
-
-    async def _fetch_token_data(self, agent_id: str) -> list[TurnTokenData]:
-        """Fetch token-level data (IDs + logprobs) for a letta code agent.
-
-        Retrieves messages with ``return_token_ids=True`` to get
-        ``output_ids`` and ``output_token_logprobs`` per message.
-        """
-        token_data: list[TurnTokenData] = []
-        try:
-            # Fetch ALL runs for this agent — client tools cause each tool-call
-            # round-trip to be a separate run, so token IDs are scattered.
-            runs_page = await self.client.runs.list(agent_id=agent_id, limit=100)
-            if not runs_page.items:
-                return token_data
-
-            # Token IDs are stored in run.metadata.result.turns (populated by SGLang native adapter)
-            for run_summary in runs_page.items:
-                run = await self.client.runs.retrieve(run_id=run_summary.id)
-                result = (run.metadata or {}).get("result", {})
-                for turn in result.get("turns") or []:
-                    output_ids = turn.get("output_ids")
-                    role = turn.get("role", "assistant")
-                    if output_ids:
-                        # Assistant turn with token IDs from SGLang
-                        token_data.append(
-                            TurnTokenData(
-                                role=role,
-                                output_ids=output_ids,
-                                output_token_logprobs=turn.get("output_token_logprobs"),
-                            )
-                        )
-                    elif role in ("tool", "tool_return", "tool_return_message") and turn.get("content"):
-                        # Tool return turn — no output_ids, but content is needed
-                        # for proper multi-turn token sequence reconstruction
-                        token_data.append(
-                            TurnTokenData(
-                                role=role,
-                                content=turn.get("content"),
-                            )
-                        )
-        except Exception as e:
-            logger.warning(f"Could not fetch token data for agent {agent_id}: {e}")
-        return token_data

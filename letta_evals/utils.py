@@ -15,12 +15,155 @@ from letta_evals.constants import (
     TURN_PASS_SYMBOL,
     TURN_PENDING_SYMBOL,
 )
-from letta_evals.models import Sample
+from letta_evals.models import Sample, TurnTokenData
 
 # Pattern to match reasoning effort suffixes
 _EFFORT_PATTERN = re.compile(r"-(low|medium|high|xhigh|max)$")
+_TOKEN_DATA_TOOL_ROLES = {"tool", "tool_return", "tool_return_message"}
 
 logger = logging.getLogger(__name__)
+
+
+def _timestamp_sort_key(value: Any) -> str:
+    """Normalize timestamp-like values for deterministic sorting."""
+    if value is None:
+        return ""
+    if hasattr(value, "isoformat"):
+        try:
+            return value.isoformat()
+        except Exception:
+            return str(value)
+    return str(value)
+
+
+def sort_items_oldest_first(items: List[Any]) -> List[Any]:
+    """Return items sorted by created_at/date then id (oldest to newest)."""
+
+    def _sort_key(item: Any) -> tuple[str, str]:
+        created_at = getattr(item, "created_at", None) or getattr(item, "date", None)
+        return _timestamp_sort_key(created_at), str(getattr(item, "id", ""))
+
+    return sorted(items, key=_sort_key)
+
+
+def dedupe_items_by_id(items: List[Any]) -> List[Any]:
+    """Dedupe object list by id while preserving first-seen order."""
+    deduped_items: List[Any] = []
+    seen_ids: set[str] = set()
+
+    for item in items:
+        item_id = getattr(item, "id", None)
+        if item_id and item_id in seen_ids:
+            continue
+        if item_id:
+            seen_ids.add(item_id)
+        deduped_items.append(item)
+
+    return deduped_items
+
+
+def extract_run_ids_from_summaries(run_summaries: List[Any]) -> List[str]:
+    """Extract deterministic, unique run IDs from run-summary objects."""
+    ordered = sort_items_oldest_first(run_summaries)
+    deduped = dedupe_items_by_id(ordered)
+    return [run_id for run_id in (getattr(summary, "id", None) for summary in deduped) if run_id]
+
+
+def _build_turn_token_data(
+    *,
+    role: str,
+    output_ids: Optional[List[int]],
+    output_token_logprobs: Optional[List[Any]],
+    content: Any,
+) -> Optional[TurnTokenData]:
+    if output_ids:
+        return TurnTokenData(
+            role=role,
+            output_ids=output_ids,
+            output_token_logprobs=output_token_logprobs,
+        )
+
+    if role in _TOKEN_DATA_TOOL_ROLES and content is not None:
+        text_content = content if isinstance(content, str) else str(content)
+        if text_content:
+            return TurnTokenData(role=role, content=text_content)
+
+    return None
+
+
+def extract_token_data_from_message(msg: Any) -> Optional[TurnTokenData]:
+    """Extract TurnTokenData from a message object."""
+    return _build_turn_token_data(
+        role=getattr(msg, "role", "assistant"),
+        output_ids=getattr(msg, "output_ids", None),
+        output_token_logprobs=getattr(msg, "output_token_logprobs", None),
+        content=getattr(msg, "content", None),
+    )
+
+
+def extract_token_data_from_messages(messages: List[Any]) -> List[TurnTokenData]:
+    """Extract token data from a list of message objects."""
+    return [td for msg in messages if (td := extract_token_data_from_message(msg)) is not None]
+
+
+def extract_token_data_from_turn(turn: Dict[str, Any]) -> Optional[TurnTokenData]:
+    """Extract TurnTokenData from a run.metadata.result.turn entry."""
+    return _build_turn_token_data(
+        role=turn.get("role", "assistant"),
+        output_ids=turn.get("output_ids"),
+        output_token_logprobs=turn.get("output_token_logprobs"),
+        content=turn.get("content"),
+    )
+
+
+def extract_token_data_from_turns(turns: List[Dict[str, Any]]) -> List[TurnTokenData]:
+    """Extract token data from run.metadata.result.turns entries."""
+    return [td for turn in turns if (td := extract_token_data_from_turn(turn)) is not None]
+
+
+async def list_run_ids(client: Any, agent_id: str) -> List[str]:
+    """List run IDs for an agent in deterministic oldest->newest order."""
+    try:
+        runs_page = await client.runs.list(agent_id=agent_id, limit=200)
+        run_summaries = list(getattr(runs_page, "items", None) or [])
+    except Exception as e:
+        logger.warning(f"Could not fetch run IDs for agent {agent_id}: {e}")
+        return []
+    return extract_run_ids_from_summaries(run_summaries)
+
+
+async def fetch_token_data(client: Any, run_ids: List[str]) -> List[TurnTokenData]:
+    """Fetch token data for runs in parallel, trying metadata then messages.
+
+    For each run, first checks ``run.metadata.result.turns`` (populated by
+    native-token adapters like SGLang).  If that's empty, falls back to
+    re-fetching messages with ``return_token_ids=true``.
+    """
+    import asyncio
+
+    async def _fetch_one(run_id: str) -> List[TurnTokenData]:
+        # Try metadata path first (single API call, used by native adapters)
+        run = await client.runs.retrieve(run_id=run_id)
+        turns = ((run.metadata or {}).get("result") or {}).get("turns") or []
+        if turns:
+            return extract_token_data_from_turns(turns)
+
+        # Fall back to messages path (used by hosted LLM endpoints)
+        messages = await list_all_run_messages(
+            client,
+            run_id,
+            params={"return_token_ids": "true"},
+        )
+        return extract_token_data_from_messages(messages)
+
+    results = await asyncio.gather(*[_fetch_one(rid) for rid in run_ids], return_exceptions=True)
+    token_data: List[TurnTokenData] = []
+    for rid, result in zip(run_ids, results):
+        if isinstance(result, Exception):
+            logger.warning(f"Could not fetch token data for run {rid}: {result}")
+        else:
+            token_data.extend(result)
+    return token_data
 
 
 def load_object(spec: str, base_dir: Path = None) -> Any:
@@ -326,7 +469,7 @@ async def list_all_run_messages(
             break
         after = last_id
 
-    return messages
+    return sort_items_oldest_first(dedupe_items_by_id(messages))
 
 
 async def list_all_agent_messages(

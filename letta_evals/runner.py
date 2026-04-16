@@ -37,6 +37,7 @@ from letta_evals.models import (
     SimpleCondition,
     SimpleGateSpec,
     SuiteSpec,
+    TargetResult,
     ToolGraderSpec,
     WeightedAverageGateSpec,
     _compare,
@@ -331,8 +332,8 @@ class Runner:
 
     async def _get_or_run_trajectory(
         self, sample: Sample, llm_config: Optional[LlmConfig | str], retrieve_agent_state: bool = False
-    ) -> tuple[List[List[LettaMessageUnion]], str, str, Optional[list[dict]], Optional[AgentState]]:
-        """Return (trajectory, agent_id, model_name, agent_usage, agent_state) using cache or by running the target.
+    ) -> TargetResult:
+        """Return trajectory data using cache or by running the target.
 
         If cache is enabled and contains an exact match, use it; otherwise run the target.
         """
@@ -356,27 +357,23 @@ class Runner:
                     await self.progress_callback.agent_created(
                         sample_id, agent_id=cached_result.agent_id, model_name=model_name, from_cache=True
                     )
-                return (
-                    cached_result.trajectory,
-                    cached_result.agent_id,
-                    model_name,
-                    getattr(cached_result, "agent_usage", None),
-                    getattr(cached_result, "agent_state", None),
+                return TargetResult(
+                    trajectory=cached_result.trajectory,
+                    agent_id=cached_result.agent_id,
+                    model_name=model_name,
+                    agent_usage=getattr(cached_result, "agent_usage", None),
+                    agent_state=getattr(cached_result, "agent_state", None),
+                    run_ids=getattr(cached_result, "run_ids", None),
+                    token_data=getattr(cached_result, "token_data", None),
                 )
 
         target = self._create_target(llm_config)
-        target_result = await target.run(
+        return await target.run(
             sample,
             progress_callback=self.progress_callback,
             project_id=self.project_id,
             retrieve_agent_state=retrieve_agent_state,
-        )
-        return (
-            target_result.trajectory,
-            target_result.agent_id,
-            target_result.model_name,
-            target_result.agent_usage,
-            target_result.agent_state,
+            return_token_data=True,
         )
 
     async def _grade_per_turn(
@@ -550,9 +547,10 @@ class Runner:
                 # check if any grader needs agent_state
                 phase = ErrorCategory.TARGET
                 retrieve_agent_state = self._requires_agent_state()
-                trajectory, agent_id, model_name, agent_usage, agent_state = await self._get_or_run_trajectory(
-                    sample, llm_config, retrieve_agent_state=retrieve_agent_state
-                )
+                tr = await self._get_or_run_trajectory(sample, llm_config, retrieve_agent_state=retrieve_agent_state)
+                trajectory, agent_id, model_name = tr.trajectory, tr.agent_id, tr.model_name
+                agent_usage, agent_state = tr.agent_usage, tr.agent_state
+                run_ids, token_data = tr.run_ids, tr.token_data
 
                 cost = calculate_cost_from_agent_usage(model_name, agent_usage) if model_name else None
                 prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
@@ -614,6 +612,8 @@ class Runner:
                     grades=grades_dict,
                     model_name=model_name,
                     agent_usage=agent_usage,
+                    run_ids=run_ids,
+                    token_data=token_data,
                     cost=cost,
                     prompt_tokens=prompt_tokens if prompt_tokens > 0 else None,
                     completion_tokens=completion_tokens if completion_tokens > 0 else None,
@@ -663,6 +663,8 @@ class Runner:
                     grades=None,
                     model_name=model_name,
                     agent_usage=agent_usage,
+                    run_ids=None,
+                    token_data=None,
                     cost=cost if cost and cost > 0 else None,
                     prompt_tokens=prompt_tokens if prompt_tokens > 0 else None,
                     completion_tokens=completion_tokens if completion_tokens > 0 else None,
