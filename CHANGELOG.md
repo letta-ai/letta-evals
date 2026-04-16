@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.14.0...letta-evals-v0.15.0) (2026-04-16)
+
+
+### Features
+
+* Add compute_gate_score() for per-sample reward computation ([#243](https://github.com/letta-ai/letta-evals/issues/243)) ([65ab71f](https://github.com/letta-ai/letta-evals/commit/65ab71fd2d653abf461ee2ea99788fde5ce05c2b))
+
 ## [0.14.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.13.0...letta-evals-v0.14.0) (2026-04-14)
 
 
