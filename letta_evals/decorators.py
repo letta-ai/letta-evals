@@ -53,8 +53,6 @@ def grader(func: Callable = None, *, name: str = None):
         registry_name = name or f.__name__
         GRADER_REGISTRY[registry_name] = f
 
-        f._is_grader = True
-
         if inspect.iscoroutinefunction(f):
 
             @wraps(f)
@@ -65,6 +63,9 @@ def grader(func: Callable = None, *, name: str = None):
             @wraps(f)
             def wrapper(*args, **kwargs):
                 return f(*args, **kwargs)
+
+        # Set on wrapper — functools.wraps doesn't copy custom attributes
+        wrapper._is_grader = True
 
         return wrapper
 
@@ -122,15 +123,20 @@ def extractor(func: Callable = None, *, name: str = None):
             if sig.return_annotation is not str:
                 raise TypeError(f"Extractor {f.__name__} must return str, got {sig.return_annotation}")
 
-        registry_name = name or f.__name__
-        EXTRACTOR_REGISTRY[registry_name] = f
-
+        # Set on f (read by registry lookup) and wrapper (read by load_object
+        # for module:func_name imports) — functools.wraps doesn't copy custom attrs
         f._is_extractor = True
         f._extractor_param_count = len(params)
+
+        registry_name = name or f.__name__
+        EXTRACTOR_REGISTRY[registry_name] = f
 
         @wraps(f)
         def wrapper(*args, **kwargs):
             return f(*args, **kwargs)
+
+        wrapper._is_extractor = True
+        wrapper._extractor_param_count = len(params)
 
         return wrapper
 
@@ -173,12 +179,12 @@ def agent_factory(func: Callable) -> Callable:
         if sig.return_annotation is not str:
             raise TypeError(f"Agent factory {func.__name__} must return str (agent_id), got {sig.return_annotation}")
 
-    # mark as validated agent factory
-    func._is_agent_factory = True
-
     @wraps(func)
     async def wrapper(*args, **kwargs):
         return await func(*args, **kwargs)
+
+    # Set on wrapper — functools.wraps doesn't copy custom attributes
+    wrapper._is_agent_factory = True
 
     return wrapper
 
@@ -232,10 +238,6 @@ def suite_setup(func: Callable) -> Callable:
         if sig.return_annotation is not None and sig.return_annotation is not None:
             raise TypeError(f"Suite setup {func.__name__} must return None, got {sig.return_annotation}")
 
-    # mark as validated suite setup and store param count
-    func._is_suite_setup = True
-    func._suite_setup_param_count = len(params)
-
     if inspect.iscoroutinefunction(func):
 
         @wraps(func)
@@ -246,5 +248,9 @@ def suite_setup(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
+
+    # Set on wrapper — functools.wraps doesn't copy custom attributes
+    wrapper._is_suite_setup = True
+    wrapper._suite_setup_param_count = len(params)
 
     return wrapper

@@ -158,6 +158,10 @@ class LettaCodeTargetSpec(BaseTargetSpec):
         description="Additional CLI flags to pass to letta code (e.g., '--memfs --context-window 8000'). "
         "Parsed with shell quoting rules so values with spaces can be quoted.",
     )
+    permission_mode: Optional[str] = Field(
+        default=None,
+        description="Permission mode for letta code (e.g., 'memory' to scope writes to memory roots).",
+    )
 
 
 TargetSpec = Annotated[
@@ -299,6 +303,28 @@ def normalize_weights(weights: Dict[str, float]) -> Dict[str, float]:
     return {k: v / total for k, v in weights.items()}
 
 
+def compute_gate_score(gate: "GateSpec", scores: Dict[str, float]) -> float:
+    """Compute a single reward score from per-grader scores using the gate config.
+
+    For simple gates, returns the score of the gate's metric_key.
+    For weighted_average gates, returns the normalized weighted sum.
+    For logical gates or unknown, falls back to averaging all scores.
+    """
+    if not scores:
+        return 0.0
+    # Import locally to avoid circular ref at module level
+    if hasattr(gate, "metric_key") and not hasattr(gate, "weights"):
+        # SimpleGateSpec
+        return scores.get(gate.metric_key, 0.0)
+    elif hasattr(gate, "weights"):
+        # WeightedAverageGateSpec
+        normalized = normalize_weights(gate.weights)
+        return sum(normalized.get(k, 0) * scores.get(k, 0) for k in normalized)
+    else:
+        # LogicalGateSpec or unknown — fall back to average
+        return sum(scores.values()) / len(scores)
+
+
 # gate models
 
 
@@ -390,6 +416,9 @@ class SuiteSpec(BaseModel):
     num_runs: Optional[int] = Field(default=1, description="Number of times to run the evaluation suite")
     max_concurrent: Optional[int] = Field(default=None, description="Maximum concurrent evaluations")
     output: Optional[Path] = Field(default=None, description="Directory where evaluation results are written")
+    cleanup: bool = Field(
+        default=False, description="Delete agents created during evaluation after each sample completes"
+    )
 
     setup_script: Optional[str] = Field(
         default=None, description="Path to Python script with setup function (e.g., setup.py:prepare_evaluation)"

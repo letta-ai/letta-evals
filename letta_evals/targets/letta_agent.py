@@ -204,10 +204,6 @@ class LettaAgentTarget(AbstractAgentTarget):
                 attempt += 1
 
                 if attempt > self.max_retries:
-                    logger.error(
-                        f"Failed to run agent for sample {sample.id} after {self.max_retries} retries. "
-                        f"Final error: {type(e).__name__}: {str(e)}"
-                    )
                     timeout_hint = f"Timed out after {self.timeout}s" if isinstance(e, TimeoutError) else ""
                     msg = str(e) or timeout_hint or type(e).__name__
                     raise TargetError(msg, agent_id=agent_id) from e

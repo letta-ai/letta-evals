@@ -1,8 +1,6 @@
-name: Publish to PyPI/TestPyPI
+name: Publish to PyPI/TestPyPI (Manual)
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       target:
@@ -16,15 +14,13 @@ on:
 jobs:
   build-and-publish-pypi:
     name: Publish to PyPI
-    if: >-
-      (github.event_name == 'release' && github.event.release.prerelease == false) ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'pypi')
+    if: github.event.inputs.target == 'pypi'
     runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/p/letta-evals
     permissions:
-      id-token: write  # for trusted publishing
+      id-token: write
       contents: read
     steps:
     - uses: actions/checkout@v4
@@ -49,16 +45,14 @@ jobs:
       uses: pypa/gh-action-pypi-publish@release/v1
 
   build-and-publish-testpypi:
-    name: Publish to TestPyPI (pre-releases)
-    if: >-
-      (github.event_name == 'release' && github.event.release.prerelease == true) ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'testpypi')
+    name: Publish to TestPyPI
+    if: github.event.inputs.target == 'testpypi'
     runs-on: ubuntu-latest
     environment:
       name: testpypi
       url: https://test.pypi.org/p/letta-evals
     permissions:
-      id-token: write  # for trusted publishing
+      id-token: write
       contents: read
     steps:
     - uses: actions/checkout@v4

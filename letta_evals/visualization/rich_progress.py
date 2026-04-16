@@ -1,15 +1,10 @@
+import asyncio
+import contextlib
 import time
-from dataclasses import dataclass
-from datetime import timedelta
-from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from rich.align import Align
-from rich.box import MINIMAL_DOUBLE_HEAD, ROUNDED
-from rich.console import Console, Group
-from rich.layout import Layout
+from rich.console import Console
 from rich.live import Live
-from rich.panel import Panel
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -21,59 +16,24 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 from rich.table import Table
-from rich.text import Text
 
-from letta_evals.types import GraderKind
-from letta_evals.utils import build_turn_symbols, calculate_turn_average
 from letta_evals.visualization.base import ProgressCallback
-
-
-class SampleState(Enum):
-    """States a sample can be in during evaluation"""
-
-    QUEUED = "queued"
-    LOADING_AGENT = "loading"
-    SENDING_MESSAGES = "sending"
-    GRADING = "grading"
-    GRADING_TURNS = "grading_turns"  # Per-turn grading in progress
-    COMPLETED = "completed"
-    FAILED = "failed"
-    ERROR = "error"
-
-
-@dataclass
-class SampleProgress:
-    """Track progress of individual sample"""
-
-    sample_id: int
-    state: SampleState = SampleState.QUEUED
-    agent_id: Optional[str] = None
-    model_name: Optional[str] = None
-    score: Optional[float] = None
-    rationale: Optional[str] = None
-    error: Optional[str] = None
-    messages_sent: int = 0
-    total_messages: int = 0
-    start_time: Optional[float] = None
-    end_time: Optional[float] = None
-    last_update_ts: Optional[float] = None
-    from_cache: bool = False
-    # Per-metric live data (for multi-grader runs)
-    metric_scores: Optional[Dict[str, float]] = None
-    metric_rationales: Optional[Dict[str, str]] = None
-    # Per-turn grading progress
-    turns_graded: int = 0
-    total_turns: int = 0
-    # Per-grader turn scores: grader_key -> list of scores (None for ungraded)
-    turn_scores: Optional[Dict[str, List[Optional[float]]]] = None
-
-
-class DisplayMode(Enum):
-    """Display modes for progress visualization"""
-
-    COMPACT = "compact"
-    STANDARD = "standard"
-    DETAILED = "detailed"
+from letta_evals.visualization.reducer import ProgressRuntimeState, ProgressStateReducer
+from letta_evals.visualization.rich_renderer import RichProgressRenderer
+from letta_evals.visualization.state import (
+    ProgressEvent,
+    SampleState,
+    VisualizationStats,
+)
+from letta_evals.visualization.summary import (
+    build_rich_sample_results_table,
+    format_gate_description,
+    get_displayed_sample_results,
+    get_metric_labels,
+    print_basic_overall_metrics,
+    print_remaining_samples_notice,
+    print_truncated_samples_notice,
+)
 
 
 class EvalProgress(ProgressCallback):
@@ -87,30 +47,27 @@ class EvalProgress(ProgressCallback):
         grader_kind: str = "tool",
         rubric_model: Optional[str] = None,
         max_concurrent: int = 15,
-        display_mode: DisplayMode = DisplayMode.STANDARD,
         console: Optional[Console] = None,
         update_freq: float = 2.0,
-        show_samples: bool = True,
         cached_mode: bool = False,
         metric_labels: Optional[Dict[str, str]] = None,
     ):
-        self.suite_name = suite_name
         self.total_samples = total_samples
-        self.target_kind = target_kind
-        self.grader_kind = grader_kind
-        self.rubric_model = rubric_model
-        self.max_concurrent = max_concurrent
-        self.display_mode = display_mode
-        self.show_samples = show_samples
         self.console = console or Console()
-        self.update_freq = update_freq
+        self.frame_interval = (1.0 / update_freq) if update_freq > 0 else 0.25
         self.cached_mode = cached_mode
-        self.metric_labels: Dict[str, str] = metric_labels or {}
-        # live aggregates per metric key
-        self.metric_totals: Dict[str, float] = {}
-        self.metric_counts: Dict[str, int] = {}
-
-        self.samples: Dict[tuple, SampleProgress] = {}  # key: (sample_id, model_name)
+        renderer_metric_labels: Dict[str, str] = metric_labels or {}
+        self._runtime_state = ProgressRuntimeState()
+        self._reducer = ProgressStateReducer(self._runtime_state)
+        self._renderer = RichProgressRenderer(
+            console=self.console,
+            suite_name=suite_name,
+            target_kind=target_kind,
+            grader_kind=grader_kind,
+            rubric_model=rubric_model,
+            max_concurrent=max_concurrent,
+            metric_labels=renderer_metric_labels,
+        )
         self.start_time = None
         self.live: Optional[Live] = None
         self.main_progress = Progress(
@@ -125,428 +82,32 @@ class EvalProgress(ProgressCallback):
             expand=True,
         )
         self.main_task_id = None
+        self._dirty = False
+        self._event_queue: Optional[asyncio.Queue[ProgressEvent]] = None
+        self._dirty_event: Optional[asyncio.Event] = None
+        self._event_task: Optional[asyncio.Task[None]] = None
+        self._render_task: Optional[asyncio.Task[None]] = None
+        self._background_error: Optional[BaseException] = None
+        self._reset_visualization_stats()
 
-        self.completed_count = 0
-        self.error_count = 0
-        self.total_score = 0.0
-        self.score_count = 0
-
-    def _get_state_icon(self, state: SampleState) -> Text:
-        """Get icon for sample state"""
-        icons = {
-            SampleState.QUEUED: ("⋯", "dim"),
-            SampleState.LOADING_AGENT: ("⊙", "yellow"),
-            SampleState.SENDING_MESSAGES: ("⚡", "cyan"),
-            SampleState.GRADING: ("🔍", "magenta"),
-            SampleState.GRADING_TURNS: ("🔍", "magenta"),
-            SampleState.COMPLETED: ("✓", "green"),
-            SampleState.FAILED: ("✗", "red"),
-            SampleState.ERROR: ("⚠", "red"),
-        }
-        icon, style = icons.get(state, ("?", "white"))
-        return Text(icon, style=style)
-
-    def _get_state_text(self, sample: SampleProgress) -> Text:
-        """Get text representation of sample state"""
-        icon = self._get_state_icon(sample.state)
-
-        if sample.state == SampleState.SENDING_MESSAGES and sample.total_messages > 0:
-            text = Text()
-            text.append(icon)
-            text.append(f" sending [{sample.messages_sent}/{sample.total_messages}]")
-            return text
-        elif sample.state == SampleState.GRADING_TURNS and sample.total_turns > 0:
-            text = Text()
-            text.append(icon)
-            text.append(f" grading [{sample.turns_graded}/{sample.total_turns}]")
-            return text
-        elif sample.state == SampleState.COMPLETED:
-            icon = Text("✓", style="green")
-            text = Text()
-            text.append(icon)
-            text.append(" completed")
-            return text
-        else:
-            text = Text()
-            text.append(icon)
-            text.append(f" {sample.state.value}")
-            return text
-
-    def _create_header_panel(self) -> Panel:
-        """Create header panel with suite info"""
-        header_title = Text(f"🧪 Evaluation: {self.suite_name}", style="bold white")
-        try:
-            header_title.apply_gradient("#00D1FF", "#7C3AED")
-        except Exception:
-            pass
-
-        subtitle = Text()
-        subtitle.append(f"Target: {self.target_kind}  •  ", style="dim")
-        subtitle.append(f"Grader: {self.grader_kind}  •  ", style="dim")
-        subtitle.append(f"Concurrent: {self.max_concurrent}", style="dim")
-
-        rows: List[Text] = [Align.center(header_title), Align.center(subtitle)]
-        if self.metric_labels:
-            metrics_line = Text("Metrics: ", style="dim")
-            metrics_line.append(", ".join(self.metric_labels.values()), style="white")
-            rows.append(Align.center(metrics_line))
-
-        content = Group(*rows)
-
-        return Panel(
-            content,
-            border_style="cyan",
-            box=MINIMAL_DOUBLE_HEAD,
-            padding=(0, 1),
-        )
-
-    def _create_samples_grid(self) -> Panel:
-        """Create grid showing sample states"""
-        if not self.show_samples or self.display_mode == DisplayMode.COMPACT:
-            return Panel("")
-
-        # collect all samples by their base sample_id
-        sample_by_id = {}
-        for key, sample in self.samples.items():
-            sample_id, _ = key
-            if sample_id not in sample_by_id or sample.last_update_ts > (sample_by_id[sample_id].last_update_ts or 0):
-                sample_by_id[sample_id] = sample
-
-        rows = []
-        samples_per_row = 15
-
-        for i in range(0, self.total_samples, samples_per_row):
-            row_text = Text(f"[{i + 1:3d}-{min(i + samples_per_row, self.total_samples):3d}] ", style="dim")
-
-            for j in range(i, min(i + samples_per_row, self.total_samples)):
-                sample = sample_by_id.get(j, SampleProgress(j))
-                icon = self._get_state_icon(sample.state)
-                if j > i:
-                    row_text.append(" ")  # space between icons
-                row_text.append(icon)
-
-            rows.append(row_text)
-
-        content = Group(*rows) if rows else Text("No samples", style="dim")
-
-        return Panel(
-            content,
-            title="Samples",
-            border_style="blue",
-            box=ROUNDED,
-            padding=(0, 1),
-        )
-
-    def _create_progress_with_metrics(self) -> Panel:
-        """Create progress bar with inline metrics"""
-        completed = self.completed_count + self.error_count
-
-        if completed == 0:
-            errors_text = "Errored: N/A"
-        else:
-            errors_pct = (self.error_count / completed * 100.0) if completed > 0 else 0.0
-            errors_text = f"Errored: {errors_pct:.1f}%"
-
-        chips = Text()
-        chips.append(f"  {errors_text}", style="bold white")
-        # add per-metric aggregates if available
-        if self.metric_totals:
-            chips.append("   ")
-            first = True
-            keys = list(self.metric_labels.keys()) if self.metric_labels else list(self.metric_totals.keys())
-            for key in keys:
-                if key not in self.metric_totals:
-                    continue
-                total = self.metric_totals[key]
-                cnt = self.metric_counts.get(key, 0)
-                if cnt == 0:
-                    continue
-                avg = total / cnt if cnt > 0 else 0.0
-                label = self.metric_labels.get(key, key)
-                if not first:
-                    chips.append("   ")
-                chips.append(f"{label}: {avg:.2f}", style="bold white")
-                first = False
-        chips.append("   ")
-        chips.append(f"✓ {self.completed_count}", style="green")
-        if self.error_count:
-            chips.append("   ")
-            chips.append(f"⚠ {self.error_count}", style="yellow")
-
-        content = Group(self.main_progress, Text(""), chips)
-
-        return Panel(content, box=ROUNDED, border_style="blue", padding=(0, 1))
-
-    def _create_metrics_panel(self) -> Panel:
-        """Create panel showing live metrics"""
-        completed = self.completed_count + self.error_count
-
-        if completed == 0:
-            errors_text_row = "N/A"
-        else:
-            errors_text_row = f"{(self.error_count / completed * 100.0):.1f}%"
-
-        metrics_table = Table.grid(padding=1)
-        metrics_table.add_column(style="cyan", justify="right")
-        metrics_table.add_column(style="white")
-
-        metrics_table.add_row("🛡️ Errored:", f"{errors_text_row} ({self.error_count}/{completed})")
-
-        if self.score_count > 0:
-            avg_score = self.total_score / self.score_count
-            metrics_table.add_row("📈 Avg Score:", f"{avg_score:.2f}")
-
-        if self.error_count > 0:
-            metrics_table.add_row("⚠️ Errors:", str(self.error_count))
-
-        # Per-metric grid
-        if self.metric_totals:
-            metrics_table.add_row("", "")
-            metrics_table.add_row("[bold]By Metric[/bold]", "")
-            for key in self.metric_labels.keys() or self.metric_totals.keys():
-                if key not in self.metric_totals:
-                    continue
-                total = self.metric_totals.get(key, 0.0)
-                cnt = self.metric_counts.get(key, 0)
-                avg = total / cnt if cnt > 0 else 0.0
-                label = self.metric_labels.get(key, key)
-                metrics_table.add_row(f"• {label}:", f"avg={avg:.2f}")
-
-        if self.start_time and completed > 0 and completed < self.total_samples:
-            elapsed = time.time() - self.start_time
-            rate = completed / elapsed
-            remaining = self.total_samples - completed
-            eta = remaining / rate if rate > 0 else 0
-            eta_text = str(timedelta(seconds=int(eta)))
-            metrics_table.add_row("⏱️ ETA:", eta_text)
-
-        return Panel(
-            metrics_table,
-            title="Metrics",
-            border_style="green",
-            box=ROUNDED,
-            padding=(0, 1),
-        )
-
-    def _create_detailed_view(self) -> Table:
-        """Create a modern, height-aware table that prioritizes active and recent samples.
-
-        Strategy:
-        - Compute how many rows fit in the terminal, accounting for header/progress chrome.
-        - Always show currently active samples (loading/sending/grading).
-        - Fill remaining space with most-recently updated completed/failed/error samples.
-        - If still space, rotate through queued items to give visibility without overflowing.
-        """
-        terminal_height = self.console.height
-
-        available_lines = max(5, terminal_height - 10)
-        # Account for table chrome (title, headers, borders)
-        max_rows = max(1, available_lines - 5)
-        n_rows = min(self.total_samples, max_rows)
-
-        def last_update_key(s: SampleProgress) -> float:
-            return s.last_update_ts or s.end_time or s.start_time or 0.0
-
-        active_states = {
-            SampleState.LOADING_AGENT,
-            SampleState.SENDING_MESSAGES,
-            SampleState.GRADING,
-            SampleState.GRADING_TURNS,
-        }
-        completed_states = {SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR}
-
-        # gather all samples
-        samples_list = list(self.samples.values())
-        active = [s for s in samples_list if s.state in active_states]
-        active.sort(key=lambda s: (s.model_name or "", s.sample_id))
-
-        recent_done = [s for s in samples_list if s.state in completed_states]
-        recent_done.sort(key=lambda s: (s.model_name or "", s.sample_id))
-
-        queued = [s for s in samples_list if s.state == SampleState.QUEUED]
-        queued.sort(key=lambda s: (s.model_name or "", s.sample_id))
-
-        rows: List[SampleProgress] = []
-
-        rows.extend(active[:n_rows])
-        remaining = n_rows - len(rows)
-
-        # 2) Show a rotating window of recently updated completed items
-        if remaining > 0 and recent_done:
-            rotation_period = 5
-            page_size = remaining
-            pages = (len(recent_done) + page_size - 1) // page_size
-            page_idx = int(time.time() // rotation_period) % max(1, pages)
-            start = page_idx * page_size
-            rows.extend(recent_done[start : start + page_size])
-            remaining = n_rows - len(rows)
-
-        # 3) Fill any remaining with queued, also rotated
-        if remaining > 0 and queued:
-            page_size = remaining
-            pages = (len(queued) + page_size - 1) // page_size
-            page_idx = int(time.time() // 7) % max(1, pages)
-            start = page_idx * page_size
-            rows.extend(queued[start : start + page_size])
-
-        showing = len(rows)
-        title = (
-            f"Active + recent · showing {showing} of {self.total_samples}"
-            if showing < self.total_samples
-            else f"All {self.total_samples} samples"
-        )
-
-        table = Table(
-            title=f"{title}  (♻ means cached)",
-            show_header=True,
-            header_style="bold cyan",
-            border_style="blue",
-            box=ROUNDED,
-            expand=True,
-        )
-
-        table.add_column("#", style="cyan", width=5)
-        table.add_column("Agent ID", style="dim cyan", no_wrap=False)
-        table.add_column("Model", style="yellow", width=27)
-        if self.grader_kind == GraderKind.MODEL_JUDGE.value and self.rubric_model:
-            table.add_column("Rubric Model", style="magenta", width=27)
-        table.add_column("Status", width=20)
-        # Add per-metric columns (score + rationale) or single score/rationale
-        metric_keys = list(self.metric_labels.keys())
-        if metric_keys:
-            for mk in metric_keys:
-                lbl = self.metric_labels.get(mk, mk)
-                table.add_column(f"{lbl} Score", width=10, justify="right")
-                table.add_column(f"{lbl} Rationale", width=45, justify="left")
-        else:
-            table.add_column("Score", width=10, justify="right")
-            table.add_column("Rationale", width=45, justify="left")
-        table.add_column("Time", width=8, justify="right")
-        table.add_column("Details", justify="left")
-
-        for s in rows:
-            if s.start_time and s.end_time:
-                duration = s.end_time - s.start_time
-                time_text = f"{duration:.1f}s"
-            elif s.start_time:
-                duration = time.time() - s.start_time
-                time_text = f"{duration:.1f}s"
-            else:
-                time_text = "-"
-
-            # Build score/rationale cells
-            cells: List[str] = []
-
-            # Check if we're in per-turn grading mode
-            if s.state == SampleState.GRADING_TURNS and s.turn_scores:
-                if self.metric_labels:
-                    # Show per-grader progress in respective columns
-                    for mk in metric_keys:
-                        grader_scores = s.turn_scores.get(mk)
-                        if grader_scores:
-                            score_cell = f"{calculate_turn_average(grader_scores):.2f}"
-                            rat = build_turn_symbols(grader_scores)
-                        else:
-                            score_cell = "-"
-                            rat = ""
-                        cells.extend([score_cell, rat])
-                else:
-                    # Single grader mode - use first/default grader
-                    first_grader = next(iter(s.turn_scores.values()), None)
-                    if first_grader:
-                        score_cell = f"{calculate_turn_average(first_grader):.2f}"
-                        rat = build_turn_symbols(first_grader)
-                    else:
-                        score_cell = "-"
-                        rat = ""
-                    cells.extend([score_cell, rat])
-            elif self.metric_labels:
-                for mk in metric_keys:
-                    val = None
-                    rat = ""
-                    if s.metric_scores and mk in s.metric_scores:
-                        val = s.metric_scores.get(mk)
-                    if s.metric_rationales and mk in s.metric_rationales:
-                        rat = s.metric_rationales.get(mk) or ""
-                    score_cell = f"{val:.2f}" if isinstance(val, (int, float)) and val is not None else "-"
-                    if rat and len(rat) > 50:
-                        rat = rat[:47] + "..."
-                    cells.extend([score_cell, rat])
-            else:
-                score_cell = f"{s.score:.2f}" if s.score is not None else "-"
-                rat = s.rationale or ""
-                if rat and len(rat) > 50:
-                    rat = rat[:47] + "..."
-                cells.extend([score_cell, rat])
-
-            if s.state == SampleState.SENDING_MESSAGES and s.total_messages > 0:
-                p = s.messages_sent / s.total_messages
-                bar_width = max(10, min(30, max(10, self.console.width // 6)))
-                filled = int(p * bar_width)
-                bar = "▰" * filled + "▱" * (bar_width - filled)
-                details = f"{bar}  msg {s.messages_sent}/{s.total_messages}"
-            elif s.state == SampleState.GRADING_TURNS and s.total_turns > 0:
-                p = s.turns_graded / s.total_turns
-                bar_width = max(10, min(30, max(10, self.console.width // 6)))
-                filled = int(p * bar_width)
-                bar = "▰" * filled + "▱" * (bar_width - filled)
-                details = f"{bar}  turn {s.turns_graded}/{s.total_turns}"
-            elif s.state == SampleState.LOADING_AGENT:
-                details = "Loading from cache…" if s.from_cache else "Loading agent…"
-            elif s.state == SampleState.GRADING:
-                details = "Grading response…"
-            elif s.state == SampleState.COMPLETED:
-                details = "[green]✓ Completed[/green]"
-            elif s.state == SampleState.ERROR:
-                details = f"[red]Error: {s.error[:25]}…[/red]" if s.error else "[red]Error[/red]"
-            elif s.state == SampleState.QUEUED:
-                details = "[dim]Waiting…[/dim]"
-            else:
-                details = ""
-
-            sample_num = str(s.sample_id + 1)
-            if s.from_cache:
-                sample_num = f"{sample_num} ♻"
-
-            row_data = [
-                sample_num,
-                s.agent_id or "-",
-                s.model_name or "-",
-            ]
-            if self.grader_kind == GraderKind.MODEL_JUDGE.value and self.rubric_model:
-                row_data.append(self.rubric_model)
-            row_data.extend([self._get_state_text(s), *cells, time_text, details])
-            table.add_row(*row_data)
-
-        return table
-
-    def _render(self) -> Layout:
-        """Render the complete progress display"""
-        layout = Layout()
-
-        layout.split_column(
-            Layout(self._create_header_panel(), size=4),
-            Layout(self._create_progress_with_metrics(), size=5),  # increased size to show both progress and metrics
-            Layout(self._create_detailed_view()),
-        )
-
-        return layout
+    def _render(self):
+        """Render the complete progress display."""
+        return self._renderer.render(self._runtime_state, self.main_progress)
 
     def reset(self):
         """Reset counters and state for a new run"""
-        self.completed_count = 0
-        self.error_count = 0
-        self.total_score = 0.0
-        self.score_count = 0
-        self.samples.clear()
-        self.metric_totals.clear()
-        self.metric_counts.clear()
+        self.start_time = time.time()
+        self._background_error = None
+        self._reset_visualization_stats()
+        self._reducer.reset()
         if self.main_task_id is not None:
             self.main_progress.update(self.main_task_id, completed=0)
+        self._mark_dirty()
 
     async def start(self):
         """Start the progress display"""
         self.start_time = time.time()
+        self._background_error = None
         task_description = "Re-grading cached trajectories" if self.cached_mode else "Evaluating samples"
         self.main_task_id = self.main_progress.add_task(
             task_description,
@@ -558,19 +119,129 @@ class EvalProgress(ProgressCallback):
         # no longer pre-populate since we need model_name for the key
 
         self.live = Live(
-            self._render(),
             console=self.console,
-            refresh_per_second=self.update_freq,
+            auto_refresh=False,
             transient=False,
-            vertical_overflow="visible",
+            vertical_overflow="ellipsis",
+            get_renderable=self._render,
         )
         self.live.start()
+        self._start_background_tasks()
+        self._mark_dirty()
+        self._refresh_live(reason="start")
 
     def stop(self):
         """Stop the progress display"""
+        self._stop_background_tasks()
         if self.live:
+            if self._dirty:
+                with contextlib.suppress(Exception):
+                    self._refresh_live(reason="stop")
             self.live.stop()
+            self.live = None
             self.console.print()
+
+    def _mark_dirty(self) -> None:
+        self._dirty = True
+        self._dirty_mark_count += 1
+        if self._dirty_event is not None:
+            self._dirty_event.set()
+
+    def _refresh_live(self, reason: str = "tick", *, force: bool = False) -> None:
+        if not self.live or (not force and not self._dirty):
+            return
+        self.live.refresh()
+        self._refresh_count += 1
+        self._refresh_reasons[reason] = self._refresh_reasons.get(reason, 0) + 1
+        self._dirty = False
+
+    def _record_background_error(self, task: asyncio.Task[None]) -> None:
+        with contextlib.suppress(asyncio.CancelledError):
+            exc = task.exception()
+            if exc is not None and self._background_error is None:
+                self._background_error = exc
+
+    def _raise_background_error(self) -> None:
+        if self._background_error is not None:
+            raise RuntimeError("EvalProgress background task failed") from self._background_error
+
+    def _start_background_tasks(self) -> None:
+        self._stop_background_tasks()
+        self._event_queue = asyncio.Queue()
+        self._dirty_event = asyncio.Event()
+        self._event_task = asyncio.create_task(self._event_loop())
+        self._render_task = asyncio.create_task(self._render_loop())
+        self._event_task.add_done_callback(self._record_background_error)
+        self._render_task.add_done_callback(self._record_background_error)
+
+    def _stop_background_tasks(self) -> None:
+        for task in (self._event_task, self._render_task):
+            if task is not None and not task.done():
+                task.cancel()
+        self._event_task = None
+        self._render_task = None
+        self._event_queue = None
+        self._dirty_event = None
+
+    async def _event_loop(self) -> None:
+        queue = self._event_queue
+        if queue is None:
+            return
+        while True:
+            event = await queue.get()
+            try:
+                self._apply_event(event)
+                self._events_processed += 1
+            except Exception as exc:
+                if event.ack is not None and not event.ack.done():
+                    event.ack.set_exception(exc)
+                raise
+            else:
+                self._mark_dirty()
+                if event.ack is not None and not event.ack.done():
+                    event.ack.set_result(None)
+            finally:
+                queue.task_done()
+
+    async def _render_loop(self) -> None:
+        dirty_event = self._dirty_event
+        if dirty_event is None:
+            return
+        while True:
+            if not self._dirty:
+                try:
+                    await asyncio.wait_for(dirty_event.wait(), timeout=self.frame_interval)
+                except asyncio.TimeoutError:
+                    self._render_wakeup_count += 1
+                    self._refresh_live(reason="timer", force=True)
+                    continue
+                dirty_event.clear()
+
+            self._render_wakeup_count += 1
+            await asyncio.sleep(self.frame_interval)
+            self._refresh_live(reason="dirty")
+
+    async def _emit_event(self, kind: str, **payload: Any) -> None:
+        self._raise_background_error()
+        self._events_emitted += 1
+
+        if self._event_queue is None:
+            self._apply_event(ProgressEvent(kind=kind, payload=payload))
+            self._events_processed += 1
+            self._mark_dirty()
+            return
+
+        loop = asyncio.get_running_loop()
+        ack: asyncio.Future[None] = loop.create_future()
+        await self._event_queue.put(ProgressEvent(kind=kind, payload=payload, ack=ack))
+        self._max_queue_depth = max(self._max_queue_depth, self._event_queue.qsize())
+        await ack
+        self._raise_background_error()
+
+    def _apply_event(self, event: ProgressEvent) -> None:
+        result = self._reducer.apply_event(event)
+        if result.progress_completed is not None:
+            self.main_progress.update(self.main_task_id, completed=result.progress_completed)
 
     async def update_sample_state(
         self,
@@ -580,73 +251,19 @@ class EvalProgress(ProgressCallback):
         model_name: Optional[str] = None,
         **kwargs,
     ):
-        """Update state of a sample"""
-        key = (sample_id, model_name)
-
-        # If we have a model_name and there's an existing entry with None, migrate it
-        if model_name is not None:
-            old_key = (sample_id, None)
-            if old_key in self.samples and key not in self.samples:
-                # Migrate the old entry to the new key
-                self.samples[key] = self.samples[old_key]
-                self.samples[key].model_name = model_name
-                del self.samples[old_key]
-
-        if key not in self.samples:
-            self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
-
-        sample = self.samples[key]
-        previous_state = sample.state
-        sample.state = state
-
-        if agent_id is not None and sample.agent_id != agent_id:
-            sample.agent_id = agent_id
-
-        if model_name is not None and sample.model_name != model_name:
-            sample.model_name = model_name
-
-        if state == SampleState.LOADING_AGENT and sample.start_time is None:
-            sample.start_time = time.time()
-        elif state in [SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR]:
-            sample.end_time = time.time()
-
-        for key, value in kwargs.items():
-            if hasattr(sample, key):
-                setattr(sample, key, value)
-        sample.last_update_ts = time.time()
-
-        terminal_states = {SampleState.COMPLETED, SampleState.FAILED, SampleState.ERROR}
-        is_new_completion = previous_state not in terminal_states and state in terminal_states
-
-        if state == SampleState.COMPLETED and is_new_completion:
-            self.completed_count += 1
-
-            if sample.score is not None:
-                self.total_score += sample.score
-                self.score_count += 1
-
-            # Update per-metric aggregates before render so the header shows correct averages
-            if sample.metric_scores:
-                for mkey, mscore in sample.metric_scores.items():
-                    self.metric_totals[mkey] = self.metric_totals.get(mkey, 0.0) + (mscore or 0.0)
-                    self.metric_counts[mkey] = self.metric_counts.get(mkey, 0) + 1
-
-            completed = self.completed_count + self.error_count
-            self.main_progress.update(self.main_task_id, completed=completed)
-
-        elif state == SampleState.ERROR and is_new_completion:
-            self.error_count += 1
-            completed = self.completed_count + self.error_count
-            self.main_progress.update(self.main_task_id, completed=completed)
-
-        if self.live:
-            self.live.update(self._render())
+        """Queue a state transition for the reducer task."""
+        await self._emit_event(
+            "update_sample_state",
+            sample_id=sample_id,
+            state=state,
+            agent_id=agent_id,
+            model_name=model_name,
+            **kwargs,
+        )
 
     async def sample_started(self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None):
         """Mark sample as started"""
-        key = (sample_id, model_name)
-        if key not in self.samples:
-            self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
+        self._reducer.ensure_sample(sample_id, agent_id=agent_id, model_name=model_name)
         # skip loading state if using cached trajectories
         if not self.cached_mode:
             await self.update_sample_state(
@@ -681,13 +298,7 @@ class EvalProgress(ProgressCallback):
 
     async def grading_started(self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None):
         """Mark sample as being graded"""
-        key = (sample_id, model_name)
-        # Check both the current key and the None key for from_cache flag
-        existing_from_cache = False
-        if key in self.samples:
-            existing_from_cache = self.samples[key].from_cache
-        elif model_name is not None and (sample_id, None) in self.samples:
-            existing_from_cache = self.samples[(sample_id, None)].from_cache
+        existing_from_cache = self._reducer.get_from_cache(sample_id, model_name)
 
         await self.update_sample_state(
             sample_id, SampleState.GRADING, agent_id=agent_id, model_name=model_name, from_cache=existing_from_cache
@@ -704,36 +315,22 @@ class EvalProgress(ProgressCallback):
         model_name: Optional[str] = None,
     ):
         """Update progress for per-turn grading"""
-        key = (sample_id, model_name)
-
-        # Get existing from_cache flag
-        existing_from_cache = False
-        if key in self.samples:
-            existing_from_cache = self.samples[key].from_cache
-        elif model_name is not None and (sample_id, None) in self.samples:
-            existing_from_cache = self.samples[(sample_id, None)].from_cache
-
-        # Initialize sample and turn_scores dict BEFORE updating state
-        if key not in self.samples:
-            self.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
-        if self.samples[key].turn_scores is None:
-            self.samples[key].turn_scores = {}
-
-        # Initialize this grader's turn scores if needed
-        gk = grader_key or "_default"
-        if gk not in self.samples[key].turn_scores:
-            self.samples[key].turn_scores[gk] = [None] * total_turns
-
-        # Update score at the turn index for this grader
-        if turn_num < len(self.samples[key].turn_scores[gk]):
-            self.samples[key].turn_scores[gk][turn_num] = turn_score
+        sample = self._reducer.record_turn_grade(
+            sample_id,
+            turn_num=turn_num,
+            total_turns=total_turns,
+            turn_score=turn_score,
+            grader_key=grader_key,
+            agent_id=agent_id,
+            model_name=model_name,
+        )
 
         await self.update_sample_state(
             sample_id,
             SampleState.GRADING_TURNS,
             agent_id=agent_id,
             model_name=model_name,
-            from_cache=existing_from_cache,
+            from_cache=sample.from_cache,
             turns_graded=turn_num + 1,  # turn_num is 0-indexed
             total_turns=total_turns,
         )
@@ -743,19 +340,14 @@ class EvalProgress(ProgressCallback):
         sample_id: int,
         agent_id: Optional[str] = None,
         score: Optional[float] = None,
+        target_cost: Optional[float] = None,
         model_name: Optional[str] = None,
         metric_scores: Optional[Dict[str, float]] = None,
         rationale: Optional[str] = None,
         metric_rationales: Optional[Dict[str, str]] = None,
     ):
         """Mark sample as completed"""
-        # preserve from_cache flag if it was set
-        key = (sample_id, model_name)
-        existing_from_cache = False
-        if key in self.samples:
-            existing_from_cache = self.samples[key].from_cache
-        elif model_name is not None and (sample_id, None) in self.samples:
-            existing_from_cache = self.samples[(sample_id, None)].from_cache
+        existing_from_cache = self._reducer.get_from_cache(sample_id, model_name)
 
         await self.update_sample_state(
             sample_id,
@@ -763,6 +355,7 @@ class EvalProgress(ProgressCallback):
             agent_id=agent_id,
             model_name=model_name,
             score=score,
+            target_cost=target_cost,
             rationale=rationale,
             from_cache=existing_from_cache,
             metric_scores=metric_scores,
@@ -770,7 +363,12 @@ class EvalProgress(ProgressCallback):
         )
 
     async def sample_error(
-        self, sample_id: int, error: str, agent_id: Optional[str] = None, model_name: Optional[str] = None
+        self,
+        sample_id: int,
+        error: str,
+        agent_id: Optional[str] = None,
+        model_name: Optional[str] = None,
+        target_cost: Optional[float] = None,
     ):
         """Mark sample as having an error"""
         await self.update_sample_state(
@@ -779,28 +377,45 @@ class EvalProgress(ProgressCallback):
             agent_id=agent_id,
             model_name=model_name,
             error=error,
+            target_cost=target_cost,
         )
+
+    def get_stats_snapshot(self) -> VisualizationStats:
+        """Return instrumentation counters for tuning the live renderer."""
+        runtime_seconds = (time.time() - self.start_time) if self.start_time is not None else 0.0
+        pending_events = self._event_queue.qsize() if self._event_queue is not None else 0
+        return VisualizationStats(
+            events_emitted=self._events_emitted,
+            events_processed=self._events_processed,
+            refreshes=self._refresh_count,
+            refreshes_by_reason=dict(self._refresh_reasons),
+            render_wakeups=self._render_wakeup_count,
+            dirty_marks=self._dirty_mark_count,
+            max_queue_depth=self._max_queue_depth,
+            pending_events=pending_events,
+            frame_interval=self.frame_interval,
+            runtime_seconds=runtime_seconds,
+        )
+
+    def _reset_visualization_stats(self) -> None:
+        self._events_emitted = 0
+        self._events_processed = 0
+        self._refresh_count = 0
+        self._refresh_reasons: Dict[str, int] = {}
+        self._render_wakeup_count = 0
+        self._dirty_mark_count = 0
+        self._max_queue_depth = 0
 
     async def suite_completed(self, result):
         """Display summary and detailed results after evaluation completes"""
-        from letta_evals.constants import MAX_SAMPLES_DISPLAY
-
         self.console.print()
         self.console.print(f"[bold]Evaluation Results: {result.suite}[/bold]")
         if self.cached_mode:
             self.console.print("[dim]Note: Results re-graded from cached trajectories[/dim]")
         self.console.print("=" * 50)
 
-        # overall metrics
         metrics = result.metrics
-        self.console.print("\n[bold]Overall Metrics:[/bold]")
-        self.console.print(f"  Total samples: {metrics.total}")
-        self.console.print(f"  Total attempted: {metrics.total_attempted}")
-        errors = metrics.total - metrics.total_attempted
-        errors_pct = (errors / metrics.total * 100.0) if metrics.total > 0 else 0.0
-        self.console.print(f"  Errored: {errors_pct:.1f}% ({errors}/{metrics.total})")
-        self.console.print(f"  Average score (attempted): {metrics.avg_score_attempted:.2f}")
-        self.console.print(f"  Average score (total): {metrics.avg_score_total:.2f}")
+        print_basic_overall_metrics(self.console, metrics)
 
         # usage metrics
         if metrics.usage_metrics:
@@ -823,11 +438,7 @@ class EvalProgress(ProgressCallback):
             metrics_table.add_column("Metric", style="cyan")
             metrics_table.add_column("Avg Score (Attempted)", style="white")
             metrics_table.add_column("Avg Score (Total)", style="white")
-            # build key->label mapping from config
-            label_map = {}
-            if "graders" in result.config and isinstance(result.config["graders"], dict):
-                for key, gspec in result.config["graders"].items():
-                    label_map[key] = gspec.get("display_name") or key
+            label_map = get_metric_labels(result.config)
 
             for key, agg in metrics.by_metric.items():
                 label = label_map.get(key, key)
@@ -884,110 +495,19 @@ class EvalProgress(ProgressCallback):
                 self.console.print(usage_table)
 
         # gate status
-        gate = result.config["gate"]
-        gate_kind = gate.get("kind", "simple")
         status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
-
-        op_symbols = {"gt": ">", "gte": "≥", "lt": "<", "lte": "≤", "eq": "="}
-
-        # format gate description based on kind
-        if gate_kind == "simple":
-            gate_op = gate["op"]
-            gate_value = gate["value"]
-            gate_aggregation = gate.get("aggregation", "avg_score")
-            gate_metric_key = gate.get("metric_key")
-            op_symbol = op_symbols.get(gate_op, gate_op)
-
-            # get display name
-            display_label = None
-            if gate_metric_key and "graders" in result.config and isinstance(result.config["graders"], dict):
-                gspec = result.config["graders"].get(gate_metric_key)
-                if gspec:
-                    display_label = gspec.get("display_name")
-            metric_label = display_label or gate_metric_key or "metric"
-
-            gate_desc = f"'{metric_label}' {gate_aggregation} {op_symbol} {gate_value}"
-
-        elif gate_kind == "weighted_average":
-            weights = gate.get("weights", {})
-            gate_op = gate["op"]
-            gate_value = gate["value"]
-            gate_aggregation = gate.get("aggregation", "avg_score")
-            op_symbol = op_symbols.get(gate_op, gate_op)
-
-            weight_strs = [f"{k}({w})" for k, w in weights.items()]
-            gate_desc = f"weighted_average[{', '.join(weight_strs)}] {gate_aggregation} {op_symbol} {gate_value}"
-
-        elif gate_kind == "logical":
-            operator = gate.get("operator", "and").upper()
-            num_conditions = len(gate.get("conditions", []))
-            gate_desc = f"logical {operator} with {num_conditions} conditions"
-
-        else:
-            gate_desc = f"unknown gate kind: {gate_kind}"
+        gate_desc = format_gate_description(
+            result.config,
+            prefer_display_label=True,
+            quote_metric_label=True,
+            default_metric_label="metric",
+        )
 
         self.console.print(f"\n[bold]Gate:[/bold] {gate_desc} → {status}")
 
         # sample results table
         self.console.print("\n[bold]Sample Results:[/bold]")
-
-        total_samples = len(result.results)
-        sorted_results = sorted(result.results, key=lambda r: (r.model_name or "", r.sample.id))
-        samples_to_display = sorted_results[:MAX_SAMPLES_DISPLAY]
-
-        if total_samples > MAX_SAMPLES_DISPLAY:
-            self.console.print(f"[dim]Showing first {MAX_SAMPLES_DISPLAY} of {total_samples} samples[/dim]")
-
-        table = Table(show_header=True, header_style="bold cyan", border_style="blue", box=ROUNDED)
-        table.add_column("Sample", style="cyan", no_wrap=True)
-        table.add_column("Agent ID", style="dim cyan", no_wrap=False)
-        table.add_column("Model", style="yellow", no_wrap=True)
-
-        # determine available metrics and display labels
-        metric_keys = []
-        metric_labels = {}
-        if "graders" in result.config and isinstance(result.config["graders"], dict):
-            for k, gspec in result.config["graders"].items():
-                metric_keys.append(k)
-                metric_labels[k] = gspec.get("display_name") or k
-
-        # add two sub-columns per metric: score + rationale
-        for mk in metric_keys:
-            lbl = metric_labels.get(mk, mk)
-            table.add_column(f"{lbl} score", style="white", no_wrap=True)
-            table.add_column(f"{lbl} rationale", style="dim", no_wrap=False)
-
-        for sample_result in samples_to_display:
-            # build per-metric cells in config order
-            cells = []
-            for mk in metric_keys:
-                g = sample_result.grades.get(mk) if sample_result.grades else None
-                if g is None:
-                    cells.extend(["-", ""])
-                else:
-                    try:
-                        s_val = float(getattr(g, "score", None))
-                        r_text = getattr(g, "rationale", None) or ""
-                    except Exception:
-                        try:
-                            s_val = float(g.get("score"))
-                            r_text = g.get("rationale", "")
-                        except Exception:
-                            s_val = None
-                            r_text = ""
-                    score_cell = f"{s_val:.2f}" if s_val is not None else "-"
-                    cells.extend([score_cell, r_text])
-
-            table.add_row(
-                f"Sample {sample_result.sample.id + 1}",
-                sample_result.agent_id or "-",
-                sample_result.model_name or "-",
-                *cells,
-            )
-
-        self.console.print(table)
-
-        if total_samples > MAX_SAMPLES_DISPLAY:
-            self.console.print(
-                f"[dim]... and {total_samples - MAX_SAMPLES_DISPLAY} more samples (see output file for complete results)[/dim]"
-            )
+        total_samples, displayed_results = get_displayed_sample_results(result)
+        print_truncated_samples_notice(self.console, total_samples, len(displayed_results))
+        self.console.print(build_rich_sample_results_table(result.config, displayed_results))
+        print_remaining_samples_notice(self.console, total_samples, len(displayed_results))

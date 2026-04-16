@@ -39,6 +39,7 @@ class LettaCodeTarget(AbstractAgentTarget):
         agent_script: Optional[str] = None,
         base_dir: Optional[Path] = None,
         flags: Optional[str] = None,
+        permission_mode: Optional[str] = None,
     ):
         """Initialize the Letta Code target.
 
@@ -59,11 +60,14 @@ class LettaCodeTarget(AbstractAgentTarget):
             base_dir: Base directory for resolving relative paths in agent_script
             flags: Additional CLI flags to pass to letta code, parsed with shell quoting
                 rules (e.g., "--memfs --context-window 8000").
+            permission_mode: Permission mode for letta code (e.g., "memory" to scope
+                writes to memory roots). When "memory", sets MEMORY_DIR env var.
         """
         self.client = client
         self.model_handle = model_handle
         self.allowed_tools = allowed_tools
         self.disallowed_tools = disallowed_tools
+        self.permission_mode = permission_mode
         self.timeout = timeout
         self.max_retries = max_retries
         self.base_url = base_url
@@ -96,22 +100,19 @@ class LettaCodeTarget(AbstractAgentTarget):
             try:
                 agent_id = None
 
-                # handle single or multiple inputs
-                inputs = sample.input if isinstance(sample.input, list) else [sample.input]
-
-                # for multiple inputs, concatenate with newlines
-                prompt = "\n".join(str(inp) for inp in inputs)
-                prompt = prompt.replace("{pwd}", self.working_dir.resolve().as_posix())
-
                 # construct the letta-code CLI command (headless streaming JSON output).
                 cmd = [
                     "letta",
-                    "--yolo",
                     "--output-format",
                     "stream-json",
                     "--model",
                     self.model_handle,
                 ]
+
+                # Only use --yolo when no explicit permission_mode is set,
+                # since --yolo overrides --permission-mode (sets bypassPermissions).
+                if not self.permission_mode:
+                    cmd.append("--yolo")
 
                 # If agent_script is provided, create agent via factory first
                 factory_agent_id = None
@@ -123,6 +124,14 @@ class LettaCodeTarget(AbstractAgentTarget):
                         await progress_callback.agent_created(
                             sample.id, agent_id=factory_agent_id, model_name=self.model_handle
                         )
+
+                # construct prompt after factory call so agent_factory can modify sample if needed
+                # handle single or multiple inputs
+                inputs = sample.input if isinstance(sample.input, list) else [sample.input]
+
+                # for multiple inputs, concatenate with newlines
+                prompt = "\n".join(str(inp) for inp in inputs)
+                prompt = prompt.replace("{pwd}", self.working_dir.resolve().as_posix())
 
                 if factory_agent_id:
                     cmd.extend(["--agent", factory_agent_id])
@@ -137,9 +146,18 @@ class LettaCodeTarget(AbstractAgentTarget):
                 if self.flags:
                     cmd.extend(self.flags)
 
-                cmd.extend(["-p", prompt])
+                # permission mode (e.g., "memory" to scope writes to MEMORY_DIR)
+                if self.permission_mode:
+                    cmd.extend(["--permission-mode", self.permission_mode])
 
-                logger.info(f"Running letta command for sample {sample.id}")
+                # Pass prompt via stdin to avoid OS ARG_MAX limits on large inputs.
+                # letta-code headless mode reads from stdin when no positional prompt given.
+                cmd.append("-p")
+                prompt_bytes = prompt.encode("utf-8")
+
+                logger.info(
+                    f"Running letta command for sample {sample.id} (prompt via stdin, {len(prompt_bytes)} bytes)"
+                )
 
                 # Prepare environment variables for the subprocess
                 # Pass base_url to letta CLI if specified
@@ -152,14 +170,30 @@ class LettaCodeTarget(AbstractAgentTarget):
                 events = []
                 stderr_chunks = []
 
-                # run the letta command
+                # When using memory permission mode, set MEMORY_DIR and cwd to the
+                # agent's memory root so relative file paths resolve correctly.
+                if self.permission_mode == "memory" and factory_agent_id:
+                    memory_dir = Path.home() / ".letta" / "agents" / factory_agent_id / "memory"
+                    memory_dir.mkdir(parents=True, exist_ok=True)
+                    env["MEMORY_DIR"] = str(memory_dir)
+                    run_cwd = str(memory_dir)
+                else:
+                    run_cwd = str(self.working_dir)
+
+                # run the letta command with prompt piped via stdin
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
+                    stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    cwd=str(self.working_dir),
+                    cwd=run_cwd,
                     env=env,
                 )
+                # Write prompt to stdin and close it
+                process.stdin.write(prompt_bytes)
+                await process.stdin.drain()
+                process.stdin.close()
+                await process.stdin.wait_closed()
 
                 # Read streaming JSON output line by line, capturing agent_id
                 # from the init event as soon as it arrives. This ensures we
@@ -205,11 +239,21 @@ class LettaCodeTarget(AbstractAgentTarget):
                 stderr_text = "".join(stderr_chunks)
 
                 if process.returncode != 0:
-                    logger.error(f"Letta command failed with return code {process.returncode}")
-                    logger.error(f"Stderr: {stderr_text}")
-                    raise RuntimeError(
-                        f"Letta command failed with return code {process.returncode}. Stderr: {stderr_text[:500]}"
-                    )
+                    # Surface the last stdout event so the real error isn't lost
+                    last_stdout_event = ""
+                    for ev in reversed(events):
+                        try:
+                            last_stdout_event = json.dumps(ev)[:500]
+                        except Exception:
+                            last_stdout_event = str(ev)[:500]
+                        break
+
+                    parts = [f"Letta command failed with return code {process.returncode}"]
+                    if last_stdout_event:
+                        parts.append(f"Last stdout event: {last_stdout_event}")
+                    if stderr_text:
+                        parts.append(f"Stderr: {stderr_text[:500]}")
+                    raise RuntimeError(". ".join(parts))
 
                 if not agent_id:
                     raise RuntimeError("No agent_id found in letta stream output")
@@ -266,11 +310,6 @@ class LettaCodeTarget(AbstractAgentTarget):
                 attempt += 1
 
                 if attempt > self.max_retries:
-                    logger.error(
-                        f"Failed to run letta command for sample {sample.id} after {self.max_retries} retries. "
-                        f"Agent: {agent_id or factory_agent_id or 'unknown'}. "
-                        f"Final error: {type(e).__name__}: {str(e)}"
-                    )
                     timeout_hint = f"Timed out after {self.timeout}s" if isinstance(e, TimeoutError) else ""
                     msg = str(e) or timeout_hint or type(e).__name__
                     raise TargetError(msg, agent_id=agent_id or factory_agent_id) from e

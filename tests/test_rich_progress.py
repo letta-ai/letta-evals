@@ -1,0 +1,127 @@
+from __future__ import annotations
+
+import asyncio
+import time
+
+import pytest
+from rich.console import Console
+
+from letta_evals.visualization.rich_progress import EvalProgress
+from letta_evals.visualization.state import SampleState
+
+
+class DummyLive:
+    def __init__(self) -> None:
+        self.refresh_count = 0
+        self.stopped = False
+
+    def refresh(self) -> None:
+        self.refresh_count += 1
+
+    def stop(self) -> None:
+        self.stopped = True
+
+
+@pytest.mark.asyncio
+async def test_event_loop_batches_burst_updates_into_single_refresh() -> None:
+    progress = EvalProgress(
+        suite_name="demo",
+        total_samples=1,
+        console=Console(width=120, height=20, force_terminal=False),
+        update_freq=5.0,
+    )
+    progress.main_task_id = progress.main_progress.add_task("Evaluating samples", total=1, completed=0)
+    progress.live = DummyLive()  # type: ignore[assignment]
+    progress._start_background_tasks()
+
+    await progress.update_sample_state(0, SampleState.LOADING_AGENT)
+    await progress.update_sample_state(0, SampleState.SENDING_MESSAGES, messages_sent=1, total_messages=2)
+    await progress.update_sample_state(0, SampleState.COMPLETED, score=1.0)
+    assert progress.live.refresh_count == 0
+
+    await asyncio.sleep(0.25)
+    assert progress.live.refresh_count == 1
+    stats = progress.get_stats_snapshot()
+    assert stats.events_emitted == 3
+    assert stats.events_processed == 3
+    assert stats.refreshes == 1
+    assert stats.avg_events_per_refresh == 3.0
+
+    progress.stop()
+    assert progress.live is None
+
+
+@pytest.mark.asyncio
+async def test_stop_flushes_dirty_state_immediately() -> None:
+    progress = EvalProgress(
+        suite_name="demo",
+        total_samples=1,
+        console=Console(width=120, height=20, force_terminal=False),
+        update_freq=5.0,
+    )
+    progress.main_task_id = progress.main_progress.add_task("Evaluating samples", total=1, completed=0)
+    live = DummyLive()
+    progress.live = live  # type: ignore[assignment]
+    progress._start_background_tasks()
+
+    await progress.update_sample_state(0, SampleState.LOADING_AGENT)
+    assert live.refresh_count == 0
+
+    progress.stop()
+
+    assert live.refresh_count == 1
+    assert live.stopped
+    assert progress.live is None
+    stats = progress.get_stats_snapshot()
+    assert stats.refreshes == 1
+    assert stats.refreshes_by_reason == {"stop": 1}
+
+
+@pytest.mark.asyncio
+async def test_stats_capture_queue_pressure_under_concurrency() -> None:
+    progress = EvalProgress(
+        suite_name="demo",
+        total_samples=15,
+        console=Console(width=120, height=20, force_terminal=False),
+        update_freq=20.0,
+    )
+    progress.main_task_id = progress.main_progress.add_task("Evaluating samples", total=15, completed=0)
+    progress.live = DummyLive()  # type: ignore[assignment]
+    progress._start_background_tasks()
+
+    await asyncio.gather(
+        *[progress.update_sample_state(i, SampleState.LOADING_AGENT) for i in range(15)],
+    )
+
+    await asyncio.sleep(0.1)
+    stats = progress.get_stats_snapshot()
+
+    assert stats.events_emitted == 15
+    assert stats.events_processed == 15
+    assert stats.max_queue_depth >= 1
+    assert stats.refreshes < stats.events_processed
+
+    progress.stop()
+
+
+@pytest.mark.asyncio
+async def test_render_loop_refreshes_timer_without_new_events() -> None:
+    progress = EvalProgress(
+        suite_name="demo",
+        total_samples=1,
+        console=Console(width=120, height=20, force_terminal=False),
+        update_freq=5.0,
+    )
+    progress.start_time = time.time()
+    progress.main_task_id = progress.main_progress.add_task("Evaluating samples", total=1, completed=0)
+    live = DummyLive()
+    progress.live = live  # type: ignore[assignment]
+    progress._start_background_tasks()
+
+    await asyncio.sleep(0.25)
+
+    stats = progress.get_stats_snapshot()
+    assert live.refresh_count >= 1
+    assert stats.refreshes_by_reason.get("timer", 0) >= 1
+
+    progress.stop()

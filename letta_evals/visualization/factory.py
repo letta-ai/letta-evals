@@ -8,7 +8,7 @@ from rich.console import Console
 from letta_evals.models import ModelJudgeGraderSpec, SuiteSpec
 from letta_evals.visualization.base import ProgressCallback
 from letta_evals.visualization.noop_progress import NoOpProgress
-from letta_evals.visualization.rich_progress import DisplayMode, EvalProgress
+from letta_evals.visualization.rich_progress import EvalProgress
 from letta_evals.visualization.simple_progress import SimpleProgress
 
 
@@ -65,9 +65,7 @@ def create_progress_callback(
         grader_kind=grader_kind_label,
         rubric_model=rubric_model,
         max_concurrent=max_concurrent,
-        display_mode=DisplayMode.DETAILED,
         console=console,
-        show_samples=True,
         cached_mode=cached_mode,
         metric_labels=metric_labels,
     )
