@@ -303,6 +303,28 @@ def normalize_weights(weights: Dict[str, float]) -> Dict[str, float]:
     return {k: v / total for k, v in weights.items()}
 
 
+def compute_gate_score(gate: "GateSpec", scores: Dict[str, float]) -> float:
+    """Compute a single reward score from per-grader scores using the gate config.
+
+    For simple gates, returns the score of the gate's metric_key.
+    For weighted_average gates, returns the normalized weighted sum.
+    For logical gates or unknown, falls back to averaging all scores.
+    """
+    if not scores:
+        return 0.0
+    # Import locally to avoid circular ref at module level
+    if hasattr(gate, "metric_key") and not hasattr(gate, "weights"):
+        # SimpleGateSpec
+        return scores.get(gate.metric_key, 0.0)
+    elif hasattr(gate, "weights"):
+        # WeightedAverageGateSpec
+        normalized = normalize_weights(gate.weights)
+        return sum(normalized.get(k, 0) * scores.get(k, 0) for k in normalized)
+    else:
+        # LogicalGateSpec or unknown — fall back to average
+        return sum(scores.values()) / len(scores)
+
+
 # gate models
 
 
