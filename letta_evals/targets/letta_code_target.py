@@ -57,6 +57,10 @@ class LettaCodeTarget(AbstractAgentTarget):
                 rules (e.g., "--memfs --context-window 8000").
             permission_mode: Permission mode for letta code (e.g., "memory" to scope
                 writes to memory roots). When "memory", sets MEMORY_DIR env var.
+
+        Agent factories may set ``sample.extra_vars["env"]`` (dict) to inject
+        per-sample env vars into the subprocess; user keys win over target-managed
+        ones. See ``_build_subprocess_env``.
         """
         self.client = client
         self.model_handle = model_handle
@@ -78,6 +82,42 @@ class LettaCodeTarget(AbstractAgentTarget):
         else:
             self.working_dir = wd_base
         self.working_dir.mkdir(parents=True, exist_ok=True)
+
+    def _build_subprocess_env(self, sample: Sample, agent_id: Optional[str]) -> dict[str, str]:
+        """Build subprocess env: os.environ -> target-managed -> sample.extra_vars["env"]."""
+        env = os.environ.copy()
+
+        if self.base_url:
+            env["LETTA_BASE_URL"] = self.base_url
+            logger.info(f"Setting LETTA_BASE_URL={self.base_url} for letta CLI")
+
+        if self.permission_mode == "memory" and agent_id:
+            memory_dir = Path.home() / ".letta" / "agents" / agent_id / "memory"
+            memory_dir.mkdir(parents=True, exist_ok=True)
+            env["MEMORY_DIR"] = str(memory_dir)
+
+        sample_env = (sample.extra_vars or {}).get("env")
+        if sample_env is not None:
+            if not isinstance(sample_env, dict):
+                raise TargetError(
+                    f"sample.extra_vars['env'] must be a dict, got {type(sample_env).__name__} for sample {sample.id}",
+                    agent_id=agent_id,
+                )
+            applied = []
+            for k, v in sample_env.items():
+                if not isinstance(k, str):
+                    raise TargetError(
+                        f"sample.extra_vars['env'] keys must be strings, got "
+                        f"{type(k).__name__} ({k!r}) for sample {sample.id}",
+                        agent_id=agent_id,
+                    )
+                # Coerce to str — env values must be strings; None becomes empty.
+                env[k] = "" if v is None else str(v)
+                applied.append(k)
+            if applied:
+                logger.info(f"Applied per-sample env overrides for sample {sample.id}: keys={sorted(applied)}")
+
+        return env
 
     async def run(
         self,
@@ -154,24 +194,19 @@ class LettaCodeTarget(AbstractAgentTarget):
                     f"Running letta command for sample {sample.id} (prompt via stdin, {len(prompt_bytes)} bytes)"
                 )
 
-                # Prepare environment variables for the subprocess
-                # Pass base_url to letta CLI if specified
-                env = os.environ.copy()
-                if self.base_url:
-                    env["LETTA_BASE_URL"] = self.base_url
-                    logger.info(f"Setting LETTA_BASE_URL={self.base_url} for letta CLI")
+                # Prepare environment variables for the subprocess.
+                # Layers target-managed env (LETTA_BASE_URL, MEMORY_DIR) and per-sample
+                # overrides from sample.extra_vars["env"] (see class docstring).
+                env = self._build_subprocess_env(sample, factory_agent_id)
 
                 agent_id = factory_agent_id
                 events = []
                 stderr_chunks = []
 
-                # When using memory permission mode, set MEMORY_DIR and cwd to the
-                # agent's memory root so relative file paths resolve correctly.
+                # When using memory permission mode, also cd into the agent's
+                # memory root so relative file paths resolve correctly.
                 if self.permission_mode == "memory" and factory_agent_id:
-                    memory_dir = Path.home() / ".letta" / "agents" / factory_agent_id / "memory"
-                    memory_dir.mkdir(parents=True, exist_ok=True)
-                    env["MEMORY_DIR"] = str(memory_dir)
-                    run_cwd = str(memory_dir)
+                    run_cwd = str(Path.home() / ".letta" / "agents" / factory_agent_id / "memory")
                 else:
                     run_cwd = str(self.working_dir)
 
