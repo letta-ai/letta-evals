@@ -491,8 +491,8 @@ description: Pet name → owner. Grep for the pet name to find its owner's refer
 
 - [[reference/people/pers-0490.md]] (Matthew Barnes) — Bird, mixed
 - [[reference/people/pers-0384.md]] (Nicole Ruiz) — Fish, mixed
-- [[reference/people/pers-0088.md]] (Sarah Newton) — Dog, unknown
 - [[reference/people/pers-0088.md]] (Sarah Newton) — Fish, purebred
+- [[reference/people/pers-0088.md]] (Sarah Newton) — Dog, unknown
 
 ## Dakota
 
@@ -542,8 +542,8 @@ description: Pet name → owner. Grep for the pet name to find its owner's refer
 - [[reference/people/pers-0285.md]] (Joshua Smith) — Bird, unknown
 - [[reference/people/pers-0113.md]] (Laura Saunders) — Bird, mixed
 - [[reference/people/pers-0292.md]] (Mary Morales) — Bird, unknown
-- [[reference/people/pers-0181.md]] (Ryan Anderson) — Cat, purebred
 - [[reference/people/pers-0181.md]] (Ryan Anderson) — Fish, mixed
+- [[reference/people/pers-0181.md]] (Ryan Anderson) — Cat, purebred
 - [[reference/people/pers-0015.md]] (Tracy Sloan) — Fish, unknown
 
 ## Dawn
