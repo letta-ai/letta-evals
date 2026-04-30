@@ -1,0 +1,49 @@
+name: filesystem-memfs
+description: |
+  Test if a Letta Code agent navigates a prose-style memfs (with cross-linked
+  indexes and per-person narratives) to answer multi-hop questions about
+  synthetic people. Same questions and ground truth as filesystem-code, but
+  the corpus is mounted as the agent's MemFS rather than as flat files in a
+  working directory.
+dataset: datasets/filesystem_memfs.jsonl
+num_runs: 1
+
+target:
+  kind: letta_code
+  base_url: https://api.letta.com/
+  sandbox: false
+  timeout: 600
+  max_retries: 1
+  agent_script: setup_memfs_agent.py:setup_memfs_agent
+  permission_mode: memory
+  model_handles:
+    - anthropic/claude-opus-4-5-20251101
+    - anthropic/claude-sonnet-4-5-20250929
+    - anthropic/claude-haiku-4-5-20251001
+    - anthropic/claude-opus-4-6
+    - anthropic/claude-sonnet-4-6
+    - gpt-5.4-xhigh
+    - gpt-5.3-codex-xhigh
+    - gpt-5-mini-high
+    - gemini-3
+    - gemini-3-flash
+    - gemini-3.1
+    - glm-5
+    - minimax-m2.5
+    - kimi-k2.5
+
+graders:
+  rubric_check:
+    kind: model_judge
+    prompt_path: rubric.txt
+    model: gpt-5-mini
+    temperature: 0.0
+    provider: openai
+    extractor: last_assistant
+
+gate:
+  kind: simple
+  metric_key: rubric_check
+  aggregation: avg_score
+  op: gte
+  value: 0.70
