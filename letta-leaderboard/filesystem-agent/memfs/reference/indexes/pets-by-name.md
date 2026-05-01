@@ -491,8 +491,8 @@ description: Pet name → owner. Grep for the pet name to find its owner's refer
 
 - [[reference/people/pers-0490.md]] (Matthew Barnes) — Bird, mixed
 - [[reference/people/pers-0384.md]] (Nicole Ruiz) — Fish, mixed
-- [[reference/people/pers-0088.md]] (Sarah Newton) — Fish, purebred
 - [[reference/people/pers-0088.md]] (Sarah Newton) — Dog, unknown
+- [[reference/people/pers-0088.md]] (Sarah Newton) — Fish, purebred
 
 ## Dakota
 
@@ -542,8 +542,8 @@ description: Pet name → owner. Grep for the pet name to find its owner's refer
 - [[reference/people/pers-0285.md]] (Joshua Smith) — Bird, unknown
 - [[reference/people/pers-0113.md]] (Laura Saunders) — Bird, mixed
 - [[reference/people/pers-0292.md]] (Mary Morales) — Bird, unknown
-- [[reference/people/pers-0181.md]] (Ryan Anderson) — Fish, mixed
 - [[reference/people/pers-0181.md]] (Ryan Anderson) — Cat, purebred
+- [[reference/people/pers-0181.md]] (Ryan Anderson) — Fish, mixed
 - [[reference/people/pers-0015.md]] (Tracy Sloan) — Fish, unknown
 
 ## Dawn
@@ -1203,8 +1203,8 @@ description: Pet name → owner. Grep for the pet name to find its owner's refer
 - [[reference/people/pers-0024.md]] (Colleen Miller) — Dog, mixed
 - [[reference/people/pers-0462.md]] (Emily Crawford) — Cat, mixed
 - [[reference/people/pers-0192.md]] (Jenny Donaldson) — Cat, mixed
-- [[reference/people/pers-0018.md]] (Matthew Winters) — Fish, unknown
 - [[reference/people/pers-0018.md]] (Matthew Winters) — Cat, purebred
+- [[reference/people/pers-0018.md]] (Matthew Winters) — Fish, unknown
 - [[reference/people/pers-0040.md]] (Robert Wong) — Bird, mixed
 - [[reference/people/pers-0423.md]] (Stanley Henry) — Bird, mixed
 - [[reference/people/pers-0318.md]] (Zachary Knight) — Dog, unknown

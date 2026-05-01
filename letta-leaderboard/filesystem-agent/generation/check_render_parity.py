@@ -13,8 +13,8 @@ Reports:
 
 Run:
 
-    python check_render_parity.py
-    python check_render_parity.py --memfs /tmp/memfs_smoke --limit 5
+    python generation/check_render_parity.py
+    python generation/check_render_parity.py --memfs /tmp/memfs_smoke --limit 5
 """
 
 from __future__ import annotations
@@ -26,8 +26,8 @@ from pathlib import Path
 from typing import Optional
 
 HERE = Path(__file__).parent
-DB_DEFAULT = HERE / "generation" / "data" / "letta_file_bench.db"
-MEMFS_DEFAULT = HERE / "memfs"
+DB_DEFAULT = HERE / "data" / "letta_file_bench.db"
+MEMFS_DEFAULT = HERE.parent / "memfs"
 
 
 def fetch_all(conn: sqlite3.Connection, sql: str) -> list[dict]:

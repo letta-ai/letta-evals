@@ -13,10 +13,10 @@ prose corpus can't reliably count or join across people without first walking
 the indexes, so the eval rewards models that follow the in-context map rather
 than ones that scrape everything.
 
-Run:
+Run from anywhere — paths are anchored relative to this file:
 
-    python render_memfs.py                              # full corpus -> ./memfs
-    python render_memfs.py --limit 5 --out /tmp/sample  # smoke render
+    python generation/render_memfs.py                              # full corpus -> ../memfs
+    python generation/render_memfs.py --limit 5 --out /tmp/sample  # smoke render
 """
 
 from __future__ import annotations
@@ -30,8 +30,8 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 HERE = Path(__file__).parent
-DB_DEFAULT = HERE / "generation" / "data" / "letta_file_bench.db"
-OUT_DEFAULT = HERE / "memfs"
+DB_DEFAULT = HERE / "data" / "letta_file_bench.db"
+OUT_DEFAULT = HERE.parent / "memfs"
 
 MONTH = [
     "January", "February", "March", "April", "May", "June",
@@ -442,8 +442,9 @@ def render_unique_index(
     The sort_key drives ordering; key_text is what's displayed.
     """
     lines = [_index_header(description), f"# {title}\n"]
+    # Total sort key — include pid + extra as tiebreakers so re-renders are stable.
     for _sort_key, key_text, pid, name, extra in sorted(
-        rows, key=lambda r: (r[0].lower(), r[1])
+        rows, key=lambda r: (r[0].lower(), r[1], r[2], r[4] or "")
     ):
         suffix = f" — {extra}" if extra else ""
         lines.append(f"- **{key_text}** → {_person_link(pid, name)}{suffix}")
@@ -462,7 +463,10 @@ def render_grouped_index(
     """
     lines = [_index_header(description), f"# {title}\n"]
     for section in sorted(groups.keys(), key=str.lower):
-        entries = sorted(set(groups[section]), key=lambda e: e[1].lower())
+        # Total sort key — pid + extra as tiebreakers so re-renders are stable.
+        entries = sorted(
+            set(groups[section]), key=lambda e: (e[1].lower(), e[0], e[2] or "")
+        )
         if not entries:
             continue
         lines.append(f"## {section}")

@@ -12,8 +12,8 @@ import json
 from pathlib import Path
 
 HERE = Path(__file__).parent
-SRC = HERE / "datasets" / "filesystem_code.jsonl"
-DST = HERE / "datasets" / "filesystem_memfs.jsonl"
+SRC = HERE.parent / "datasets" / "filesystem_code.jsonl"
+DST = HERE.parent / "datasets" / "filesystem_memfs.jsonl"
 
 QUESTION_MARKER = "Question:"
 

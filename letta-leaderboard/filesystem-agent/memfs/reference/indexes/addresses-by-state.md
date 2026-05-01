@@ -289,8 +289,8 @@ description: Each section lists residents of that state. Grep for the state name
 - [[reference/people/pers-0429.md]] (John Jenkins) — South Edwardchester
 - [[reference/people/pers-0052.md]] (Johnny Griffin) — Stevenshaven
 - [[reference/people/pers-0387.md]] (Julie Saunders) — Kelseyville
-- [[reference/people/pers-0273.md]] (Kimberly Mason) — South Maria
 - [[reference/people/pers-0273.md]] (Kimberly Mason) — Johnsonton
+- [[reference/people/pers-0273.md]] (Kimberly Mason) — South Maria
 - [[reference/people/pers-0456.md]] (Michael Campbell) — Jasonton
 - [[reference/people/pers-0302.md]] (Michael Mccann) — Marcmouth
 - [[reference/people/pers-0479.md]] (Patrick Guzman) — East Jennifer
@@ -348,8 +348,8 @@ description: Each section lists residents of that state. Grep for the state name
 ## Iowa
 
 - [[reference/people/pers-0199.md]] (Alexandra Brown) — Lake Arielhaven
-- [[reference/people/pers-0249.md]] (Alisha Stark) — Wilsonhaven
 - [[reference/people/pers-0249.md]] (Alisha Stark) — East Nancymouth
+- [[reference/people/pers-0249.md]] (Alisha Stark) — Wilsonhaven
 - [[reference/people/pers-0103.md]] (Brittany Ellis) — Lauraburgh
 - [[reference/people/pers-0135.md]] (Bryan Byrd) — Tamarashire
 - [[reference/people/pers-0316.md]] (Cheyenne Howe) — Lake Anita
@@ -357,8 +357,8 @@ description: Each section lists residents of that state. Grep for the state name
 - [[reference/people/pers-0403.md]] (Debra Levine) — Barreraton
 - [[reference/people/pers-0378.md]] (Dylan Lewis) — New Kristenfort
 - [[reference/people/pers-0012.md]] (Jacob Compton) — Fosterton
-- [[reference/people/pers-0221.md]] (Jason Rivers) — Rodriguezville
 - [[reference/people/pers-0221.md]] (Jason Rivers) — North Sandra
+- [[reference/people/pers-0221.md]] (Jason Rivers) — Rodriguezville
 - [[reference/people/pers-0023.md]] (Jennifer Smith) — Lisaberg
 - [[reference/people/pers-0161.md]] (Kyle Mosley) — East Hayleychester
 - [[reference/people/pers-0038.md]] (Latoya Leonard) — New Alanbury
@@ -762,15 +762,15 @@ description: Each section lists residents of that state. Grep for the state name
 - [[reference/people/pers-0256.md]] (Alexis Stanley) — Lake Brittanyfurt
 - [[reference/people/pers-0357.md]] (Benjamin Brown) — West Jessicabury
 - [[reference/people/pers-0123.md]] (Brenda Henry) — Thomasfurt
-- [[reference/people/pers-0166.md]] (Carla Jackson) — Maryberg
 - [[reference/people/pers-0166.md]] (Carla Jackson) — Brandonchester
+- [[reference/people/pers-0166.md]] (Carla Jackson) — Maryberg
 - [[reference/people/pers-0499.md]] (Curtis Alexander) — Lukeburgh
 - [[reference/people/pers-0177.md]] (Denise Moore) — Granthaven
 - [[reference/people/pers-0338.md]] (George Skinner) — Lake Ruth
 - [[reference/people/pers-0182.md]] (Jocelyn White) — Josephtown
 - [[reference/people/pers-0091.md]] (Jonathan Hood) — Nicholasberg
-- [[reference/people/pers-0476.md]] (Kristie Tucker) — Salazarshire
 - [[reference/people/pers-0476.md]] (Kristie Tucker) — North Jonathanborough
+- [[reference/people/pers-0476.md]] (Kristie Tucker) — Salazarshire
 - [[reference/people/pers-0156.md]] (Mario Cameron) — East Madeline
 - [[reference/people/pers-0312.md]] (Megan Davidson) — Gonzalezfurt
 - [[reference/people/pers-0437.md]] (Nicholas Klein) — Lake Jacob
@@ -843,8 +843,8 @@ description: Each section lists residents of that state. Grep for the state name
 
 - [[reference/people/pers-0372.md]] (Brian Kelley) — New Elizabeth
 - [[reference/people/pers-0343.md]] (Christina Grant) — West Charlesville
-- [[reference/people/pers-0146.md]] (Christopher Beck) — Wallfurt
 - [[reference/people/pers-0146.md]] (Christopher Beck) — Hoodfort
+- [[reference/people/pers-0146.md]] (Christopher Beck) — Wallfurt
 - [[reference/people/pers-0411.md]] (George Peterson) — Barrymouth
 - [[reference/people/pers-0401.md]] (Haley Perez) — West Jamesburgh
 - [[reference/people/pers-0350.md]] (Jason Ruiz) — Lake Rachelland
@@ -988,8 +988,8 @@ description: Each section lists residents of that state. Grep for the state name
 - [[reference/people/pers-0199.md]] (Alexandra Brown) — Port Jeffrey
 - [[reference/people/pers-0201.md]] (Allison Thomas) — West Richardshire
 - [[reference/people/pers-0127.md]] (Andrea Singleton) — West James
-- [[reference/people/pers-0164.md]] (Austin Smith) — North Harold
 - [[reference/people/pers-0164.md]] (Austin Smith) — Jameshaven
+- [[reference/people/pers-0164.md]] (Austin Smith) — North Harold
 - [[reference/people/pers-0381.md]] (Brian Larson) — Greeneside
 - [[reference/people/pers-0103.md]] (Brittany Ellis) — Murphytown
 - [[reference/people/pers-0291.md]] (Christopher Stark) — South Carlosbury
@@ -1012,8 +1012,8 @@ description: Each section lists residents of that state. Grep for the state name
 - [[reference/people/pers-0314.md]] (Denise Jones) — South Ericborough
 - [[reference/people/pers-0064.md]] (Gabrielle Allen) — Gabriellamouth
 - [[reference/people/pers-0168.md]] (Geoffrey Long) — Haroldfurt
-- [[reference/people/pers-0385.md]] (Kristen Pennington) — Munozburgh
 - [[reference/people/pers-0385.md]] (Kristen Pennington) — Christopherbury
+- [[reference/people/pers-0385.md]] (Kristen Pennington) — Munozburgh
 - [[reference/people/pers-0078.md]] (Laura Wagner) — South Ginaport
 - [[reference/people/pers-0276.md]] (Lisa Wagner) — South Gregoryside
 - [[reference/people/pers-0463.md]] (Madison Montoya) — Lake Shanefurt
@@ -1095,8 +1095,8 @@ description: Each section lists residents of that state. Grep for the state name
 
 - [[reference/people/pers-0128.md]] (Amy Wood) — North Kristin
 - [[reference/people/pers-0084.md]] (Christine Martinez) — West Brianmouth
-- [[reference/people/pers-0093.md]] (Dawn Johnston) — Port Gregory
 - [[reference/people/pers-0093.md]] (Dawn Johnston) — North Jeffreyview
+- [[reference/people/pers-0093.md]] (Dawn Johnston) — Port Gregory
 - [[reference/people/pers-0157.md]] (Emily Schmidt) — South Kennethfort
 - [[reference/people/pers-0398.md]] (James Barker) — Lake Taylorville
 - [[reference/people/pers-0309.md]] (James Roy) — North Anitaberg
