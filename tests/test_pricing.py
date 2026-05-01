@@ -7,8 +7,7 @@ from typing import Dict
 import pytest
 
 from letta_evals import pricing
-from letta_evals.pricing import ModelPricing, resolve_model
-from letta_evals.utils import calculate_cost_from_agent_usage
+from letta_evals.pricing import ModelPricing, calculate_cost_from_agent_usage, resolve_model
 
 # A trimmed fixture mirroring the schema in
 # https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json
@@ -344,22 +343,6 @@ def test_load_pricing_caches_in_process(monkeypatch):
     pricing.load_pricing_table()
     pricing.load_pricing_table()
     assert fetch_count["n"] == 1
-
-
-def test_force_refresh_clears_cache(monkeypatch):
-    fetch_count = {"n": 0}
-
-    def counting_fetch():
-        fetch_count["n"] += 1
-        return FIXTURE_RAW
-
-    monkeypatch.setattr(pricing, "_fetch_upstream", counting_fetch)
-    pricing._PRICING = None
-
-    pricing.load_pricing_table()
-    assert fetch_count["n"] == 1
-    pricing.force_refresh()
-    assert fetch_count["n"] == 2
 
 
 def test_load_falls_back_to_stale_cache_on_fetch_error(monkeypatch):

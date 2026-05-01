@@ -202,16 +202,6 @@ def load_pricing_table() -> Dict[str, ModelPricing]:
     return _PRICING
 
 
-def force_refresh() -> Dict[str, ModelPricing]:
-    """Force a fresh fetch from upstream, bypassing both caches."""
-    global _PRICING
-    _PRICING = None
-    raw = _fetch_upstream()
-    _write_disk_cache(raw)
-    _PRICING = _build_pricing_from_json(raw)
-    return _PRICING
-
-
 def _candidate_keys(model_name: str) -> List[str]:
     """Generate the ordered list of litellm keys to probe for a Letta model name."""
     candidates: List[str] = [model_name]
@@ -272,3 +262,117 @@ def resolve_model(model_name: str) -> Optional[ModelPricing]:
             return table[candidate]
 
     return None
+
+
+# ---------------------------------------------------------------------------
+# Cost computation
+# ---------------------------------------------------------------------------
+
+
+def _read_nested(record: dict, parent_key: str, candidate_keys: List[str]) -> int:
+    """Read a token count from a nested usage detail record (e.g. prompt_tokens_details)."""
+    details = record.get(parent_key) or {}
+    if not isinstance(details, dict):
+        return 0
+    for k in candidate_keys:
+        v = details.get(k)
+        if v:
+            return v
+    return 0
+
+
+def _bill_record(
+    pricing: ModelPricing,
+    non_cached: int,
+    cached: int,
+    cache_write: int,
+    completion: int,
+) -> float:
+    """Compute the dollar cost of a single LLM call given a ModelPricing entry."""
+    total_input = non_cached + cached + cache_write
+    use_tier = pricing.threshold_tokens is not None and total_input > pricing.threshold_tokens
+
+    if use_tier and pricing.input_above_threshold_per_token is not None:
+        in_rate = pricing.input_above_threshold_per_token
+    else:
+        in_rate = pricing.input_per_token
+
+    if use_tier and pricing.output_above_threshold_per_token is not None:
+        out_rate = pricing.output_above_threshold_per_token
+    else:
+        out_rate = pricing.output_per_token
+
+    if use_tier and pricing.cache_read_above_threshold_per_token is not None:
+        cache_read_rate = pricing.cache_read_above_threshold_per_token
+    elif pricing.cache_read_per_token is not None:
+        cache_read_rate = pricing.cache_read_per_token
+    else:
+        # No cache pricing available: bill cached input at full input rate.
+        cache_read_rate = in_rate
+
+    if use_tier and pricing.cache_creation_above_threshold_per_token is not None:
+        cache_create_rate = pricing.cache_creation_above_threshold_per_token
+    elif pricing.cache_creation_per_token is not None:
+        cache_create_rate = pricing.cache_creation_per_token
+    else:
+        # OpenAI-style models don't have cache writes; rate is 0.
+        cache_create_rate = 0.0
+
+    return (
+        non_cached * in_rate
+        + cached * cache_read_rate
+        + cache_write * cache_create_rate
+        + completion * out_rate
+    )
+
+
+def calculate_cost_from_agent_usage(model_name: str, agent_usage: Optional[List[dict]]) -> float:
+    """Calculate total cost from agent_usage data.
+
+    Bills cache reads, cache writes, and tiered (>200k context) pricing per LLM
+    call, using rates from the litellm pricing JSON.
+
+    Args:
+        model_name: Name of the model
+        agent_usage: List of usage statistics from the agent run
+
+    Returns:
+        Total cost in dollars for the entire agent run, or 0.0 if model pricing
+        is unavailable (logs a debug message).
+    """
+    if not agent_usage:
+        return 0.0
+
+    pricing = resolve_model(model_name)
+    if pricing is None:
+        logger.debug(f"No pricing information available for model: {model_name}")
+        return 0.0
+
+    total_cost = 0.0
+    for record in agent_usage:
+        if record.get("message_type") != "usage_statistics":
+            continue
+
+        prompt_tokens = record.get("prompt_tokens") or 0
+        completion_tokens = record.get("completion_tokens") or 0
+
+        cached_input = record.get("cached_input_tokens") or _read_nested(
+            record,
+            "prompt_tokens_details",
+            ["cached_tokens", "cache_read_tokens", "cache_read_input_tokens", "cached_input_tokens"],
+        )
+        cache_write = record.get("cache_write_tokens") or _read_nested(
+            record,
+            "prompt_tokens_details",
+            ["cache_creation_tokens", "cache_creation_input_tokens"],
+        )
+
+        # Letta normalizes prompt_tokens differently per provider:
+        #   Anthropic: prompt_tokens = non_cached + cache_read + cache_write
+        #   OpenAI:    prompt_tokens = non_cached + cache_read (no cache_write)
+        # Subtracting both cached buckets gives non-cached input in either case.
+        non_cached = max(prompt_tokens - cached_input - cache_write, 0)
+
+        total_cost += _bill_record(pricing, non_cached, cached_input, cache_write, completion_tokens)
+
+    return total_cost

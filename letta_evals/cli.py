@@ -282,18 +282,6 @@ def list_graders():
     console.print("\n[dim]You can also use 'model_judge' or 'letta_judge' graders with custom prompts[/dim]")
 
 
-@app.command("refresh-prices")
-def refresh_prices():
-    """Force a fresh fetch of the litellm model pricing JSON, bypassing the on-disk cache."""
-
-    from letta_evals.pricing import CACHE_FILE, LITELLM_PRICING_URL, force_refresh
-
-    console.print(f"Fetching pricing from [cyan]{LITELLM_PRICING_URL}[/cyan]...")
-    table = force_refresh()
-    console.print(f"[green]Loaded pricing for {len(table)} models[/green]")
-    console.print(f"Cache written to: [dim]{CACHE_FILE}[/dim]")
-
-
 def display_aggregate_statistics(run_statistics):
     """Display aggregate statistics across multiple runs."""
     from letta_evals.models import RunStatistics
