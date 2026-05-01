@@ -20,8 +20,9 @@ QUESTION_MARKER = "Question:"
 V3_PREFIX = """\
 Answer the following question using the memories available to you.
 
-Your memory has a map at `system/index.md` that describes the layout:
+Your memory contains:
 
+- A navigation map at `system/index.md` (already projected into your system prompt).
 - Per-person prose narratives at `reference/people/pers-XXXX.md` — one file per person, with addresses, pets, vehicles, employment, banking, cards, insurance, medical, and internet accounts written out as natural prose.
 - Domain indexes at `reference/indexes/<domain>.md` — sparse lookup tables mapping a key (pet name, license plate, username, state, employer, blood type, bank, insurer) to the matching `[[reference/people/pers-XXXX.md]]` files.
 
