@@ -1,6 +1,5 @@
 import importlib.util
 import logging
-import re
 import sys
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional
@@ -9,16 +8,12 @@ import anyio
 import httpx
 
 from letta_evals.constants import (
-    MODEL_COSTS,
-    MODEL_NAME_MAPPING,
     TURN_FAIL_SYMBOL,
     TURN_PASS_SYMBOL,
     TURN_PENDING_SYMBOL,
 )
 from letta_evals.models import Sample
-
-# Pattern to match reasoning effort suffixes
-_EFFORT_PATTERN = re.compile(r"-(low|medium|high|xhigh|max)$")
+from letta_evals.pricing import ModelPricing, resolve_model
 
 logger = logging.getLogger(__name__)
 
@@ -62,81 +57,61 @@ def load_object(spec: str, base_dir: Path = None) -> Any:
     return getattr(module, obj_name)
 
 
-def normalize_model_name(model_name: str) -> str:
-    """
-    Normalize model names to match MODEL_COSTS keys.
-
-    Args:
-        model_name: Raw model name (e.g., "gpt-4.1-mini", "openai/gpt-4.1", "claude-sonnet-4-5-20250929")
-
-    Returns:
-        Normalized model name that can be found in MODEL_COSTS
-    """
-    # Direct match in MODEL_COSTS
-    if model_name in MODEL_COSTS:
-        return model_name
-
-    # Try the mapping (handles base names like "gpt-4.1-mini" -> "openai/gpt-4.1-mini-2025-04-14")
-    if model_name in MODEL_NAME_MAPPING:
-        return MODEL_NAME_MAPPING[model_name]
-
-    # If it has a provider prefix (e.g., "openai/gpt-4.1"), strip it and try mapping
-    if "/" in model_name:
-        model_part = model_name.split("/", 1)[1]
-        if model_part in MODEL_NAME_MAPPING:
-            return MODEL_NAME_MAPPING[model_part]
-
-    # Try with provider prefix for common patterns
-    if model_name.startswith("claude"):
-        prefixed = f"anthropic/{model_name}"
-        if prefixed in MODEL_COSTS:
-            return prefixed
-    elif model_name.startswith("gpt"):
-        prefixed = f"openai/{model_name}"
-        if prefixed in MODEL_COSTS:
-            return prefixed
-    elif model_name.startswith("gemini"):
-        prefixed = f"google_ai/{model_name}"
-        if prefixed in MODEL_COSTS:
-            return prefixed
-
-    # Strip effort-level suffix (e.g. "gpt-5.2-high" -> "gpt-5.2") and retry
-    stripped = _EFFORT_PATTERN.sub("", model_name)
-    if stripped != model_name:
-        return normalize_model_name(stripped)
-
-    # No match found
-    return model_name
+def _read_nested(record: dict, parent_key: str, candidate_keys: List[str]) -> int:
+    """Read a token count from a nested usage detail record (e.g. prompt_tokens_details)."""
+    details = record.get(parent_key) or {}
+    if not isinstance(details, dict):
+        return 0
+    for k in candidate_keys:
+        v = details.get(k)
+        if v:
+            return v
+    return 0
 
 
-def calculate_cost(model_name: str, prompt_tokens: int, completion_tokens: int) -> float:
-    """
-    Calculate the cost for a model's token usage.
+def _bill_record(
+    pricing: ModelPricing,
+    non_cached: int,
+    cached: int,
+    cache_write: int,
+    completion: int,
+) -> float:
+    """Compute the dollar cost of a single LLM call given a ModelPricing entry."""
+    total_input = non_cached + cached + cache_write
+    use_tier = pricing.threshold_tokens is not None and total_input > pricing.threshold_tokens
 
-    Args:
-        model_name: Name of the model (will be normalized if needed)
-        prompt_tokens: Number of prompt tokens used
-        completion_tokens: Number of completion tokens used
+    if use_tier and pricing.input_above_threshold_per_token is not None:
+        in_rate = pricing.input_above_threshold_per_token
+    else:
+        in_rate = pricing.input_per_token
 
-    Returns:
-        Total cost in dollars, or 0.0 if model pricing is not available
+    if use_tier and pricing.output_above_threshold_per_token is not None:
+        out_rate = pricing.output_above_threshold_per_token
+    else:
+        out_rate = pricing.output_per_token
 
-    Note:
-        Returns 0.0 if model pricing is not found in MODEL_COSTS instead of raising an error.
-        This allows evaluation to continue even for new/unknown models.
-    """
-    # Normalize model name (resolve aliases and add provider prefix if needed)
-    normalized_name = normalize_model_name(model_name)
+    if use_tier and pricing.cache_read_above_threshold_per_token is not None:
+        cache_read_rate = pricing.cache_read_above_threshold_per_token
+    elif pricing.cache_read_per_token is not None:
+        cache_read_rate = pricing.cache_read_per_token
+    else:
+        # No cache pricing available: bill cached input at full input rate
+        cache_read_rate = in_rate
 
-    # Check if we have pricing for this model
-    if normalized_name not in MODEL_COSTS:
-        logger.debug(f"No pricing information available for model: {normalized_name} (original: {model_name})")
-        return 0.0
+    if use_tier and pricing.cache_creation_above_threshold_per_token is not None:
+        cache_create_rate = pricing.cache_creation_above_threshold_per_token
+    elif pricing.cache_creation_per_token is not None:
+        cache_create_rate = pricing.cache_creation_per_token
+    else:
+        # OpenAI-style models don't have cache writes; rate is 0.
+        cache_create_rate = 0.0
 
-    model_costs = MODEL_COSTS[normalized_name]
-    prompt_cost = model_costs["prompt_tokens"] * prompt_tokens / 1_000_000
-    completion_cost = model_costs["completion_tokens"] * completion_tokens / 1_000_000
-    return prompt_cost + completion_cost
+    return (
+        non_cached * in_rate
+        + cached * cache_read_rate
+        + cache_write * cache_create_rate
+        + completion * out_rate
+    )
 
 
 def extract_token_counts(agent_usage: Optional[List[dict]]) -> tuple[int, int, int, int, int]:
@@ -209,23 +184,51 @@ def calculate_cost_from_agent_usage(model_name: str, agent_usage: Optional[List[
     """
     Calculate total cost from agent_usage data.
 
+    Bills cache reads, cache writes, and tiered (>200k context) pricing per
+    LLM call, using rates from the litellm pricing JSON.
+
     Args:
         model_name: Name of the model
         agent_usage: List of usage statistics from the agent run
 
     Returns:
-        Total cost in dollars for the entire agent run
+        Total cost in dollars for the entire agent run, or 0.0 if model pricing
+        is unavailable (logs a debug message).
     """
     if not agent_usage:
         return 0.0
 
+    pricing = resolve_model(model_name)
+    if pricing is None:
+        logger.debug(f"No pricing information available for model: {model_name}")
+        return 0.0
+
     total_cost = 0.0
-    for usage_record in agent_usage:
-        if usage_record.get("message_type") == "usage_statistics":
-            # Handle None values explicitly: .get() returns None if key exists with None value
-            prompt_tokens = usage_record.get("prompt_tokens") or 0
-            completion_tokens = usage_record.get("completion_tokens") or 0
-            total_cost += calculate_cost(model_name, prompt_tokens, completion_tokens)
+    for record in agent_usage:
+        if record.get("message_type") != "usage_statistics":
+            continue
+
+        prompt_tokens = record.get("prompt_tokens") or 0
+        completion_tokens = record.get("completion_tokens") or 0
+
+        cached_input = record.get("cached_input_tokens") or _read_nested(
+            record,
+            "prompt_tokens_details",
+            ["cached_tokens", "cache_read_tokens", "cache_read_input_tokens", "cached_input_tokens"],
+        )
+        cache_write = record.get("cache_write_tokens") or _read_nested(
+            record,
+            "prompt_tokens_details",
+            ["cache_creation_tokens", "cache_creation_input_tokens"],
+        )
+
+        # Letta normalizes prompt_tokens differently per provider:
+        #   Anthropic: prompt_tokens = non_cached + cache_read + cache_write
+        #   OpenAI:    prompt_tokens = non_cached + cache_read (no cache_write)
+        # In both cases, subtracting both cached buckets gives non-cached input.
+        non_cached = max(prompt_tokens - cached_input - cache_write, 0)
+
+        total_cost += _bill_record(pricing, non_cached, cached_input, cache_write, completion_tokens)
 
     return total_cost
 
