@@ -42,6 +42,7 @@ from letta_evals.models import (
     _compare,
     normalize_weights,
 )
+from letta_evals.pricing import calculate_cost_from_agent_usage
 from letta_evals.streaming import StreamingReader, StreamingWriter
 from letta_evals.targets.base import AbstractAgentTarget, TargetError
 from letta_evals.targets.letta_agent import LettaAgentTarget
@@ -49,7 +50,6 @@ from letta_evals.targets.letta_code_target import LettaCodeTarget
 from letta_evals.types import Aggregation, ErrorCategory, LogicalOp, TargetKind
 from letta_evals.utils import (
     build_turn_summary,
-    calculate_cost_from_agent_usage,
     extract_token_counts,
     is_per_turn_evaluation,
     load_object,
