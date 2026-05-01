@@ -16,7 +16,7 @@ target:
   max_retries: 1
   agent_script: setup_memfs_agent.py:setup_memfs_agent
   permission_mode: memory
-  flags: "--system default"
+  flags: "--system default --conv default"
   model_handles:
     - anthropic/claude-opus-4-5-20251101
     - anthropic/claude-sonnet-4-5-20250929
