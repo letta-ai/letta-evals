@@ -23,7 +23,7 @@ class LettaCodeTarget(AbstractAgentTarget):
     def __init__(
         self,
         client: AsyncLetta,
-        model_handle: str = "anthropic/claude-sonnet-4-5-20250929",
+        model_handle: str,
         working_dir: Optional[Path] = None,
         sandbox: bool = True,
         allowed_tools: Optional[list[str]] = None,
@@ -172,10 +172,6 @@ class LettaCodeTarget(AbstractAgentTarget):
                     cmd.extend(["--agent", factory_agent_id])
                 else:
                     cmd.append("--new-agent")
-
-                # Use codex system prompt for GPT-style models (matches `letta --help` examples)
-                if "gpt" in self.model_handle:
-                    cmd.extend(["--system", "codex"])
 
                 # append any extra flags from suite config
                 if self.flags:
