@@ -25,9 +25,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-LITELLM_PRICING_URL = (
-    "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
-)
+LITELLM_PRICING_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 CACHE_DIR = Path(os.environ.get("LETTA_EVALS_CACHE_DIR", str(Path.home() / ".cache" / "letta_evals")))
 CACHE_FILE = CACHE_DIR / "model_prices.json"
 CACHE_TTL_SECONDS = 30 * 60  # 30 minutes
@@ -318,12 +316,7 @@ def _bill_record(
         # OpenAI-style models don't have cache writes; rate is 0.
         cache_create_rate = 0.0
 
-    return (
-        non_cached * in_rate
-        + cached * cache_read_rate
-        + cache_write * cache_create_rate
-        + completion * out_rate
-    )
+    return non_cached * in_rate + cached * cache_read_rate + cache_write * cache_create_rate + completion * out_rate
 
 
 def calculate_cost_from_agent_usage(model_name: str, agent_usage: Optional[List[dict]]) -> float:

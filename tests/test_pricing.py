@@ -90,6 +90,7 @@ def _stub_loader(monkeypatch):
 # Resolution
 # ---------------------------------------------------------------------------
 
+
 def test_resolve_anthropic_provider_prefix():
     p = resolve_model("anthropic/claude-opus-4-5")
     assert p is not None
@@ -159,6 +160,7 @@ def test_resolve_skips_embedding_only_entry_via_explicit_match():
 # Overrides
 # ---------------------------------------------------------------------------
 
+
 def test_override_takes_precedence_over_json():
     pricing.MODEL_PRICE_OVERRIDES["anthropic/claude-opus-4-5"] = ModelPricing(
         input_per_token=999e-06,
@@ -182,6 +184,7 @@ def test_override_for_internal_model_not_in_json():
 # ---------------------------------------------------------------------------
 # Cost billing
 # ---------------------------------------------------------------------------
+
 
 def _usage(prompt: int, completion: int, *, cached: int = 0, cache_write: int = 0) -> dict:
     """Build a single usage_statistics record."""
@@ -321,6 +324,7 @@ def test_reads_nested_cache_tokens_from_prompt_details():
 # ---------------------------------------------------------------------------
 # Loader behavior
 # ---------------------------------------------------------------------------
+
 
 def test_load_pricing_skips_sample_spec_and_embedding_only():
     table = pricing.load_pricing_table()
