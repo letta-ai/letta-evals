@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.15.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.14.0...letta-evals-v0.15.0) (2026-05-01)
+
+
+### Features
+
+* Add compute_gate_score() for per-sample reward computation ([#243](https://github.com/letta-ai/letta-evals/issues/243)) ([65ab71f](https://github.com/letta-ai/letta-evals/commit/65ab71fd2d653abf461ee2ea99788fde5ce05c2b))
+* **letta-code-target:** Add per-sample env override hook via sample.extra_vars["env"] ([#245](https://github.com/letta-ai/letta-evals/issues/245)) ([237140b](https://github.com/letta-ai/letta-evals/commit/237140b4922e3d41080895c88c7b300353405647))
+* **pricing:** Drive model costs from litellm pricing JSON ([#247](https://github.com/letta-ai/letta-evals/issues/247)) ([235838e](https://github.com/letta-ai/letta-evals/commit/235838e5b28789dde65e29c822d953d384b35bec))
+
+
+### Bug Fixes
+
+* **letta-code-target:** Remove model-specific system prompt branch and require model_handle ([#248](https://github.com/letta-ai/letta-evals/issues/248)) ([d83da35](https://github.com/letta-ai/letta-evals/commit/d83da35fe579a9afc9572e841cea2a31a0560f1f))
+
 ## [0.14.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.13.0...letta-evals-v0.14.0) (2026-04-14)
 
 
