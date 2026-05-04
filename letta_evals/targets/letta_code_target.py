@@ -146,7 +146,7 @@ class LettaCodeTarget(AbstractAgentTarget):
 
                 cmd.extend(["-p", prompt])
 
-                logger.info(f"Running letta command for sample {sample.id}")
+                logger.info(f"Running letta command for sample {sample.id}: {' '.join(cmd[:15])}")
 
                 # Prepare environment variables for the subprocess
                 # Pass base_url to letta CLI if specified
@@ -165,6 +165,11 @@ class LettaCodeTarget(AbstractAgentTarget):
                     memory_dir = Path.home() / ".letta" / "agents" / factory_agent_id / "memory"
                     memory_dir.mkdir(parents=True, exist_ok=True)
                     env["MEMORY_DIR"] = str(memory_dir)
+                    # letta-code also consults USER_CWD when resolving client-side
+                    # tool paths. Override it so Read/Write/Bash resolve relative
+                    # paths against the rollout agent's memory repo rather than the
+                    # training repo that launched this process.
+                    env["USER_CWD"] = str(memory_dir)
                     run_cwd = str(memory_dir)
                 else:
                     run_cwd = str(self.working_dir)
