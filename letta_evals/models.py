@@ -715,6 +715,22 @@ class SampleResult(BaseModel):
     )
     per_grader_time: Optional[Dict[str, float]] = Field(default=None, description="Wall time in seconds per grader key")
     error: Optional[ErrorInfo] = Field(default=None, description="Structured error info if this sample failed")
+    agent_state: Optional[AgentState] = Field(
+        default=None,
+        description=(
+            "Agent state after running the target (includes memory blocks). "
+            "Only populated when at least one grader requires agent_state. "
+            "Lets callers avoid re-fetching state via a separate "
+            "client.agents.retrieve(...) call."
+        ),
+    )
+    token_data: Optional[List[TurnTokenData]] = Field(
+        default=None,
+        description=(
+            "Per-token IDs and logprobs across all turns in the trajectory. "
+            "Only populated when run_sample(return_token_data=True) is called."
+        ),
+    )
 
 
 class RunnerResult(BaseModel):

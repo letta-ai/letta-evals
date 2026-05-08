@@ -330,11 +330,28 @@ class Runner:
         return cache
 
     async def _get_or_run_trajectory(
-        self, sample: Sample, llm_config: Optional[LlmConfig | str], retrieve_agent_state: bool = False
-    ) -> tuple[List[List[LettaMessageUnion]], str, str, Optional[list[dict]], Optional[AgentState]]:
-        """Return (trajectory, agent_id, model_name, agent_usage, agent_state) using cache or by running the target.
+        self,
+        sample: Sample,
+        llm_config: Optional[LlmConfig | str],
+        retrieve_agent_state: bool = False,
+        return_token_data: bool = False,
+    ) -> tuple[
+        List[List[LettaMessageUnion]],
+        str,
+        str,
+        Optional[list[dict]],
+        Optional[AgentState],
+        Optional[list],
+    ]:
+        """Return (trajectory, agent_id, model_name, agent_usage, agent_state, token_data) using cache or by running the target.
 
         If cache is enabled and contains an exact match, use it; otherwise run the target.
+
+        Args:
+            return_token_data: If True, also requests per-token IDs and logprobs from
+                the target. Used by callers that need generation, grading, and
+                token extraction in a single pass. Cached results never include
+                token_data (they don't carry it).
         """
         sample_id = sample.id
         model_name = _extract_model_name(llm_config)
@@ -362,6 +379,7 @@ class Runner:
                     model_name,
                     getattr(cached_result, "agent_usage", None),
                     getattr(cached_result, "agent_state", None),
+                    getattr(cached_result, "token_data", None),
                 )
 
         target = self._create_target(llm_config)
@@ -370,6 +388,7 @@ class Runner:
             progress_callback=self.progress_callback,
             project_id=self.project_id,
             retrieve_agent_state=retrieve_agent_state,
+            return_token_data=return_token_data,
         )
         return (
             target_result.trajectory,
@@ -377,6 +396,7 @@ class Runner:
             target_result.model_name,
             target_result.agent_usage,
             target_result.agent_state,
+            target_result.token_data,
         )
 
     async def _grade_per_turn(
@@ -533,8 +553,20 @@ class Runner:
 
         return None
 
-    async def run_sample(self, sample: Sample, llm_config: Optional[LlmConfig | str] = None) -> SampleResult:
-        """Run a single sample through target and grader."""
+    async def run_sample(
+        self,
+        sample: Sample,
+        llm_config: Optional[LlmConfig | str] = None,
+        return_token_data: bool = False,
+    ) -> SampleResult:
+        """Run a single sample through target and grader.
+
+        Args:
+            return_token_data: If True, requests per-token IDs and logprobs from
+                the target and includes them on the returned ``SampleResult.token_data``.
+                Default False; existing callers that don't pass it see no
+                behavior change.
+        """
         sample_id = sample.id
         model_name = _extract_model_name(llm_config)
 
@@ -550,8 +582,18 @@ class Runner:
                 # check if any grader needs agent_state
                 phase = ErrorCategory.TARGET
                 retrieve_agent_state = self._requires_agent_state()
-                trajectory, agent_id, model_name, agent_usage, agent_state = await self._get_or_run_trajectory(
-                    sample, llm_config, retrieve_agent_state=retrieve_agent_state
+                (
+                    trajectory,
+                    agent_id,
+                    model_name,
+                    agent_usage,
+                    agent_state,
+                    token_data,
+                ) = await self._get_or_run_trajectory(
+                    sample,
+                    llm_config,
+                    retrieve_agent_state=retrieve_agent_state,
+                    return_token_data=return_token_data,
                 )
 
                 cost = calculate_cost_from_agent_usage(model_name, agent_usage) if model_name else None
@@ -625,6 +667,8 @@ class Runner:
                     extraction_time=extraction_time if extraction_time > 0 else None,
                     per_grader_time=per_grader_time if per_grader_time else None,
                     error=error_info,
+                    agent_state=agent_state,
+                    token_data=token_data,
                 )
             except Exception as e:
                 # Recover agent_id from TargetError if the target created an agent before failing
