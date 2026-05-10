@@ -207,6 +207,14 @@ class LettaCodeTarget(AbstractAgentTarget):
                     run_cwd = str(self.working_dir)
 
                 # run the letta command with prompt piped via stdin
+                #
+                # NOTE: We bump the StreamReader limit well above asyncio's
+                # 64 KiB default. letta-code emits one JSON event per line in
+                # stream-json mode, and a single event (e.g. a Read of a large
+                # file, verbose Bash output, or a base64-encoded image) can
+                # easily exceed 64 KiB. Without this, `async for raw_line in
+                # process.stdout` below raises LimitOverrunError on long-tool-
+                # result turns and crashes the rollout.
                 process = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdin=asyncio.subprocess.PIPE,
@@ -214,6 +222,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                     stderr=asyncio.subprocess.PIPE,
                     cwd=run_cwd,
                     env=env,
+                    limit=16 * 1024 * 1024,
                 )
                 # Write prompt to stdin and close it
                 process.stdin.write(prompt_bytes)
