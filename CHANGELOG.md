@@ -43,10 +43,11 @@ still include this field will emit a `DeprecationWarning` and the field is
 dropped on load.
 
 **Schema.** OpenAI judge calls now use
-`response_format={"type": "json_schema", ...}` with a hand-built strict
-schema (`additionalProperties: false`, no unsupported keywords). Score
-bounds (`[0, 1]`) are enforced Python-side via the existing post-parse
-clamp, which is now covered by a regression test.
+`response_format={"type": "json_schema", ...}` with the pydantic-derived
+`_JudgeResponse` schema as guidance (non-strict), bringing parity with
+the Anthropic and Google paths. Score bounds (`[0, 1]`) are enforced
+Python-side via the existing post-parse clamp, which is covered by a
+regression test.
 
 **Migration checklist.**
 

@@ -21,31 +21,15 @@ load_dotenv()
 class _JudgeResponse(PydanticBaseModel):
     """Shared schema for judge responses across all providers.
 
-    The ``score`` field is bounded to ``[0.0, 1.0]`` via Pydantic validation.
-    These bounds are enforced Python-side after parsing the judge's reply,
-    not pushed into the wire schema, because OpenAI's structured-output
-    ``strict`` mode does not accept ``minimum`` / ``maximum`` keywords.
+    Sent verbatim to all three providers (OpenAI, Anthropic, Google) as a
+    JSON schema response format. The schema acts as guidance — bounds on
+    ``score`` are re-applied Python-side via a post-parse clamp because
+    not every provider honors numeric bound keywords (``minimum`` /
+    ``maximum``) consistently.
     """
 
     score: float = PydanticField(ge=0.0, le=1.0, description="Score between 0.0 and 1.0")
     rationale: str = PydanticField(description="Explanation of the grading decision")
-
-
-# Schema sent to OpenAI for structured outputs. Hand-built to satisfy the
-# strict-mode subset (https://platform.openai.com/docs/guides/structured-outputs):
-# every object must declare ``additionalProperties: false``, and unsupported
-# keywords (``minimum`` / ``maximum`` / ``minLength`` / ``pattern`` / ...) must
-# be omitted. Bounds on ``score`` are re-applied via ``_JudgeResponse`` after
-# JSON parsing.
-_OPENAI_JUDGE_RESPONSE_SCHEMA: dict = {
-    "type": "object",
-    "properties": {
-        "score": {"type": "number", "description": "Score between 0.0 and 1.0"},
-        "rationale": {"type": "string", "description": "Explanation of the grading decision"},
-    },
-    "required": ["score", "rationale"],
-    "additionalProperties": False,
-}
 
 
 class RubricGrader(Grader):
@@ -165,8 +149,7 @@ class RubricGrader(Grader):
                         "type": "json_schema",
                         "json_schema": {
                             "name": "JudgeResponse",
-                            "schema": _OPENAI_JUDGE_RESPONSE_SCHEMA,
-                            "strict": True,
+                            "schema": _JudgeResponse.model_json_schema(),
                         },
                     },
                 )

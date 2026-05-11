@@ -245,7 +245,7 @@ class TestRubricGraderGrade:
             assert legacy not in sent
         assert sent == "only-this"
 
-    async def test_response_format_is_json_schema_strict_subset(self):
+    async def test_response_format_is_json_schema_non_strict(self):
         grader = RubricGrader(prompt="x", model="gpt-4o-mini")
         _patch_openai(grader)
         mock_client = grader.client
@@ -255,20 +255,15 @@ class TestRubricGraderGrade:
         rf = mock_client.chat.completions.create.call_args.kwargs["response_format"]
         assert rf["type"] == "json_schema"
         js = rf["json_schema"]
-        assert js["strict"] is True
+        # We intentionally do NOT pass strict=true: it forbids `minimum` /
+        # `maximum` keywords and would require a hand-built schema that
+        # duplicates _JudgeResponse. The pydantic-derived schema is sent as
+        # guidance, and the score is clamped to [0, 1] Python-side.
+        assert js.get("strict") in (None, False)
         schema = js["schema"]
-        # OpenAI strict-mode requirements: type=object, all fields required,
-        # additionalProperties=false, and *no* unsupported keywords like
-        # minimum/maximum/minLength/pattern.
         assert schema["type"] == "object"
-        assert schema["additionalProperties"] is False
         assert set(schema["required"]) == {"score", "rationale"}
         assert set(schema["properties"]) == {"score", "rationale"}
-        for prop in schema["properties"].values():
-            assert "minimum" not in prop
-            assert "maximum" not in prop
-            assert "minLength" not in prop
-            assert "pattern" not in prop
 
     async def test_score_is_clamped_to_unit_interval(self):
         """Belt-and-suspenders: even though the OpenAI strict schema lets
