@@ -245,7 +245,7 @@ class TestRubricGraderGrade:
             assert legacy not in sent
         assert sent == "only-this"
 
-    async def test_response_format_is_json_schema(self):
+    async def test_response_format_is_json_schema_strict_subset(self):
         grader = RubricGrader(prompt="x", model="gpt-4o-mini")
         _patch_openai(grader)
         mock_client = grader.client
@@ -254,10 +254,42 @@ class TestRubricGraderGrade:
 
         rf = mock_client.chat.completions.create.call_args.kwargs["response_format"]
         assert rf["type"] == "json_schema"
-        schema = rf["json_schema"]["schema"]
-        assert "score" in schema["properties"]
-        assert schema["properties"]["score"]["minimum"] == 0.0
-        assert schema["properties"]["score"]["maximum"] == 1.0
+        js = rf["json_schema"]
+        assert js["strict"] is True
+        schema = js["schema"]
+        # OpenAI strict-mode requirements: type=object, all fields required,
+        # additionalProperties=false, and *no* unsupported keywords like
+        # minimum/maximum/minLength/pattern.
+        assert schema["type"] == "object"
+        assert schema["additionalProperties"] is False
+        assert set(schema["required"]) == {"score", "rationale"}
+        assert set(schema["properties"]) == {"score", "rationale"}
+        for prop in schema["properties"].values():
+            assert "minimum" not in prop
+            assert "maximum" not in prop
+            assert "minLength" not in prop
+            assert "pattern" not in prop
+
+    async def test_score_is_clamped_to_unit_interval(self):
+        """Belt-and-suspenders: even though the OpenAI strict schema lets
+        unbounded numbers through, the grader clamps the parsed score into
+        [0, 1] before returning it."""
+        grader = RubricGrader(prompt="x", model="gpt-4o-mini")
+        mock_client = MagicMock()
+        mock_choice = MagicMock()
+        mock_choice.message.content = json.dumps({"score": 2.5, "rationale": "ok"})
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_response.usage = MagicMock(model_dump=lambda: {})
+        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+        grader.client = mock_client
+
+        result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
+        assert result.score == 1.0
+
+        mock_choice.message.content = json.dumps({"score": -0.4, "rationale": "ok"})
+        result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
+        assert result.score == 0.0
 
     async def test_missing_rubric_returns_zero_with_error_metadata(self):
         # prompt=None and sample.rubric=None → graceful error result.
