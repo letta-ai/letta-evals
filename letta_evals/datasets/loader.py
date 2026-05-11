@@ -7,10 +7,36 @@ import pandas as pd
 from letta_evals.models import Sample
 
 
+def _resolve_rubric_fields(
+    rubric_inline: Optional[str],
+    rubric_path: Optional[str],
+    dataset_dir: Path,
+    row_idx: int,
+) -> Optional[str]:
+    """Resolve per-sample rubric fields into a single rubric string.
+
+    Returns the rubric text (loaded from disk if ``rubric_path`` is set,
+    otherwise the inline ``rubric``), or ``None`` if neither is provided.
+    Raises ``ValueError`` if both are set.
+    """
+    if rubric_inline is not None and rubric_path is not None:
+        raise ValueError(f"Row {row_idx}: cannot set both 'rubric' and 'rubric_path'. Use one or the other.")
+    if rubric_path is not None:
+        path = Path(rubric_path)
+        if not path.is_absolute():
+            path = (dataset_dir / path).resolve()
+        if not path.exists():
+            raise ValueError(f"Row {row_idx}: rubric_path '{rubric_path}' does not exist (resolved to {path}).")
+        with open(path, "r") as f:
+            return f.read()
+    return rubric_inline
+
+
 def load_jsonl(
     file_path: Path, max_samples: Optional[int] = None, sample_tags: Optional[List[str]] = None
 ) -> Iterator[Sample]:
     """Load samples from a JSONL file."""
+    dataset_dir = file_path.parent
     with open(file_path, "r") as f:
         line_index = 0
         yielded_count = 0
@@ -26,6 +52,12 @@ def load_jsonl(
                 pass
 
             metadata = data.get("metadata") or {}
+            rubric_text = _resolve_rubric_fields(
+                data.get("rubric"),
+                data.get("rubric_path"),
+                dataset_dir,
+                line_index,
+            )
             sample = Sample(
                 id=line_index,
                 input=data.get("input") or data["prompt"],
@@ -33,6 +65,7 @@ def load_jsonl(
                 agent_args=data.get("agent_args") or metadata.get("agent_args"),
                 rubric_vars=data.get("rubric_vars") or metadata.get("rubric_vars"),
                 extra_vars=data.get("extra_vars") or metadata.get("extra_vars"),
+                rubric=rubric_text,
             )
 
             line_index += 1
@@ -87,6 +120,10 @@ def load_csv(
     - agent_args (optional): dict as JSON string
     - rubric_vars (optional): dict as JSON string
     - extra_vars (optional): dict as JSON string
+    - rubric (optional): per-sample rubric text (multi-line strings in CSV
+      cells are awkward; prefer ``rubric_path`` for non-trivial rubrics)
+    - rubric_path (optional): per-sample rubric file path. Resolved relative
+      to the dataset file's directory. Mutually exclusive with ``rubric``.
     """
     try:
         df = pd.read_csv(file_path)
@@ -99,6 +136,7 @@ def load_csv(
     if "input" not in df.columns:
         raise ValueError(f"CSV file {file_path} missing required column 'input'. Found columns: {list(df.columns)}")
 
+    dataset_dir = file_path.parent
     yielded_count = 0
     for idx, row in df.iterrows():
         if max_samples and yielded_count >= max_samples:
@@ -119,6 +157,15 @@ def load_csv(
         rubric_vars = _parse_json_dict_field(df, row, "rubric_vars", idx)
         extra_vars = _parse_json_dict_field(df, row, "extra_vars", idx)
 
+        rubric_inline = None
+        if "rubric" in df.columns and not pd.isna(row.get("rubric")):
+            rubric_inline = str(row["rubric"])
+        rubric_path_value = None
+        if "rubric_path" in df.columns and not pd.isna(row.get("rubric_path")):
+            rubric_path_value = str(row["rubric_path"]).strip()
+
+        rubric_text = _resolve_rubric_fields(rubric_inline, rubric_path_value, dataset_dir, int(idx))
+
         # create sample
         try:
             sample = Sample(
@@ -128,6 +175,7 @@ def load_csv(
                 agent_args=agent_args,
                 rubric_vars=rubric_vars,
                 extra_vars=extra_vars,
+                rubric=rubric_text,
             )
         except Exception as e:
             raise ValueError(f"Row {idx}: Failed to create Sample: {e}")

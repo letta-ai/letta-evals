@@ -1,5 +1,9 @@
 You are evaluating an AI agent's response to a data analysis question about synthetic people records stored in text files.
 
+Question: {input}
+Expected Answer: {ground_truth}
+Agent's Submission: {submission}
+
 ## Task
 The agent was asked to find specific information by reading and cross-referencing multiple text files (people.txt, pets.txt, vehicles.txt, bank_accounts.txt, credit_cards.txt, employments.txt, addresses.txt, insurance_policies.txt, internet_accounts.txt, medical_records.txt).
 

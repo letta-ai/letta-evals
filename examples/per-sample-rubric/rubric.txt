@@ -1,0 +1,17 @@
+You are evaluating an ASCII art submission.
+
+Task given to the agent:
+{input}
+
+Agent's Submission:
+{submission}
+
+This is the suite-level default rubric — used when a sample does not specify
+its own `rubric` or `rubric_path`.
+
+Score 1.0 if the submission is a recognizable ASCII rendering of the requested
+subject AND is wrapped in backticks.
+Score 0.5 if recognizable but with formatting issues or weak resemblance.
+Score 0.0 otherwise.
+
+Provide your score and a brief rationale.

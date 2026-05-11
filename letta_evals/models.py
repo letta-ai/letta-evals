@@ -62,6 +62,22 @@ class Sample(BaseModel):
     extra_vars: Optional[Dict[str, Any]] = Field(
         default=None, description="Custom user-supplied variables. Useful when writing custom extractors, graders, etc."
     )
+    rubric: Optional[str] = Field(
+        default=None,
+        description=(
+            "Per-sample rubric text. When set, overrides the grader-level rubric "
+            "(e.g. ``prompt`` / ``prompt_path``) for this sample. The rubric is "
+            "sent verbatim to the judge after template substitution."
+        ),
+    )
+    rubric_path: Optional[Path] = Field(
+        default=None,
+        description=(
+            "Per-sample rubric file path. Resolved by the dataset loader, which "
+            "reads the file contents into ``rubric``. Only one of ``rubric`` or "
+            "``rubric_path`` may be set per sample."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_ground_truth_format(self):
@@ -78,6 +94,16 @@ class Sample(BaseModel):
                     f"For per-turn evaluation, each input must have a corresponding ground_truth."
                 )
 
+        return self
+
+    @model_validator(mode="after")
+    def validate_rubric_fields(self):
+        """At most one of rubric / rubric_path may be set."""
+        if self.rubric is not None and self.rubric_path is not None:
+            raise ValueError(
+                "Sample cannot have both 'rubric' and 'rubric_path' set. "
+                "Use one or the other (the loader resolves rubric_path into rubric)."
+            )
         return self
 
 
@@ -201,15 +227,23 @@ class ModelJudgeGraderSpec(BaseGraderSpec):
     provider: LLMProvider = Field(default=LLMProvider.OPENAI, description="LLM provider for model judge")
     max_retries: int = Field(default=5, description="Maximum number of retries for model judge")
     timeout: float = Field(default=120.0, description="Timeout for model judge in seconds")
-    rubric_vars: Optional[List[str]] = Field(
-        default=None, description="List of required custom variables for prompt substitution"
+    system_prompt: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional system prompt sent to the judge. By default no system "
+            "prompt is sent — the rubric is the entire instruction. Set this "
+            "to opt back into a system message (e.g. role framing)."
+        ),
     )
 
     @model_validator(mode="after")
     def validate_prompt_config(self):
-        if not self.prompt and not self.prompt_path:
-            raise ValueError("Model judge requires either prompt or prompt_path")
-        if self.prompt and self.prompt_path:
+        if self.prompt is None and self.prompt_path is None:
+            raise ValueError(
+                "Model judge requires either 'prompt' or 'prompt_path' "
+                "(samples may also override these via Sample.rubric / rubric_path)."
+            )
+        if self.prompt is not None and self.prompt_path is not None:
             raise ValueError("Model judge cannot have both prompt and prompt_path")
 
         # load prompt from file if needed
@@ -230,9 +264,6 @@ class LettaJudgeGraderSpec(BaseGraderSpec):
     agent_id: Optional[str] = Field(default=None, description="Letta Cloud agent ID to use as judge")
     judge_tool_name: str = Field(
         default="submit_grade", description="Name of tool that agent uses to submit score/rationale"
-    )
-    rubric_vars: Optional[List[str]] = Field(
-        default=None, description="List of required custom variables for prompt substitution"
     )
 
     @field_validator("agent_file")
@@ -476,6 +507,8 @@ class SuiteSpec(BaseModel):
 
             # resolve multi-graders (required)
             if "graders" in yaml_data and isinstance(yaml_data["graders"], dict):
+                import warnings as _warnings
+
                 resolved_graders: Dict[str, Any] = {}
                 for key, gspec in yaml_data["graders"].items():
                     if "prompt_path" in gspec and gspec["prompt_path"]:
@@ -484,6 +517,18 @@ class SuiteSpec(BaseModel):
                     if "agent_file" in gspec and gspec["agent_file"]:
                         if not Path(gspec["agent_file"]).is_absolute():
                             gspec["agent_file"] = str((base_dir / gspec["agent_file"]).resolve())
+                    # Deprecation: drop legacy grader-level rubric_vars allow-list.
+                    # Variables are now auto-substituted from sample.rubric_vars.
+                    if "rubric_vars" in gspec:
+                        _warnings.warn(
+                            f"Grader '{key}': 'rubric_vars' on the grader is "
+                            "deprecated and ignored. Variables in sample.rubric_vars "
+                            "are now substituted into the rubric automatically. "
+                            "Remove this field from your suite YAML.",
+                            DeprecationWarning,
+                            stacklevel=3,
+                        )
+                        gspec.pop("rubric_vars", None)
                     gspec["base_dir"] = base_dir
                     resolved_graders[key] = gspec
                 yaml_data["graders"] = resolved_graders

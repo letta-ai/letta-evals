@@ -1,8 +1,11 @@
-The agent should use the {{skill}} skill and following additional files to complete this task:
-{{files}}
+The agent should use the {skill} skill and following additional files to complete this task:
+{files}
 
 Given these files and the following rubric, evaluate the agent's skill use for this task:
-{{rubric_skill_use}}
+{rubric_skill_use}
+
+Agent's Submission (sandbox files / skills used):
+{submission}
 
 Instructions:
 - Each criterion is binary with a score of either 0 or 0.25.

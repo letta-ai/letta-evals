@@ -1,5 +1,66 @@
 # Changelog
 
+## Unreleased
+
+### ⚠ BREAKING CHANGES — rubric grader redesign
+
+The `model_judge` and `letta_judge` graders now send the rubric **verbatim**
+to the judge after template substitution. The framework no longer wraps the
+rubric, injects a system prompt, or auto-appends sections like "Original
+Question / Expected Answer / Agent's Submission". This eliminates hidden
+behavior that occasionally contradicted user-written rubrics.
+
+**Template variables.** Reference these placeholders explicitly in your
+rubric text where you want them substituted:
+
+- `{input}` — the sample input
+- `{ground_truth}` — the sample's expected answer (empty string if unset)
+- `{submission}` — the agent's extracted output
+- Any key from `sample.rubric_vars` (per-row dict in the dataset)
+
+Use `{{` and `}}` for literal braces. Missing placeholders raise a clear
+`KeyError` at grade time; the runner also pre-validates static rubrics
+against the dataset and fails fast before any judge call.
+
+**Per-sample rubrics.** Dataset rows may now set:
+
+- `rubric` — inline rubric string for this sample, or
+- `rubric_path` — path to a rubric file (resolved relative to the dataset
+  file's directory).
+
+Per-sample rubric overrides the grader's `prompt` / `prompt_path` for that
+sample. The two fields are mutually exclusive. See
+`examples/per-sample-rubric/` for a worked example.
+
+**Optional system prompt.** `model_judge` graders accept an optional
+`system_prompt` field for users who want to add a framing message in
+addition to the rubric. No system prompt is sent by default.
+
+**Removed.** The grader-level `rubric_vars: [...]` allow-list on
+`model_judge` / `letta_judge` specs is removed. All keys in
+`sample.rubric_vars` are auto-substituted into the rubric. Suite YAMLs that
+still include this field will emit a `DeprecationWarning` and the field is
+dropped on load.
+
+**Schema.** OpenAI judge calls now use
+`response_format={"type": "json_schema", ...}` with bounded `score ∈ [0, 1]`
+(was: `json_object`), matching the Anthropic and Google paths.
+
+**Migration checklist.**
+
+1. Rewrite any rubrics that relied on the old wrapper text to explicitly
+   reference `{input}`, `{ground_truth}`, `{submission}` in the prose. The
+   in-repo rubrics under `examples/` and `letta-leaderboard/` have already
+   been migrated.
+2. Migrate any Jinja-style `{{var}}` placeholders to Python format-style
+   `{var}` (the old code only ever supported `{var}`; `{{var}}` rubrics
+   silently failed to substitute).
+3. Remove `rubric_vars: [...]` allow-lists from grader specs in suite
+   YAMLs.
+4. If a rubric loses important framing that came from the old system
+   prompt, either inline that text into the rubric or pass it via the new
+   `system_prompt` field on the grader spec.
+
 ## [0.15.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.14.0...letta-evals-v0.15.0) (2026-05-01)
 
 

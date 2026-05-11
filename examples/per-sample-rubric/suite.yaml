@@ -1,7 +1,6 @@
-name: ascii-art-rubric-test
-description: Test if agent can generate ASCII art correctly using rubric grading
-dataset: dataset.csv
-max_samples: 3
+name: per-sample-rubric-example
+description: Demonstrates per-sample rubric overrides (inline `rubric` and `rubric_path` on a dataset row override the grader-level rubric for that sample).
+dataset: dataset.jsonl
 target:
   kind: letta_agent
   agent_file: ascii-art-agent.af
@@ -10,7 +9,7 @@ graders:
   quality:
     kind: model_judge
     display_name: "rubric score"
-    prompt_path: rubric.txt
+    prompt_path: rubric.txt  # suite-level default; overridden per-sample if the row specifies rubric/rubric_path
     model: gpt-5-mini
     temperature: 0.0
     provider: openai

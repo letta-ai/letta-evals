@@ -1,4 +1,18 @@
-Scoring dimensions (sum → 1.0):
+You are evaluating an agent's ASCII art submission against a reference example.
+
+Task given to the agent:
+{input}
+
+Agent's Submission:
+{submission}
+
+Here is an example of a high-quality ASCII art for this task:
+
+```
+{reference_ascii}
+```
+
+Use this as a reference for quality, detail level, and craftsmanship when evaluating the submission. Below are the scoring dimensions (sum → 1.0):
 
 1. Instruction compliance (0.30)  
    0.30: Art wrapped in backticks as requested (```art```); no extra content outside backticks

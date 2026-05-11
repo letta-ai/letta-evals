@@ -35,9 +35,7 @@ graders:
     max_retries: 3
     timeout: 120.0
     extractor: custom_extractor.py:sandbox_files_extractor
-    rubric_vars:
-      - rubric_task_completion
-  
+
   skill_use:
     kind: model_judge
     display_name: "skill use score"
@@ -48,10 +46,6 @@ graders:
     max_retries: 3
     timeout: 120.0
     extractor: custom_extractor.py:skill_extractor
-    rubric_vars:
-      - rubric_skill_use
-      - skill
-      - files
 
 gate:
   kind: simple

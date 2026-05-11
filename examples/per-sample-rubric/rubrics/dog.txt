@@ -1,0 +1,13 @@
+You are evaluating a dog ASCII art submission.
+
+Task given to the agent:
+{input}
+
+Agent's Submission:
+{submission}
+
+Score 1.0 if the submission shows clear dog-specific features (snout, ears, four legs, tail) AND is wrapped in backticks.
+Score 0.5 if recognizable but missing some dog features OR formatting.
+Score 0.0 otherwise.
+
+Provide your score and a brief rationale.
