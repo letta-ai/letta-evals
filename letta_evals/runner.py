@@ -223,7 +223,7 @@ class Runner:
                         extractor=gspec.extractor,
                         extractor_config=gspec.extractor_config,
                         base_dir=gspec.base_dir,
-                        rubric_vars=gspec.rubric_vars,
+                        system_prompt=gspec.system_prompt,
                     )
                 elif isinstance(gspec, LettaJudgeGraderSpec):
                     # If agent_id is provided, use it directly
@@ -250,7 +250,6 @@ class Runner:
                         extractor=gspec.extractor,
                         extractor_config=gspec.extractor_config,
                         base_dir=gspec.base_dir,
-                        rubric_vars=gspec.rubric_vars,
                     )
                 else:
                     raise ValueError(f"Unknown grader spec type: {type(gspec)}")
@@ -428,6 +427,7 @@ class Runner:
                 agent_args=sample.agent_args,
                 rubric_vars=sample.rubric_vars,
                 extra_vars=sample.extra_vars,
+                rubric=sample.rubric,
             )
 
             # Grade this turn
@@ -725,27 +725,54 @@ class Runner:
                         logger.warning(f"Failed to cleanup agent {agent_id}: {cleanup_err}")
 
     def _validate_rubric_vars(self, samples: List[Sample]) -> None:
-        """Validate that all samples have required rubric_vars for configured graders."""
+        """Validate rubric-variable wiring before any sample runs.
+
+        With the rubric-grader redesign, rubrics are sent verbatim to the
+        judge and any ``{placeholder}`` in the rubric must resolve at grade
+        time. This pre-check fails fast with a clear error rather than
+        surfacing as a ``KeyError`` mid-run on the first sample.
+
+        It only checks rubrics that are static (grader-level ``prompt`` /
+        ``prompt_path``). Per-sample rubrics (``Sample.rubric``) are checked
+        at grade time.
+        """
         if not self.suite.graders:
             return
 
+        import string as _string
+
         for grader_key, grader_spec in self.suite.graders.items():
-            # check if grader uses rubric_vars (model_judge or letta_judge)
-            if not isinstance(grader_spec, (ModelJudgeGraderSpec, LettaJudgeGraderSpec)) or not grader_spec.rubric_vars:
+            if not isinstance(grader_spec, (ModelJudgeGraderSpec, LettaJudgeGraderSpec)):
+                continue
+            rubric_text = grader_spec.prompt
+            if rubric_text is None:
+                continue
+
+            # Names referenced by the rubric template
+            referenced: set = set()
+            for _, field_name, _, _ in _string.Formatter().parse(rubric_text):
+                if field_name:
+                    # Strip indexing/attribute access (e.g. {foo.bar} -> "foo")
+                    referenced.add(field_name.split(".")[0].split("[")[0])
+
+            reserved = {"input", "ground_truth", "submission"}
+            extras_needed = referenced - reserved
+            if not extras_needed:
                 continue
 
             for sample in samples:
-                if not sample.rubric_vars:
+                # If the sample provides its own rubric, skip this check —
+                # the per-sample rubric will be validated at grade time.
+                if sample.rubric is not None:
+                    continue
+                provided = set((sample.rubric_vars or {}).keys())
+                missing = extras_needed - provided
+                if missing:
                     raise ValueError(
-                        f"Sample {sample.id} is missing rubric_vars field. "
-                        f"Grader '{grader_key}' requires variables: {', '.join(grader_spec.rubric_vars)}"
-                    )
-
-                missing_vars = [var for var in grader_spec.rubric_vars if var not in sample.rubric_vars]
-                if missing_vars:
-                    raise ValueError(
-                        f"Sample {sample.id} is missing required rubric variables for grader '{grader_key}': "
-                        f"{', '.join(missing_vars)}"
+                        f"Sample {sample.id} is missing rubric variables required by "
+                        f"grader '{grader_key}': {sorted(missing)}. "
+                        f"Add them to sample.rubric_vars, or override the rubric "
+                        f"via sample.rubric / sample.rubric_path."
                     )
 
     async def run(self) -> RunnerResult:

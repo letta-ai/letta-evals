@@ -16,11 +16,18 @@ logger = logging.getLogger(__name__)
 
 
 class AgentJudgeGrader(Grader):
-    """Grader that uses a Letta agent as a judge with custom rubric prompts."""
+    """Grader that uses a Letta agent as a judge with custom rubric prompts.
+
+    The rubric is sent verbatim to the judge agent after template
+    substitution. Use the placeholders {input}, {ground_truth}, {submission},
+    plus any keys from ``sample.rubric_vars`` inside the rubric. The rubric
+    is responsible for telling the judge agent to call the judge tool
+    (``judge_tool_name``).
+    """
 
     def __init__(
         self,
-        prompt: str,
+        prompt: Optional[str],
         client: AsyncLetta,
         agent_file: Optional[Path] = None,
         agent_id: Optional[str] = None,
@@ -30,7 +37,6 @@ class AgentJudgeGrader(Grader):
         extractor: str = "last_assistant",
         extractor_config: Optional[dict] = None,
         base_dir: Optional[Path] = None,
-        rubric_vars: Optional[List[str]] = None,
     ):
         if not agent_file and not agent_id:
             raise ValueError("Either agent_file or agent_id must be provided")
@@ -46,7 +52,6 @@ class AgentJudgeGrader(Grader):
         self.judge_tool_name = judge_tool_name
         self.extractor_name = extractor
         self.base_dir = base_dir
-        self.rubric_vars = rubric_vars or []
         self._init_extractor(extractor, extractor_config, base_dir=base_dir)
 
         # validate agent file contains the required tool with correct schema (only if agent_file is provided)
@@ -61,9 +66,19 @@ class AgentJudgeGrader(Grader):
         if early:
             return early
 
-        judge_prompt = build_judge_prompt(
-            self.prompt, sample, submission, self.rubric_vars, judge_tool_name=self.judge_tool_name
-        )
+        # Per-sample rubric overrides the grader-level rubric.
+        rubric_text = sample.rubric if sample.rubric is not None else self.prompt
+        if rubric_text is None:
+            return GradeResult(
+                score=0.0,
+                rationale=(
+                    "No rubric available: neither the grader (prompt/prompt_path) "
+                    "nor the sample (rubric/rubric_path) provided one."
+                ),
+                metadata={"error": "missing_rubric", "extraction_time": extraction_time},
+            ), submission
+
+        judge_prompt = build_judge_prompt(rubric_text, sample, submission)
 
         judge_agent_id = None
         try:

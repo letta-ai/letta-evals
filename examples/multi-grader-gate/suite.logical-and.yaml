@@ -16,8 +16,6 @@ graders:
     max_retries: 3
     timeout: 120.0
     extractor: last_assistant
-    rubric_vars:
-      - reference_ascii
   ascii_only:
     kind: tool
     display_name: "ascii character check"

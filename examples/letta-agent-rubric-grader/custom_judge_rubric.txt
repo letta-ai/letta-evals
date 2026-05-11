@@ -1,8 +1,16 @@
+You are evaluating an AI agent's response to a question about a webpage.
+
+Original Question:
+{input}
+
+Agent's Submission:
+{submission}
+
 Evaluate the agent's response based on the following criteria:
 
 1. **Correctness (0.6 weight)**: Does the response contain accurate information from the webpage? Check if the answer matches what was requested in the input.
 
-2. **Format (0.2 weight)**: Is the response formatted correctly? The input often requests answers in a specific format (e.g., in brackets like {Answer}).
+2. **Format (0.2 weight)**: Is the response formatted correctly? The input often requests answers in a specific format (e.g., in brackets like {{Answer}}).
 
 3. **Completeness (0.2 weight)**: Does the response fully address the question without unnecessary information?
 

@@ -1,8 +1,8 @@
 You are evaluating if an AI assistant correctly answered a question.
 
-Question: {{input}}
-Expected Answer: {{ground_truth}}
-Assistant's Response: {{submission}}
+Question: {input}
+Expected Answer: {ground_truth}
+Assistant's Response: {submission}
 
 Score the response on a scale of 0.0 to 1.0:
 - 1.0: The response contains the correct answer
