@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.16.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.15.0...letta-evals-v0.16.0) (2026-05-10)
+
+
+### Features
+
+* **runner:** Surface token_data + agent_state on SampleResult ([#249](https://github.com/letta-ai/letta-evals/issues/249)) ([f295ada](https://github.com/letta-ai/letta-evals/commit/f295adaaa18fdd670252576591ebfa6289f5ef48))
+
+
+### Bug Fixes
+
+* **letta-code-target:** Raise asyncio StreamReader limit to 16 MiB ([#251](https://github.com/letta-ai/letta-evals/issues/251)) ([f854951](https://github.com/letta-ai/letta-evals/commit/f8549514c0104f9a71b25a331fa05f679996f092))
+
 ## [0.15.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.14.0...letta-evals-v0.15.0) (2026-05-01)
 
 
