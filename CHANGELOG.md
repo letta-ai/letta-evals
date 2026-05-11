@@ -43,8 +43,10 @@ still include this field will emit a `DeprecationWarning` and the field is
 dropped on load.
 
 **Schema.** OpenAI judge calls now use
-`response_format={"type": "json_schema", ...}` with bounded `score ∈ [0, 1]`
-(was: `json_object`), matching the Anthropic and Google paths.
+`response_format={"type": "json_schema", ...}` with a hand-built strict
+schema (`additionalProperties: false`, no unsupported keywords). Score
+bounds (`[0, 1]`) are enforced Python-side via the existing post-parse
+clamp, which is now covered by a regression test.
 
 **Migration checklist.**
 
@@ -60,6 +62,18 @@ dropped on load.
 4. If a rubric loses important framing that came from the old system
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
+
+## [0.16.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.15.0...letta-evals-v0.16.0) (2026-05-10)
+
+
+### Features
+
+* **runner:** Surface token_data + agent_state on SampleResult ([#249](https://github.com/letta-ai/letta-evals/issues/249)) ([f295ada](https://github.com/letta-ai/letta-evals/commit/f295adaaa18fdd670252576591ebfa6289f5ef48))
+
+
+### Bug Fixes
+
+* **letta-code-target:** Raise asyncio StreamReader limit to 16 MiB ([#251](https://github.com/letta-ai/letta-evals/issues/251)) ([f854951](https://github.com/letta-ai/letta-evals/commit/f8549514c0104f9a71b25a331fa05f679996f092))
 
 ## [0.15.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.14.0...letta-evals-v0.15.0) (2026-05-01)
 
