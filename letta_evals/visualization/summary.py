@@ -199,21 +199,3 @@ def build_rich_sample_results_table(suite: SuiteSpec, displayed_rows: List[Displ
         )
 
     return table
-
-
-__all__ = [
-    "build_rich_sample_results_table",
-    "build_simple_sample_results_table",
-    "extract_score_and_rationale",
-    "format_gate_description",
-    "get_displayed_sample_results",
-    "get_metric_labels",
-    "print_basic_overall_metrics",
-    "print_remaining_samples_notice",
-    "print_truncated_samples_notice",
-    "DisplayRow",
-    # re-export for downstream typing convenience
-    "GradeResult",
-    "ModelSummary",
-    "Summary",
-]
