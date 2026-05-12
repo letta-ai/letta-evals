@@ -83,25 +83,28 @@ target:
 
 ### Results Output
 
-Results in `results.jsonl` will contain per-model metrics:
+Each model gets its own per-sample results file (`<model>.jsonl`), and `summary.json` contains a `models` array with one entry per model:
 
 ```json
 {
-  "type": "summary",
-  "results_by_model": {
-    "openai/gpt-4.1": {
-      "quality": {
-        "avg_score": 0.82,
-        "pass_rate": 0.85
-      }
+  "suite": "multi-model-rubric-grader",
+  "gates_passed": true,
+  "models": [
+    {
+      "model": "openai/gpt-4.1",
+      "n_total": 20,
+      "n_attempted": 20,
+      "score": 0.82,
+      "per_metric": { "quality": 0.82 }
     },
-    "openai/gpt-4.1-mini": {
-      "quality": {
-        "avg_score": 0.71,
-        "pass_rate": 0.72
-      }
+    {
+      "model": "openai/gpt-4.1-mini",
+      "n_total": 20,
+      "n_attempted": 20,
+      "score": 0.71,
+      "per_metric": { "quality": 0.71 }
     }
-  }
+  ]
 }
 ```
 

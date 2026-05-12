@@ -115,20 +115,21 @@ class SimpleProgress(ProgressCallback):
         self.console.print("[bold]Evaluation Results:[/bold]")
         self.console.print("=" * 50)
 
-        print_basic_overall_metrics(self.console, result.metrics)
+        suite_spec = result.suite_spec
+        print_basic_overall_metrics(self.console, result.summary)
 
         # gate status
         status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
-        gate_desc = format_gate_description(result.config, fixed_decimal_value=True)
+        gate_desc = format_gate_description(suite_spec, fixed_decimal_value=True)
 
         self.console.print(f"\n[bold]Gate:[/bold] {gate_desc} → {status}")
 
         # sample results table
         self.console.print("\n[bold]Sample Results:[/bold]")
-        total_samples, displayed_results = get_displayed_sample_results(result)
-        print_truncated_samples_notice(self.console, total_samples, len(displayed_results))
-        self.console.print(build_simple_sample_results_table(result.config, displayed_results))
-        print_remaining_samples_notice(self.console, total_samples, len(displayed_results))
+        total_samples, displayed_rows = get_displayed_sample_results(result)
+        print_truncated_samples_notice(self.console, total_samples, len(displayed_rows))
+        self.console.print(build_simple_sample_results_table(suite_spec, displayed_rows))
+        print_remaining_samples_notice(self.console, total_samples, len(displayed_rows))
 
     def _format_prefix(self, sample_id: int, agent_id: Optional[str], model_name: Optional[str]) -> str:
         """format a compact prefix for substeps to show which sample they belong to."""

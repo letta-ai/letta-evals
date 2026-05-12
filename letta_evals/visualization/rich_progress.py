@@ -409,66 +409,46 @@ class EvalProgress(ProgressCallback):
     async def suite_completed(self, result):
         """Display summary and detailed results after evaluation completes"""
         self.console.print()
-        self.console.print(f"[bold]Evaluation Results: {result.suite}[/bold]")
+        self.console.print(f"[bold]Evaluation Results: {result.summary.suite}[/bold]")
         if self.cached_mode:
             self.console.print("[dim]Note: Results re-graded from cached trajectories[/dim]")
         self.console.print("=" * 50)
 
-        metrics = result.metrics
-        print_basic_overall_metrics(self.console, metrics)
+        summary = result.summary
+        suite_spec = result.suite_spec
+        label_map = get_metric_labels(suite_spec)
 
-        # usage metrics
-        if metrics.usage_metrics:
-            self.console.print("\n[bold]Usage:[/bold]")
-            self.console.print(f"  Total prompt tokens: {metrics.usage_metrics.total_prompt_tokens:,}")
-            self.console.print(f"  Total completion tokens: {metrics.usage_metrics.total_completion_tokens:,}")
-            if metrics.usage_metrics.total_cost is not None:
-                self.console.print(f"  Total cost: ${metrics.usage_metrics.total_cost:.4f}")
-            if metrics.usage_metrics.total_cached_input_tokens > 0:
-                self.console.print(f"  Total cached input tokens: {metrics.usage_metrics.total_cached_input_tokens:,}")
-            if metrics.usage_metrics.total_cache_write_tokens > 0:
-                self.console.print(f"  Total cache write tokens: {metrics.usage_metrics.total_cache_write_tokens:,}")
-            if metrics.usage_metrics.total_reasoning_tokens > 0:
-                self.console.print(f"  Total reasoning tokens: {metrics.usage_metrics.total_reasoning_tokens:,}")
+        print_basic_overall_metrics(self.console, summary)
 
-        # per-metric aggregates
-        if hasattr(metrics, "by_metric") and metrics.by_metric:
-            self.console.print("\n[bold]Metrics by Metric:[/bold]")
-            metrics_table = Table()
-            metrics_table.add_column("Metric", style="cyan")
-            metrics_table.add_column("Avg Score (Attempted)", style="white")
-            metrics_table.add_column("Avg Score (Total)", style="white")
-            label_map = get_metric_labels(result.config)
-
-            for key, agg in metrics.by_metric.items():
-                label = label_map.get(key, key)
-                metrics_table.add_row(label, f"{agg.avg_score_attempted:.2f}", f"{agg.avg_score_total:.2f}")
-            self.console.print(metrics_table)
-
-        # per-model metrics
-        if metrics.per_model:
-            self.console.print("\n[bold]Per-Model Metrics:[/bold]")
+        # Per-model summary table
+        if summary.models:
+            self.console.print("\n[bold]Per-Model Summary:[/bold]")
             model_table = Table()
             model_table.add_column("Model", style="cyan")
             model_table.add_column("Samples", style="white")
             model_table.add_column("Attempted", style="white")
-            model_table.add_column("Avg Score (Attempted)", style="white")
-            model_table.add_column("Avg Score (Total)", style="white")
+            model_table.add_column("Score", style="white")
+            for metric_key in label_map.keys():
+                model_table.add_column(label_map[metric_key], style="white")
 
-            for model_metrics in metrics.per_model:
-                model_table.add_row(
-                    model_metrics.model_name,
-                    str(model_metrics.total),
-                    str(model_metrics.total_attempted),
-                    f"{model_metrics.avg_score_attempted:.2f}",
-                    f"{model_metrics.avg_score_total:.2f}",
-                )
+            for ms in summary.models:
+                row = [
+                    ms.model,
+                    str(ms.n_total),
+                    str(ms.n_attempted),
+                    f"{ms.score:.2f}",
+                ]
+                for metric_key in label_map.keys():
+                    row.append(f"{ms.per_metric.get(metric_key, 0.0):.2f}")
+                model_table.add_row(*row)
 
             self.console.print(model_table)
 
-            # per-model usage metrics
-            has_usage_data = any(m.usage_metrics for m in metrics.per_model)
-            if has_usage_data:
+            # Per-model usage table
+            has_usage = any(
+                ms.usage and (ms.usage.prompt_tokens > 0 or ms.usage.completion_tokens > 0) for ms in summary.models
+            )
+            if has_usage:
                 self.console.print("\n[bold]Per-Model Usage:[/bold]")
                 usage_table = Table()
                 usage_table.add_column("Model", style="cyan")
@@ -479,25 +459,24 @@ class EvalProgress(ProgressCallback):
                 usage_table.add_column("Cache Write", style="dim white")
                 usage_table.add_column("Reasoning", style="dim white")
 
-                for model_metrics in metrics.per_model:
-                    if model_metrics.usage_metrics:
-                        u = model_metrics.usage_metrics
-                        usage_table.add_row(
-                            model_metrics.model_name,
-                            f"{u.total_prompt_tokens:,}",
-                            f"{u.total_completion_tokens:,}",
-                            f"${u.total_cost:.4f}" if u.total_cost is not None else "-",
-                            f"{u.total_cached_input_tokens:,}" if u.total_cached_input_tokens > 0 else "-",
-                            f"{u.total_cache_write_tokens:,}" if u.total_cache_write_tokens > 0 else "-",
-                            f"{u.total_reasoning_tokens:,}" if u.total_reasoning_tokens > 0 else "-",
-                        )
+                for ms in summary.models:
+                    u = ms.usage
+                    usage_table.add_row(
+                        ms.model,
+                        f"{u.prompt_tokens:,}",
+                        f"{u.completion_tokens:,}",
+                        f"${u.cost:.4f}" if u.cost is not None else "-",
+                        f"{u.cached_input_tokens:,}" if u.cached_input_tokens > 0 else "-",
+                        f"{u.cache_write_tokens:,}" if u.cache_write_tokens > 0 else "-",
+                        f"{u.reasoning_tokens:,}" if u.reasoning_tokens > 0 else "-",
+                    )
 
                 self.console.print(usage_table)
 
         # gate status
         status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
         gate_desc = format_gate_description(
-            result.config,
+            suite_spec,
             prefer_display_label=True,
             quote_metric_label=True,
             default_metric_label="metric",
@@ -507,7 +486,7 @@ class EvalProgress(ProgressCallback):
 
         # sample results table
         self.console.print("\n[bold]Sample Results:[/bold]")
-        total_samples, displayed_results = get_displayed_sample_results(result)
-        print_truncated_samples_notice(self.console, total_samples, len(displayed_results))
-        self.console.print(build_rich_sample_results_table(result.config, displayed_results))
-        print_remaining_samples_notice(self.console, total_samples, len(displayed_results))
+        total_samples, displayed_rows = get_displayed_sample_results(result)
+        print_truncated_samples_notice(self.console, total_samples, len(displayed_rows))
+        self.console.print(build_rich_sample_results_table(suite_spec, displayed_rows))
+        print_remaining_samples_notice(self.console, total_samples, len(displayed_rows))

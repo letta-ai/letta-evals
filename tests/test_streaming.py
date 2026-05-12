@@ -1,143 +1,271 @@
-"""Unit tests for letta_evals.streaming module."""
+"""Unit tests for letta_evals.streaming module (always-partitioned layout)."""
 
+import json
 import tempfile
 from pathlib import Path
 
 import pytest
 
-from letta_evals.models import GradeResult, Metrics, Sample, SampleResult
+from letta_evals.metrics import summarize_model, summarize_runs
+from letta_evals.models import (
+    GradeResult,
+    LettaAgentTargetSpec,
+    Sample,
+    SampleResult,
+    SimpleGateSpec,
+    SuiteSpec,
+    Summary,
+    Timing,
+    ToolGraderSpec,
+)
 from letta_evals.streaming import StreamingReader, StreamingWriter
+from letta_evals.types import Aggregation, GateKind, MetricOp, TargetKind
 
 
-def _make_sample_result(sample_id: int = 0, score: float = 1.0) -> SampleResult:
-    sample = Sample(id=sample_id, input="test input", ground_truth="test answer")
-    grade = GradeResult(score=score, rationale="test rationale")
+def _make_suite() -> SuiteSpec:
+    return SuiteSpec(
+        name="test-suite",
+        dataset="ignored",
+        target=LettaAgentTargetSpec(kind=TargetKind.LETTA_AGENT, agent_id="agent-fake-1"),
+        graders={"check": ToolGraderSpec(function="exact_match", display_name="Check")},
+        gate=SimpleGateSpec(
+            kind=GateKind.SIMPLE,
+            metric_key="check",
+            aggregation=Aggregation.AVG_SCORE,
+            op=MetricOp.GTE,
+            value=0.5,
+        ),
+    )
+
+
+def _make_samples(n: int = 2):
+    return [Sample(id=i, input=f"in-{i}", ground_truth=f"gt-{i}") for i in range(n)]
+
+
+def _make_result(sample_id: int, score: float) -> SampleResult:
     return SampleResult(
-        sample=sample,
-        submission="test submission",
-        trajectory=[],
-        grade=grade,
-        model_name="gpt-4o",
+        sample_id=sample_id,
+        agent_id="agent-x",
+        trajectory=[[]],
+        submissions={"check": "x"},
+        grades={"check": GradeResult(score=score, rationale="r")},
+        timing=Timing(total=1.0, target=0.8),
     )
 
 
-def _make_metrics() -> Metrics:
-    return Metrics(
-        total=2,
-        total_attempted=2,
-        avg_score_attempted=0.75,
-        avg_score_total=0.75,
-        metrics={"default": 75.0},
+_GATE = SimpleGateSpec(
+    kind=GateKind.SIMPLE,
+    metric_key="check",
+    aggregation=Aggregation.AVG_SCORE,
+    op=MetricOp.GTE,
+    value=0.5,
+)
+
+
+def _summary_for(model: str, results):
+    return summarize_model(
+        model=model,
+        results=results,
+        grader_keys=["check"],
+        gate=_GATE,
     )
 
 
-class TestStreamingWriterReader:
+# ── construction guards ──
+
+
+class TestWriterConstruction:
+    def test_empty_models_rejected(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with pytest.raises(ValueError):
+                StreamingWriter(Path(tmpdir), _make_suite(), _make_samples(), models=[])
+
+
+# ── single-run ──
+
+
+class TestSingleRun:
+    @pytest.mark.asyncio
+    async def test_single_model_round_trip(self):
+        """Even a 'single-model' suite uses the partitioned layout."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir)
+            writer = StreamingWriter(
+                output_path,
+                _make_suite(),
+                _make_samples(2),
+                models=["default"],
+                num_runs=1,
+            )
+            await writer.initialize()
+
+            r1 = _make_result(0, 1.0)
+            r2 = _make_result(1, 0.0)
+            await writer.append_result(r1, model="default")
+            await writer.append_result(r2, model="default")
+
+            summary = Summary(
+                suite="test-suite",
+                models=[_summary_for("default", [r1, r2])],
+                gates_passed=True,
+            )
+            await writer.write_summary(summary)
+
+            assert (output_path / "suite.json").exists()
+            assert (output_path / "default.jsonl").exists()
+            assert (output_path / "summary.json").exists()
+            # No legacy results.jsonl
+            assert not (output_path / "results.jsonl").exists()
+
+            result = await StreamingReader.to_runner_result(output_path)
+            assert result.suite_spec.name == "test-suite"
+            assert len(result.samples) == 2
+            assert result.gates_passed is True
+            assert "default" in result.runs
+            assert result.runs["default"].results[0].grades["check"].score == 1.0
+
+    @pytest.mark.asyncio
+    async def test_multiple_models_round_trip(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir)
+            writer = StreamingWriter(
+                output_path,
+                _make_suite(),
+                _make_samples(2),
+                models=["gpt-4o", "claude-3-opus"],
+                num_runs=1,
+            )
+            await writer.initialize()
+
+            r_a = _make_result(0, 1.0)
+            r_b = _make_result(1, 0.5)
+            await writer.append_result(r_a, model="gpt-4o")
+            await writer.append_result(r_b, model="claude-3-opus")
+
+            summary = Summary(
+                suite="test-suite",
+                models=[
+                    _summary_for("gpt-4o", [r_a]),
+                    _summary_for("claude-3-opus", [r_b]),
+                ],
+                gates_passed=True,
+            )
+            await writer.write_summary(summary)
+
+            assert (output_path / "gpt-4o.jsonl").exists()
+            assert (output_path / "claude-3-opus.jsonl").exists()
+
+            result = await StreamingReader.to_runner_result(output_path)
+            assert set(result.runs.keys()) == {"gpt-4o", "claude-3-opus"}
+            assert result.runs["gpt-4o"].results[0].grades["check"].score == 1.0
+            assert result.runs["claude-3-opus"].results[0].grades["check"].score == 0.5
+
+    @pytest.mark.asyncio
+    async def test_safe_segment_for_slash_in_model(self):
+        """Model names with slashes are sanitised to filenames."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir)
+            writer = StreamingWriter(
+                output_path,
+                _make_suite(),
+                _make_samples(1),
+                models=["openai/gpt-4"],
+                num_runs=1,
+            )
+            await writer.initialize()
+
+            r = _make_result(0, 1.0)
+            await writer.append_result(r, model="openai/gpt-4")
+
+            summary = Summary(
+                suite="test-suite",
+                models=[_summary_for("openai/gpt-4", [r])],
+                gates_passed=True,
+            )
+            await writer.write_summary(summary)
+
+            assert (output_path / "openai-gpt-4.jsonl").exists()
+
+            result = await StreamingReader.to_runner_result(output_path)
+            assert "openai/gpt-4" in result.runs
+
+
+# ── multi-run ──
+
+
+class TestMultiRun:
     @pytest.mark.asyncio
     async def test_round_trip(self):
-        """Write results with StreamingWriter, read back with StreamingReader."""
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir)
-            config = {"target": {"kind": "letta_agent"}, "graders": {"check": {"kind": "tool"}}}
-
-            # Write
-            writer = StreamingWriter(output_path, "test-suite", config)
+            writer = StreamingWriter(
+                output_path,
+                _make_suite(),
+                _make_samples(1),
+                models=["m1"],
+                num_runs=3,
+            )
             await writer.initialize()
 
-            r1 = _make_sample_result(0, 1.0)
-            r2 = _make_sample_result(1, 0.5)
-            await writer.append_result(r1)
-            await writer.append_result(r2)
+            run_results = []
+            for run in (1, 2, 3):
+                r = _make_result(0, score=run / 3.0)
+                await writer.append_result(r, model="m1", run=run)
+                run_results.append([r])
 
-            metrics = _make_metrics()
-            await writer.write_metrics(metrics, gates_passed=True)
+            model_summary = summarize_runs(
+                model="m1",
+                per_run_results=run_results,
+                grader_keys=["check"],
+                gate=_GATE,
+            )
+            await writer.write_model_summary(model_summary)
 
-            # Read
+            top = Summary(
+                suite="test-suite",
+                models=[model_summary],
+                gates_passed=True,
+                runs_passed=2,
+            )
+            await writer.write_summary(top)
+
+            assert (output_path / "m1" / "run_1.jsonl").exists()
+            assert (output_path / "m1" / "run_2.jsonl").exists()
+            assert (output_path / "m1" / "run_3.jsonl").exists()
+            assert (output_path / "m1" / "summary.json").exists()
+            assert (output_path / "summary.json").exists()
+
+            # top-level summary should NOT include per-run breakdown
+            with open(output_path / "summary.json") as f:
+                top_obj = json.load(f)
+            assert "runs" not in top_obj["models"][0]
+
+            # per-model summary SHOULD include runs
+            with open(output_path / "m1" / "summary.json") as f:
+                detail_obj = json.load(f)
+            assert "runs" in detail_obj and len(detail_obj["runs"]) == 3
+
             result = await StreamingReader.to_runner_result(output_path)
+            assert result.runs["m1"].runs is not None
+            assert len(result.runs["m1"].runs) == 3
 
-            assert result.suite == "test-suite"
-            assert result.config == config
-            assert len(result.results) == 2
-            assert result.results[0].sample.id == 0
-            assert result.results[0].grade.score == 1.0
-            assert result.results[1].grade.score == 0.5
-            assert result.metrics.total == 2
-            assert result.metrics.avg_score_attempted == pytest.approx(0.75)
-            assert result.gates_passed is True
 
+# ── error paths ──
+
+
+class TestReaderErrors:
     @pytest.mark.asyncio
-    async def test_creates_output_directory(self):
-        """StreamingWriter should create the output directory if it doesn't exist."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_path = Path(tmpdir) / "nested" / "dir"
-            writer = StreamingWriter(output_path, "test-suite", {})
-            await writer.initialize()
-            assert (output_path / "header.json").exists()
-
-    @pytest.mark.asyncio
-    async def test_header_written_on_initialize(self):
-        """Header file should be created on initialize."""
+    async def test_missing_suite_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir)
-            writer = StreamingWriter(output_path, "my-suite", {"key": "val"})
-            await writer.initialize()
-
-            import json
-
-            with open(output_path / "header.json") as f:
-                header = json.load(f)
-            assert header["type"] == "header"
-            assert header["suite"] == "my-suite"
-            assert header["config"] == {"key": "val"}
-
-    @pytest.mark.asyncio
-    async def test_reader_missing_header(self):
-        """StreamingReader should raise FileNotFoundError if header.json is missing."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_path = Path(tmpdir)
-            (output_path / "summary.json").write_text('{"type":"summary","metrics":{},"gates_passed":false}')
-            (output_path / "results.jsonl").write_text("")
+            (output_path / "summary.json").write_text('{"suite":"x","models":[],"gates_passed":false}')
             with pytest.raises(FileNotFoundError):
                 await StreamingReader.to_runner_result(output_path)
 
     @pytest.mark.asyncio
-    async def test_reader_missing_summary(self):
-        """StreamingReader should raise FileNotFoundError if summary.json is missing."""
+    async def test_missing_summary_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir)
-            import json
-
-            with open(output_path / "header.json", "w") as f:
-                json.dump({"type": "header", "suite": "s", "config": {}}, f)
-            (output_path / "results.jsonl").write_text("")
+            (output_path / "suite.json").write_text(json.dumps({"suite": "x", "config": {}, "samples": []}))
             with pytest.raises(FileNotFoundError):
                 await StreamingReader.to_runner_result(output_path)
-
-    @pytest.mark.asyncio
-    async def test_reader_malformed_result_record(self):
-        """StreamingReader should raise if a result record is malformed."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_path = Path(tmpdir)
-
-            writer = StreamingWriter(output_path, "test-suite", {})
-            await writer.initialize()
-            await writer.write_metrics(_make_metrics(), gates_passed=True)
-
-            # Write a malformed record (missing "result" key)
-            with open(output_path / "results.jsonl", "w") as f:
-                f.write('{"type": "result", "bad_key": {}}\n')
-
-            with pytest.raises(KeyError):
-                await StreamingReader.to_runner_result(output_path)
-
-    @pytest.mark.asyncio
-    async def test_gates_passed_false(self):
-        """Verify gates_passed=False is preserved through round-trip."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_path = Path(tmpdir)
-            writer = StreamingWriter(output_path, "test-suite", {})
-            await writer.initialize()
-            await writer.append_result(_make_sample_result(0, 0.0))
-            await writer.write_metrics(_make_metrics(), gates_passed=False)
-
-            result = await StreamingReader.to_runner_result(output_path)
-            assert result.gates_passed is False

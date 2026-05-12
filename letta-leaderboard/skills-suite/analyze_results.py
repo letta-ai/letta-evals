@@ -43,18 +43,20 @@ def collect_results(results_dir="results_old"):
             print(f"Unknown setting for {dir_name}, skipping")
             continue
 
-        # Load and extract metrics from per_model array
+        # Load and extract per-model metrics from new summary shape.
+        # ``per_metric`` is a dict on a 0-1 scale; report ×100 for parity with
+        # the previous percentage display.
         with open(summary_file, "r") as f:
             data = json.load(f)
 
-        per_model = data.get("metrics", {}).get("per_model", [])
+        models = data.get("models", [])
 
         print(f"{dir_name} ({setting}):")
-        for model_data in per_model:
-            model_name = model_data.get("model_name", "unknown")
-            metrics = model_data.get("metrics", {})
-            task_completion = metrics.get("task_completion", 0)
-            skill_use = metrics.get("skill_use", 0)
+        for model_data in models:
+            model_name = model_data.get("model", "unknown")
+            per_metric = model_data.get("per_metric", {})
+            task_completion = float(per_metric.get("task_completion", 0.0)) * 100
+            skill_use = float(per_metric.get("skill_use", 0.0)) * 100
 
             results[model_name][setting] = {"task_completion": task_completion, "skill_use": skill_use}
 

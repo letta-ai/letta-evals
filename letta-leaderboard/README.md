@@ -48,7 +48,7 @@ letta-evals run letta-leaderboard/skills-suite/suite_skill_select_use.yaml \
 
 4. Generate the updated leaderboard:
 
-The `generate_leaderboard_results.py` script reads evaluation results and merges them into the leaderboard YAML file. The script looks for `aggregate_stats.json` (computed from multiple runs) or falls back to `summary.json` (from a single run) in the specified directories.
+The `generate_leaderboard_results.py` script reads evaluation results from the unified `summary.json` produced by `letta-evals` and merges them into the leaderboard YAML file. `summary.json` has the same shape for single-run and multi-run; the script mean-aggregates across runs automatically.
 
 **Basic usage:**
 ```bash
@@ -59,17 +59,16 @@ python3 generate_leaderboard_results.py \
 ```
 
 The script will:
-- Read `aggregate_stats.json` if available, otherwise fall back to `summary.json`
-- Extract model performance metrics (scores and costs) from the JSON files
+- Read `summary.json` from each results directory
+- Extract per-model `score` (0–1, reported ×100) and `usage.cost`
 - Automatically detect the correct metric key from the existing leaderboard
 - Add new models or update existing ones while preserving all data
 - Handle null/missing cost data gracefully
 - Normalize model names with provider prefixes (e.g., `gpt-4` → `openai/gpt-4`)
 
-**File format requirements:**
-- `aggregate_stats.json`: Contains `num_runs`, `individual_run_metrics`, and `per_model` data
-- `summary.json`: Contains `metrics` and `per_model` data
-- Both formats include `model_name`, `avg_score_attempted`, and optional `cost` information
+**File format:**
+- `summary.json`: Top-level fields `{ suite, gates_passed, models: [...], runs_passed? }`
+- Each entry in `models` has `{ model, n_total, n_attempted, score, per_metric, usage, timing, ... }` (multi-run also has `score_std` and `per_metric_std`)
 
 5. Update leaderboard site
 - Add new models and any analysis / commentary to [updates.md](../leaderboard_site/src/_includes/updates.md).

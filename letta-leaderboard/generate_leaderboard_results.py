@@ -1,8 +1,9 @@
 """
 Leaderboard Results Generator
 
-Processes evaluation results from aggregate_stats.json or summary.json files
-and merges them with an existing leaderboard YAML file.
+Reads ``summary.json`` files written by ``letta-evals`` (one unified shape for
+single and multi-run evaluations) and merges per-model results with an
+existing leaderboard YAML file.
 """
 
 import argparse
@@ -49,143 +50,48 @@ def normalize_model_name(model_name: str) -> str:
     return model_name
 
 
-def read_stats_file(directory: Path) -> Optional[Dict]:
-    """
-    Read aggregate_stats.json or fallback to summary.json from a directory.
+def read_summary_file(directory: Path) -> Optional[Dict]:
+    """Read ``summary.json`` from a directory.
 
-    Args:
-        directory: Path to directory containing stats files
-
-    Returns:
-        Dictionary containing the stats data, or None if neither file exists
+    Returns the parsed JSON, or ``None`` if the file is missing or malformed.
     """
-    aggregate_stats_path = directory / "aggregate_stats.json"
     summary_path = directory / "summary.json"
+    if not summary_path.exists():
+        logger.warning(f"summary.json not found in {directory}")
+        return None
 
-    if aggregate_stats_path.exists():
-        logger.info(f"Reading aggregate_stats.json from {directory}")
-        try:
-            with open(aggregate_stats_path, "r") as f:
-                return json.load(f)
-        except (IOError, json.JSONDecodeError) as e:
-            logger.error(f"Error reading {aggregate_stats_path}: {e}")
-            return None
-
-    elif summary_path.exists():
-        logger.info(f"Reading summary.json from {directory}")
-        try:
-            with open(summary_path, "r") as f:
-                return json.load(f)
-        except (IOError, json.JSONDecodeError) as e:
-            logger.error(f"Error reading {summary_path}: {e}")
-            return None
-
-    else:
-        logger.warning(f"Neither aggregate_stats.json nor summary.json found in {directory}")
+    logger.info(f"Reading summary.json from {directory}")
+    try:
+        with open(summary_path, "r") as f:
+            return json.load(f)
+    except (IOError, json.JSONDecodeError) as e:
+        logger.error(f"Error reading {summary_path}: {e}")
         return None
 
 
-def extract_model_results_from_aggregate(stats: Dict) -> List[Dict]:
+def extract_model_results_from_summary(summary: Dict) -> List[Dict]:
+    """Extract per-model leaderboard rows from a unified ``summary.json``.
+
+    ``summary.json`` has the same shape for single-run and multi-run; for
+    multi-run, ``score`` is the mean across runs (penalizing errors/timeouts).
+    All scores are on a 0–1 scale; the leaderboard reports them ×100.
     """
-    Extract model results from aggregate_stats.json.
+    model_results: List[Dict] = []
+    for model_info in summary.get("models", []):
+        model_name = normalize_model_name(model_info["model"])
+        score = float(model_info.get("score", 0.0)) * 100
+        usage = model_info.get("usage") or {}
+        cost = float(usage.get("cost") or 0.0)
+        per_metric = {k: float(v) * 100 for k, v in (model_info.get("per_metric") or {}).items()}
 
-    Args:
-        stats: Parsed aggregate_stats.json data
-
-    Returns:
-        List of model result dictionaries with name, score, cost, and individual metrics
-    """
-    model_results = []
-
-    # Check if this is aggregate stats (has num_runs and individual_run_metrics)
-    if "num_runs" in stats and "individual_run_metrics" in stats:
-        # Aggregate model results across all runs
-        model_data = {}
-
-        for run_metrics in stats["individual_run_metrics"]:
-            if "per_model" not in run_metrics:
-                continue
-
-            for model_info in run_metrics["per_model"]:
-                model_name = normalize_model_name(model_info["model_name"])
-
-                if model_name not in model_data:
-                    model_data[model_name] = {
-                        "scores": [],
-                        "costs": [],
-                        "metrics": {},
-                    }
-
-                # Leaderboard score uses avg_score_total (penalizes errors/timeouts)
-                score = model_info.get("avg_score_total", 0) * 100
-                cost_data = model_info.get("usage_metrics") or model_info.get("cost")
-                cost = cost_data.get("total_cost", 0) if isinstance(cost_data, dict) else 0
-
-                model_data[model_name]["scores"].append(score)
-                model_data[model_name]["costs"].append(cost)
-
-                # Extract individual metrics (e.g., task_completion, skill_use)
-                metrics_data = model_info.get("metrics", {})
-                for metric_name, metric_value in metrics_data.items():
-                    if metric_name not in model_data[model_name]["metrics"]:
-                        model_data[model_name]["metrics"][metric_name] = []
-                    model_data[model_name]["metrics"][metric_name].append(metric_value)
-
-        # Compute averages
-        for model_name, data in model_data.items():
-            avg_score = sum(data["scores"]) / len(data["scores"]) if data["scores"] else 0
-            avg_cost = sum(data["costs"]) / len(data["costs"]) if data["costs"] else 0
-
-            # Average individual metrics
-            avg_metrics = {}
-            for metric_name, metric_values in data["metrics"].items():
-                avg_metrics[metric_name] = sum(metric_values) / len(metric_values) if metric_values else 0
-
-            model_results.append(
-                {
-                    "model_name": model_name,
-                    "score": avg_score,
-                    "cost": avg_cost,
-                    "metrics": avg_metrics,
-                }
-            )
-
-    return model_results
-
-
-def extract_model_results_from_summary(stats: Dict) -> List[Dict]:
-    """
-    Extract model results from summary.json.
-
-    Args:
-        stats: Parsed summary.json data
-
-    Returns:
-        List of model result dictionaries with name, score, cost, and individual metrics
-    """
-    model_results = []
-
-    if "metrics" in stats and "per_model" in stats["metrics"]:
-        for model_info in stats["metrics"]["per_model"]:
-            model_name = normalize_model_name(model_info["model_name"])
-
-            # Leaderboard score uses avg_score_total (penalizes errors/timeouts)
-            score = model_info.get("avg_score_total", 0) * 100
-            cost_data = model_info.get("usage_metrics") or model_info.get("cost")
-            cost = cost_data.get("total_cost", 0) if isinstance(cost_data, dict) else 0
-
-            # Extract individual metrics (e.g., task_completion, skill_use)
-            metrics_data = model_info.get("metrics", {})
-
-            model_results.append(
-                {
-                    "model_name": model_name,
-                    "score": score,
-                    "cost": cost,
-                    "metrics": metrics_data,
-                }
-            )
-
+        model_results.append(
+            {
+                "model_name": model_name,
+                "score": score,
+                "cost": cost,
+                "metrics": per_metric,
+            }
+        )
     return model_results
 
 
@@ -333,12 +239,8 @@ def parse_arguments() -> argparse.Namespace:
     Returns:
         Parsed arguments
     """
-    parser = argparse.ArgumentParser(
-        description="Generate or update leaderboard results from aggregate_stats.json or summary.json files"
-    )
-    parser.add_argument(
-        "directories", nargs="+", type=Path, help="Directories containing aggregate_stats.json or summary.json files"
-    )
+    parser = argparse.ArgumentParser(description="Generate or update leaderboard results from summary.json files")
+    parser.add_argument("directories", nargs="+", type=Path, help="Directories containing summary.json files")
     parser.add_argument(
         "--leaderboard", "-l", type=Path, required=True, help="Path to the leaderboard YAML file (input and output)"
     )
@@ -418,20 +320,11 @@ def main() -> None:
             logger.warning(f"Directory {directory} does not exist, skipping")
             continue
 
-        # Read stats file
-        stats = read_stats_file(directory)
-        if stats is None:
+        summary = read_summary_file(directory)
+        if summary is None:
             continue
 
-        # Extract model results based on file type
-        if "num_runs" in stats:
-            model_results = extract_model_results_from_aggregate(stats)
-        elif "metrics" in stats:
-            model_results = extract_model_results_from_summary(stats)
-        else:
-            logger.warning(f"Unknown stats format in {directory}, skipping")
-            continue
-
+        model_results = extract_model_results_from_summary(summary)
         all_new_results.extend(model_results)
         logger.info(f"Extracted {len(model_results)} model results from {directory}")
 

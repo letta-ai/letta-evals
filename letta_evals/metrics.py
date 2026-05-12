@@ -1,269 +1,287 @@
-"""Metrics computation for evaluation results.
+"""Metrics aggregation for evaluation results.
 
-Pure functions that aggregate SampleResult lists into metrics models.
-Extracted from Runner to make them independently testable.
+Pure functions that turn ``List[SampleResult]`` (per-run, single-model) into
+``ModelSummary`` and ``PerRunSummary``. Extracted from Runner to make them
+independently testable.
 """
 
 import statistics as _statistics
-from collections import Counter, defaultdict
+from collections import Counter
 from typing import Dict, List, Optional
 
 from letta_evals.models import (
+    Error,
     ErrorSummary,
-    MetricAggregate,
-    Metrics,
-    ModelMetrics,
-    RunStatistics,
+    GateSpec,
+    ModelSummary,
+    PerRunSummary,
     SampleResult,
-    SuiteSpec,
-    TimingMetrics,
-    UsageMetrics,
+    SimpleGateSpec,
+    Timing,
+    TimingStats,
+    Usage,
+    WeightedAverageGateSpec,
+    compute_gate_score,
+    normalize_weights,
 )
 
-
-def compute_usage_metrics(results: List[SampleResult]) -> Optional[UsageMetrics]:
-    """Compute aggregate usage metrics from a list of sample results."""
-    costs = [r.cost for r in results if r.cost is not None]
-    total_cost = sum(costs) if costs else None
-
-    total_prompt = sum(r.prompt_tokens for r in results if r.prompt_tokens is not None)
-    total_completion = sum(r.completion_tokens for r in results if r.completion_tokens is not None)
-    total_cached = sum(r.cached_input_tokens for r in results if r.cached_input_tokens is not None)
-    total_cache_write = sum(r.cache_write_tokens for r in results if r.cache_write_tokens is not None)
-    total_reasoning = sum(r.reasoning_tokens for r in results if r.reasoning_tokens is not None)
-
-    if total_prompt > 0 or total_completion > 0 or (total_cost is not None and total_cost > 0):
-        return UsageMetrics(
-            total_prompt_tokens=total_prompt,
-            total_completion_tokens=total_completion,
-            total_cost=total_cost if total_cost and total_cost > 0 else None,
-            total_cached_input_tokens=total_cached,
-            total_cache_write_tokens=total_cache_write,
-            total_reasoning_tokens=total_reasoning,
-        )
-    return None
+# ── per-sample aggregation primitives ──
 
 
-def compute_error_summary(results: List[SampleResult]) -> Optional[ErrorSummary]:
-    """Compute error summary from a list of sample results."""
-    error_results = [r for r in results if r.error is not None]
-    if not error_results:
-        return None
-    return ErrorSummary(
-        total_errors=len(error_results),
-        by_category=dict(Counter(r.error.category.value for r in error_results)),
-        by_exception_type=dict(Counter(r.error.exception_type for r in error_results)),
-        failed_sample_ids=sorted(r.sample.id for r in error_results),
+def aggregate_usage(results: List[SampleResult]) -> Usage:
+    """Sum usage across samples. Returns a Usage with all zeros if nothing.
+
+    Note: ``cost`` is summed only over samples that report a cost; if no
+    sample has a cost, ``cost`` is left ``None``.
+    """
+    prompt = 0
+    completion = 0
+    cached = 0
+    cache_write = 0
+    reasoning = 0
+    costs: List[float] = []
+
+    for r in results:
+        if r.usage is None:
+            continue
+        prompt += r.usage.prompt_tokens
+        completion += r.usage.completion_tokens
+        cached += r.usage.cached_input_tokens
+        cache_write += r.usage.cache_write_tokens
+        reasoning += r.usage.reasoning_tokens
+        if r.usage.cost is not None:
+            costs.append(r.usage.cost)
+
+    return Usage(
+        prompt_tokens=prompt,
+        completion_tokens=completion,
+        cached_input_tokens=cached,
+        cache_write_tokens=cache_write,
+        reasoning_tokens=reasoning,
+        cost=sum(costs) if costs else None,
     )
 
 
-def compute_timing_metrics(results: List[SampleResult]) -> Optional[TimingMetrics]:
-    """Compute aggregate timing statistics from a list of sample results."""
-    total_times = [r.total_time for r in results if r.total_time is not None]
-    if not total_times:
+def aggregate_timing(results: List[SampleResult]) -> Optional[TimingStats]:
+    """Aggregate per-sample timing into mean/p50/p95 stats. Returns None if empty."""
+    timings: List[Timing] = [r.timing for r in results if r.timing is not None]
+    if not timings:
         return None
 
-    target_times = [r.target_time for r in results if r.target_time is not None]
-    extraction_times = [r.extraction_time for r in results if r.extraction_time is not None]
+    total_times = [t.total for t in timings]
+    target_times = [t.target for t in timings]
+    extraction_times = [t.extraction for t in timings if t.extraction is not None]
 
     n = len(total_times)
     sorted_totals = sorted(total_times)
 
-    # Aggregate per-grader times
     grader_keys: set = set()
-    for r in results:
-        if r.per_grader_time:
-            grader_keys.update(r.per_grader_time.keys())
+    for t in timings:
+        if t.per_grader:
+            grader_keys.update(t.per_grader.keys())
     per_grader_mean: Dict[str, float] = {}
     for k in sorted(grader_keys):
-        vals = [r.per_grader_time[k] for r in results if r.per_grader_time and k in r.per_grader_time]
+        vals = [t.per_grader[k] for t in timings if t.per_grader and k in t.per_grader]
         per_grader_mean[k] = sum(vals) / len(vals) if vals else 0.0
 
-    return TimingMetrics(
-        mean_total_seconds=sum(total_times) / n,
-        mean_target_seconds=sum(target_times) / len(target_times) if target_times else 0.0,
-        mean_extraction_seconds=sum(extraction_times) / len(extraction_times) if extraction_times else 0.0,
-        p50_total_seconds=sorted_totals[n // 2],
-        p95_total_seconds=sorted_totals[min(int(n * 0.95), n - 1)],
-        per_grader_mean_seconds=per_grader_mean if per_grader_mean else None,
+    return TimingStats(
+        mean_total=sum(total_times) / n,
+        mean_target=sum(target_times) / len(target_times) if target_times else 0.0,
+        mean_extraction=(sum(extraction_times) / len(extraction_times)) if extraction_times else None,
+        p50_total=sorted_totals[n // 2],
+        p95_total=sorted_totals[min(int(n * 0.95), n - 1)],
+        per_grader_mean=per_grader_mean if per_grader_mean else None,
     )
 
 
-def calculate_metrics(
-    results: List[SampleResult],
-    grader_keys: Optional[List[str]],
-    has_multi_model: bool,
-) -> Metrics:
-    """Calculate aggregate metrics from results.
+def aggregate_errors(results: List[SampleResult]) -> Optional[ErrorSummary]:
+    """Summarize errors. Returns None when there are no errors."""
+    errors: List[Error] = [r.error for r in results if r.error is not None]
+    if not errors:
+        return None
+    return ErrorSummary(
+        total_errors=len(errors),
+        by_category=dict(Counter(e.category.value for e in errors)),
+        by_exception_type=dict(Counter(e.exception_type for e in errors)),
+    )
 
-    Args:
-        results: All sample results from the evaluation run.
-        grader_keys: Ordered list of grader keys (from suite.graders), or None for single-grader.
-        has_multi_model: Whether the eval used multiple model configs.
 
-    Returns:
-        Metrics with overall and optionally per-model breakdowns.
+# ── per-grader score aggregation ──
+
+
+def _per_metric_average(results: List[SampleResult], grader_keys: List[str]) -> Dict[str, float]:
+    """Mean score per grader across attempted (non-error) samples, 0-1 scale."""
+    attempted = [r for r in results if r.error is None]
+    out: Dict[str, float] = {}
+    for key in grader_keys:
+        scores = [r.grades[key].score for r in attempted if key in r.grades]
+        out[key] = sum(scores) / len(scores) if scores else 0.0
+    return out
+
+
+def _gate_primary_score(per_metric: Dict[str, float], gate: Optional[GateSpec]) -> float:
+    """Pick a single 0-1 score representing the gate's primary metric.
+
+    - SimpleGateSpec → per_metric[gate.metric_key]
+    - WeightedAverageGateSpec → normalized weighted sum
+    - LogicalGateSpec / no gate → arithmetic mean of per_metric values
     """
-    total = len(results)
-    if total == 0:
-        return Metrics(
-            total=0,
-            total_attempted=0,
-            avg_score_attempted=0.0,
-            avg_score_total=0.0,
-            metrics={},
-        )
+    if not per_metric:
+        return 0.0
+    if gate is None:
+        return sum(per_metric.values()) / len(per_metric)
+    if isinstance(gate, SimpleGateSpec):
+        return per_metric.get(gate.metric_key, 0.0)
+    if isinstance(gate, WeightedAverageGateSpec):
+        weights = normalize_weights(gate.weights)
+        return sum(weights.get(k, 0.0) * per_metric.get(k, 0.0) for k in weights)
+    # Fall back to gate-helper logic for any other shape
+    return compute_gate_score(gate, per_metric)
 
-    def is_success(r: SampleResult) -> bool:
-        return r.error is None
 
-    attempted = sum(1 for r in results if is_success(r))
+# ── public summarization API ──
 
-    error_summary = compute_error_summary(results)
 
-    # compute per-metric aggregates if multiple graders
-    by_metric: Dict[str, MetricAggregate] = {}
-    if grader_keys:
-        for metric_key in grader_keys:
-            m_scores = [
-                r.grades[metric_key].score for r in results if is_success(r) and r.grades and metric_key in r.grades
-            ]
-            m_avg_attempted = sum(m_scores) / len(m_scores) if m_scores else 0.0
-            m_avg_total = sum(m_scores) / len(results) if m_scores else 0.0
-            # pass_rate is just avg score as percentage
-            m_pass_rate = m_avg_attempted * 100.0
-            by_metric[metric_key] = MetricAggregate(
-                avg_score_attempted=m_avg_attempted,
-                avg_score_total=m_avg_total,
-                pass_rate=m_pass_rate,
-            )
+def summarize_model(
+    *,
+    model: str,
+    results: List[SampleResult],
+    grader_keys: List[str],
+    gate: Optional[GateSpec],
+) -> ModelSummary:
+    """Build a ModelSummary from a single run's worth of results for one model.
 
-    metrics_dict: Dict[str, float] = {}
-    if grader_keys:
-        # use first grader for overall metrics
-        first_key = grader_keys[0]
-        for key, agg in by_metric.items():
-            metrics_dict[key] = agg.pass_rate
+    For multi-run aggregation, build one PerRunSummary per run with
+    ``summarize_run`` and then call ``summarize_runs``.
+    """
+    n_total = len(results)
+    n_attempted = sum(1 for r in results if r.error is None)
+    per_metric = _per_metric_average(results, grader_keys)
+    score = _gate_primary_score(per_metric, gate)
+    usage = aggregate_usage(results)
+    timing = aggregate_timing(results) or TimingStats(
+        mean_total=0.0, mean_target=0.0, mean_extraction=None, p50_total=0.0, p95_total=0.0
+    )
+    errors = aggregate_errors(results)
 
-        agg = by_metric.get(first_key) if first_key in by_metric else None
-        avg_score_attempted = agg.avg_score_attempted if agg else 0.0
-        avg_score_total = agg.avg_score_total if agg else 0.0
-    else:
-        scores = [r.grade.score for r in results if is_success(r)]
-        avg_score_attempted = sum(scores) / len(scores) if scores else 0.0
-        avg_score_total = sum(scores) / len(results) if scores else 0.0
-        # for single grader case, use a default key
-        default_key = "default"
-        metrics_dict[default_key] = avg_score_attempted * 100.0
-
-    usage_metrics = compute_usage_metrics(results)
-    timing_metrics = compute_timing_metrics(results)
-
-    per_model = None
-    if has_multi_model:
-        model_results: Dict[str, List[SampleResult]] = defaultdict(list)
-        for result in results:
-            model_results[result.model_name].append(result)
-
-        per_model = []
-        for model_name, m_results in sorted(model_results.items()):
-            model_attempted = sum(1 for r in m_results if is_success(r))
-            model_metrics_dict: Dict[str, float] = {}
-
-            if grader_keys:
-                # use first grader for overall model metrics
-                first_key = grader_keys[0]
-                # calculate avg score for each metric
-                for metric_key in grader_keys:
-                    metric_scores = [
-                        r.grades[metric_key].score
-                        for r in m_results
-                        if is_success(r) and r.grades and metric_key in r.grades
-                    ]
-                    model_metrics_dict[metric_key] = (
-                        (sum(metric_scores) / len(metric_scores)) * 100.0 if metric_scores else 0.0
-                    )
-
-                model_scores = [
-                    r.grades[first_key].score for r in m_results if is_success(r) and r.grades and first_key in r.grades
-                ]
-            else:
-                model_scores = [r.grade.score for r in m_results if is_success(r)]
-                default_key = "default"
-                model_metrics_dict[default_key] = (
-                    (sum(model_scores) / len(model_scores)) * 100.0 if model_scores else 0.0
-                )
-
-            model_avg_attempted = sum(model_scores) / len(model_scores) if model_scores else 0.0
-            model_avg_total = sum(model_scores) / len(m_results) if model_scores else 0.0
-
-            model_usage_metrics = compute_usage_metrics(m_results)
-            model_timing_metrics = compute_timing_metrics(m_results)
-            model_error_summary = compute_error_summary(m_results)
-
-            per_model.append(
-                ModelMetrics(
-                    model_name=model_name,
-                    total=len(m_results),
-                    total_attempted=model_attempted,
-                    avg_score_attempted=model_avg_attempted,
-                    avg_score_total=model_avg_total,
-                    metrics=model_metrics_dict,
-                    usage_metrics=model_usage_metrics,
-                    timing_metrics=model_timing_metrics,
-                    error_summary=model_error_summary,
-                )
-            )
-
-    return Metrics(
-        total=total,
-        total_attempted=attempted,
-        avg_score_attempted=avg_score_attempted,
-        avg_score_total=avg_score_total,
-        per_model=per_model,
-        by_metric=by_metric if by_metric else None,
-        metrics=metrics_dict,
-        usage_metrics=usage_metrics,
-        timing_metrics=timing_metrics,
-        error_summary=error_summary,
+    return ModelSummary(
+        model=model,
+        n_total=n_total,
+        n_attempted=n_attempted,
+        score=score,
+        per_metric=per_metric,
+        usage=usage,
+        timing=timing,
+        errors=errors,
     )
 
 
-def calculate_run_statistics(all_metrics: List[Metrics], runs_passed: int, suite: SuiteSpec) -> RunStatistics:
-    """Calculate aggregate statistics across multiple runs."""
-    num_runs = len(all_metrics)
-
-    avg_scores_attempted = [m.avg_score_attempted for m in all_metrics]
-    avg_scores_total = [m.avg_score_total for m in all_metrics]
-
-    mean_avg_score_attempted = _statistics.mean(avg_scores_attempted)
-    std_avg_score_attempted = _statistics.stdev(avg_scores_attempted) if num_runs > 1 else 0.0
-
-    mean_avg_score_total = _statistics.mean(avg_scores_total)
-    std_avg_score_total = _statistics.stdev(avg_scores_total) if num_runs > 1 else 0.0
-
-    mean_scores: Dict[str, float] = {}
-    std_scores: Dict[str, float] = {}
-
-    if suite.graders:
-        for metric_key in suite.graders.keys():
-            metric_values = []
-            for m in all_metrics:
-                if m.by_metric and metric_key in m.by_metric:
-                    metric_values.append(m.by_metric[metric_key].avg_score_attempted)
-
-            if metric_values:
-                mean_scores[metric_key] = _statistics.mean(metric_values)
-                std_scores[metric_key] = _statistics.stdev(metric_values) if len(metric_values) > 1 else 0.0
-
-    return RunStatistics(
-        num_runs=num_runs,
-        runs_passed=runs_passed,
-        mean_avg_score_attempted=mean_avg_score_attempted,
-        std_avg_score_attempted=std_avg_score_attempted,
-        mean_avg_score_total=mean_avg_score_total,
-        std_avg_score_total=std_avg_score_total,
-        mean_scores=mean_scores,
-        std_scores=std_scores,
-        individual_run_metrics=all_metrics,
+def summarize_run(
+    *,
+    run: int,
+    results: List[SampleResult],
+    grader_keys: List[str],
+    gate: Optional[GateSpec],
+) -> PerRunSummary:
+    """Build a per-run summary for one model and one run."""
+    per_metric = _per_metric_average(results, grader_keys)
+    score = _gate_primary_score(per_metric, gate)
+    usage = aggregate_usage(results)
+    timing = aggregate_timing(results) or TimingStats(
+        mean_total=0.0, mean_target=0.0, mean_extraction=None, p50_total=0.0, p95_total=0.0
     )
+    n_errors = sum(1 for r in results if r.error is not None)
+    return PerRunSummary(
+        run=run,
+        score=score,
+        per_metric=per_metric,
+        usage=usage,
+        timing=timing,
+        n_errors=n_errors,
+    )
+
+
+def summarize_runs(
+    *,
+    model: str,
+    per_run_results: List[List[SampleResult]],
+    grader_keys: List[str],
+    gate: Optional[GateSpec],
+) -> ModelSummary:
+    """Build a ModelSummary aggregating across multiple runs for one model.
+
+    Populates ``score_std``, ``per_metric_std``, and ``runs`` on the returned
+    summary. Per-run usage is summed; per-run timing stats are averaged across
+    runs (mean of means/percentiles).
+    """
+    if not per_run_results:
+        raise ValueError("summarize_runs requires at least one run")
+
+    run_summaries: List[PerRunSummary] = [
+        summarize_run(run=i + 1, results=run_results, grader_keys=grader_keys, gate=gate)
+        for i, run_results in enumerate(per_run_results)
+    ]
+
+    n_total = sum(len(r) for r in per_run_results) // len(per_run_results)  # per-run sample count
+    n_attempted = sum(sum(1 for r in run_results if r.error is None) for run_results in per_run_results)
+
+    scores = [rs.score for rs in run_summaries]
+    score_mean = _statistics.mean(scores)
+    score_std = _statistics.stdev(scores) if len(scores) > 1 else 0.0
+
+    per_metric_mean: Dict[str, float] = {}
+    per_metric_std: Dict[str, float] = {}
+    for key in grader_keys:
+        vals = [rs.per_metric.get(key, 0.0) for rs in run_summaries]
+        per_metric_mean[key] = _statistics.mean(vals) if vals else 0.0
+        per_metric_std[key] = _statistics.stdev(vals) if len(vals) > 1 else 0.0
+
+    # Sum usage across all runs.
+    all_results: List[SampleResult] = [r for run in per_run_results for r in run]
+    usage = aggregate_usage(all_results)
+
+    # Aggregate timing across runs: average each timing field across run-level means.
+    run_timings = [rs.timing for rs in run_summaries]
+    timing = TimingStats(
+        mean_total=_statistics.mean(t.mean_total for t in run_timings),
+        mean_target=_statistics.mean(t.mean_target for t in run_timings),
+        mean_extraction=(
+            _statistics.mean(t.mean_extraction for t in run_timings if t.mean_extraction is not None)
+            if any(t.mean_extraction is not None for t in run_timings)
+            else None
+        ),
+        p50_total=_statistics.mean(t.p50_total for t in run_timings),
+        p95_total=_statistics.mean(t.p95_total for t in run_timings),
+        per_grader_mean=_average_per_grader([t.per_grader_mean for t in run_timings]),
+    )
+
+    errors = aggregate_errors(all_results)
+
+    return ModelSummary(
+        model=model,
+        n_total=n_total,
+        n_attempted=n_attempted,
+        score=score_mean,
+        per_metric=per_metric_mean,
+        usage=usage,
+        timing=timing,
+        errors=errors,
+        score_std=score_std,
+        per_metric_std=per_metric_std,
+        runs=run_summaries,
+    )
+
+
+def _average_per_grader(per_grader_dicts: List[Optional[Dict[str, float]]]) -> Optional[Dict[str, float]]:
+    """Average per-grader mean times across runs."""
+    keys: set = set()
+    for d in per_grader_dicts:
+        if d:
+            keys.update(d.keys())
+    if not keys:
+        return None
+    out: Dict[str, float] = {}
+    for k in sorted(keys):
+        vals = [d[k] for d in per_grader_dicts if d and k in d]
+        out[k] = sum(vals) / len(vals) if vals else 0.0
+    return out
