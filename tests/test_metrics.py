@@ -12,7 +12,6 @@ The new API is built around four primitives:
 All scores live on a 0-1 scale.
 """
 
-import math
 
 import pytest
 
@@ -34,7 +33,6 @@ from letta_evals.models import (
     WeightedAverageGateSpec,
 )
 from letta_evals.types import Aggregation, ErrorCategory, GateKind, MetricOp
-
 
 _DEFAULT_GRADER = "default"
 

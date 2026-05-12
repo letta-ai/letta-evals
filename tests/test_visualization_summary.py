@@ -18,7 +18,6 @@ from letta_evals.models import (
 from letta_evals.types import (
     Aggregation,
     GateKind,
-    GraderKind,
     MetricOp,
     TargetKind,
 )

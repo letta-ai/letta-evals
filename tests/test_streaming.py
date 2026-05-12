@@ -13,8 +13,8 @@ from letta_evals.models import (
     Sample,
     SampleResult,
     SimpleGateSpec,
-    Summary,
     SuiteSpec,
+    Summary,
     Timing,
     ToolGraderSpec,
 )

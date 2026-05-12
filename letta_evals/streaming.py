@@ -35,8 +35,8 @@ from letta_evals.models import (
     RunnerResult,
     Sample,
     SampleResult,
-    Summary,
     SuiteSpec,
+    Summary,
 )
 
 

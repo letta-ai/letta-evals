@@ -8,8 +8,6 @@ from rich.table import Table
 
 from letta_evals.constants import MAX_SAMPLES_DISPLAY
 from letta_evals.models import (
-    GradeResult,
-    ModelSummary,
     SampleResult,
     SuiteSpec,
     Summary,
