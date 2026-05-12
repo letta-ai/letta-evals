@@ -586,17 +586,20 @@ class TargetResult(BaseModel):
 
 
 class PerTurnGrade(BaseModel):
-    """Grade result for a single turn in per-turn evaluation."""
+    """Grade result for a single turn in per-turn evaluation.
+
+    ``ground_truth`` is not stored here — look up ``sample.ground_truth[turn]``
+    using the per-sample ``sample_id``.
+    """
 
     turn: int = Field(description="Turn index (0-based)")
     score: float = Field(description="Score for this turn (0.0 to 1.0)")
     rationale: Optional[str] = Field(default=None, description="Explanation for this turn's grade")
     submission: str = Field(description="Extracted submission for this turn")
-    ground_truth: str = Field(description="Expected ground truth for this turn")
 
 
 class GradeResult(BaseModel):
-    """Grading result."""
+    """Grading result for one (sample, grader) pair."""
 
     score: float = Field(description="Numeric score between 0.0 and 1.0")
     rationale: Optional[str] = Field(default=None, description="Explanation of the grading decision")
@@ -612,161 +615,89 @@ class GradeResult(BaseModel):
         return v
 
 
-# Runner models
+# Usage / Timing / Error primitives — used both per-sample and as aggregates.
 
 
-class UsageMetrics(BaseModel):
-    """Token usage and cost metrics."""
+class Usage(BaseModel):
+    """Token usage and cost. Used both per-sample and as a summed aggregate."""
 
-    total_prompt_tokens: int = Field(default=0, description="total number of prompt tokens")
-    total_completion_tokens: int = Field(default=0, description="total number of completion tokens")
-    total_cost: Optional[float] = Field(default=None, description="total cost in dollars")
-    total_cached_input_tokens: int = Field(
-        default=0, description="total number of cached input tokens served from cache"
-    )
-    total_cache_write_tokens: int = Field(default=0, description="total number of cache write tokens (Anthropic only)")
-    total_reasoning_tokens: int = Field(default=0, description="total number of reasoning/thinking tokens generated")
+    prompt_tokens: int = Field(default=0, description="Prompt tokens used")
+    completion_tokens: int = Field(default=0, description="Completion tokens generated")
+    cached_input_tokens: int = Field(default=0, description="Cached input tokens served from cache")
+    cache_write_tokens: int = Field(default=0, description="Cache write tokens (Anthropic only)")
+    reasoning_tokens: int = Field(default=0, description="Reasoning/thinking tokens generated")
+    cost: Optional[float] = Field(default=None, description="Cost in dollars")
 
 
-class TimingMetrics(BaseModel):
-    """Aggregate timing statistics across samples (in seconds)."""
+class Timing(BaseModel):
+    """Per-sample timing (seconds)."""
 
-    mean_total_seconds: float = Field(description="mean total wall time per sample")
-    mean_target_seconds: float = Field(description="mean target execution time per sample")
-    mean_extraction_seconds: float = Field(description="mean extraction time per sample")
-    p50_total_seconds: Optional[float] = Field(default=None, description="median total wall time per sample")
-    p95_total_seconds: Optional[float] = Field(default=None, description="95th percentile total wall time per sample")
-    per_grader_mean_seconds: Optional[Dict[str, float]] = Field(
-        default=None, description="mean wall time per grader key"
-    )
+    total: float = Field(description="Total wall time for this sample")
+    target: float = Field(description="Wall time for target execution (agent creation + messages)")
+    extraction: Optional[float] = Field(default=None, description="Wall time for extraction across all graders")
+    per_grader: Optional[Dict[str, float]] = Field(default=None, description="Wall time per grader key")
 
 
-class ErrorInfo(BaseModel):
+class TimingStats(BaseModel):
+    """Aggregate timing statistics across samples (seconds)."""
+
+    mean_total: float = Field(description="Mean total wall time per sample")
+    mean_target: float = Field(description="Mean target execution time per sample")
+    mean_extraction: Optional[float] = Field(default=None, description="Mean extraction time per sample")
+    p50_total: float = Field(description="Median total wall time per sample")
+    p95_total: float = Field(description="95th percentile total wall time per sample")
+    per_grader_mean: Optional[Dict[str, float]] = Field(default=None, description="Mean wall time per grader key")
+
+
+class Error(BaseModel):
     """Structured error information for a failed sample."""
 
     category: ErrorCategory = Field(description="Category of the error")
-    exception_type: str = Field(description="Python exception class name (e.g. 'TimeoutError', 'ConnectionError')")
+    exception_type: str = Field(description="Python exception class name")
     message: str = Field(description="Full error message")
 
 
 class ErrorSummary(BaseModel):
-    """Summary of errors across an evaluation run."""
+    """Summary of errors across an evaluation run (or a single model)."""
 
     total_errors: int = Field(description="Total number of samples that errored")
     by_category: Dict[str, int] = Field(default_factory=dict, description="Error count by category")
     by_exception_type: Dict[str, int] = Field(default_factory=dict, description="Error count by exception type")
-    failed_sample_ids: List[int] = Field(default_factory=list, description="List of sample IDs that failed")
 
 
-class ModelMetrics(BaseModel):
-    """metrics for a specific model configuration."""
-
-    model_name: str = Field(description="model configuration name")
-    total: int = Field(description="total results (success + error)")
-    total_attempted: int = Field(description="total successfully attempted (completed without error)")
-    avg_score_attempted: float = Field(description="average score across attempted results (0.0 to 1.0)")
-    avg_score_total: float = Field(description="average score across all results (0.0 to 1.0)")
-    metrics: Dict[str, float] = Field(
-        default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
-    )
-    usage_metrics: Optional[UsageMetrics] = Field(
-        default=None, description="token usage and cost metrics for this model"
-    )
-    timing_metrics: Optional[TimingMetrics] = Field(default=None, description="timing statistics for this model")
-    error_summary: Optional[ErrorSummary] = Field(default=None, description="Breakdown of errors for this model")
-
-
-class MetricAggregate(BaseModel):
-    """aggregate metrics for a single metric key (grader)."""
-
-    avg_score_attempted: float = Field(
-        description="average score for this metric across attempted results (0.0 to 1.0)"
-    )
-    avg_score_total: float = Field(description="average score for this metric across all results (0.0 to 1.0)")
-    pass_rate: float = Field(description="average score as percentage")
-
-
-class Metrics(BaseModel):
-    """evaluation metrics."""
-
-    total: int = Field(description="total results (success + error)")
-    total_attempted: int = Field(description="total successfully attempted (completed without error)")
-    avg_score_attempted: float = Field(description="average score across attempted results (0.0 to 1.0)")
-    avg_score_total: float = Field(description="average score across all results (0.0 to 1.0)")
-    per_model: Optional[List[ModelMetrics]] = Field(
-        default=None, description="metrics broken down by model configuration"
-    )
-    by_metric: Optional[Dict[str, MetricAggregate]] = Field(default=None, description="aggregates for each metric key")
-    metrics: Dict[str, float] = Field(
-        default_factory=dict, description="per-metric scores (metric_key -> average score percentage)"
-    )
-    usage_metrics: Optional[UsageMetrics] = Field(
-        default=None, description="token usage and cost metrics across all samples"
-    )
-    timing_metrics: Optional[TimingMetrics] = Field(default=None, description="timing statistics across all samples")
-    error_summary: Optional[ErrorSummary] = Field(default=None, description="Breakdown of errors across samples")
-
-
-class RunStatistics(BaseModel):
-    """Aggregate statistics across multiple evaluation runs."""
-
-    num_runs: int = Field(description="Total number of runs executed")
-    runs_passed: int = Field(description="Number of runs that passed the gate")
-    mean_avg_score_attempted: float = Field(description="Mean of avg_score_attempted across all runs")
-    std_avg_score_attempted: float = Field(description="Standard deviation of avg_score_attempted across all runs")
-    mean_avg_score_total: float = Field(description="Mean of avg_score_total across all runs")
-    std_avg_score_total: float = Field(description="Standard deviation of avg_score_total across all runs")
-    mean_scores: Dict[str, float] = Field(
-        default_factory=dict, description="Mean score for each metric across all runs"
-    )
-    std_scores: Dict[str, float] = Field(
-        default_factory=dict, description="Standard deviation for each metric across all runs"
-    )
-    individual_run_metrics: List[Metrics] = Field(description="Metrics from each individual run")
+# Per-sample result. Lives in <model>.jsonl or <model>/run_<n>.jsonl.
+#
+# The model that produced this result is implicit in the file path; the
+# Sample object is stored only once at the top level (suite.json), and looked
+# up by ``sample_id``.
 
 
 class SampleResult(BaseModel):
     """Result for a single sample evaluation."""
 
-    sample: Sample = Field(description="The original sample that was evaluated")
-    submission: str = Field(description="Extracted response from the trajectory")
-    submissions: Optional[Dict[str, str]] = Field(default=None, description="Per-metric extracted submissions")
-    trajectory: List[List[LettaMessageUnion]] = Field(description="Full conversation trajectory from the agent")
+    sample_id: int = Field(description="ID of the sample (look up the full Sample in suite.json)")
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
-    grade: GradeResult = Field(description="Grading result for this sample")
-    grades: Optional[Dict[str, GradeResult]] = Field(default=None, description="Per-metric grading results")
-    model_name: Optional[str] = Field(description="Model configuration name used for this sample")
+    trajectory: List[List[LettaMessageUnion]] = Field(description="Full conversation trajectory from the agent")
+    submissions: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Per-grader extracted submissions (keyed by grader name)",
+    )
+    grades: Dict[str, GradeResult] = Field(
+        default_factory=dict,
+        description="Per-grader grading results (keyed by grader name)",
+    )
+    usage: Optional[Usage] = Field(default=None, description="Token usage and cost for this sample")
+    timing: Timing = Field(description="Wall-clock timing for this sample")
+    error: Optional[Error] = Field(default=None, description="Structured error info if this sample failed")
+    # Optional extras — omitted from serialized output when None.
     agent_usage: Optional[List[dict]] = Field(
-        default=None, description="Usage statistics emitted by the agent during the run"
+        default=None, description="Raw usage statistics emitted by the agent during the run"
     )
-    cost: Optional[float] = Field(default=None, description="Total cost in dollars for this sample run")
-    prompt_tokens: Optional[int] = Field(default=None, description="Total prompt tokens used for this sample")
-    completion_tokens: Optional[int] = Field(default=None, description="Total completion tokens used for this sample")
-    cached_input_tokens: Optional[int] = Field(
-        default=None, description="Total cached input tokens served from cache for this sample"
-    )
-    cache_write_tokens: Optional[int] = Field(
-        default=None, description="Total cache write tokens for this sample (Anthropic only)"
-    )
-    reasoning_tokens: Optional[int] = Field(
-        default=None, description="Total reasoning/thinking tokens generated for this sample"
-    )
-    total_time: Optional[float] = Field(default=None, description="Total wall time in seconds for this sample")
-    target_time: Optional[float] = Field(
-        default=None, description="Wall time in seconds for target execution (agent creation + messages)"
-    )
-    extraction_time: Optional[float] = Field(
-        default=None, description="Wall time in seconds for extraction across all graders"
-    )
-    per_grader_time: Optional[Dict[str, float]] = Field(default=None, description="Wall time in seconds per grader key")
-    error: Optional[ErrorInfo] = Field(default=None, description="Structured error info if this sample failed")
     agent_state: Optional[AgentState] = Field(
         default=None,
         description=(
             "Agent state after running the target (includes memory blocks). "
-            "Only populated when at least one grader requires agent_state. "
-            "Lets callers avoid re-fetching state via a separate "
-            "client.agents.retrieve(...) call."
+            "Only populated when at least one grader requires agent_state."
         ),
     )
     token_data: Optional[List[TurnTokenData]] = Field(
@@ -778,14 +709,76 @@ class SampleResult(BaseModel):
     )
 
 
-class RunnerResult(BaseModel):
-    """Complete evaluation run result."""
+# Aggregate summary types. Live in summary.json (one shape regardless of
+# num_runs).
+
+
+class PerRunSummary(BaseModel):
+    """Per-run summary for a single model (multi-run only)."""
+
+    run: int = Field(description="Run index (1-based)")
+    score: float = Field(description="Primary gate metric score for this run (0-1)")
+    per_metric: Dict[str, float] = Field(description="Per-grader average score for this run (0-1)")
+    usage: Usage = Field(description="Aggregate usage for this run")
+    timing: TimingStats = Field(description="Aggregate timing for this run")
+    n_errors: int = Field(default=0, description="Number of errored samples in this run")
+
+
+class ModelSummary(BaseModel):
+    """Summary metrics for one model across one or more runs."""
+
+    model: str = Field(description="Model identifier")
+    n_total: int = Field(description="Total samples scheduled (success + error) per run")
+    n_attempted: int = Field(description="Samples completed without error (sum across runs)")
+    score: float = Field(description="Primary gate metric score (0-1, mean across runs)")
+    per_metric: Dict[str, float] = Field(description="Per-grader average score (0-1, mean across runs)")
+    usage: Usage = Field(description="Aggregate usage (summed across runs)")
+    timing: TimingStats = Field(description="Aggregate timing (averaged across runs)")
+    errors: Optional[ErrorSummary] = Field(default=None, description="Error breakdown (only when errors > 0)")
+    # Multi-run only:
+    score_std: Optional[float] = Field(default=None, description="Standard deviation of score across runs")
+    per_metric_std: Optional[Dict[str, float]] = Field(
+        default=None, description="Standard deviation of per_metric values across runs"
+    )
+    runs: Optional[List[PerRunSummary]] = Field(
+        default=None,
+        description="Per-run breakdown (only present in per-model summary.json, not top-level)",
+    )
+
+
+class Summary(BaseModel):
+    """Top-level evaluation summary."""
 
     suite: str = Field(description="Name of the evaluation suite")
-    config: Dict[str, Any] = Field(description="Configuration used for this run (target config, grader config, etc.)")
-    results: List[SampleResult] = Field(description="Results for each evaluated sample")
-    metrics: Metrics = Field(description="Aggregate metrics across all samples")
+    models: List[ModelSummary] = Field(description="Per-model summary (one entry per model)")
     gates_passed: bool = Field(description="Whether all gate criteria were satisfied")
-    run_statistics: Optional[RunStatistics] = Field(
-        default=None, description="Aggregate statistics across multiple runs (if num_runs > 1)"
+    runs_passed: Optional[int] = Field(default=None, description="Number of runs that passed the gate (multi-run only)")
+
+
+# In-memory holders. ``RunnerResult`` is what ``run_suite`` returns and what
+# the visualization layer consumes. Disk layout is owned by
+# ``letta_evals.streaming``.
+
+
+class ModelRun(BaseModel):
+    """In-memory results for one model (one or more runs)."""
+
+    model: str = Field(description="Model identifier")
+    results: List[SampleResult] = Field(
+        description="Sample results. For num_runs > 1 this is the last run; see ``runs`` for full history.",
     )
+    runs: Optional[List[List[SampleResult]]] = Field(
+        default=None,
+        description="Per-run sample results, indexed as runs[run_idx][sample_idx] (only when num_runs > 1)",
+    )
+    summary: ModelSummary = Field(description="Aggregate summary for this model")
+
+
+class RunnerResult(BaseModel):
+    """Complete evaluation run result returned by ``run_suite``."""
+
+    suite_spec: SuiteSpec = Field(description="The full suite configuration that produced this run")
+    samples: List[Sample] = Field(description="The dataset, loaded once and shared across all model runs")
+    runs: Dict[str, ModelRun] = Field(description="Per-model run data, keyed by model identifier")
+    summary: Summary = Field(description="Top-level summary across all models")
+    gates_passed: bool = Field(description="Whether all gate criteria were satisfied")

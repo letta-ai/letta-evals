@@ -5,7 +5,7 @@ import os
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import anyio
 import yaml
@@ -18,26 +18,29 @@ from letta_evals.graders.agent_judge import AgentJudgeGrader
 from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
-from letta_evals.metrics import calculate_metrics, calculate_run_statistics
+from letta_evals.metrics import summarize_model, summarize_runs
 from letta_evals.models import (
     AgentState,
-    ErrorInfo,
+    Error,
     GradeResult,
     LettaAgentTargetSpec,
     LettaJudgeGraderSpec,
     LettaMessageUnion,
     LogicalGateSpec,
-    Metrics,
     ModelJudgeGraderSpec,
+    ModelRun,
+    ModelSummary,
     PerTurnGrade,
     RunnerResult,
-    RunStatistics,
     Sample,
     SampleResult,
     SimpleCondition,
     SimpleGateSpec,
+    Summary,
     SuiteSpec,
+    Timing,
     ToolGraderSpec,
+    Usage,
     WeightedAverageGateSpec,
     _compare,
     normalize_weights,
@@ -59,6 +62,9 @@ from letta_evals.visualization.factory import ProgressStyle, create_progress_cal
 
 logger = logging.getLogger(__name__)
 
+# Sentinel model identifier used when a suite has no model_configs/model_handles.
+DEFAULT_MODEL_ID = "default"
+
 
 def _extract_model_name(llm_config) -> Optional[str]:
     """Extract model name from LlmConfig object or string handle."""
@@ -67,6 +73,37 @@ def _extract_model_name(llm_config) -> Optional[str]:
     elif isinstance(llm_config, str):
         return llm_config
     return None
+
+
+def _model_id_for(llm_config) -> str:
+    """Stable bucket/path identifier for a model config or handle."""
+    return _extract_model_name(llm_config) or DEFAULT_MODEL_ID
+
+
+def _build_usage(
+    *,
+    cost: Optional[float],
+    prompt_tokens: Optional[int],
+    completion_tokens: Optional[int],
+    cached_input_tokens: Optional[int],
+    cache_write_tokens: Optional[int],
+    reasoning_tokens: Optional[int],
+) -> Optional[Usage]:
+    """Build a Usage object only when there's something meaningful to record."""
+    nonzero = any(
+        v is not None and v > 0
+        for v in (prompt_tokens, completion_tokens, cost)
+    )
+    if not nonzero:
+        return None
+    return Usage(
+        prompt_tokens=prompt_tokens or 0,
+        completion_tokens=completion_tokens or 0,
+        cached_input_tokens=cached_input_tokens or 0,
+        cache_write_tokens=cache_write_tokens or 0,
+        reasoning_tokens=reasoning_tokens or 0,
+        cost=cost if cost and cost > 0 else None,
+    )
 
 
 class Runner:
@@ -82,6 +119,8 @@ class Runner:
         letta_api_key: Optional[str] = None,
         letta_base_url: Optional[str] = None,
         letta_project_id: Optional[str] = None,
+        stream_writer: Optional[StreamingWriter] = None,
+        current_run: int = 1,
     ):
         self.suite: SuiteSpec = suite
 
@@ -89,17 +128,14 @@ class Runner:
         env_base_url = os.getenv("LETTA_BASE_URL")
         env_project_id = os.getenv("LETTA_PROJECT_ID")
 
-        # priority: cli arg > yaml suite config > env var
         api_key = letta_api_key or self.suite.target.api_key or env_api_key
         base_url = letta_base_url or self.suite.target.base_url or env_base_url
         self.project_id = letta_project_id or self.suite.target.project_id or env_project_id
 
         client_kwargs: dict[str, object] = {"timeout": self.suite.target.timeout}
-        # Set base_url - default to Letta Cloud if not specified
         if base_url:
             client_kwargs["base_url"] = base_url
         elif api_key:
-            # If using API key but no base_url, assume Letta Cloud
             client_kwargs["base_url"] = "https://api.letta.com"
             logger.info("Using default Letta Cloud base_url: https://api.letta.com")
         if api_key:
@@ -113,6 +149,8 @@ class Runner:
         self.graders: Optional[Dict[str, Grader]] = None
         self._init_graders()
 
+        # results bucketed by model_id; flat list for cross-cutting computations.
+        self.results_by_model: Dict[str, List[SampleResult]] = defaultdict(list)
         self.results: List[SampleResult] = []
         self.max_concurrent = max_concurrent
         self.semaphore = anyio.Semaphore(max_concurrent)
@@ -122,8 +160,29 @@ class Runner:
         self._cached_trajectories: Dict[int, Dict[str, SampleResult]] = (
             self._build_trajectory_cache() if cached_results else {}
         )
-        self.stream_writer: Optional[StreamingWriter] = None
+        self._sample_lookup: Dict[int, Sample] = {}
+        # ``stream_writer`` is shared across runs in multi-run mode; if not
+        # provided, the runner builds its own. ``current_run`` is the 1-based
+        # index of this run inside that shared writer.
+        self.stream_writer: Optional[StreamingWriter] = stream_writer
+        self.current_run: int = current_run
         self.output_path = output_path
+
+    # ── partition helpers ──
+
+    @property
+    def model_ids(self) -> List[str]:
+        return [_model_id_for(cfg) for cfg in self.model_configs]
+
+    @property
+    def is_partitioned(self) -> bool:
+        return bool(self.suite.target.model_configs or self.suite.target.model_handles)
+
+    @property
+    def grader_keys(self) -> List[str]:
+        return list(self.graders.keys()) if self.graders else []
+
+    # ── target setup ──
 
     def _load_model_configs(self) -> List[Optional[LlmConfig | str]]:
         """Load model configurations and handles if specified."""
@@ -131,14 +190,13 @@ class Runner:
         has_handles = self.suite.target.model_handles is not None
 
         if not has_configs and not has_handles:
-            return [None]  # no model configs or handles, use default
+            return [None]
 
         if has_configs and has_handles:
             raise ValueError("Cannot specify both model_configs and model_handles in target spec")
 
-        configs = []
+        configs: List[LlmConfig | str] = []
 
-        # load model configs from JSON files
         if has_configs:
             model_configs_dir = Path(__file__).parent / "llm_model_configs"
             for config_name in self.suite.target.model_configs:
@@ -151,7 +209,6 @@ class Runner:
                     llm_config = LlmConfig(**config_data)
                     configs.append(llm_config)
 
-        # load model handles as strings
         if has_handles:
             for handle in self.suite.target.model_handles:
                 configs.append(handle)
@@ -161,7 +218,6 @@ class Runner:
     def _create_target(self, llm_config: Optional[LlmConfig | str] = None) -> AbstractAgentTarget:
         """Create target from spec, optionally with model config or handle."""
         if self.suite.target.kind == TargetKind.LETTA_AGENT:
-            # check both before reassigning
             model_handle = llm_config if isinstance(llm_config, str) else None
             actual_llm_config = llm_config if isinstance(llm_config, LlmConfig) else None
 
@@ -226,14 +282,11 @@ class Runner:
                         system_prompt=gspec.system_prompt,
                     )
                 elif isinstance(gspec, LettaJudgeGraderSpec):
-                    # If agent_id is provided, use it directly
-                    # Otherwise, use agent_file (or default agent file if not provided)
                     agent_file = None
                     agent_id = gspec.agent_id
                     judge_tool_name = gspec.judge_tool_name
 
                     if agent_id is None:
-                        # use default agent file if not provided
                         agent_file = gspec.agent_file
                         if agent_file is None:
                             agent_file = Path(__file__).parent / "graders/letta-evals-judge-agent.af"
@@ -257,30 +310,20 @@ class Runner:
             raise ValueError("Suite must define 'graders'")
 
     def _requires_agent_state(self) -> bool:
-        """Check if any grader requires agent_state for extraction."""
         if self.graders:
             return any(grader.requires_agent_state for grader in self.graders.values())
         return False
 
     def _should_cleanup_agent(self) -> bool:
-        """Check if agents should be deleted after each sample.
-
-        Returns True when cleanup is enabled and the target creates agents per-sample
-        (i.e., not using a pre-existing agent_id).
-        """
         if not self.suite.cleanup:
             return False
-        # Never delete a pre-existing agent specified by agent_id
         if isinstance(self.suite.target, LettaAgentTargetSpec) and self.suite.target.agent_id:
             return False
         return True
 
-    async def _run_setup(self, model_name: Optional[str] = None) -> None:
-        """Execute the setup function if specified.
+    # ── setup ──
 
-        Args:
-            model_name: Optional model name to pass to setup function if it accepts one.
-        """
+    async def _run_setup(self, model_name: Optional[str] = None) -> None:
         if not self.suite.setup_script:
             return
 
@@ -289,7 +332,6 @@ class Runner:
             if not hasattr(setup_func, "_is_suite_setup"):
                 raise ValueError(f"Setup function must be decorated with @suite_setup: {self.suite.setup_script}")
 
-            # check if setup function expects client and/or model_name parameters
             param_count = getattr(setup_func, "_suite_setup_param_count", 1)
 
             log_msg = f"Running setup script: {self.suite.setup_script}"
@@ -318,14 +360,15 @@ class Runner:
             logger.error(f"Error running setup script: {e}")
             raise RuntimeError(f"Setup failed: {e}") from e
 
+    # ── cache ──
+
     def _build_trajectory_cache(self) -> Dict[int, Dict[str, SampleResult]]:
-        """Build a cache of sample results indexed by sample_id -> model_name -> SampleResult."""
+        """Cache previous results indexed by sample_id → model → SampleResult."""
         cache: Dict[int, Dict[str, SampleResult]] = defaultdict(dict)
         if self.cached_results:
-            for result in self.cached_results.results:
-                # use model_name as key, or None if not specified
-                model_key = result.model_name if result.model_name else None
-                cache[result.sample.id][model_key] = result
+            for model_id, model_run in self.cached_results.runs.items():
+                for result in model_run.results:
+                    cache[result.sample_id][model_id] = result
         return cache
 
     async def _get_or_run_trajectory(
@@ -342,16 +385,7 @@ class Runner:
         Optional[AgentState],
         Optional[list],
     ]:
-        """Return (trajectory, agent_id, model_name, agent_usage, agent_state, token_data) using cache or by running the target.
-
-        If cache is enabled and contains an exact match, use it; otherwise run the target.
-
-        Args:
-            return_token_data: If True, also requests per-token IDs and logprobs from
-                the target. Used by callers that need generation, grading, and
-                token extraction in a single pass. Cached results never include
-                token_data (they don't carry it).
-        """
+        """Return (trajectory, agent_id, model_name, agent_usage, agent_state, token_data)."""
         sample_id = sample.id
         model_name = _extract_model_name(llm_config)
 
@@ -360,12 +394,11 @@ class Runner:
             cached_models = self._cached_trajectories.get(sample_id)
 
             if cached_models:
-                if model_name is not None:
-                    cached_result = cached_models.get(model_name)
-                else:
-                    if len(cached_models) == 1:
-                        cached_result = next(iter(cached_models.values()))
-                        model_name = cached_result.model_name
+                lookup_key = model_name or DEFAULT_MODEL_ID
+                if lookup_key in cached_models:
+                    cached_result = cached_models[lookup_key]
+                elif len(cached_models) == 1:
+                    cached_result = next(iter(cached_models.values()))
 
             if cached_result is not None:
                 if self.progress_callback:
@@ -375,7 +408,7 @@ class Runner:
                 return (
                     cached_result.trajectory,
                     cached_result.agent_id,
-                    model_name,
+                    model_name or DEFAULT_MODEL_ID,
                     getattr(cached_result, "agent_usage", None),
                     getattr(cached_result, "agent_state", None),
                     getattr(cached_result, "token_data", None),
@@ -398,6 +431,8 @@ class Runner:
             target_result.token_data,
         )
 
+    # ── grading ──
+
     async def _grade_per_turn(
         self,
         sample: Sample,
@@ -416,10 +451,8 @@ class Runner:
         grader_extraction_time = 0.0
 
         for turn_idx in range(num_turns):
-            # Create single-turn trajectory for this turn
             single_turn_trajectory = [trajectory[turn_idx]] if turn_idx < len(trajectory) else []
 
-            # Create a modified sample with the turn's ground_truth
             turn_sample = Sample(
                 id=sample.id,
                 input=sample.input[turn_idx] if isinstance(sample.input, list) else sample.input,
@@ -430,7 +463,6 @@ class Runner:
                 rubric=sample.rubric,
             )
 
-            # Grade this turn
             turn_grade, turn_submission = await grader.grade(
                 turn_sample, single_turn_trajectory, agent_state=agent_state
             )
@@ -442,11 +474,9 @@ class Runner:
                     score=turn_grade.score,
                     rationale=turn_grade.rationale,
                     submission=turn_submission,
-                    ground_truth=ground_truths[turn_idx],
                 )
             )
 
-            # Update progress callback with per-turn grading progress
             if self.progress_callback:
                 await self.progress_callback.turn_graded(
                     sample_id=sample_id,
@@ -458,15 +488,12 @@ class Runner:
                     model_name=model_name,
                 )
 
-        # Calculate proportional score (average across turns)
         turn_scores = [g.score for g in per_turn_grades]
         final_score = sum(turn_scores) / num_turns if num_turns > 0 else 0.0
         turns_passed = sum(1 for sc in turn_scores if sc >= 1.0)
 
-        # Build summary rationale with turn symbols
         summary_rationale = build_turn_summary(turn_scores)
 
-        # Combine submissions for display (join all turn submissions)
         combined_submission = " | ".join(f"[Turn {g.turn}] {g.submission}" for g in per_turn_grades)
 
         grade = GradeResult(
@@ -490,11 +517,7 @@ class Runner:
         agent_id: str,
         model_name: str,
     ) -> tuple[Dict[str, GradeResult], Dict[str, str], Dict[str, float]]:
-        """Grade a sample across all graders.
-
-        Handles both standard (full trajectory) and per-turn (turn-by-turn) evaluation.
-        Returns (grades_dict, submissions_dict, per_grader_time).
-        """
+        """Grade a sample across all graders. Returns (grades, submissions, per_grader_time)."""
         grades_dict: Dict[str, GradeResult] = {}
         submissions_dict: Dict[str, str] = {}
         per_grader_time: Dict[str, float] = {}
@@ -519,33 +542,36 @@ class Runner:
 
     @staticmethod
     def _detect_errors(
-        grade_result: GradeResult,
-        trajectory: list,
-        submission: str,
         grades_dict: Dict[str, GradeResult],
-    ) -> Optional[ErrorInfo]:
+        trajectory: list,
+        submissions: Dict[str, str],
+    ) -> Optional[Error]:
         """Detect extraction or grading errors from results."""
-        # Extraction error: empty trajectory/submission with zero score
-        is_extraction_error = grade_result.score == 0.0 and (
-            not trajectory
-            or not submission
-            or (
-                grade_result.rationale
-                and ("Empty trajectory" in grade_result.rationale or "Empty submission" in grade_result.rationale)
+        # Pick a representative grade for extraction-error detection (any will
+        # do since extraction-empty signals come from the shared extractor).
+        if grades_dict:
+            first_key = next(iter(grades_dict.keys()))
+            first_grade = grades_dict[first_key]
+            first_submission = submissions.get(first_key, "")
+            is_extraction_error = first_grade.score == 0.0 and (
+                not trajectory
+                or not first_submission
+                or (
+                    first_grade.rationale
+                    and ("Empty trajectory" in first_grade.rationale or "Empty submission" in first_grade.rationale)
+                )
             )
-        )
-        if is_extraction_error:
-            return ErrorInfo(
-                category=ErrorCategory.EXTRACTION,
-                exception_type="ExtractionError",
-                message=grade_result.rationale or "Empty trajectory or submission",
-            )
+            if is_extraction_error:
+                return Error(
+                    category=ErrorCategory.EXTRACTION,
+                    exception_type="ExtractionError",
+                    message=first_grade.rationale or "Empty trajectory or submission",
+                )
 
-        # Grading error: grader reported an error in metadata
         grading_errors = {k: gr.metadata["error"] for k, gr in grades_dict.items() if gr.metadata.get("error")}
         if grading_errors:
             details = "; ".join(f"{k}: {v}" for k, v in grading_errors.items())
-            return ErrorInfo(
+            return Error(
                 category=ErrorCategory.GRADING,
                 exception_type="GradingError",
                 message=f"Grading failed for: {details}",
@@ -553,20 +579,15 @@ class Runner:
 
         return None
 
+    # ── per-sample driver ──
+
     async def run_sample(
         self,
         sample: Sample,
         llm_config: Optional[LlmConfig | str] = None,
         return_token_data: bool = False,
     ) -> SampleResult:
-        """Run a single sample through target and grader.
-
-        Args:
-            return_token_data: If True, requests per-token IDs and logprobs from
-                the target and includes them on the returned ``SampleResult.token_data``.
-                Default False; existing callers that don't pass it see no
-                behavior change.
-        """
+        """Run a single sample through target and grader."""
         sample_id = sample.id
         model_name = _extract_model_name(llm_config)
 
@@ -579,7 +600,6 @@ class Runner:
                 if self.progress_callback:
                     await self.progress_callback.sample_started(sample_id, model_name=model_name)
 
-                # check if any grader needs agent_state
                 phase = ErrorCategory.TARGET
                 retrieve_agent_state = self._requires_agent_state()
                 (
@@ -610,68 +630,65 @@ class Runner:
                     sample, trajectory, agent_state, sample_id, agent_id, model_name
                 )
 
-                # use first grader as primary for legacy grade_result/submission
-                first_key = next(iter(grades_dict.keys()))
-                grade_result = grades_dict[first_key]
-                submission = submissions_dict[first_key]
+                error = self._detect_errors(grades_dict, trajectory, submissions_dict)
+                primary_score = next(iter(grades_dict.values())).score if grades_dict else 0.0
+                primary_rationale = next(iter(grades_dict.values())).rationale if grades_dict else None
 
-                error_info = self._detect_errors(grade_result, trajectory, submission, grades_dict)
-                if error_info and self.progress_callback:
+                if error and self.progress_callback:
                     await self.progress_callback.sample_error(
                         sample_id,
-                        error_info.message,
+                        error.message,
                         agent_id=agent_id,
                         model_name=model_name,
                         target_cost=cost if cost and cost > 0 else None,
                     )
 
-                if error_info is None and self.progress_callback:
-                    metric_scores = None
-                    metric_rationales = None
-                    if self.graders is not None and grades_dict is not None:
-                        metric_scores = {k: v.score for k, v in grades_dict.items()}
-                        metric_rationales = {k: (v.rationale or "") for k, v in grades_dict.items()}
+                if error is None and self.progress_callback:
+                    metric_scores = {k: v.score for k, v in grades_dict.items()}
+                    metric_rationales = {k: (v.rationale or "") for k, v in grades_dict.items()}
                     await self.progress_callback.sample_completed(
                         sample_id,
                         agent_id=agent_id,
-                        score=grade_result.score,
+                        score=primary_score,
                         target_cost=cost if cost and cost > 0 else None,
                         model_name=model_name,
                         metric_scores=metric_scores,
-                        rationale=grade_result.rationale,
+                        rationale=primary_rationale,
                         metric_rationales=metric_rationales,
                     )
 
-                # Calculate timing
                 total_time = time.perf_counter() - t_sample_start
                 extraction_time = sum(gr.metadata.get("extraction_time", 0.0) for gr in grades_dict.values())
 
-                return SampleResult(
-                    sample=sample,
-                    submission=submission,
-                    submissions=submissions_dict,
-                    trajectory=trajectory,
-                    agent_id=agent_id,
-                    grade=grade_result,
-                    grades=grades_dict,
-                    model_name=model_name,
-                    agent_usage=agent_usage,
+                usage = _build_usage(
                     cost=cost,
-                    prompt_tokens=prompt_tokens if prompt_tokens > 0 else None,
-                    completion_tokens=completion_tokens if completion_tokens > 0 else None,
-                    cached_input_tokens=cached_input_tokens if cached_input_tokens > 0 else None,
-                    cache_write_tokens=cache_write_tokens if cache_write_tokens > 0 else None,
-                    reasoning_tokens=reasoning_tokens if reasoning_tokens > 0 else None,
-                    total_time=total_time,
-                    target_time=target_time,
-                    extraction_time=extraction_time if extraction_time > 0 else None,
-                    per_grader_time=per_grader_time if per_grader_time else None,
-                    error=error_info,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    cached_input_tokens=cached_input_tokens,
+                    cache_write_tokens=cache_write_tokens,
+                    reasoning_tokens=reasoning_tokens,
+                )
+                timing = Timing(
+                    total=total_time,
+                    target=target_time,
+                    extraction=extraction_time if extraction_time > 0 else None,
+                    per_grader=per_grader_time if per_grader_time else None,
+                )
+
+                return SampleResult(
+                    sample_id=sample_id,
+                    agent_id=agent_id,
+                    trajectory=trajectory,
+                    submissions=submissions_dict,
+                    grades=grades_dict,
+                    usage=usage,
+                    timing=timing,
+                    error=error,
+                    agent_usage=agent_usage,
                     agent_state=agent_state,
                     token_data=token_data,
                 )
             except Exception as e:
-                # Recover agent_id from TargetError if the target created an agent before failing
                 if isinstance(e, TargetError) and e.agent_id:
                     agent_id = e.agent_id
                 agent_str = f" ({agent_id})" if agent_id else ""
@@ -680,7 +697,7 @@ class Runner:
                 category = ErrorCategory.TARGET if isinstance(e, TargetError) else phase
                 cause = e.__cause__ if e.__cause__ else e
                 error_message = str(e) or type(cause).__name__
-                error_info = ErrorInfo(
+                error = Error(
                     category=category,
                     exception_type=type(cause).__name__,
                     message=error_message,
@@ -697,24 +714,28 @@ class Runner:
                         model_name=model_name,
                         target_cost=cost if cost and cost > 0 else None,
                     )
+                usage = _build_usage(
+                    cost=cost,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    cached_input_tokens=cached_input_tokens,
+                    cache_write_tokens=cache_write_tokens,
+                    reasoning_tokens=reasoning_tokens,
+                )
+                timing = Timing(
+                    total=time.perf_counter() - t_sample_start,
+                    target=0.0,
+                )
                 return SampleResult(
-                    sample=sample,
-                    submission="",
-                    submissions=None,
-                    trajectory=[],
+                    sample_id=sample_id,
                     agent_id=agent_id,
-                    grade=GradeResult(score=0.0, rationale=f"Error: {error_message}"),
-                    grades=None,
-                    model_name=model_name,
+                    trajectory=[],
+                    submissions={},
+                    grades={},
+                    usage=usage,
+                    timing=timing,
+                    error=error,
                     agent_usage=agent_usage,
-                    cost=cost if cost and cost > 0 else None,
-                    prompt_tokens=prompt_tokens if prompt_tokens > 0 else None,
-                    completion_tokens=completion_tokens if completion_tokens > 0 else None,
-                    cached_input_tokens=cached_input_tokens if cached_input_tokens > 0 else None,
-                    cache_write_tokens=cache_write_tokens if cache_write_tokens > 0 else None,
-                    reasoning_tokens=reasoning_tokens if reasoning_tokens > 0 else None,
-                    total_time=time.perf_counter() - t_sample_start,
-                    error=error_info,
                 )
             finally:
                 if self._should_cleanup_agent() and agent_id:
@@ -724,18 +745,9 @@ class Runner:
                     except Exception as cleanup_err:
                         logger.warning(f"Failed to cleanup agent {agent_id}: {cleanup_err}")
 
+    # ── rubric validation ──
+
     def _validate_rubric_vars(self, samples: List[Sample]) -> None:
-        """Validate rubric-variable wiring before any sample runs.
-
-        With the rubric-grader redesign, rubrics are sent verbatim to the
-        judge and any ``{placeholder}`` in the rubric must resolve at grade
-        time. This pre-check fails fast with a clear error rather than
-        surfacing as a ``KeyError`` mid-run on the first sample.
-
-        It only checks rubrics that are static (grader-level ``prompt`` /
-        ``prompt_path``). Per-sample rubrics (``Sample.rubric``) are checked
-        at grade time.
-        """
         if not self.suite.graders:
             return
 
@@ -748,11 +760,9 @@ class Runner:
             if rubric_text is None:
                 continue
 
-            # Names referenced by the rubric template
             referenced: set = set()
             for _, field_name, _, _ in _string.Formatter().parse(rubric_text):
                 if field_name:
-                    # Strip indexing/attribute access (e.g. {foo.bar} -> "foo")
                     referenced.add(field_name.split(".")[0].split("[")[0])
 
             reserved = {"input", "ground_truth", "submission"}
@@ -761,8 +771,6 @@ class Runner:
                 continue
 
             for sample in samples:
-                # If the sample provides its own rubric, skip this check —
-                # the per-sample rubric will be validated at grade time.
                 if sample.rubric is not None:
                     continue
                 provided = set((sample.rubric_vars or {}).keys())
@@ -775,91 +783,140 @@ class Runner:
                         f"via sample.rubric / sample.rubric_path."
                     )
 
+    # ── orchestration ──
+
     async def run(self) -> RunnerResult:
-        """Run evaluation on all samples."""
-        # Check if setup function accepts model_name parameter
+        """Run evaluation across all configured models and samples (single run).
+
+        For multi-run mode the orchestrator (``_execute_runs``) constructs a
+        Runner per run and shares one StreamingWriter across them.
+        """
+        # Setup-once (when setup doesn't need model_name).
         setup_needs_model = False
         if self.suite.setup_script:
             setup_func = load_object(self.suite.setup_script, self.suite.base_dir)
             param_count = getattr(setup_func, "_suite_setup_param_count", 1)
             setup_needs_model = param_count == 2
 
-        # If setup doesn't need model name, run it once now
         if not setup_needs_model:
             await self._run_setup()
 
         samples = list(
             load_dataset(self.suite.dataset, max_samples=self.suite.max_samples, sample_tags=self.suite.sample_tags)
         )
+        self._sample_lookup = {s.id: s for s in samples}
 
-        # validate rubric variables before running any samples
         self._validate_rubric_vars(samples)
 
+        self.results_by_model.clear()
         self.results = []
-        # prepare config for both streaming and final result
-        config: Dict[str, Any] = {
-            "target": json.loads(self.suite.target.model_dump_json()),
-            "gate": json.loads(self.suite.gate.model_dump_json()),
-        }
-        if self.suite.graders:
-            config["graders"] = {k: json.loads(v.model_dump_json()) for k, v in self.suite.graders.items()}
 
-        # initialize streaming writer if output path is provided
-        if self.output_path:
-            self.stream_writer = StreamingWriter(self.output_path, self.suite.name, config)
+        # Build the writer if not provided externally.
+        owns_writer = False
+        if self.stream_writer is None and self.output_path:
+            self.stream_writer = StreamingWriter(
+                self.output_path,
+                suite_spec=self.suite,
+                samples=samples,
+                models=self.model_ids if self.is_partitioned else [],
+                num_runs=1,
+            )
             await self.stream_writer.initialize()
+            owns_writer = True
 
         try:
             async with anyio.create_task_group() as tg:
                 for llm_config in self.model_configs:
-                    # If setup needs model name, run it once per model
                     if setup_needs_model:
                         await self._run_setup(model_name=_extract_model_name(llm_config))
 
+                    model_id = _model_id_for(llm_config)
+
                     for sample in samples:
 
-                        async def run_and_append(s, cfg):
+                        async def run_and_append(s, cfg, mid):
                             result = await self.run_sample(s, llm_config=cfg)
+                            self.results_by_model[mid].append(result)
                             self.results.append(result)
                             if self.stream_writer:
-                                await self.stream_writer.append_result(result)
+                                writer_model = mid if self.is_partitioned else None
+                                await self.stream_writer.append_result(
+                                    result, model=writer_model, run=self.current_run
+                                )
 
-                        tg.start_soon(run_and_append, sample, llm_config)
+                        tg.start_soon(run_and_append, sample, llm_config, model_id)
 
-            metrics = calculate_metrics(
-                self.results,
-                list(self.graders.keys()) if self.graders else None,
-                bool(self.suite.target.model_configs or self.suite.target.model_handles),
+            # Per-model summaries
+            model_summaries: List[ModelSummary] = []
+            for model_id in self.model_ids:
+                ms = summarize_model(
+                    model=model_id,
+                    results=self.results_by_model.get(model_id, []),
+                    grader_keys=self.grader_keys,
+                    gate=self.suite.gate,
+                )
+                model_summaries.append(ms)
+
+            gates_passed = self._check_gates_flat(self.results)
+            summary = Summary(
+                suite=self.suite.name,
+                models=model_summaries,
+                gates_passed=gates_passed,
             )
-            gates_passed = self._check_gates(metrics)
 
-            # write final metrics if streaming
-            if self.stream_writer:
-                await self.stream_writer.write_metrics(metrics, gates_passed)
+            # Build per-model in-memory runs.
+            runs: Dict[str, ModelRun] = {}
+            for ms in model_summaries:
+                runs[ms.model] = ModelRun(
+                    model=ms.model,
+                    results=self.results_by_model.get(ms.model, []),
+                    summary=ms,
+                )
+
+            if self.stream_writer and owns_writer:
+                await self.stream_writer.write_summary(summary)
 
             return RunnerResult(
-                suite=self.suite.name, config=config, results=self.results, metrics=metrics, gates_passed=gates_passed
+                suite_spec=self.suite,
+                samples=samples,
+                runs=runs,
+                summary=summary,
+                gates_passed=gates_passed,
             )
         except BaseException:
-            # On interruption or errors, write a best-effort summary for a valid JSONL
+            # Best-effort summary on interruption.
             try:
-                metrics = calculate_metrics(
-                    self.results,
-                    list(self.graders.keys()) if self.graders else None,
-                    bool(self.suite.target.model_configs or self.suite.target.model_handles),
-                )
-                gates_passed = self._check_gates(metrics)
-                if self.stream_writer:
-                    await self.stream_writer.write_metrics(metrics, gates_passed)
+                if self.stream_writer and owns_writer:
+                    model_summaries = []
+                    for model_id in self.model_ids:
+                        model_summaries.append(
+                            summarize_model(
+                                model=model_id,
+                                results=self.results_by_model.get(model_id, []),
+                                grader_keys=self.grader_keys,
+                                gate=self.suite.gate,
+                            )
+                        )
+                    gates_passed = self._check_gates_flat(self.results)
+                    summary = Summary(
+                        suite=self.suite.name,
+                        models=model_summaries,
+                        gates_passed=gates_passed,
+                    )
+                    await self.stream_writer.write_summary(summary)
             finally:
-                # Re-raise to preserve original error/interrupt semantics
                 raise
 
+    # ── gate evaluation ──
+
     def _compute_aggregation(
-        self, metric_key: str, aggregation: Aggregation, pass_threshold: Optional[float] = None
+        self,
+        results: List[SampleResult],
+        metric_key: str,
+        aggregation: Aggregation,
+        pass_threshold: Optional[float] = None,
     ) -> float:
-        """compute aggregated value for a metric key using the specified aggregation function."""
-        scores = [r.grades[metric_key].score for r in self.results if r.grades and metric_key in r.grades]
+        scores = [r.grades[metric_key].score for r in results if metric_key in r.grades]
 
         if not scores:
             return 0.0
@@ -880,80 +937,66 @@ class Runner:
             percentile = 95 if aggregation == Aggregation.P95 else 99
             return float(np.percentile(scores, percentile))
         elif aggregation == Aggregation.ACCURACY:
-            # accuracy: percentage of scores that pass the threshold
             threshold = pass_threshold if pass_threshold is not None else 1.0
             passed = sum(1 for s in scores if s >= threshold)
             return (passed / len(scores)) * 100.0
         else:
             return 0.0
 
-    def _evaluate_simple_condition(self, condition: SimpleCondition) -> bool:
-        """evaluate a simple condition against current results."""
+    def _evaluate_simple_condition(self, results: List[SampleResult], condition: SimpleCondition) -> bool:
         if condition.metric_key not in self.graders:
             raise ValueError(f"metric_key '{condition.metric_key}' not found in graders")
-        value = self._compute_aggregation(condition.metric_key, condition.aggregation, condition.pass_threshold)
+        value = self._compute_aggregation(results, condition.metric_key, condition.aggregation, condition.pass_threshold)
         return _compare(value, condition.op, condition.value)
 
-    def _evaluate_logical_gate(self, gate: LogicalGateSpec) -> bool:
-        """recursively evaluate logical gate with nested conditions."""
-        results = []
+    def _evaluate_logical_gate(self, results: List[SampleResult], gate: LogicalGateSpec) -> bool:
+        sub_results = []
         for condition in gate.conditions:
             if isinstance(condition, SimpleCondition):
-                results.append(self._evaluate_simple_condition(condition))
+                sub_results.append(self._evaluate_simple_condition(results, condition))
             elif isinstance(condition, LogicalGateSpec):
-                results.append(self._evaluate_logical_gate(condition))
+                sub_results.append(self._evaluate_logical_gate(results, condition))
             else:
                 raise ValueError(f"unknown condition type: {type(condition)}")
 
         if gate.operator == LogicalOp.AND:
-            return all(results)
+            return all(sub_results)
         elif gate.operator == LogicalOp.OR:
-            return any(results)
+            return any(sub_results)
         else:
             raise ValueError(f"unknown logical operator: {gate.operator}")
 
-    def _check_gates(self, metrics: Metrics) -> bool:
-        """check if the configured gate passes."""
+    def _check_gates_flat(self, results: List[SampleResult]) -> bool:
+        """Evaluate the suite's gate against a flat list of sample results."""
         gate = self.suite.gate
 
         if isinstance(gate, SimpleGateSpec):
             if gate.metric_key not in self.graders:
                 raise ValueError(f"metric_key '{gate.metric_key}' not found in graders")
-            value = self._compute_aggregation(gate.metric_key, gate.aggregation, gate.pass_threshold)
+            value = self._compute_aggregation(results, gate.metric_key, gate.aggregation, gate.pass_threshold)
             return _compare(value, gate.op, gate.value)
 
         elif isinstance(gate, WeightedAverageGateSpec):
-            # validate all metric keys exist
             for metric_key in gate.weights.keys():
                 if metric_key not in self.graders:
                     raise ValueError(f"metric_key '{metric_key}' not found in graders")
 
-            # normalize weights and compute weighted average
             normalized = normalize_weights(gate.weights)
             weighted_sum = 0.0
             for metric_key, weight in normalized.items():
-                agg_value = self._compute_aggregation(metric_key, gate.aggregation)
+                agg_value = self._compute_aggregation(results, metric_key, gate.aggregation)
                 weighted_sum += weight * agg_value
 
             return _compare(weighted_sum, gate.op, gate.value)
 
         elif isinstance(gate, LogicalGateSpec):
-            return self._evaluate_logical_gate(gate)
+            return self._evaluate_logical_gate(results, gate)
 
         else:
             raise ValueError(f"unknown gate type: {type(gate)}")
 
 
-async def _write_aggregate_statistics(output_path: Path, run_statistics: RunStatistics) -> None:
-    """Write aggregate statistics to a JSON file."""
-    stats_file = output_path / "aggregate_stats.json"
-    output_path.mkdir(parents=True, exist_ok=True)
-
-    def _write() -> None:
-        with open(stats_file, "w", encoding="utf-8") as f:
-            json.dump(json.loads(run_statistics.model_dump_json()), f, indent=2)
-
-    await anyio.to_thread.run_sync(_write)
+# ── top-level run_suite ──
 
 
 async def run_suite(
@@ -985,7 +1028,6 @@ async def run_suite(
 
     actual_num_runs = num_runs if num_runs is not None else (suite.num_runs or 1)
 
-    # Multiple runs don't make sense with cached results (trajectories would be identical)
     if actual_num_runs > 1 and cached_results_path:
         raise ValueError("Cannot use --num-runs > 1 with --cached (results would be identical)")
 
@@ -996,7 +1038,7 @@ async def run_suite(
 
         cached_results = await StreamingReader.to_runner_result(cached_results_path)
 
-        cached_sample_map = {result.sample.id: result.sample for result in cached_results.results}
+        cached_sample_map = {s.id: s for s in cached_results.samples}
         samples = list(load_dataset(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
 
         for sample in samples:
@@ -1023,7 +1065,6 @@ async def run_suite(
     if custom_progress_callback is not None:
         progress_cb = custom_progress_callback
     else:
-        # Accept string value for style for external callers
         style_val = progress_style
         if isinstance(style_val, str):
             try:
@@ -1040,7 +1081,6 @@ async def run_suite(
             metric_labels=metric_labels,
         )
 
-    # Attach a file handler so logs persist in the output directory
     file_handler: Optional[logging.FileHandler] = None
     if output_path:
         output_path.mkdir(parents=True, exist_ok=True)
@@ -1050,14 +1090,13 @@ async def run_suite(
         file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
         pkg_logger = logging.getLogger("letta_evals")
         pkg_logger.addHandler(file_handler)
-        # Ensure the logger accepts WARNING; without this, the default WARNING
-        # threshold with NOTSET silently drops messages before they reach handlers.
         if pkg_logger.level == logging.NOTSET:
             pkg_logger.setLevel(logging.WARNING)
 
     try:
         return await _execute_runs(
             suite=suite,
+            samples=samples,
             actual_num_runs=actual_num_runs,
             max_concurrent=max_concurrent,
             progress_cb=progress_cb,
@@ -1075,6 +1114,7 @@ async def run_suite(
 
 async def _execute_runs(
     suite: SuiteSpec,
+    samples: List[Sample],
     actual_num_runs: int,
     max_concurrent: int,
     progress_cb: Optional[ProgressCallback],
@@ -1084,60 +1124,33 @@ async def _execute_runs(
     letta_base_url: Optional[str],
     letta_project_id: Optional[str],
 ) -> RunnerResult:
-    """Execute single or multiple evaluation runs."""
-    if actual_num_runs > 1:
-        all_run_results: List[RunnerResult] = []
-        all_metrics: List[Metrics] = []
-        runs_passed = 0
-
-        for run_idx in range(actual_num_runs):
-            run_output_path = None
-            if output_path:
-                run_output_path = output_path / f"run_{run_idx + 1}"
-
-            runner = Runner(
-                suite,
-                max_concurrent=max_concurrent,
-                progress_callback=progress_cb,
-                cached_results=cached_results,
-                output_path=run_output_path,
-                letta_api_key=letta_api_key,
-                letta_base_url=letta_base_url,
-                letta_project_id=letta_project_id,
-            )
-
-            if progress_cb is not None:
-                if run_idx == 0:
-                    await progress_cb.start()
-                else:
-                    progress_cb.reset()
-
-            try:
-                result = await runner.run()
-                all_run_results.append(result)
-                all_metrics.append(result.metrics)
-                if result.gates_passed:
-                    runs_passed += 1
-            finally:
-                if progress_cb is not None and run_idx == actual_num_runs - 1:
-                    # stop live display first, then show summary
-                    progress_cb.stop()
-                    run_statistics = calculate_run_statistics(all_metrics, runs_passed, suite)
-                    final_result_temp = all_run_results[-1]
-                    final_result_temp.run_statistics = run_statistics
-                    final_result_temp.gates_passed = runs_passed > 0
-                    await progress_cb.suite_completed(final_result_temp)
-
-        run_statistics = calculate_run_statistics(all_metrics, runs_passed, suite)
-
-        if output_path:
-            await _write_aggregate_statistics(output_path, run_statistics)
-
-        final_result = all_run_results[-1]
-        final_result.run_statistics = run_statistics
-        final_result.gates_passed = runs_passed > 0
-        return final_result
+    """Execute single or multiple evaluation runs sharing one streaming writer."""
+    is_partitioned = bool(suite.target.model_configs or suite.target.model_handles)
+    if suite.target.model_configs:
+        model_ids = [_model_id_for(c) for c in (suite.target.model_configs or [])]
+    elif suite.target.model_handles:
+        model_ids = list(suite.target.model_handles or [])
     else:
+        model_ids = [DEFAULT_MODEL_ID]
+
+    # Build a single writer that lives across all runs.
+    shared_writer: Optional[StreamingWriter] = None
+    if output_path:
+        shared_writer = StreamingWriter(
+            output_path,
+            suite_spec=suite,
+            samples=samples,
+            models=model_ids if is_partitioned else [],
+            num_runs=actual_num_runs,
+        )
+        await shared_writer.initialize()
+
+    # Accumulate per-run results per model for multi-run aggregation.
+    per_run_results: Dict[str, List[List[SampleResult]]] = defaultdict(list)
+    runs_passed = 0
+    last_runner_result: Optional[RunnerResult] = None
+
+    for run_idx in range(actual_num_runs):
         runner = Runner(
             suite,
             max_concurrent=max_concurrent,
@@ -1147,17 +1160,83 @@ async def _execute_runs(
             letta_api_key=letta_api_key,
             letta_base_url=letta_base_url,
             letta_project_id=letta_project_id,
+            stream_writer=shared_writer,
+            current_run=run_idx + 1,
         )
 
         if progress_cb is not None:
-            await progress_cb.start()
-        result = None
+            if run_idx == 0:
+                await progress_cb.start()
+            else:
+                progress_cb.reset()
+
         try:
             result = await runner.run()
-            return result
+            last_runner_result = result
+            for model_id, model_run in result.runs.items():
+                per_run_results[model_id].append(model_run.results)
+            if result.gates_passed:
+                runs_passed += 1
         finally:
-            if progress_cb is not None:
-                # stop live display first, then show summary
+            if progress_cb is not None and run_idx == actual_num_runs - 1:
                 progress_cb.stop()
-                if result is not None:
-                    await progress_cb.suite_completed(result)
+
+    if last_runner_result is None:
+        raise RuntimeError("No runs completed")
+
+    # Build the final aggregated summary.
+    grader_keys = list(suite.graders.keys()) if suite.graders else []
+
+    if actual_num_runs > 1:
+        aggregated_models: List[ModelSummary] = []
+        for model_id in model_ids:
+            ms = summarize_runs(
+                model=model_id,
+                per_run_results=per_run_results.get(model_id, []),
+                grader_keys=grader_keys,
+                gate=suite.gate,
+            )
+            aggregated_models.append(ms)
+            # Write per-model summary.json with the per-run breakdown.
+            if shared_writer is not None:
+                await shared_writer.write_model_summary(ms)
+
+        final_summary = Summary(
+            suite=suite.name,
+            models=aggregated_models,
+            gates_passed=runs_passed > 0,
+            runs_passed=runs_passed,
+        )
+        if shared_writer is not None:
+            await shared_writer.write_summary(final_summary)
+
+        # Build the in-memory RunnerResult with multi-run breakdown per model.
+        final_runs: Dict[str, ModelRun] = {}
+        for ms in aggregated_models:
+            runs_list = per_run_results.get(ms.model, [])
+            final_runs[ms.model] = ModelRun(
+                model=ms.model,
+                results=runs_list[-1] if runs_list else [],
+                runs=runs_list if runs_list else None,
+                summary=ms,
+            )
+
+        final_result = RunnerResult(
+            suite_spec=suite,
+            samples=samples,
+            runs=final_runs,
+            summary=final_summary,
+            gates_passed=runs_passed > 0,
+        )
+
+        if progress_cb is not None:
+            await progress_cb.suite_completed(final_result)
+        return final_result
+
+    # Single-run: last_runner_result is already the right shape, but we need to
+    # write the top-level summary now that the writer is shared.
+    if shared_writer is not None:
+        await shared_writer.write_summary(last_runner_result.summary)
+    if progress_cb is not None:
+        await progress_cb.suite_completed(last_runner_result)
+    return last_runner_result

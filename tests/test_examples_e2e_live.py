@@ -42,13 +42,22 @@ async def test_single_suite(request, tmp_path: Path, caplog) -> None:
         letta_base_url="https://api.letta.com/",
     )
 
+    # Aggregate across all model partitions for the summary log line.
+    total = sum(ms.n_total for ms in result.summary.models)
+    attempted = sum(ms.n_attempted for ms in result.summary.models)
+    # Simple unweighted mean of model scores (parity with the prior log line).
+    mean_score = (
+        sum(ms.score for ms in result.summary.models) / len(result.summary.models)
+        if result.summary.models
+        else 0.0
+    )
     logger.info(
         f"\n{'=' * 60}\n"
-        f"Results: {result.metrics.total_attempted}/{result.metrics.total} attempted, "
-        f"avg score: {result.metrics.avg_score_attempted:.2f}\n"
+        f"Results: {attempted}/{total} attempted, "
+        f"avg score: {mean_score:.2f}\n"
         f"{'=' * 60}"
     )
 
     assert result.gates_passed, f"Gate failed for suite: {suite_path}"
-    assert result.metrics.total > 0
+    assert total > 0
     assert output_path.exists()

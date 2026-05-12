@@ -35,6 +35,7 @@ from letta_evals.models import (
     Sample,
     SampleResult,
     TargetResult,
+    Timing,
     TurnTokenData,
 )
 from letta_evals.runner import Runner
@@ -141,13 +142,12 @@ def _make_runner(grader: _FakeGrader, target: MagicMock) -> Runner:
 
 def test_t0_3_sample_result_validates_with_new_fields_none():
     """T0.3a: callers that don't pass these fields → both are None."""
-    sample = Sample(id=0, input="hi")
     result = SampleResult(
-        sample=sample,
-        submission="x",
+        sample_id=0,
         trajectory=[[]],
-        grade=GradeResult(score=1.0),
-        model_name="m",
+        submissions={"acc": "x"},
+        grades={"acc": GradeResult(score=1.0)},
+        timing=Timing(total=0.0, target=0.0),
     )
     assert result.token_data is None
     assert result.agent_state is None
@@ -155,7 +155,6 @@ def test_t0_3_sample_result_validates_with_new_fields_none():
 
 def test_t0_3_sample_result_validates_with_token_data_populated():
     """T0.3b: callers passing populated token_data → schema accepts it."""
-    sample = Sample(id=0, input="hi")
     token_data = [
         TurnTokenData(
             role="assistant_message",
@@ -165,11 +164,11 @@ def test_t0_3_sample_result_validates_with_token_data_populated():
         )
     ]
     result = SampleResult(
-        sample=sample,
-        submission="x",
+        sample_id=0,
         trajectory=[[]],
-        grade=GradeResult(score=1.0),
-        model_name="m",
+        submissions={"acc": "x"},
+        grades={"acc": GradeResult(score=1.0)},
+        timing=Timing(total=0.0, target=0.0),
         token_data=token_data,
     )
     assert result.token_data == token_data
@@ -184,13 +183,12 @@ def test_t0_3_sample_result_round_trips_through_pydantic():
     it's a complex Letta SDK type whose serialization is its own concern;
     token_data is the new addition this PR introduces.
     """
-    sample = Sample(id=0, input="hi")
     original = SampleResult(
-        sample=sample,
-        submission="x",
+        sample_id=0,
         trajectory=[[]],
-        grade=GradeResult(score=1.0),
-        model_name="m",
+        submissions={"acc": "x"},
+        grades={"acc": GradeResult(score=1.0)},
+        timing=Timing(total=0.0, target=0.0),
         token_data=[TurnTokenData(role="tool_call_message", content="t", output_ids=[9, 10])],
     )
     dumped = original.model_dump()

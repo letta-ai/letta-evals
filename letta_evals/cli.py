@@ -156,24 +156,25 @@ def run(
     try:
         result = anyio.run(run_with_progress)  # type: ignore[arg-type]
 
-        if not quiet:
-            # Display aggregate statistics if multiple runs
-            if result.run_statistics is not None:
-                display_aggregate_statistics(result.run_statistics)
+        is_multi_run = result.summary.runs_passed is not None
+        is_partitioned = bool(suite.target.model_configs or suite.target.model_handles)
+
+        if not quiet and is_multi_run:
+            display_multi_run_summary(result.summary)
 
         if effective_output and not quiet:
-            if result.run_statistics is not None:
-                # Multiple runs - output to subdirectories
-                num_runs_actual = result.run_statistics.num_runs
+            console.print(f"[green]Suite config saved to {effective_output}/suite.json[/green]")
+            console.print(f"[green]Summary saved to {effective_output}/summary.json[/green]")
+            if is_multi_run:
+                model_dirs = ", ".join(ms.model for ms in result.summary.models)
                 console.print(
-                    f"[green]Individual run results saved to {effective_output}/run_1/ through {effective_output}/run_{num_runs_actual}/[/green]"
+                    f"[green]Per-run results saved under {effective_output}/<model>/run_*.jsonl (models: {model_dirs})[/green]"
                 )
-                console.print(f"[green]Aggregate statistics saved to {effective_output}/aggregate_stats.json[/green]")
+            elif is_partitioned:
+                files = ", ".join(f"{ms.model}.jsonl" for ms in result.summary.models)
+                console.print(f"[green]Per-model results streamed to {effective_output}/{{{files}}}[/green]")
             else:
-                # Single run - output to main directory
-                console.print(f"[green]Results streamed to {effective_output}/results.jsonl (JSONL)[/green]")
-                console.print(f"[green]Summary saved to {effective_output}/summary.json[/green]")
-                console.print(f"[green]Header saved to {effective_output}/header.json[/green]")
+                console.print(f"[green]Results streamed to {effective_output}/results.jsonl[/green]")
 
         if result.gates_passed:
             if not quiet:
@@ -282,43 +283,33 @@ def list_graders():
     console.print("\n[dim]You can also use 'model_judge' or 'letta_judge' graders with custom prompts[/dim]")
 
 
-def display_aggregate_statistics(run_statistics):
-    """Display aggregate statistics across multiple runs."""
-    from letta_evals.models import RunStatistics
+def display_multi_run_summary(summary):
+    """Display aggregate statistics across multiple runs from a Summary."""
+    num_runs = max((len(ms.runs) for ms in summary.models if ms.runs), default=0)
+    runs_passed = summary.runs_passed or 0
 
-    stats: RunStatistics = run_statistics
-
-    console.print(f"\n[bold]Aggregate Statistics (across {stats.num_runs} runs):[/bold]")
+    console.print(f"\n[bold]Aggregate Statistics (across {num_runs} runs):[/bold]")
     console.print("=" * 50)
 
     console.print("\n[bold]Run Summary:[/bold]")
-    console.print(f"  Total runs: {stats.num_runs}")
-    console.print(f"  Runs passed: {stats.runs_passed}")
-    console.print(f"  Runs failed: {stats.num_runs - stats.runs_passed}")
-    pass_rate = (stats.runs_passed / stats.num_runs * 100.0) if stats.num_runs > 0 else 0.0
+    console.print(f"  Total runs: {num_runs}")
+    console.print(f"  Runs passed: {runs_passed}")
+    console.print(f"  Runs failed: {num_runs - runs_passed}")
+    pass_rate = (runs_passed / num_runs * 100.0) if num_runs > 0 else 0.0
     console.print(f"  Pass rate: {pass_rate:.1f}%")
 
-    console.print("\n[bold]Average Score (Attempted):[/bold]")
-    console.print(f"  Mean: {stats.mean_avg_score_attempted:.4f}")
-    console.print(f"  Std Dev: {stats.std_avg_score_attempted:.4f}")
-
-    console.print("\n[bold]Average Score (Total):[/bold]")
-    console.print(f"  Mean: {stats.mean_avg_score_total:.4f}")
-    console.print(f"  Std Dev: {stats.std_avg_score_total:.4f}")
-
-    if stats.mean_scores:
-        console.print("\n[bold]Per-Metric Statistics:[/bold]")
-        table = Table()
-        table.add_column("Metric", style="cyan")
-        table.add_column("Mean Score", style="white")
-        table.add_column("Std Dev", style="white")
-
-        for metric_key in stats.mean_scores.keys():
-            mean = stats.mean_scores[metric_key]
-            std = stats.std_scores.get(metric_key, 0.0)
-            table.add_row(metric_key, f"{mean:.4f}", f"{std:.4f}")
-
-        console.print(table)
+    for ms in summary.models:
+        console.print(f"\n[bold cyan]Model: {ms.model}[/]")
+        console.print(f"  Score: mean={ms.score:.4f} std={ms.score_std or 0.0:.4f}")
+        if ms.per_metric:
+            table = Table()
+            table.add_column("Metric", style="cyan")
+            table.add_column("Mean Score", style="white")
+            table.add_column("Std Dev", style="white")
+            for metric_key, mean in ms.per_metric.items():
+                std = (ms.per_metric_std or {}).get(metric_key, 0.0)
+                table.add_row(metric_key, f"{mean:.4f}", f"{std:.4f}")
+            console.print(table)
 
 
 if __name__ == "__main__":
