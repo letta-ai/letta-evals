@@ -90,10 +90,7 @@ def _build_usage(
     reasoning_tokens: Optional[int],
 ) -> Optional[Usage]:
     """Build a Usage object only when there's something meaningful to record."""
-    nonzero = any(
-        v is not None and v > 0
-        for v in (prompt_tokens, completion_tokens, cost)
-    )
+    nonzero = any(v is not None and v > 0 for v in (prompt_tokens, completion_tokens, cost))
     if not nonzero:
         return None
     return Usage(
@@ -835,9 +832,7 @@ class Runner:
                             self.results_by_model[mid].append(result)
                             self.results.append(result)
                             if self.stream_writer:
-                                await self.stream_writer.append_result(
-                                    result, model=mid, run=self.current_run
-                                )
+                                await self.stream_writer.append_result(result, model=mid, run=self.current_run)
 
                         tg.start_soon(run_and_append, sample, llm_config, model_id)
 
@@ -941,7 +936,9 @@ class Runner:
     def _evaluate_simple_condition(self, results: List[SampleResult], condition: SimpleCondition) -> bool:
         if condition.metric_key not in self.graders:
             raise ValueError(f"metric_key '{condition.metric_key}' not found in graders")
-        value = self._compute_aggregation(results, condition.metric_key, condition.aggregation, condition.pass_threshold)
+        value = self._compute_aggregation(
+            results, condition.metric_key, condition.aggregation, condition.pass_threshold
+        )
         return _compare(value, condition.op, condition.value)
 
     def _evaluate_logical_gate(self, results: List[SampleResult], gate: LogicalGateSpec) -> bool:

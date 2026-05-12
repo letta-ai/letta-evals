@@ -29,8 +29,11 @@ def _make_suite() -> SuiteSpec:
         target=LettaAgentTargetSpec(kind=TargetKind.LETTA_AGENT, agent_id="agent-fake-1"),
         graders={"check": ToolGraderSpec(function="exact_match", display_name="Check")},
         gate=SimpleGateSpec(
-            kind=GateKind.SIMPLE, metric_key="check", aggregation=Aggregation.AVG_SCORE,
-            op=MetricOp.GTE, value=0.5,
+            kind=GateKind.SIMPLE,
+            metric_key="check",
+            aggregation=Aggregation.AVG_SCORE,
+            op=MetricOp.GTE,
+            value=0.5,
         ),
     )
 
@@ -51,14 +54,20 @@ def _make_result(sample_id: int, score: float) -> SampleResult:
 
 
 _GATE = SimpleGateSpec(
-    kind=GateKind.SIMPLE, metric_key="check", aggregation=Aggregation.AVG_SCORE,
-    op=MetricOp.GTE, value=0.5,
+    kind=GateKind.SIMPLE,
+    metric_key="check",
+    aggregation=Aggregation.AVG_SCORE,
+    op=MetricOp.GTE,
+    value=0.5,
 )
 
 
 def _summary_for(model: str, results):
     return summarize_model(
-        model=model, results=results, grader_keys=["check"], gate=_GATE,
+        model=model,
+        results=results,
+        grader_keys=["check"],
+        gate=_GATE,
     )
 
 
@@ -82,8 +91,11 @@ class TestSingleRun:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir)
             writer = StreamingWriter(
-                output_path, _make_suite(), _make_samples(2),
-                models=["default"], num_runs=1,
+                output_path,
+                _make_suite(),
+                _make_samples(2),
+                models=["default"],
+                num_runs=1,
             )
             await writer.initialize()
 
@@ -117,8 +129,11 @@ class TestSingleRun:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir)
             writer = StreamingWriter(
-                output_path, _make_suite(), _make_samples(2),
-                models=["gpt-4o", "claude-3-opus"], num_runs=1,
+                output_path,
+                _make_suite(),
+                _make_samples(2),
+                models=["gpt-4o", "claude-3-opus"],
+                num_runs=1,
             )
             await writer.initialize()
 
@@ -151,8 +166,11 @@ class TestSingleRun:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir)
             writer = StreamingWriter(
-                output_path, _make_suite(), _make_samples(1),
-                models=["openai/gpt-4"], num_runs=1,
+                output_path,
+                _make_suite(),
+                _make_samples(1),
+                models=["openai/gpt-4"],
+                num_runs=1,
             )
             await writer.initialize()
 
@@ -181,8 +199,11 @@ class TestMultiRun:
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir)
             writer = StreamingWriter(
-                output_path, _make_suite(), _make_samples(1),
-                models=["m1"], num_runs=3,
+                output_path,
+                _make_suite(),
+                _make_samples(1),
+                models=["m1"],
+                num_runs=3,
             )
             await writer.initialize()
 
@@ -193,12 +214,18 @@ class TestMultiRun:
                 run_results.append([r])
 
             model_summary = summarize_runs(
-                model="m1", per_run_results=run_results, grader_keys=["check"], gate=_GATE,
+                model="m1",
+                per_run_results=run_results,
+                grader_keys=["check"],
+                gate=_GATE,
             )
             await writer.write_model_summary(model_summary)
 
             top = Summary(
-                suite="test-suite", models=[model_summary], gates_passed=True, runs_passed=2,
+                suite="test-suite",
+                models=[model_summary],
+                gates_passed=True,
+                runs_passed=2,
             )
             await writer.write_summary(top)
 
@@ -231,9 +258,7 @@ class TestReaderErrors:
     async def test_missing_suite_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir)
-            (output_path / "summary.json").write_text(
-                '{"suite":"x","models":[],"gates_passed":false}'
-            )
+            (output_path / "summary.json").write_text('{"suite":"x","models":[],"gates_passed":false}')
             with pytest.raises(FileNotFoundError):
                 await StreamingReader.to_runner_result(output_path)
 
@@ -241,8 +266,6 @@ class TestReaderErrors:
     async def test_missing_summary_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir)
-            (output_path / "suite.json").write_text(
-                json.dumps({"suite": "x", "config": {}, "samples": []})
-            )
+            (output_path / "suite.json").write_text(json.dumps({"suite": "x", "config": {}, "samples": []}))
             with pytest.raises(FileNotFoundError):
                 await StreamingReader.to_runner_result(output_path)

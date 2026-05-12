@@ -109,9 +109,7 @@ def aggregate_errors(results: List[SampleResult]) -> Optional[ErrorSummary]:
 # ── per-grader score aggregation ──
 
 
-def _per_metric_average(
-    results: List[SampleResult], grader_keys: List[str]
-) -> Dict[str, float]:
+def _per_metric_average(results: List[SampleResult], grader_keys: List[str]) -> Dict[str, float]:
     """Mean score per grader across attempted (non-error) samples, 0-1 scale."""
     attempted = [r for r in results if r.error is None]
     out: Dict[str, float] = {}

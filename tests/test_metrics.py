@@ -12,7 +12,6 @@ The new API is built around four primitives:
 All scores live on a 0-1 scale.
 """
 
-
 import pytest
 
 from letta_evals.metrics import (
@@ -103,14 +102,24 @@ class TestAggregateUsage:
 
     def test_cached_and_reasoning_tokens(self):
         results = [
-            _make_result(usage=Usage(
-                prompt_tokens=100, completion_tokens=50,
-                cached_input_tokens=30, cache_write_tokens=20, reasoning_tokens=10,
-            )),
-            _make_result(usage=Usage(
-                prompt_tokens=200, completion_tokens=100,
-                cached_input_tokens=60, cache_write_tokens=40, reasoning_tokens=25,
-            )),
+            _make_result(
+                usage=Usage(
+                    prompt_tokens=100,
+                    completion_tokens=50,
+                    cached_input_tokens=30,
+                    cache_write_tokens=20,
+                    reasoning_tokens=10,
+                )
+            ),
+            _make_result(
+                usage=Usage(
+                    prompt_tokens=200,
+                    completion_tokens=100,
+                    cached_input_tokens=60,
+                    cache_write_tokens=40,
+                    reasoning_tokens=25,
+                )
+            ),
         ]
         u = aggregate_usage(results)
         assert u.cached_input_tokens == 90
@@ -199,14 +208,20 @@ class TestSummarizeModel:
             value=0.5,
         )
         results = [
-            _make_result(sample_id=0, grades={
-                "accuracy": GradeResult(score=0.8, rationale="ok"),
-                "quality": GradeResult(score=0.6, rationale="ok"),
-            }),
-            _make_result(sample_id=1, grades={
-                "accuracy": GradeResult(score=1.0, rationale="great"),
-                "quality": GradeResult(score=0.9, rationale="great"),
-            }),
+            _make_result(
+                sample_id=0,
+                grades={
+                    "accuracy": GradeResult(score=0.8, rationale="ok"),
+                    "quality": GradeResult(score=0.6, rationale="ok"),
+                },
+            ),
+            _make_result(
+                sample_id=1,
+                grades={
+                    "accuracy": GradeResult(score=1.0, rationale="great"),
+                    "quality": GradeResult(score=0.9, rationale="great"),
+                },
+            ),
         ]
         s = summarize_model(model="gpt-4o", results=results, grader_keys=["accuracy", "quality"], gate=gate)
         assert s.model == "gpt-4o"
@@ -225,20 +240,24 @@ class TestSummarizeModel:
             value=0.5,
         )
         results = [
-            _make_result(grades={
-                "accuracy": GradeResult(score=0.8),
-                "quality": GradeResult(score=0.4),
-            }),
+            _make_result(
+                grades={
+                    "accuracy": GradeResult(score=0.8),
+                    "quality": GradeResult(score=0.4),
+                }
+            ),
         ]
         s = summarize_model(model="m", results=results, grader_keys=["accuracy", "quality"], gate=gate)
         assert s.score == pytest.approx(0.7 * 0.8 + 0.3 * 0.4)
 
     def test_no_gate_uses_mean(self):
         results = [
-            _make_result(grades={
-                "a": GradeResult(score=1.0),
-                "b": GradeResult(score=0.5),
-            }),
+            _make_result(
+                grades={
+                    "a": GradeResult(score=1.0),
+                    "b": GradeResult(score=0.5),
+                }
+            ),
         ]
         s = summarize_model(model="m", results=results, grader_keys=["a", "b"], gate=None)
         assert s.score == pytest.approx(0.75)
@@ -246,8 +265,11 @@ class TestSummarizeModel:
     def test_errors_excluded_from_attempted(self):
         err = Error(category=ErrorCategory.TARGET, exception_type="X", message="boom")
         gate = SimpleGateSpec(
-            kind=GateKind.SIMPLE, metric_key="default", aggregation=Aggregation.AVG_SCORE,
-            op=MetricOp.GTE, value=0.5,
+            kind=GateKind.SIMPLE,
+            metric_key="default",
+            aggregation=Aggregation.AVG_SCORE,
+            op=MetricOp.GTE,
+            value=0.5,
         )
         results = [
             _make_result(sample_id=0, score=1.0),
@@ -276,8 +298,11 @@ class TestSummarizeModel:
 class TestSummarizeRuns:
     def _gate(self) -> SimpleGateSpec:
         return SimpleGateSpec(
-            kind=GateKind.SIMPLE, metric_key="accuracy", aggregation=Aggregation.AVG_SCORE,
-            op=MetricOp.GTE, value=0.5,
+            kind=GateKind.SIMPLE,
+            metric_key="accuracy",
+            aggregation=Aggregation.AVG_SCORE,
+            op=MetricOp.GTE,
+            value=0.5,
         )
 
     def test_summarize_run_returns_per_run_summary(self):

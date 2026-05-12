@@ -48,7 +48,9 @@ def _make_suite() -> SuiteSpec:
     )
 
 
-def _sample_result(sample_id: int, agent_id: str, accuracy: float, acc_rat: str, quality: float, q_rat: str) -> SampleResult:
+def _sample_result(
+    sample_id: int, agent_id: str, accuracy: float, acc_rat: str, quality: float, q_rat: str
+) -> SampleResult:
     return SampleResult(
         sample_id=sample_id,
         agent_id=agent_id,

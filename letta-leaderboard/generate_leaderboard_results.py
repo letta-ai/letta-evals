@@ -239,12 +239,8 @@ def parse_arguments() -> argparse.Namespace:
     Returns:
         Parsed arguments
     """
-    parser = argparse.ArgumentParser(
-        description="Generate or update leaderboard results from summary.json files"
-    )
-    parser.add_argument(
-        "directories", nargs="+", type=Path, help="Directories containing summary.json files"
-    )
+    parser = argparse.ArgumentParser(description="Generate or update leaderboard results from summary.json files")
+    parser.add_argument("directories", nargs="+", type=Path, help="Directories containing summary.json files")
     parser.add_argument(
         "--leaderboard", "-l", type=Path, required=True, help="Path to the leaderboard YAML file (input and output)"
     )

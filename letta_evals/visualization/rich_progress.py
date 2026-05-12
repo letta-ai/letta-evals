@@ -445,7 +445,9 @@ class EvalProgress(ProgressCallback):
             self.console.print(model_table)
 
             # Per-model usage table
-            has_usage = any(ms.usage and (ms.usage.prompt_tokens > 0 or ms.usage.completion_tokens > 0) for ms in summary.models)
+            has_usage = any(
+                ms.usage and (ms.usage.prompt_tokens > 0 or ms.usage.completion_tokens > 0) for ms in summary.models
+            )
             if has_usage:
                 self.console.print("\n[bold]Per-Model Usage:[/bold]")
                 usage_table = Table()
