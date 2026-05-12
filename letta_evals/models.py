@@ -731,15 +731,17 @@ class ModelSummary(BaseModel):
     n_total: int = Field(description="Total samples scheduled (success + error) per run")
     n_attempted: int = Field(description="Samples completed without error (sum across runs)")
     score: float = Field(description="Primary gate metric score (0-1, mean across runs)")
+    score_std: Optional[float] = Field(
+        default=None, description="Standard deviation of score across runs (multi-run only)"
+    )
     per_metric: Dict[str, float] = Field(description="Per-grader average score (0-1, mean across runs)")
+    per_metric_std: Optional[Dict[str, float]] = Field(
+        default=None,
+        description="Standard deviation of per_metric values across runs (multi-run only)",
+    )
     usage: Usage = Field(description="Aggregate usage (summed across runs)")
     timing: TimingStats = Field(description="Aggregate timing (averaged across runs)")
     errors: Optional[ErrorSummary] = Field(default=None, description="Error breakdown (only when errors > 0)")
-    # Multi-run only:
-    score_std: Optional[float] = Field(default=None, description="Standard deviation of score across runs")
-    per_metric_std: Optional[Dict[str, float]] = Field(
-        default=None, description="Standard deviation of per_metric values across runs"
-    )
     runs: Optional[List[PerRunSummary]] = Field(
         default=None,
         description="Per-run breakdown (only present in per-model summary.json, not top-level)",
