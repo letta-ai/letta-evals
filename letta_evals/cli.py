@@ -157,7 +157,6 @@ def run(
         result = anyio.run(run_with_progress)  # type: ignore[arg-type]
 
         is_multi_run = result.summary.runs_passed is not None
-        is_partitioned = bool(suite.target.model_configs or suite.target.model_handles)
 
         if not quiet and is_multi_run:
             display_multi_run_summary(result.summary)
@@ -170,11 +169,9 @@ def run(
                 console.print(
                     f"[green]Per-run results saved under {effective_output}/<model>/run_*.jsonl (models: {model_dirs})[/green]"
                 )
-            elif is_partitioned:
+            else:
                 files = ", ".join(f"{ms.model}.jsonl" for ms in result.summary.models)
                 console.print(f"[green]Per-model results streamed to {effective_output}/{{{files}}}[/green]")
-            else:
-                console.print(f"[green]Results streamed to {effective_output}/results.jsonl[/green]")
 
         if result.gates_passed:
             if not quiet:

@@ -85,7 +85,7 @@ The core evaluation flow is:
 # run an evaluation suite with real-time progress
 letta-evals run suite.yaml
 
-# save results to a directory (suite.json, summary.json, results.jsonl)
+# save results to a directory (suite.json, summary.json, <model>.jsonl)
 letta-evals run suite.yaml --output results
 
 # run multiple times for statistical analysis

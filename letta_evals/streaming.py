@@ -1,20 +1,16 @@
-"""Streaming I/O for evaluation results.
+"""Incremental writer + reader for evaluation results.
 
-On-disk layout:
+On-disk layout (always partitioned by model — there is always at least one
+model identifier, defaulting to ``"default"`` when the suite does not pin
+specific models):
 
-    num_runs = 1, model partition:
+    num_runs = 1:
         output/
         ├── suite.json
         ├── <model>.jsonl
         └── summary.json
 
-    num_runs = 1, no partition (no model_configs/model_handles):
-        output/
-        ├── suite.json
-        ├── results.jsonl
-        └── summary.json
-
-    num_runs > 1, model partition:
+    num_runs > 1:
         output/
         ├── suite.json
         ├── <model>/
@@ -23,20 +19,13 @@ On-disk layout:
         │   └── summary.json
         └── summary.json
 
-    num_runs > 1, no partition:
-        output/
-        ├── suite.json
-        ├── run_1.jsonl
-        ├── run_2.jsonl
-        └── summary.json
-
 Each per-sample line in a ``*.jsonl`` is just the serialized ``SampleResult``
 JSON (no wrapper). ``suite.json`` and ``summary.json`` are single JSON files.
 """
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import anyio
 
@@ -52,7 +41,7 @@ from letta_evals.models import (
 
 
 class StreamingWriter:
-    """Writes evaluation outputs incrementally to the partitioned layout.
+    """Writes evaluation outputs incrementally to the on-disk layout.
 
     Parameters
     ----------
@@ -62,10 +51,8 @@ class StreamingWriter:
         The suite configuration; written to ``suite.json`` on initialize.
     samples : List[Sample]
         The dataset, written to ``suite.json`` on initialize.
-    models : List[str] | None
-        Ordered list of model identifiers to partition by. Use ``None`` (or
-        an empty list) to skip the model partition and write everything to
-        the top-level results files.
+    models : List[str]
+        Ordered list of model identifiers. Must be non-empty.
     num_runs : int
         Number of runs. Determines whether to use ``run_N.jsonl`` filenames
         and whether per-model summaries are written.
@@ -76,19 +63,17 @@ class StreamingWriter:
         output_path: Path,
         suite_spec: SuiteSpec,
         samples: List[Sample],
-        models: Optional[List[str]] = None,
+        models: List[str],
         num_runs: int = 1,
     ):
+        if not models:
+            raise ValueError("StreamingWriter requires at least one model id")
         self.output_path = Path(output_path)
         self.suite_spec = suite_spec
         self.samples = samples
-        self.models = [m for m in (models or []) if m]
+        self.models = list(models)
         self.num_runs = max(1, int(num_runs))
         self.output_path.mkdir(parents=True, exist_ok=True)
-
-    @property
-    def partitioned(self) -> bool:
-        return bool(self.models)
 
     @property
     def multi_run(self) -> bool:
@@ -96,25 +81,17 @@ class StreamingWriter:
 
     # ── path resolution ──
 
-    def results_path(self, model: Optional[str] = None, run: int = 1) -> Path:
+    def results_path(self, model: str, run: int = 1) -> Path:
         """Return the per-(model, run) results.jsonl path.
 
         Creates parent directories as needed.
         """
-        if self.partitioned:
-            model_id = model or ""
-            if not model_id:
-                raise ValueError("model is required when writer is partitioned by model")
-            model_dir = self.output_path / _safe_segment(model_id)
-            if self.multi_run:
-                model_dir.mkdir(parents=True, exist_ok=True)
-                return model_dir / f"run_{run}.jsonl"
-            # single-run, partitioned: flat file at top level
-            return self.output_path / f"{_safe_segment(model_id)}.jsonl"
-        # not partitioned
+        segment = _safe_segment(model)
         if self.multi_run:
-            return self.output_path / f"run_{run}.jsonl"
-        return self.output_path / "results.jsonl"
+            model_dir = self.output_path / segment
+            model_dir.mkdir(parents=True, exist_ok=True)
+            return model_dir / f"run_{run}.jsonl"
+        return self.output_path / f"{segment}.jsonl"
 
     def model_summary_path(self, model: str) -> Path:
         """Return the per-model summary.json path (multi-run only)."""
@@ -145,19 +122,12 @@ class StreamingWriter:
                 json.dump(suite_obj, f, indent=2, default=str)
             # truncate per-(model, run) result files
             targets: List[Path] = []
-            if self.partitioned:
-                for model in self.models:
-                    if self.multi_run:
-                        for run in range(1, self.num_runs + 1):
-                            targets.append(self.results_path(model, run))
-                    else:
-                        targets.append(self.results_path(model))
-            else:
+            for model in self.models:
                 if self.multi_run:
                     for run in range(1, self.num_runs + 1):
-                        targets.append(self.results_path(None, run))
+                        targets.append(self.results_path(model, run))
                 else:
-                    targets.append(self.results_path())
+                    targets.append(self.results_path(model))
             for path in targets:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("", encoding="utf-8")
@@ -167,7 +137,7 @@ class StreamingWriter:
     async def append_result(
         self,
         result: SampleResult,
-        model: Optional[str] = None,
+        model: str,
         run: int = 1,
     ) -> None:
         """Append a per-sample record to the appropriate jsonl file."""
@@ -236,14 +206,15 @@ class StreamingReader:
 
             runs: Dict[str, ModelRun] = {}
             for model_summary in summary.models:
-                model_dir = path / _safe_segment(model_summary.model)
-                model_jsonl = path / f"{_safe_segment(model_summary.model)}.jsonl"
-                # Multi-run: dir exists with run_*.jsonl + summary.json
+                segment = _safe_segment(model_summary.model)
+                model_dir = path / segment
+                model_jsonl = path / f"{segment}.jsonl"
+
                 if model_dir.is_dir():
-                    per_run_results: List[List[SampleResult]] = []
-                    run_files = sorted(model_dir.glob("run_*.jsonl"))
-                    for rf in run_files:
-                        per_run_results.append(_read_jsonl(rf))
+                    # Multi-run layout
+                    per_run_results: List[List[SampleResult]] = [
+                        _read_jsonl(rf) for rf in sorted(model_dir.glob("run_*.jsonl"))
+                    ]
                     detailed_summary_path = model_dir / "summary.json"
                     if detailed_summary_path.exists():
                         with open(detailed_summary_path, "r", encoding="utf-8") as f:
@@ -257,35 +228,18 @@ class StreamingReader:
                         summary=detailed_summary,
                     )
                 elif model_jsonl.exists():
-                    # Single-run, partitioned
-                    results = _read_jsonl(model_jsonl)
+                    # Single-run layout
                     runs[model_summary.model] = ModelRun(
                         model=model_summary.model,
-                        results=results,
+                        results=_read_jsonl(model_jsonl),
                         runs=None,
                         summary=model_summary,
                     )
                 else:
-                    # Not partitioned: results live at top level
-                    if (path / "results.jsonl").exists():
-                        results = _read_jsonl(path / "results.jsonl")
-                        runs[model_summary.model] = ModelRun(
-                            model=model_summary.model,
-                            results=results,
-                            runs=None,
-                            summary=model_summary,
-                        )
-                    else:
-                        # Not partitioned, multi-run: run_*.jsonl at top level
-                        per_run_results = []
-                        for rf in sorted(path.glob("run_*.jsonl")):
-                            per_run_results.append(_read_jsonl(rf))
-                        runs[model_summary.model] = ModelRun(
-                            model=model_summary.model,
-                            results=per_run_results[-1] if per_run_results else [],
-                            runs=per_run_results if per_run_results else None,
-                            summary=model_summary,
-                        )
+                    raise FileNotFoundError(
+                        f"No results file found for model {model_summary.model!r} in {path} "
+                        f"(expected {model_jsonl} or {model_dir}/run_*.jsonl)"
+                    )
 
             return RunnerResult(
                 suite_spec=suite_spec,

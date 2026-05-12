@@ -1,13 +1,4 @@
-"""Unit tests for letta_evals.streaming module (new partitioned layout).
-
-The layout is documented in ``letta_evals/streaming.py``. We exercise four
-configurations:
-
-  - single-run, no model partition  → ``results.jsonl`` + ``summary.json``
-  - single-run, partitioned          → ``<model>.jsonl`` + ``summary.json``
-  - multi-run, partitioned           → ``<model>/run_*.jsonl`` + per-model summary
-  - multi-run, no partition          → ``run_*.jsonl`` at top level
-"""
+"""Unit tests for letta_evals.streaming module (always-partitioned layout)."""
 
 import json
 import tempfile
@@ -28,7 +19,7 @@ from letta_evals.models import (
     ToolGraderSpec,
 )
 from letta_evals.streaming import StreamingReader, StreamingWriter
-from letta_evals.types import Aggregation, GateKind, GraderKind, MetricOp, TargetKind
+from letta_evals.types import Aggregation, GateKind, MetricOp, TargetKind
 
 
 def _make_suite() -> SuiteSpec:
@@ -59,65 +50,76 @@ def _make_result(sample_id: int, score: float) -> SampleResult:
     )
 
 
-def _summary_for(model: str, results) -> "ModelSummary":  # noqa: F821 - returned for use by caller
+_GATE = SimpleGateSpec(
+    kind=GateKind.SIMPLE, metric_key="check", aggregation=Aggregation.AVG_SCORE,
+    op=MetricOp.GTE, value=0.5,
+)
+
+
+def _summary_for(model: str, results):
     return summarize_model(
-        model=model, results=results, grader_keys=["check"],
-        gate=SimpleGateSpec(
-            kind=GateKind.SIMPLE, metric_key="check", aggregation=Aggregation.AVG_SCORE,
-            op=MetricOp.GTE, value=0.5,
-        ),
+        model=model, results=results, grader_keys=["check"], gate=_GATE,
     )
 
 
-# ── single-run, no model partition ──
+# ── construction guards ──
 
 
-class TestSingleRunUnpartitioned:
+class TestWriterConstruction:
+    def test_empty_models_rejected(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with pytest.raises(ValueError):
+                StreamingWriter(Path(tmpdir), _make_suite(), _make_samples(), models=[])
+
+
+# ── single-run ──
+
+
+class TestSingleRun:
     @pytest.mark.asyncio
-    async def test_round_trip(self):
+    async def test_single_model_round_trip(self):
+        """Even a 'single-model' suite uses the partitioned layout."""
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir)
-            suite = _make_suite()
-            samples = _make_samples(2)
-
-            writer = StreamingWriter(output_path, suite, samples, models=None, num_runs=1)
+            writer = StreamingWriter(
+                output_path, _make_suite(), _make_samples(2),
+                models=["default"], num_runs=1,
+            )
             await writer.initialize()
 
             r1 = _make_result(0, 1.0)
             r2 = _make_result(1, 0.0)
-            await writer.append_result(r1)
-            await writer.append_result(r2)
+            await writer.append_result(r1, model="default")
+            await writer.append_result(r2, model="default")
 
-            model_summary = _summary_for("default", [r1, r2])
-            summary = Summary(suite="test-suite", models=[model_summary], gates_passed=True)
+            summary = Summary(
+                suite="test-suite",
+                models=[_summary_for("default", [r1, r2])],
+                gates_passed=True,
+            )
             await writer.write_summary(summary)
 
             assert (output_path / "suite.json").exists()
-            assert (output_path / "results.jsonl").exists()
+            assert (output_path / "default.jsonl").exists()
             assert (output_path / "summary.json").exists()
+            # No legacy results.jsonl
+            assert not (output_path / "results.jsonl").exists()
 
             result = await StreamingReader.to_runner_result(output_path)
             assert result.suite_spec.name == "test-suite"
             assert len(result.samples) == 2
             assert result.gates_passed is True
             assert "default" in result.runs
-            assert len(result.runs["default"].results) == 2
             assert result.runs["default"].results[0].grades["check"].score == 1.0
 
-
-# ── single-run, partitioned by model ──
-
-
-class TestSingleRunPartitioned:
     @pytest.mark.asyncio
-    async def test_round_trip(self):
+    async def test_multiple_models_round_trip(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir)
-            suite = _make_suite()
-            samples = _make_samples(2)
-            models = ["gpt-4o", "claude-3-opus"]
-
-            writer = StreamingWriter(output_path, suite, samples, models=models, num_runs=1)
+            writer = StreamingWriter(
+                output_path, _make_suite(), _make_samples(2),
+                models=["gpt-4o", "claude-3-opus"], num_runs=1,
+            )
             await writer.initialize()
 
             r_a = _make_result(0, 1.0)
@@ -127,7 +129,10 @@ class TestSingleRunPartitioned:
 
             summary = Summary(
                 suite="test-suite",
-                models=[_summary_for("gpt-4o", [r_a]), _summary_for("claude-3-opus", [r_b])],
+                models=[
+                    _summary_for("gpt-4o", [r_a]),
+                    _summary_for("claude-3-opus", [r_b]),
+                ],
                 gates_passed=True,
             )
             await writer.write_summary(summary)
@@ -140,19 +145,45 @@ class TestSingleRunPartitioned:
             assert result.runs["gpt-4o"].results[0].grades["check"].score == 1.0
             assert result.runs["claude-3-opus"].results[0].grades["check"].score == 0.5
 
+    @pytest.mark.asyncio
+    async def test_safe_segment_for_slash_in_model(self):
+        """Model names with slashes are sanitised to filenames."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir)
+            writer = StreamingWriter(
+                output_path, _make_suite(), _make_samples(1),
+                models=["openai/gpt-4"], num_runs=1,
+            )
+            await writer.initialize()
 
-# ── multi-run, partitioned ──
+            r = _make_result(0, 1.0)
+            await writer.append_result(r, model="openai/gpt-4")
+
+            summary = Summary(
+                suite="test-suite",
+                models=[_summary_for("openai/gpt-4", [r])],
+                gates_passed=True,
+            )
+            await writer.write_summary(summary)
+
+            assert (output_path / "openai-gpt-4.jsonl").exists()
+
+            result = await StreamingReader.to_runner_result(output_path)
+            assert "openai/gpt-4" in result.runs
 
 
-class TestMultiRunPartitioned:
+# ── multi-run ──
+
+
+class TestMultiRun:
     @pytest.mark.asyncio
     async def test_round_trip(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir)
-            suite = _make_suite()
-            samples = _make_samples(1)
-
-            writer = StreamingWriter(output_path, suite, samples, models=["m1"], num_runs=3)
+            writer = StreamingWriter(
+                output_path, _make_suite(), _make_samples(1),
+                models=["m1"], num_runs=3,
+            )
             await writer.initialize()
 
             run_results = []
@@ -161,12 +192,8 @@ class TestMultiRunPartitioned:
                 await writer.append_result(r, model="m1", run=run)
                 run_results.append([r])
 
-            gate = SimpleGateSpec(
-                kind=GateKind.SIMPLE, metric_key="check", aggregation=Aggregation.AVG_SCORE,
-                op=MetricOp.GTE, value=0.5,
-            )
             model_summary = summarize_runs(
-                model="m1", per_run_results=run_results, grader_keys=["check"], gate=gate
+                model="m1", per_run_results=run_results, grader_keys=["check"], gate=_GATE,
             )
             await writer.write_model_summary(model_summary)
 
@@ -194,46 +221,6 @@ class TestMultiRunPartitioned:
             result = await StreamingReader.to_runner_result(output_path)
             assert result.runs["m1"].runs is not None
             assert len(result.runs["m1"].runs) == 3
-
-
-# ── multi-run, no partition ──
-
-
-class TestMultiRunUnpartitioned:
-    @pytest.mark.asyncio
-    async def test_round_trip(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_path = Path(tmpdir)
-            suite = _make_suite()
-            samples = _make_samples(1)
-
-            writer = StreamingWriter(output_path, suite, samples, models=None, num_runs=2)
-            await writer.initialize()
-
-            r1 = _make_result(0, 1.0)
-            r2 = _make_result(0, 0.0)
-            await writer.append_result(r1, run=1)
-            await writer.append_result(r2, run=2)
-
-            gate = SimpleGateSpec(
-                kind=GateKind.SIMPLE, metric_key="check", aggregation=Aggregation.AVG_SCORE,
-                op=MetricOp.GTE, value=0.5,
-            )
-            model_summary = summarize_runs(
-                model="default", per_run_results=[[r1], [r2]], grader_keys=["check"], gate=gate
-            )
-            top = Summary(
-                suite="test-suite", models=[model_summary], gates_passed=False, runs_passed=1
-            )
-            await writer.write_summary(top)
-
-            assert (output_path / "run_1.jsonl").exists()
-            assert (output_path / "run_2.jsonl").exists()
-
-            result = await StreamingReader.to_runner_result(output_path)
-            assert result.runs["default"].runs is not None
-            assert len(result.runs["default"].runs) == 2
-            assert result.gates_passed is False
 
 
 # ── error paths ──

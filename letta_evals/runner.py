@@ -175,10 +175,6 @@ class Runner:
         return [_model_id_for(cfg) for cfg in self.model_configs]
 
     @property
-    def is_partitioned(self) -> bool:
-        return bool(self.suite.target.model_configs or self.suite.target.model_handles)
-
-    @property
     def grader_keys(self) -> List[str]:
         return list(self.graders.keys()) if self.graders else []
 
@@ -818,7 +814,7 @@ class Runner:
                 self.output_path,
                 suite_spec=self.suite,
                 samples=samples,
-                models=self.model_ids if self.is_partitioned else [],
+                models=self.model_ids,
                 num_runs=1,
             )
             await self.stream_writer.initialize()
@@ -839,9 +835,8 @@ class Runner:
                             self.results_by_model[mid].append(result)
                             self.results.append(result)
                             if self.stream_writer:
-                                writer_model = mid if self.is_partitioned else None
                                 await self.stream_writer.append_result(
-                                    result, model=writer_model, run=self.current_run
+                                    result, model=mid, run=self.current_run
                                 )
 
                         tg.start_soon(run_and_append, sample, llm_config, model_id)
@@ -1125,7 +1120,6 @@ async def _execute_runs(
     letta_project_id: Optional[str],
 ) -> RunnerResult:
     """Execute single or multiple evaluation runs sharing one streaming writer."""
-    is_partitioned = bool(suite.target.model_configs or suite.target.model_handles)
     if suite.target.model_configs:
         model_ids = [_model_id_for(c) for c in (suite.target.model_configs or [])]
     elif suite.target.model_handles:
@@ -1140,7 +1134,7 @@ async def _execute_runs(
             output_path,
             suite_spec=suite,
             samples=samples,
-            models=model_ids if is_partitioned else [],
+            models=model_ids,
             num_runs=actual_num_runs,
         )
         await shared_writer.initialize()
