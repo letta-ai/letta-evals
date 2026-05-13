@@ -30,7 +30,7 @@ from letta_evals.models.results import (
     TurnTokenData,
     Usage,
 )
-from letta_evals.models.sample import Sample
+from letta_evals.models.sample import Sample, SampleId
 from letta_evals.models.specs import (
     BaseGraderSpec,
     BaseTargetSpec,
@@ -64,6 +64,7 @@ __all__ = [
     "AgentState",
     # sample
     "Sample",
+    "SampleId",
     # specs — targets
     "BaseTargetSpec",
     "LettaAgentTargetSpec",

@@ -105,6 +105,26 @@ class TestLoadJsonl:
         assert samples[0].ground_truth == "world"
         assert samples[1].id == 1
 
+    def test_preserves_explicit_sample_id(self):
+        path = self._write_jsonl(
+            [
+                {"sample_id": 101, "input": "hello"},
+                {"sample_id": 205, "input": "foo"},
+            ]
+        )
+        samples = list(load_jsonl(path))
+        assert [s.id for s in samples] == [101, 205]
+
+    def test_preserves_explicit_string_sample_id(self):
+        path = self._write_jsonl([{"sample_id": "sample-a", "input": "hello"}])
+        samples = list(load_jsonl(path))
+        assert samples[0].id == "sample-a"
+
+    def test_preserves_explicit_id_when_sample_id_missing(self):
+        path = self._write_jsonl([{"id": "row-a", "input": "hello"}])
+        samples = list(load_jsonl(path))
+        assert samples[0].id == "row-a"
+
     def test_max_samples(self):
         path = self._write_jsonl([{"input": f"q{i}"} for i in range(10)])
         samples = list(load_jsonl(path, max_samples=3))
@@ -160,6 +180,21 @@ class TestLoadCsv:
         assert len(samples) == 2
         assert samples[0].input == "hello"
         assert samples[0].ground_truth == "world"
+
+    def test_preserves_explicit_numeric_sample_id(self):
+        path = self._write_csv("sample_id,input\n101,hello\n205,foo\n")
+        samples = list(load_csv(path))
+        assert [s.id for s in samples] == [101, 205]
+
+    def test_preserves_explicit_string_sample_id(self):
+        path = self._write_csv("sample_id,input\nsample-a,hello\nsample-b,foo\n")
+        samples = list(load_csv(path))
+        assert [s.id for s in samples] == ["sample-a", "sample-b"]
+
+    def test_preserves_explicit_id_when_sample_id_missing(self):
+        path = self._write_csv("id,input\nrow-a,hello\nrow-b,foo\n")
+        samples = list(load_csv(path))
+        assert [s.id for s in samples] == ["row-a", "row-b"]
 
     def test_max_samples(self):
         rows = "input\n" + "\n".join(f"q{i}" for i in range(10)) + "\n"

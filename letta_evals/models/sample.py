@@ -9,11 +9,13 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, model_validator
 
+SampleId = Union[int, str]
+
 
 class Sample(BaseModel):
     """Single evaluation sample."""
 
-    id: int = Field(description="Sample ID (0-based index from dataset)")
+    id: SampleId = Field(description="Sample ID from the dataset, or row index if the dataset does not provide one")
     input: Union[str, List[str]] = Field(description="Input message(s) to send to the agent")
     ground_truth: Optional[Union[str, List[str]]] = Field(
         default=None,

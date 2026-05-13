@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Dict, Optional
 
+from letta_evals.models.sample import SampleId
+
 
 class ProgressCallback(ABC):
     """Abstract base class for progress tracking during evaluation runs.
@@ -33,13 +35,13 @@ class ProgressCallback(ABC):
 
     @abstractmethod
     async def sample_started(
-        self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None
+        self, sample_id: SampleId, agent_id: Optional[str] = None, model_name: Optional[str] = None
     ) -> None:
         """Called when a sample evaluation starts."""
         ...
 
     async def agent_created(
-        self, sample_id: int, agent_id: str, model_name: Optional[str] = None, from_cache: bool = False
+        self, sample_id: SampleId, agent_id: str, model_name: Optional[str] = None, from_cache: bool = False
     ) -> None:
         """Called when an agent has been created/provisioned or resolved from cache.
 
@@ -49,7 +51,7 @@ class ProgressCallback(ABC):
 
     async def message_sending(
         self,
-        sample_id: int,
+        sample_id: SampleId,
         message_num: int,
         total_messages: int,
         agent_id: Optional[str] = None,
@@ -59,14 +61,14 @@ class ProgressCallback(ABC):
         pass
 
     async def grading_started(
-        self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None
+        self, sample_id: SampleId, agent_id: Optional[str] = None, model_name: Optional[str] = None
     ) -> None:
         """Called when grading of a sample begins."""
         pass
 
     async def turn_graded(
         self,
-        sample_id: int,
+        sample_id: SampleId,
         turn_num: int,
         total_turns: int,
         turn_score: float,
@@ -80,7 +82,7 @@ class ProgressCallback(ABC):
     @abstractmethod
     async def sample_completed(
         self,
-        sample_id: int,
+        sample_id: SampleId,
         agent_id: Optional[str] = None,
         score: Optional[float] = None,
         target_cost: Optional[float] = None,
@@ -95,7 +97,7 @@ class ProgressCallback(ABC):
     @abstractmethod
     async def sample_error(
         self,
-        sample_id: int,
+        sample_id: SampleId,
         error: str,
         agent_id: Optional[str] = None,
         model_name: Optional[str] = None,

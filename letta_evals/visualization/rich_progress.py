@@ -17,6 +17,7 @@ from rich.progress import (
 )
 from rich.table import Table
 
+from letta_evals.models.sample import SampleId
 from letta_evals.visualization.base import ProgressCallback
 from letta_evals.visualization.reducer import ProgressRuntimeState, ProgressStateReducer
 from letta_evals.visualization.rich_renderer import RichProgressRenderer
@@ -245,7 +246,7 @@ class EvalProgress(ProgressCallback):
 
     async def update_sample_state(
         self,
-        sample_id: int,
+        sample_id: SampleId,
         state: SampleState,
         agent_id: Optional[str] = None,
         model_name: Optional[str] = None,
@@ -261,7 +262,9 @@ class EvalProgress(ProgressCallback):
             **kwargs,
         )
 
-    async def sample_started(self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None):
+    async def sample_started(
+        self, sample_id: SampleId, agent_id: Optional[str] = None, model_name: Optional[str] = None
+    ):
         """Mark sample as started"""
         self._reducer.ensure_sample(sample_id, agent_id=agent_id, model_name=model_name)
         # skip loading state if using cached trajectories
@@ -271,7 +274,7 @@ class EvalProgress(ProgressCallback):
             )
 
     async def agent_created(
-        self, sample_id: int, agent_id: str, model_name: Optional[str] = None, from_cache: bool = False
+        self, sample_id: SampleId, agent_id: str, model_name: Optional[str] = None, from_cache: bool = False
     ):
         """Update sample with agent_id once agent is provisioned."""
         await self.update_sample_state(
@@ -280,7 +283,7 @@ class EvalProgress(ProgressCallback):
 
     async def message_sending(
         self,
-        sample_id: int,
+        sample_id: SampleId,
         message_num: int,
         total_messages: int,
         agent_id: Optional[str] = None,
@@ -296,7 +299,9 @@ class EvalProgress(ProgressCallback):
             total_messages=total_messages,
         )
 
-    async def grading_started(self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None):
+    async def grading_started(
+        self, sample_id: SampleId, agent_id: Optional[str] = None, model_name: Optional[str] = None
+    ):
         """Mark sample as being graded"""
         existing_from_cache = self._reducer.get_from_cache(sample_id, model_name)
 
@@ -306,7 +311,7 @@ class EvalProgress(ProgressCallback):
 
     async def turn_graded(
         self,
-        sample_id: int,
+        sample_id: SampleId,
         turn_num: int,
         total_turns: int,
         turn_score: float,
@@ -337,7 +342,7 @@ class EvalProgress(ProgressCallback):
 
     async def sample_completed(
         self,
-        sample_id: int,
+        sample_id: SampleId,
         agent_id: Optional[str] = None,
         score: Optional[float] = None,
         target_cost: Optional[float] = None,
@@ -364,7 +369,7 @@ class EvalProgress(ProgressCallback):
 
     async def sample_error(
         self,
-        sample_id: int,
+        sample_id: SampleId,
         error: str,
         agent_id: Optional[str] = None,
         model_name: Optional[str] = None,

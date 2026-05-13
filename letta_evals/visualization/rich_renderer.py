@@ -23,6 +23,10 @@ from letta_evals.visualization.state import (
 )
 
 
+def _sample_id_sort_key(sample_id):
+    return (0, sample_id) if isinstance(sample_id, int) else (1, str(sample_id))
+
+
 class RichProgressRenderer:
     """Render the live Rich layout for evaluation progress."""
 
@@ -83,7 +87,7 @@ class RichProgressRenderer:
     ) -> List[SampleProgress]:
         """Select only currently active rows for the live top panel."""
         rows = [sample for sample in runtime_state.samples.values() if is_active_state(sample.state)]
-        rows.sort(key=lambda sample: (sample.model_name or "", sample.sample_id))
+        rows.sort(key=lambda sample: (sample.model_name or "", _sample_id_sort_key(sample.sample_id)))
         if limit is None:
             return rows
         return rows[:limit]
@@ -93,7 +97,13 @@ class RichProgressRenderer:
     ) -> List[SampleProgress]:
         """Select the most recent completed or errored rows for the bottom panel."""
         rows = [sample for sample in runtime_state.samples.values() if is_completed_state(sample.state)]
-        rows.sort(key=lambda sample: (-get_last_update_key(sample), sample.model_name or "", sample.sample_id))
+        rows.sort(
+            key=lambda sample: (
+                -get_last_update_key(sample),
+                sample.model_name or "",
+                _sample_id_sort_key(sample.sample_id),
+            )
+        )
         if limit is None:
             return rows
         return rows[:limit]

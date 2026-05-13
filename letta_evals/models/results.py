@@ -24,6 +24,7 @@ from letta_client.types.agents import (
 )
 from pydantic import BaseModel, Field, field_validator
 
+from letta_evals.models.sample import SampleId
 from letta_evals.types import ErrorCategory
 
 # Type alias for message union (replaces LettaMessageUnion from v0.x SDK)
@@ -181,7 +182,7 @@ class ErrorSummary(BaseModel):
 class SampleResult(BaseModel):
     """Result for a single sample evaluation."""
 
-    sample_id: int = Field(description="ID of the sample (look up the full Sample in suite.json)")
+    sample_id: SampleId = Field(description="ID of the sample (look up the full Sample in suite.json)")
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
     trajectory: List[List[LettaMessageUnion]] = Field(description="Full conversation trajectory from the agent")
     submissions: Dict[str, str] = Field(
