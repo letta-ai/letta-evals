@@ -33,6 +33,7 @@ from letta_evals.models import (
     PerTurnGrade,
     RunnerResult,
     Sample,
+    SampleId,
     SampleResult,
     SimpleCondition,
     SimpleGateSpec,
@@ -154,10 +155,10 @@ class Runner:
         self.progress_callback = progress_callback
         self.model_configs = self._load_model_configs()
         self.cached_results = cached_results
-        self._cached_trajectories: Dict[int, Dict[str, SampleResult]] = (
+        self._cached_trajectories: Dict[SampleId, Dict[str, SampleResult]] = (
             self._build_trajectory_cache() if cached_results else {}
         )
-        self._sample_lookup: Dict[int, Sample] = {}
+        self._sample_lookup: Dict[SampleId, Sample] = {}
         # ``stream_writer`` is shared across runs in multi-run mode; if not
         # provided, the runner builds its own. ``current_run`` is the 1-based
         # index of this run inside that shared writer.
@@ -355,9 +356,9 @@ class Runner:
 
     # ── cache ──
 
-    def _build_trajectory_cache(self) -> Dict[int, Dict[str, SampleResult]]:
+    def _build_trajectory_cache(self) -> Dict[SampleId, Dict[str, SampleResult]]:
         """Cache previous results indexed by sample_id → model → SampleResult."""
-        cache: Dict[int, Dict[str, SampleResult]] = defaultdict(dict)
+        cache: Dict[SampleId, Dict[str, SampleResult]] = defaultdict(dict)
         if self.cached_results:
             for model_id, model_run in self.cached_results.runs.items():
                 for result in model_run.results:
@@ -433,7 +434,7 @@ class Runner:
         agent_state: Optional[AgentState],
         grader: Grader,
         grader_key: str,
-        sample_id: int,
+        sample_id: SampleId,
         agent_id: str,
         model_name: str,
     ) -> tuple[GradeResult, str]:
@@ -506,7 +507,7 @@ class Runner:
         sample: Sample,
         trajectory: List[List[LettaMessageUnion]],
         agent_state: Optional[AgentState],
-        sample_id: int,
+        sample_id: SampleId,
         agent_id: str,
         model_name: str,
     ) -> tuple[Dict[str, GradeResult], Dict[str, str], Dict[str, float]]:

@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from letta_evals.models.sample import SampleId
+
 
 class SampleState(Enum):
     """States a sample can be in during evaluation."""
@@ -38,7 +40,7 @@ COMPLETED_SAMPLE_STATES = frozenset(
 class SampleProgress:
     """Track progress of an individual sample."""
 
-    sample_id: int
+    sample_id: SampleId
     state: SampleState = SampleState.QUEUED
     agent_id: Optional[str] = None
     model_name: Optional[str] = None

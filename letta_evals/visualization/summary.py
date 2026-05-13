@@ -114,6 +114,10 @@ def extract_score_and_rationale(grade: Any) -> tuple[Optional[float], str]:
 DisplayRow = Tuple[str, SampleResult]
 
 
+def _sample_id_sort_key(sample_id):
+    return (0, sample_id) if isinstance(sample_id, int) else (1, str(sample_id))
+
+
 def get_displayed_sample_results(result: Any) -> tuple[int, List[DisplayRow]]:
     """Flatten the per-model results into a sorted list for display.
 
@@ -127,7 +131,7 @@ def get_displayed_sample_results(result: Any) -> tuple[int, List[DisplayRow]]:
         for sample_result in model_run.results:
             rows.append((model_id, sample_result))
 
-    rows.sort(key=lambda row: (row[0], row[1].sample_id))
+    rows.sort(key=lambda row: (row[0], _sample_id_sort_key(row[1].sample_id)))
     return len(rows), rows[:MAX_SAMPLES_DISPLAY]
 
 

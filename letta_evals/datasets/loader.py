@@ -4,7 +4,30 @@ from typing import Iterator, List, Optional, Union
 
 import pandas as pd
 
-from letta_evals.models import Sample
+from letta_evals.models import Sample, SampleId
+
+
+def _normalize_sample_id(value) -> SampleId:
+    """Return a JSON-serializable sample id while preserving explicit dataset identity."""
+    if hasattr(value, "item"):
+        value = value.item()
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return value
+
+
+def _json_sample_id(data: dict, fallback: int) -> SampleId:
+    for field_name in ("sample_id", "id"):
+        if field_name in data and data[field_name] is not None:
+            return _normalize_sample_id(data[field_name])
+    return fallback
+
+
+def _csv_sample_id(df: pd.DataFrame, row, fallback: int) -> SampleId:
+    for field_name in ("sample_id", "id"):
+        if field_name in df.columns and not pd.isna(row.get(field_name)):
+            return _normalize_sample_id(row[field_name])
+    return fallback
 
 
 def _resolve_rubric_fields(
@@ -59,7 +82,7 @@ def load_jsonl(
                 line_index,
             )
             sample = Sample(
-                id=line_index,
+                id=_json_sample_id(data, line_index),
                 input=data.get("input") or data["prompt"],
                 ground_truth=data.get("ground_truth"),
                 agent_args=data.get("agent_args") or metadata.get("agent_args"),
@@ -169,7 +192,7 @@ def load_csv(
         # create sample
         try:
             sample = Sample(
-                id=int(idx),
+                id=_csv_sample_id(df, row, int(idx)),
                 input=input_value,
                 ground_truth=ground_truth,
                 agent_args=agent_args,

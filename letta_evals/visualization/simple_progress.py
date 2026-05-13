@@ -4,6 +4,7 @@ from typing import Dict, Optional
 
 from rich.console import Console
 
+from letta_evals.models.sample import SampleId
 from letta_evals.visualization.base import ProgressCallback
 from letta_evals.visualization.summary import (
     build_simple_sample_results_table,
@@ -44,14 +45,14 @@ class SimpleProgress(ProgressCallback):
         """Reset state for a new run."""
 
     async def sample_started(
-        self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None
+        self, sample_id: SampleId, agent_id: Optional[str] = None, model_name: Optional[str] = None
     ) -> None:
         model_text = f" [dim]({model_name})[/]" if model_name else ""
         agent_text = f" [dim]agent={agent_id}[/]" if agent_id else ""
         self.console.print(f"[bold cyan]▸ Sample [{sample_id}]{model_text}{agent_text}[/]")
 
     async def agent_created(
-        self, sample_id: int, agent_id: str, model_name: Optional[str] = None, from_cache: bool = False
+        self, sample_id: SampleId, agent_id: str, model_name: Optional[str] = None, from_cache: bool = False
     ) -> None:
         prefix = self._format_prefix(sample_id, agent_id, model_name)
         cache_text = " [dim](cached)[/]" if from_cache else ""
@@ -59,7 +60,7 @@ class SimpleProgress(ProgressCallback):
 
     async def message_sending(
         self,
-        sample_id: int,
+        sample_id: SampleId,
         message_num: int,
         total_messages: int,
         agent_id: Optional[str] = None,
@@ -69,14 +70,14 @@ class SimpleProgress(ProgressCallback):
         self.console.print(f"{prefix} [dim]•[/] Sending messages {message_num}/{total_messages}")
 
     async def grading_started(
-        self, sample_id: int, agent_id: Optional[str] = None, model_name: Optional[str] = None
+        self, sample_id: SampleId, agent_id: Optional[str] = None, model_name: Optional[str] = None
     ) -> None:
         prefix = self._format_prefix(sample_id, agent_id, model_name)
         self.console.print(f"{prefix} [dim]•[/] Grading...")
 
     async def sample_completed(
         self,
-        sample_id: int,
+        sample_id: SampleId,
         agent_id: Optional[str] = None,
         score: Optional[float] = None,
         target_cost: Optional[float] = None,
@@ -100,7 +101,7 @@ class SimpleProgress(ProgressCallback):
 
     async def sample_error(
         self,
-        sample_id: int,
+        sample_id: SampleId,
         error: str,
         agent_id: Optional[str] = None,
         model_name: Optional[str] = None,
@@ -131,7 +132,7 @@ class SimpleProgress(ProgressCallback):
         self.console.print(build_simple_sample_results_table(suite_spec, displayed_rows))
         print_remaining_samples_notice(self.console, total_samples, len(displayed_rows))
 
-    def _format_prefix(self, sample_id: int, agent_id: Optional[str], model_name: Optional[str]) -> str:
+    def _format_prefix(self, sample_id: SampleId, agent_id: Optional[str], model_name: Optional[str]) -> str:
         """format a compact prefix for substeps to show which sample they belong to."""
         parts = [f"[dim]\\[[/][cyan]{sample_id}[/][dim]][/]"]
         if model_name:

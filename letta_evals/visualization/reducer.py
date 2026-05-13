@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
+from letta_evals.models.sample import SampleId
 from letta_evals.visualization.state import (
     ProgressEvent,
     SampleProgress,
@@ -11,7 +12,7 @@ from letta_evals.visualization.state import (
     is_terminal_state,
 )
 
-SampleKey = tuple[int, Optional[str]]
+SampleKey = tuple[SampleId, Optional[str]]
 
 
 @dataclass
@@ -49,7 +50,7 @@ class ProgressStateReducer:
 
     def ensure_sample(
         self,
-        sample_id: int,
+        sample_id: SampleId,
         *,
         agent_id: Optional[str] = None,
         model_name: Optional[str] = None,
@@ -72,11 +73,11 @@ class ProgressStateReducer:
             sample.model_name = model_name
         return sample
 
-    def get_from_cache(self, sample_id: int, model_name: Optional[str] = None) -> bool:
+    def get_from_cache(self, sample_id: SampleId, model_name: Optional[str] = None) -> bool:
         sample = self.get_sample(sample_id, model_name)
         return sample.from_cache if sample is not None else False
 
-    def get_sample(self, sample_id: int, model_name: Optional[str] = None) -> Optional[SampleProgress]:
+    def get_sample(self, sample_id: SampleId, model_name: Optional[str] = None) -> Optional[SampleProgress]:
         key = (sample_id, model_name)
         if key in self.state.samples:
             return self.state.samples[key]
@@ -86,7 +87,7 @@ class ProgressStateReducer:
 
     def record_turn_grade(
         self,
-        sample_id: int,
+        sample_id: SampleId,
         *,
         turn_num: int,
         total_turns: int,
@@ -115,7 +116,7 @@ class ProgressStateReducer:
 
     def apply_sample_state_update(
         self,
-        sample_id: int,
+        sample_id: SampleId,
         state: SampleState,
         agent_id: Optional[str] = None,
         model_name: Optional[str] = None,

@@ -7,6 +7,7 @@ from letta_evals.models import (
     LettaAgentTargetSpec,
     ModelRun,
     ModelSummary,
+    SampleId,
     SampleResult,
     SimpleGateSpec,
     SuiteSpec,
@@ -49,7 +50,7 @@ def _make_suite() -> SuiteSpec:
 
 
 def _sample_result(
-    sample_id: int, agent_id: str, accuracy: float, acc_rat: str, quality: float, q_rat: str
+    sample_id: SampleId, agent_id: str, accuracy: float, acc_rat: str, quality: float, q_rat: str
 ) -> SampleResult:
     return SampleResult(
         sample_id=sample_id,
@@ -125,6 +126,28 @@ def test_get_displayed_sample_results_sorts_by_model_then_sample() -> None:
     assert [(model_id, sr.sample_id) for model_id, sr in displayed] == [
         ("model-a", 0),
         ("model-z", 1),
+    ]
+
+
+def test_get_displayed_sample_results_sorts_string_sample_ids() -> None:
+    result = _make_result()
+    result.runs = {
+        "model-a": ModelRun(
+            model="model-a",
+            results=[
+                _sample_result("sample-b", "agent-b", accuracy=0.25, acc_rat="b", quality=0.75, q_rat="b"),
+                _sample_result("sample-a", "agent-a", accuracy=1.0, acc_rat="a", quality=0.5, q_rat="a"),
+            ],
+            summary=_model_summary("model-a", score=1.0, per_metric={"accuracy": 1.0, "quality": 0.5}),
+        )
+    }
+
+    total, displayed = get_displayed_sample_results(result)
+
+    assert total == 2
+    assert [(model_id, sr.sample_id) for model_id, sr in displayed] == [
+        ("model-a", "sample-a"),
+        ("model-a", "sample-b"),
     ]
 
 

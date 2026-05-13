@@ -42,7 +42,7 @@ def _make_samples(n: int = 2):
     return [Sample(id=i, input=f"in-{i}", ground_truth=f"gt-{i}") for i in range(n)]
 
 
-def _make_result(sample_id: int, score: float) -> SampleResult:
+def _make_result(sample_id, score: float) -> SampleResult:
     return SampleResult(
         sample_id=sample_id,
         agent_id="agent-x",
@@ -123,6 +123,34 @@ class TestSingleRun:
             assert result.gates_passed is True
             assert "default" in result.runs
             assert result.runs["default"].results[0].grades["check"].score == 1.0
+
+    @pytest.mark.asyncio
+    async def test_string_sample_id_round_trip(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir)
+            samples = [Sample(id="sample-a", input="in-a", ground_truth="gt-a")]
+            writer = StreamingWriter(
+                output_path,
+                _make_suite(),
+                samples,
+                models=["default"],
+                num_runs=1,
+            )
+            await writer.initialize()
+
+            r = _make_result("sample-a", 1.0)
+            await writer.append_result(r, model="default")
+            await writer.write_summary(
+                Summary(
+                    suite="test-suite",
+                    models=[_summary_for("default", [r])],
+                    gates_passed=True,
+                )
+            )
+
+            result = await StreamingReader.to_runner_result(output_path)
+            assert result.samples[0].id == "sample-a"
+            assert result.runs["default"].results[0].sample_id == "sample-a"
 
     @pytest.mark.asyncio
     async def test_multiple_models_round_trip(self):
