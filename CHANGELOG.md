@@ -64,6 +64,24 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.17.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.16.0...letta-evals-v0.17.0) (2026-05-13)
+
+
+### Features
+
+* **rubric-grader:** Send rubric verbatim and support per-sample overrides ([#252](https://github.com/letta-ai/letta-evals/issues/252)) ([f15e118](https://github.com/letta-ai/letta-evals/commit/f15e118076a0d333ab6b917bf75984151f97f855))
+
+
+### Bug Fixes
+
+* Preserve explicit dataset sample ids ([#256](https://github.com/letta-ai/letta-evals/issues/256)) ([70759fc](https://github.com/letta-ai/letta-evals/commit/70759fc918bb9f76fa23547d69a8acbf2ae543b6))
+
+
+### Refactors
+
+* **models:** Split models.py into focused submodules ([#255](https://github.com/letta-ai/letta-evals/issues/255)) ([93eebfc](https://github.com/letta-ai/letta-evals/commit/93eebfcf360275f7540547a8bdf1f260d0188bd9))
+* Simplify metrics/result data model and on-disk layout ([#254](https://github.com/letta-ai/letta-evals/issues/254)) ([181296d](https://github.com/letta-ai/letta-evals/commit/181296d6fdfe6cb47ea04c8b47bd0dcc9b08027d))
+
 ## [0.16.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.15.0...letta-evals-v0.16.0) (2026-05-10)
 
 
