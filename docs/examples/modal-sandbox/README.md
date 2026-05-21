@@ -45,13 +45,21 @@ final `SampleResult` JSON back.
 2. **Authenticate to Modal.** Either run `modal token new` or set
    `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`.
 
-3. **Upload Modal Secrets.** Each name in `sandbox.secrets` must
-   correspond to a pre-uploaded Modal Secret containing the env vars the
-   in-sandbox processes need (`LETTA_API_KEY`, judge model keys, etc.).
+3. **Provide API keys.** No setup needed for the common ones:
+   `letta-evals run` auto-loads `./.env`, and the runner forwards an
+   allowlist of host env vars into the sandbox — `LETTA_API_KEY`,
+   `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`,
+   `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `TINKER_API_KEY` — whenever
+   they're present. So a `.env` (or exported vars) is enough to run.
 
-4. **Reference the secrets in your suite YAML.** See `suite.yaml` in
-   this directory. The bundled base image already carries `letta-evals`
-   and `@letta-ai/letta-code`, so most suites won't need a custom image.
+   - Forward **extra** variables with `forward_env: [NAME, ...]`.
+   - For shared/CI use, pre-create named Modal Secrets
+     (`modal secret create <name> KEY=...`) and list them under
+     `secrets: [<name>]`. Only allowlisted names are forwarded — never
+     your whole environment.
+
+   The bundled base image already carries `letta-evals` and
+   `@letta-ai/letta-code`, so most suites won't need a custom image.
 
 ### Building a custom image (optional)
 

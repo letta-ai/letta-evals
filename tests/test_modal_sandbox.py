@@ -50,6 +50,7 @@ class TestModalSandboxSpec:
         assert spec.block_network is False
         assert spec.app_name == "letta-evals"
         assert spec.secrets == []
+        assert spec.forward_env == []
         assert spec.volumes == {}
         assert spec.letta_evals_version is None
 
@@ -91,6 +92,7 @@ class TestModalSandboxSpec:
             image="img:1",
             letta_evals_version="0.17.0",
             secrets=["k1", "k2"],
+            forward_env=["MY_CUSTOM_KEY"],
             volumes={"/mnt/cache": "cache-vol"},
             cpu=4,
             memory_mb=8192,
@@ -99,6 +101,7 @@ class TestModalSandboxSpec:
             app_name="my-app",
         )
         assert spec.secrets == ["k1", "k2"]
+        assert spec.forward_env == ["MY_CUSTOM_KEY"]
         assert spec.volumes == {"/mnt/cache": "cache-vol"}
         assert spec.cpu == 4
         assert spec.memory_mb == 8192

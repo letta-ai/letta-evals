@@ -140,6 +140,33 @@ class TestRunSampleInSandbox:
         assert result.sample_id == "s1"
         assert result.grades["acc"].score == 1.0
 
+    def test_forwards_allowlisted_env_vars(self, tmp_path, monkeypatch):
+        """Allowlisted host env vars (+ forward_env extras) reach the in-sandbox
+        CLI exec; unrelated vars and absent ones do not."""
+        _write_suite_yaml(tmp_path)
+        runner = _make_runner_with_sandbox(
+            tmp_path,
+            sandbox_spec=ModalSandboxSpec(image="img:test", timeout_sec=60, forward_env=["MY_EXTRA"]),
+        )
+        stub = _StubSandbox()
+        monkeypatch.setattr("letta_evals.sandbox.modal.ModalSandbox", lambda spec, session_id: stub)
+
+        monkeypatch.setenv("LETTA_API_KEY", "sk-letta")  # default allowlist
+        monkeypatch.setenv("MY_EXTRA", "extra-val")  # via forward_env
+        monkeypatch.setenv("SECRET_UNRELATED", "should-not-leak")  # not listed
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)  # absent -> skipped
+
+        sample = Sample(id="s1", input="hi", ground_truth="hi")
+        anyio.run(runner._run_sample_in_sandbox, sample, "openai/gpt-a", False, 0.0)
+
+        cli_execs = [c for c in stub.execs if "--sample" in c[0]]
+        assert cli_execs, stub.execs
+        env = cli_execs[0][1] or {}
+        assert env.get("LETTA_API_KEY") == "sk-letta"
+        assert env.get("MY_EXTRA") == "extra-val"
+        assert "SECRET_UNRELATED" not in env
+        assert "OPENAI_API_KEY" not in env
+
     def test_sandbox_torn_down_on_exec_failure(self, tmp_path, monkeypatch):
         _write_suite_yaml(tmp_path)
         runner = _make_runner_with_sandbox(tmp_path)

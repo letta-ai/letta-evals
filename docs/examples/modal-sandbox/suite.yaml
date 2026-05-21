@@ -28,11 +28,14 @@ gate:
 # the first build), which carries letta-evals (pip) and @letta-ai/letta-code
 # (npm). Override `image` only when you need extra system tools the agent
 # invokes.
+# Secrets: LETTA_API_KEY, OPENAI_API_KEY, etc. are auto-forwarded from your
+# host env (and ./.env is auto-loaded at startup), so no setup is needed for
+# the common keys. Use `forward_env: [EXTRA_KEY]` for extras, or `secrets:`
+# for pre-created named Modal Secrets (preferred for shared/CI use).
 sandbox:
   kind: modal
-  secrets:                                # named Modal Secrets, pre-uploaded
-    - letta-api-key
-    - openai-key
+  # forward_env: [MY_CUSTOM_KEY]          # extra host env vars to forward
+  # secrets: [some-named-modal-secret]    # pre-uploaded named Modal Secrets
   cpu: 2
   memory_mb: 4096
   timeout_sec: 1800

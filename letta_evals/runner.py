@@ -66,6 +66,20 @@ logger = logging.getLogger(__name__)
 # Sentinel model identifier used when a suite has no model_configs/model_handles.
 DEFAULT_MODEL_ID = "default"
 
+# Host env vars auto-forwarded into a Modal sandbox (when present) so the
+# in-sandbox target/graders can authenticate without pre-creating Modal
+# Secrets. Only these explicit names are forwarded — never the whole env.
+# Suite authors extend this via `sandbox.forward_env`. See _run_sample_in_sandbox.
+DEFAULT_SANDBOX_FORWARD_ENV = (
+    "LETTA_API_KEY",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GOOGLE_API_KEY",
+    "GEMINI_API_KEY",
+    "OPENROUTER_API_KEY",
+    "TINKER_API_KEY",
+)
+
 
 def _extract_model_name(llm_config) -> Optional[str]:
     """Extract model name from LlmConfig object or string handle."""
@@ -704,10 +718,19 @@ class Runner:
             inner_command = " ".join(_shlex.quote(p) for p in cmd_parts)
             command = f"cd /mnt/suite && {inner_command}"
 
-            # Per-exec env mirrors host env vars that the in-sandbox CLI
-            # expects. Named Modal Secrets supply API keys; we don't inline
-            # key material here.
+            # Forward an explicit allowlist of host env vars (API keys etc.)
+            # into the sandbox so the in-sandbox target/graders authenticate
+            # without pre-creating Modal Secrets. Only listed names are sent —
+            # never the whole environment. Named Modal Secrets (sandbox.secrets)
+            # still apply on top for shared/CI use.
             exec_env: Dict[str, str] = {}
+            forward_names = list(DEFAULT_SANDBOX_FORWARD_ENV) + list(self.suite.sandbox.forward_env or [])
+            for _name in forward_names:
+                _val = os.environ.get(_name)
+                if _val is not None:
+                    exec_env[_name] = _val
+            if exec_env:
+                logger.debug("Forwarding env vars to sandbox %s: %s", sandbox.sandbox_id, sorted(exec_env))
 
             exec_timeout = self.suite.sandbox.timeout_sec
             result_exec = await sandbox.exec(command, env=exec_env, timeout_sec=exec_timeout)

@@ -142,6 +142,15 @@ class ModalSandboxSpec(BaseModel):
         ),
     )
     secrets: List[str] = Field(default_factory=list, description="Names of pre-uploaded Modal Secrets to attach")
+    forward_env: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Extra host environment variable names to forward into the sandbox, "
+            "in addition to a built-in allowlist (LETTA_API_KEY and common model-"
+            "provider keys). Values are read from the host process environment at "
+            "run time; only listed names are forwarded — never the whole environment."
+        ),
+    )
     volumes: Dict[str, str] = Field(
         default_factory=dict,
         description="Mapping of in-sandbox mount path -> Modal Volume name",

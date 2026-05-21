@@ -26,6 +26,15 @@ to `/mnt/suite/` inside the sandbox, execs `letta-evals run --sample ...`,
 and round-trips a single `SampleResult` per sample. Concurrency, progress
 callbacks, and JSONL output continue to work on the host as before.
 
+**Secrets.** API keys reach the sandbox automatically: the runner forwards an
+allowlist of host environment variables — `LETTA_API_KEY` and common
+model-provider keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`,
+`GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `TINKER_API_KEY`) — whenever they're present, and
+`letta-evals run` now auto-loads `./.env` into the host process at startup. Add
+`forward_env: [NAME, ...]` to forward extra variables, or `secrets: [name, ...]`
+to attach pre-created named Modal Secrets (preferred for shared/CI use). Only
+allowlisted names are forwarded — never the whole environment.
+
 Install the optional dependency to use it: `pip install letta-evals[modal]`.
 See `docs/examples/modal-sandbox/` for an example suite.
 

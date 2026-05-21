@@ -112,9 +112,20 @@ def run(
 ):
     """Run an evaluation suite."""
 
-    # auto-detect if we should disable fancy output based on terminal capabilities
     import os
 
+    from dotenv import load_dotenv
+
+    # Auto-load ./.env (CWD only, no upward search) into the host process so
+    # Modal sandbox secret-forwarding — and in-process targets — pick up API
+    # keys with zero setup. override=False: explicitly-exported vars win.
+    env_file = Path.cwd() / ".env"
+    if env_file.is_file():
+        load_dotenv(env_file, override=False)
+        if not quiet:
+            console.print(f"[dim]Loaded environment from {env_file}[/dim]")
+
+    # auto-detect if we should disable fancy output based on terminal capabilities
     no_fancy = not console.is_terminal or os.getenv("NO_COLOR") is not None
 
     if not suite_path.exists():
