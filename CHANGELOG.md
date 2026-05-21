@@ -76,6 +76,13 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.17.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.17.0...letta-evals-v0.17.1) (2026-05-21)
+
+
+### Bug Fixes
+
+* **cli:** Repair broken GateKind import and add --version flag ([#257](https://github.com/letta-ai/letta-evals/issues/257)) ([30d351d](https://github.com/letta-ai/letta-evals/commit/30d351de132eedc92916aa9f0b39df227fadac3e))
+
 ## [0.17.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.16.0...letta-evals-v0.17.0) (2026-05-13)
 
 
