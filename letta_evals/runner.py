@@ -733,6 +733,30 @@ class Runner:
             exec_timeout = self.suite.sandbox.timeout_sec
             result_exec = await sandbox.exec(command, env=exec_env, timeout_sec=exec_timeout)
 
+            if result_exec.return_code == -1:
+                # Modal's ContainerProcess.wait() returns -1 when the exec
+                # exceeds its deadline (timeout_sec). Surface it as a clear
+                # timeout rather than a generic non-zero exit.
+                msg = f"Sandbox exec exceeded timeout_sec={exec_timeout}"
+                logger.error(
+                    "Sandbox %s timed out for sample %s after %ss",
+                    sandbox.sandbox_id,
+                    sample_id,
+                    exec_timeout,
+                )
+                return SampleResult(
+                    sample_id=sample_id,
+                    trajectory=[],
+                    submissions={},
+                    grades={},
+                    timing=Timing(total=time.perf_counter() - t_sample_start, target=0.0),
+                    error=Error(
+                        category=ErrorCategory.TARGET,
+                        exception_type="SandboxTimeout",
+                        message=msg,
+                    ),
+                )
+
             if result_exec.return_code != 0:
                 msg = (result_exec.stderr or result_exec.stdout or "sandbox exec returned non-zero").strip()
                 category = (
