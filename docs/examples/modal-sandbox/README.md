@@ -36,10 +36,11 @@ final `SampleResult` JSON back.
 
 ## Setup
 
-1. **Install the Modal SDK extra:**
+1. **Install letta-evals.** The Modal SDK ships as a dependency, so no
+   extra is needed:
 
    ```sh
-   pip install 'letta-evals[modal]'
+   pip install letta-evals
    ```
 
 2. **Authenticate to Modal.** Either run `modal token new` or set
@@ -110,7 +111,7 @@ resolves to a real file under `/mnt/suite/`.
 
 | Symptom | Likely cause |
 |---|---|
-| `Modal SDK not found` | Install with `pip install 'letta-evals[modal]'`. |
+| `Modal SDK not found` | Reinstall letta-evals (`pip install letta-evals`); the Modal SDK ships with it. |
 | `Modal authentication not found` | Run `modal token new`. |
 | `SandboxExecError` with `letta-evals: not found` | The image doesn't install letta-evals on `PATH`. |
 | `VersionMismatch` | The image's `letta-evals --version` doesn't match the `letta_evals_version` pinned in the YAML. Rebuild the image or unpin. |

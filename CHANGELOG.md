@@ -35,8 +35,9 @@ model-provider keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`,
 to attach pre-created named Modal Secrets (preferred for shared/CI use). Only
 allowlisted names are forwarded — never the whole environment.
 
-Install the optional dependency to use it: `pip install letta-evals[modal]`.
-See `docs/examples/modal-sandbox/` for an example suite.
+The Modal SDK ships as a base dependency, so `pip install letta-evals` is all
+you need to drive sandboxes. See `docs/examples/modal-sandbox/` for an example
+suite.
 
 ### ⚠ BREAKING CHANGES — `target.sandbox` and `target.working_dir` removed
 

@@ -2,8 +2,9 @@
 
 One Modal sandbox per sample. Created on :meth:`ModalSandbox.start`, executes
 the in-sandbox ``letta-evals run --sample`` invocation, and tears down on
-:meth:`ModalSandbox.stop`. Modal SDK is imported lazily so missing
-``letta-evals[modal]`` doesn't break the rest of letta-evals.
+:meth:`ModalSandbox.stop`. The Modal SDK (a letta-evals dependency) is
+imported lazily so this module stays importable with no import-time cost
+when the sandbox driver isn't used.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ def _import_modal():
         import modal  # type: ignore
     except ImportError as e:
         raise SandboxNotInstalledError(
-            "Modal SDK not found. Install with `pip install letta-evals[modal]`."
+            "Modal SDK not found. It ships with letta-evals; reinstall with `pip install letta-evals`."
         ) from e
     return modal
 
