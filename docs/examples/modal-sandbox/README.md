@@ -103,9 +103,45 @@ resolves to a real file under `/mnt/suite/`.
   so extractors that read sandbox-filesystem state (e.g. agent memory
   git repos under `~/.letta/agents/<agent_id>/memory`) work without any
   artifact round-trip.
-- Local Letta server tunneling. The sandbox must reach a remote Letta
-  endpoint; users running a local Letta server should point at a
-  reachable URL.
+- Built-in reverse tunnels to a `localhost` server. Modal's tunnels are
+  inbound-only, so the sandbox can't dial your host's `localhost` directly.
+  A self-hosted/private server is still reachable — see
+  [Reaching a self-hosted Letta server](#reaching-a-self-hosted-letta-server).
+
+## Reaching a self-hosted Letta server
+
+By default the sandbox talks to Letta Cloud (`https://api.letta.com`). The
+sandbox runs in Modal's cloud and reaches the server over its normal
+**outbound** network (`block_network: false`), so any Letta endpoint reachable
+from Modal works. Point it with `target.base_url` in the suite YAML (or the
+`LETTA_BASE_URL` env var, which is auto-forwarded — `target.base_url` wins if
+both are set):
+
+```yaml
+target:
+  kind: letta_code
+  base_url: https://your-letta-server.example.com
+sandbox:
+  kind: modal
+  block_network: false
+```
+
+Depending on where the server runs:
+
+- **Publicly reachable** (cloud VM, load balancer, or a cloudflared/ngrok
+  tunnel in front of it) → set `base_url` to that URL.
+- **Private / on your own machine** → join the sandbox to your network with a
+  mesh VPN. Modal has a first-class Tailscale integration: install Tailscale in
+  a derived image, pass an auth key via a Modal Secret (`sandbox.secrets`),
+  bring it up at startup, and set `base_url` to the server's tailnet name/IP.
+  See [Add Modal Apps to Tailscale](https://modal.com/docs/examples/modal_tailscale).
+- **On Modal** → run letta-server in its own Modal app/sandbox exposed with a
+  tunnel (`encrypted_ports`) and point `base_url` at the tunnel URL.
+
+Modal's built-in tunnels are *inbound* (they expose a port running inside a
+container to the internet), not a reverse tunnel from the sandbox to your
+host's `localhost` — so a local server must be reachable via a mesh VPN or an
+exposed URL, not by pointing at `localhost`.
 
 ## Common failure modes
 
