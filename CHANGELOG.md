@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Fixed — `letta-evals` CLI failed to import
+
+`cli.py` imported `GateKind` from `letta_evals.models`, but #254 moved it
+to `letta_evals.types`, so every `letta-evals` invocation failed at import
+with `ImportError: cannot import name 'GateKind'`. Now imports it from
+`letta_evals.types`.
+
+### Added — `letta-evals --version`
+
+A top-level `--version` flag prints the installed version (e.g.
+`letta-evals 0.17.0`) and exits.
+
 ### ⚠ BREAKING CHANGES — rubric grader redesign
 
 The `model_judge` and `letta_judge` graders now send the rubric **verbatim**
