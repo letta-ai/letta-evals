@@ -130,6 +130,7 @@ We suggest getting started with these examples:
 - **Programmatic agent creation**: [`examples/programmatic-agent-creation/`](examples/programmatic-agent-creation/) - Using agent factories to create agents dynamically per sample
 - **Custom graders and extractors**: [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-and-extractor/) - Implementing custom evaluation logic with Python decorators
 - **Letta Code CLI evaluation**: [`examples/letta-code-simple-edit/`](examples/letta-code-simple-edit/) - Testing autonomous coding agents with async graders and subprocess execution, including multi-model evaluation support
+- **Modal sandbox execution**: [`docs/examples/modal-sandbox/`](docs/examples/modal-sandbox/) - Run every sample inside a fresh Modal sandbox for isolated, reproducible execution across CI / laptops / leaderboard runners
 
 ### Writing Custom Components
 

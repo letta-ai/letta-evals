@@ -1,0 +1,35 @@
+name: modal-sandbox-example
+description: Minimal example showing how to run every sample inside a Modal sandbox.
+dataset: samples.jsonl
+
+target:
+  kind: letta_agent
+  agent_id: agent-test
+  model_handles:
+    - openai/gpt-4.1
+
+graders:
+  acc:
+    kind: tool
+    function: exact_match
+
+gate:
+  kind: simple
+  metric_key: acc
+  op: gte
+  value: 1.0
+
+# Per-sample isolated execution. Each sample dispatches into a fresh
+# Modal sandbox; target + extractors + graders run inside it; the host
+# only sees the final SampleResult JSON.
+sandbox:
+  kind: modal
+  image: ghcr.io/your-org/letta-evals-runtime:0.17.0
+  letta_evals_version: "0.17.0"           # asserted against the image at start
+  secrets:                                # named Modal Secrets, pre-uploaded
+    - letta-api-key
+    - openai-key
+  cpu: 2
+  memory_mb: 4096
+  timeout_sec: 1800
+  block_network: false
