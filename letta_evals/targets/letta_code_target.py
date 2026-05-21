@@ -24,8 +24,6 @@ class LettaCodeTarget(AbstractAgentTarget):
         self,
         client: AsyncLetta,
         model_handle: str,
-        working_dir: Optional[Path] = None,
-        sandbox: bool = True,
         allowed_tools: Optional[list[str]] = None,
         disallowed_tools: Optional[list[str]] = None,
         timeout: int = 300,
@@ -41,9 +39,6 @@ class LettaCodeTarget(AbstractAgentTarget):
         Args:
             client: AsyncLetta client for retrieving messages after CLI execution
             model_handle: Model handle to use with letta code
-            working_dir: Working directory for letta command execution
-            sandbox: If True, create a per-model subdirectory under working_dir
-                for isolated execution. If False, use working_dir directly.
             allowed_tools: List of allowed tools (e.g., ["Bash", "Read"])
             disallowed_tools: List of disallowed tools
             timeout: Command timeout in seconds (default: 300)
@@ -61,6 +56,11 @@ class LettaCodeTarget(AbstractAgentTarget):
         Agent factories may set ``sample.extra_vars["env"]`` (dict) to inject
         per-sample env vars into the subprocess; user keys win over target-managed
         ones. See ``_build_subprocess_env``.
+
+        The CLI runs in the process's current working directory. For isolated
+        execution, configure ``suite.sandbox`` to dispatch each sample to a
+        fresh Modal sandbox — the image's ``WORKDIR`` becomes the per-sample
+        working directory.
         """
         self.client = client
         self.model_handle = model_handle
@@ -73,15 +73,10 @@ class LettaCodeTarget(AbstractAgentTarget):
         self.agent_script = agent_script
         self.base_dir = base_dir or Path.cwd()
         self.flags = shlex.split(flags) if flags else []
-
-        # Resolve the working directory, optionally creating a per-model sandbox
-        wd_base = working_dir or Path.cwd()
-        if sandbox:
-            model_name = model_handle.split("/")[-1]
-            self.working_dir = wd_base / model_name
-        else:
-            self.working_dir = wd_base
-        self.working_dir.mkdir(parents=True, exist_ok=True)
+        # Bind once so per-sample call sites can still reference a stable path
+        # for {pwd} substitution and subprocess cwd; sandbox isolation is now
+        # handled by suite.sandbox (Modal) rather than per-model subdirs.
+        self.working_dir = Path.cwd()
 
     def _build_subprocess_env(self, sample: Sample, agent_id: Optional[str]) -> dict[str, str]:
         """Build subprocess env: os.environ -> target-managed -> sample.extra_vars["env"]."""

@@ -235,8 +235,6 @@ class Runner:
             return LettaCodeTarget(
                 client=self.client,
                 model_handle=model_handle,
-                working_dir=self.suite.target.working_dir,
-                sandbox=self.suite.target.sandbox,
                 allowed_tools=self.suite.target.allowed_tools,
                 disallowed_tools=self.suite.target.disallowed_tools,
                 timeout=int(self.suite.target.timeout),
@@ -600,7 +598,6 @@ class Runner:
         from letta_evals.sandbox.modal import ModalSandbox
 
         sample_id = sample.id
-        model_name = _extract_model_name(llm_config)
         session_id = f"{self.suite.name}-{sample_id}-{uuid.uuid4().hex[:8]}"
 
         if self.suite.base_dir is None:

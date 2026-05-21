@@ -86,10 +86,6 @@ class LettaCodeTargetSpec(BaseTargetSpec):
 
     kind: Literal[TargetKind.LETTA_CODE] = TargetKind.LETTA_CODE
 
-    working_dir: Optional[Path] = Field(default=None, description="Working directory for letta code execution")
-    sandbox: bool = Field(
-        default=True, description="Create a per-model subdirectory under working_dir for isolated sandbox execution."
-    )
     allowed_tools: Optional[List[str]] = Field(
         default=None, description="List of allowed tools for letta code (e.g., ['Bash', 'Read'])"
     )
@@ -439,12 +435,6 @@ class SuiteSpec(BaseModel):
                     if not Path(yaml_data["target"]["agent_file"]).is_absolute():
                         yaml_data["target"]["agent_file"] = str(
                             (base_dir / yaml_data["target"]["agent_file"]).resolve()
-                        )
-
-                if "working_dir" in yaml_data["target"] and yaml_data["target"]["working_dir"]:
-                    if not Path(yaml_data["target"]["working_dir"]).is_absolute():
-                        yaml_data["target"]["working_dir"] = str(
-                            (base_dir / yaml_data["target"]["working_dir"]).resolve()
                         )
 
                 # resolve path-valued flags (--skills, --import) relative to suite file

@@ -7,13 +7,11 @@ teardown) without touching Modal at all.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Optional
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import anyio
-import pytest
 
 from letta_evals.models import (
     GradeResult,

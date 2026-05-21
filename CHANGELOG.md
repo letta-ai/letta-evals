@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+### Modal sandboxes for per-sample execution
+
+Suites can opt into running every sample inside a fresh Modal sandbox by
+adding a top-level `sandbox` field to the suite YAML:
+
+```yaml
+sandbox:
+  kind: modal
+  image: my-org/letta-evals-runtime:0.17.0
+  secrets: [letta-api-key, openai-key]
+  cpu: 2
+  memory_mb: 4096
+```
+
+When `sandbox` is set, the runner uploads the entire suite directory tree
+to `/mnt/suite/` inside the sandbox, execs `letta-evals run --sample ...`,
+and round-trips a single `SampleResult` per sample. Concurrency, progress
+callbacks, and JSONL output continue to work on the host as before.
+
+Install the optional dependency to use it: `pip install letta-evals[modal]`.
+See `docs/examples/modal-sandbox/` for a reference Dockerfile and example
+suite.
+
+### ⚠ BREAKING CHANGES — `target.sandbox` and `target.working_dir` removed
+
+The `sandbox: bool` and `working_dir: Path` fields on `LettaCodeTargetSpec`
+have been removed without a shim. They were a partial workaround for the
+same isolation problem the new suite-level `sandbox` field solves properly.
+
+**Migration:** delete these fields from your suite YAML. If you relied on
+`working_dir` to scope CLI writes, bake the working directory into your
+Modal image's `WORKDIR` (or run host-side from a directory of your choice).
+If you relied on `sandbox: true` for per-model isolation, switch to the
+suite-level `sandbox: { kind: modal, image: ... }` field, which creates a
+fresh container per sample.
+
 ### ⚠ BREAKING CHANGES — rubric grader redesign
 
 The `model_judge` and `letta_judge` graders now send the rubric **verbatim**

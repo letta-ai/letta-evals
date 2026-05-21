@@ -10,8 +10,8 @@ from rich.table import Table
 
 from letta_evals.datasets.loader import load_dataset
 from letta_evals.models import SuiteSpec
-from letta_evals.types import GateKind
 from letta_evals.runner import run_suite
+from letta_evals.types import GateKind
 from letta_evals.visualization.factory import ProgressStyle
 
 app = typer.Typer(help="Letta Evals - Evaluation framework for Letta AI agents")
