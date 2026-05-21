@@ -111,6 +111,41 @@ TargetSpec = Annotated[
 ]
 
 
+# Sandbox specs
+
+
+class ModalSandboxSpec(BaseModel):
+    """Modal sandbox execution configuration.
+
+    When attached to a :class:`SuiteSpec` via the ``sandbox`` field, every
+    sample executes inside a fresh Modal sandbox driven by the host runner.
+    """
+
+    kind: Literal["modal"] = "modal"
+    image: str = Field(description="Registry reference for the runtime image (project-specific)")
+    letta_evals_version: Optional[str] = Field(
+        default=None,
+        description=(
+            "If set, the runner asserts the image's ``letta-evals --version`` "
+            "matches at sandbox start to guard against SampleResult schema drift."
+        ),
+    )
+    secrets: List[str] = Field(default_factory=list, description="Names of pre-uploaded Modal Secrets to attach")
+    volumes: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of in-sandbox mount path -> Modal Volume name",
+    )
+    cpu: int = Field(default=2, description="vCPU count for the sandbox")
+    memory_mb: int = Field(default=2048, description="Memory in MiB for the sandbox")
+    timeout_sec: int = Field(default=1800, description="Hard sandbox timeout in seconds")
+    idle_timeout_sec: Optional[int] = Field(default=None, description="Idle timeout (seconds) before auto-termination")
+    block_network: bool = Field(default=False, description="If True, the sandbox is created without network access")
+    app_name: str = Field(default="letta-evals", description="Modal App name to attach sandboxes to")
+
+
+SandboxSpec = Annotated[ModalSandboxSpec, Field(discriminator="kind")]
+
+
 # Grader specs
 
 
@@ -373,6 +408,14 @@ class SuiteSpec(BaseModel):
 
     setup_script: Optional[str] = Field(
         default=None, description="Path to Python script with setup function (e.g., setup.py:prepare_evaluation)"
+    )
+
+    sandbox: Optional[ModalSandboxSpec] = Field(
+        default=None,
+        description=(
+            "Optional sandbox configuration. When set, every sample runs inside "
+            "a fresh per-sample sandbox. Only Modal is supported in v1."
+        ),
     )
 
     # internal field for path resolution

@@ -40,7 +40,9 @@ from letta_evals.models.specs import (
     LettaCodeTargetSpec,
     LettaJudgeGraderSpec,
     LogicalGateSpec,
+    ModalSandboxSpec,
     ModelJudgeGraderSpec,
+    SandboxSpec,
     SimpleCondition,
     SimpleGateSpec,
     SuiteSpec,
@@ -82,6 +84,9 @@ __all__ = [
     "WeightedAverageGateSpec",
     "LogicalGateSpec",
     "GateSpec",
+    # specs — sandbox
+    "ModalSandboxSpec",
+    "SandboxSpec",
     # specs — suite
     "SuiteSpec",
     # specs — gate helpers
