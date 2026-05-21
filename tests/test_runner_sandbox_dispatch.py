@@ -184,6 +184,28 @@ class TestRunSampleInSandbox:
         assert result.error is not None
         assert result.error.exception_type == "SandboxExecError"
 
+    def test_exec_timeout_returns_sandbox_timeout(self, tmp_path, monkeypatch):
+        """An exec returning -1 (Modal's exec-deadline sentinel) surfaces as a
+        SandboxTimeout (category=target), not a generic SandboxExecError."""
+        _write_suite_yaml(tmp_path)
+        runner = _make_runner_with_sandbox(tmp_path)
+        stub = _StubSandbox(exec_return_code=-1)
+        monkeypatch.setattr("letta_evals.sandbox.modal.ModalSandbox", lambda spec, session_id: stub)
+
+        sample = Sample(id="s1", input="hi", ground_truth="hi")
+        result = anyio.run(
+            runner._run_sample_in_sandbox,
+            sample,
+            "openai/gpt-a",
+            False,
+            0.0,
+        )
+
+        assert stub.stopped, "sandbox must be torn down on timeout"
+        assert result.error is not None
+        assert result.error.exception_type == "SandboxTimeout"
+        assert result.error.category.value == "target"
+
     def test_version_mismatch_short_circuits(self, tmp_path, monkeypatch):
         _write_suite_yaml(tmp_path)
         runner = _make_runner_with_sandbox(
