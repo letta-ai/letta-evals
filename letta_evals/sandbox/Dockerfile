@@ -1,9 +1,10 @@
 # Base runtime image for letta-evals Modal sandboxes.
 #
-# This is the image referenced by ModalSandboxSpec's default `image` value
-# (ghcr.io/letta-ai/letta-evals-runtime:latest). Suite authors only need
-# their own Dockerfile when they need extra system tools the agent invokes
-# (e.g. compilers, language toolchains, project-specific binaries).
+# When a suite sets `sandbox: { kind: modal }` without an `image`, the driver
+# builds this Dockerfile on demand via Modal's Image.from_dockerfile (the build
+# is cached, so only the first sandbox after an edit pays the build cost).
+# Suite authors only need their own image when they need extra system tools the
+# agent invokes (e.g. compilers, language toolchains, project-specific binaries).
 
 FROM python:3.12-slim
 
@@ -11,8 +12,11 @@ FROM python:3.12-slim
 # (e.g. envs/memory_update/extractors.py reading ~/.letta/agents/<id>/memory).
 # curl is used to install Node.js via NodeSource; ca-certificates so HTTPS
 # certificate verification works for the NodeSource setup script.
+# build-essential supplies make + a C/C++ toolchain so node-gyp can compile
+# @letta-ai/letta-code's native dependency (node-pty) during npm install.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        build-essential \
         ca-certificates \
         curl \
         git \

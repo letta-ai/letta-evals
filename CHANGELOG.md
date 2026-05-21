@@ -15,10 +15,11 @@ sandbox:
   memory_mb: 4096
 ```
 
-`image` is optional — when omitted, the runner uses the published base
-image `ghcr.io/letta-ai/letta-evals-runtime:latest`, which already
-carries `letta-evals` (pip) and `@letta-ai/letta-code` (npm). Override
-`image` only when the agent needs additional system tools.
+`image` is optional — when omitted, the driver builds the base image on
+demand from the bundled `letta_evals/sandbox/Dockerfile` (cached after the
+first build), which already carries `letta-evals` (pip) and
+`@letta-ai/letta-code` (npm). Override `image` with a pre-built registry
+reference only when the agent needs additional system tools.
 
 When `sandbox` is set, the runner uploads the entire suite directory tree
 to `/mnt/suite/` inside the sandbox, execs `letta-evals run --sample ...`,
@@ -26,8 +27,7 @@ and round-trips a single `SampleResult` per sample. Concurrency, progress
 callbacks, and JSONL output continue to work on the host as before.
 
 Install the optional dependency to use it: `pip install letta-evals[modal]`.
-See `docs/examples/modal-sandbox/` for a reference Dockerfile and example
-suite.
+See `docs/examples/modal-sandbox/` for an example suite.
 
 ### ⚠ BREAKING CHANGES — `target.sandbox` and `target.working_dir` removed
 
@@ -39,8 +39,8 @@ same isolation problem the new suite-level `sandbox` field solves properly.
 `working_dir` to scope CLI writes, bake the working directory into your
 Modal image's `WORKDIR` (or run host-side from a directory of your choice).
 If you relied on `sandbox: true` for per-model isolation, switch to the
-suite-level `sandbox: { kind: modal, image: ... }` field, which creates a
-fresh container per sample.
+suite-level `sandbox: { kind: modal }` field, which creates a fresh
+container per sample.
 
 ### ⚠ BREAKING CHANGES — rubric grader redesign
 

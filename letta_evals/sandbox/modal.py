@@ -67,7 +67,15 @@ class ModalSandbox(AbstractSandbox):
         _check_modal_auth()
 
         app = await modal.App.lookup.aio(name=self.spec.app_name, create_if_missing=True)
-        image = modal.Image.from_registry(self.spec.image)
+        if self.spec.image is None:
+            # Default: build the base image from the Dockerfile bundled with
+            # the package. Modal caches the build, so repeated sandboxes
+            # don't pay the full build cost — only the first sandbox after
+            # the Dockerfile changes does.
+            dockerfile_path = Path(__file__).parent / "Dockerfile"
+            image = modal.Image.from_dockerfile(str(dockerfile_path))
+        else:
+            image = modal.Image.from_registry(self.spec.image)
 
         secrets = [modal.Secret.from_name(name) for name in self.spec.secrets]
         volumes = {

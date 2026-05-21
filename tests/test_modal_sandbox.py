@@ -1,8 +1,8 @@
 """Unit tests for ModalSandboxSpec and the Modal sandbox driver.
 
 The live driver test is skipped unless Modal credentials are configured
-(MODAL_TOKEN_ID / MODAL_TOKEN_SECRET or ~/.modal.toml). It uses the
-default published base image — no per-test image config required.
+(MODAL_TOKEN_ID / MODAL_TOKEN_SECRET or ~/.modal.toml). It builds the
+bundled Dockerfile (the default image) — no per-test image config required.
 The spec-parsing tests do not touch Modal at all.
 """
 
@@ -12,7 +12,7 @@ import os
 
 import pytest
 
-from letta_evals.models import DEFAULT_MODAL_IMAGE, ModalSandboxSpec, SuiteSpec
+from letta_evals.models import ModalSandboxSpec, SuiteSpec
 from letta_evals.sandbox.base import ExecResult
 
 
@@ -39,11 +39,11 @@ def _minimal_suite_yaml(**sandbox_overrides):
 
 class TestModalSandboxSpec:
     def test_defaults(self):
-        """Image defaults to the published base runtime; everything else has
-        documented defaults so a minimal `sandbox: { kind: modal }` block works."""
+        """Image defaults to None (build from bundled Dockerfile); other
+        defaults let a minimal `sandbox: { kind: modal }` block work."""
         spec = ModalSandboxSpec()
         assert spec.kind == "modal"
-        assert spec.image == DEFAULT_MODAL_IMAGE
+        assert spec.image is None
         assert spec.cpu == 2
         assert spec.memory_mb == 2048
         assert spec.timeout_sec == 1800
@@ -57,8 +57,9 @@ class TestModalSandboxSpec:
         spec = ModalSandboxSpec(image="ghcr.io/custom/runtime:1.0")
         assert spec.image == "ghcr.io/custom/runtime:1.0"
 
-    def test_yaml_without_image_uses_default(self):
-        """A suite YAML can declare `sandbox: { kind: modal }` with no image."""
+    def test_yaml_without_image_leaves_image_unset(self):
+        """A suite YAML can declare `sandbox: { kind: modal }` with no image
+        — the driver builds from the bundled Dockerfile."""
         yaml_data = {
             "name": "u",
             "dataset": "s.jsonl",
@@ -69,7 +70,21 @@ class TestModalSandboxSpec:
         }
         suite = SuiteSpec.from_yaml(yaml_data)
         assert suite.sandbox is not None
-        assert suite.sandbox.image == DEFAULT_MODAL_IMAGE
+        assert suite.sandbox.image is None
+
+    def test_bundled_dockerfile_exists(self):
+        """The Dockerfile must ship with the package so Image.from_dockerfile
+        can resolve it when image is unset."""
+        from pathlib import Path
+
+        import letta_evals.sandbox as sandbox_pkg
+
+        dockerfile = Path(sandbox_pkg.__file__).parent / "Dockerfile"
+        assert dockerfile.is_file(), f"Bundled Dockerfile missing: {dockerfile}"
+        contents = dockerfile.read_text()
+        # Sanity-check the recipe carries both runtimes.
+        assert "letta-evals" in contents
+        assert "@letta-ai/letta-code" in contents
 
     def test_overrides(self):
         spec = ModalSandboxSpec(
@@ -149,16 +164,16 @@ class TestModalDriverLazyImport:
 class TestModalDriverLive:
     """Live driver test against the default base image.
 
-    Uses the default image (ghcr.io/letta-ai/letta-evals-runtime:latest)
-    so suite authors don't have to wire any project-specific image to
-    exercise this path.
+    Builds the bundled Dockerfile (letta_evals/sandbox/Dockerfile), the
+    default when `image` is unset, so suite authors don't have to wire any
+    project-specific image to exercise this path.
     """
 
     @pytest.mark.asyncio
     async def test_echo_round_trip(self):
         from letta_evals.sandbox.modal import ModalSandbox
 
-        # No image override: defaults to the published runtime.
+        # No image override: defaults to building the bundled Dockerfile.
         spec = ModalSandboxSpec(timeout_sec=120, cpu=1, memory_mb=512)
         sandbox = ModalSandbox(spec=spec, session_id="unit-echo")
         await sandbox.start()

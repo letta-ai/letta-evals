@@ -23,10 +23,11 @@ gate:
 # Modal sandbox; target + extractors + graders run inside it; the host
 # only sees the final SampleResult JSON.
 #
-# `image` is optional — when omitted, the runner uses the published
-# `ghcr.io/letta-ai/letta-evals-runtime:latest` base image, which carries
-# letta-evals (pip) and @letta-ai/letta-code (npm). Override `image`
-# only when you need extra system tools the agent invokes.
+# `image` is optional — when omitted, the driver builds the base image
+# on demand from the bundled letta_evals/sandbox/Dockerfile (cached after
+# the first build), which carries letta-evals (pip) and @letta-ai/letta-code
+# (npm). Override `image` only when you need extra system tools the agent
+# invokes.
 sandbox:
   kind: modal
   secrets:                                # named Modal Secrets, pre-uploaded

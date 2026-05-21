@@ -110,29 +110,28 @@ TargetSpec = Annotated[
 # Sandbox specs
 
 
-# Default base image: built and published by letta-evals. Carries the letta-evals
-# Python package and the @letta-ai/letta-code npm CLI so a suite-level
-# `sandbox: { kind: modal }` works out of the box without the suite author
-# building anything. Override `image` only when the suite needs additional
-# runtime (e.g. extra system tools the agent invokes via Bash).
-DEFAULT_MODAL_IMAGE = "ghcr.io/letta-ai/letta-evals-runtime:latest"
-
-
 class ModalSandboxSpec(BaseModel):
     """Modal sandbox execution configuration.
 
     When attached to a :class:`SuiteSpec` via the ``sandbox`` field, every
     sample executes inside a fresh Modal sandbox driven by the host runner.
+
+    When ``image`` is unset (the default), the driver builds the sandbox
+    image from the Dockerfile bundled at ``letta_evals/sandbox/Dockerfile``
+    via Modal's ``Image.from_dockerfile``. The bundled recipe carries the
+    ``letta-evals`` Python package and the ``@letta-ai/letta-code`` npm
+    CLI, so no registry publishing is required for the common case.
     """
 
     kind: Literal["modal"] = "modal"
-    image: str = Field(
-        default=DEFAULT_MODAL_IMAGE,
+    image: Optional[str] = Field(
+        default=None,
         description=(
-            "Registry reference for the runtime image. Defaults to the "
-            "letta-evals-published base image which carries letta-evals "
-            "(pip) and @letta-ai/letta-code (npm). Override for project-"
-            "specific runtimes."
+            "Optional registry reference for the runtime image. When unset, "
+            "the driver builds an image from the bundled Dockerfile "
+            "(letta_evals/sandbox/Dockerfile) via Modal's Image.from_dockerfile. "
+            "Set this to point at a pre-built registry image when you need "
+            "extra runtime your derived image already ships with."
         ),
     )
     letta_evals_version: Optional[str] = Field(

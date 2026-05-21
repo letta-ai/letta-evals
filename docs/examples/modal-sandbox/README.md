@@ -11,10 +11,12 @@ sandbox:
   memory_mb: 4096
 ```
 
-`image` is optional. When unset, the runner uses the published base
-image `ghcr.io/letta-ai/letta-evals-runtime:latest`, which carries
-`letta-evals` (pip) and `@letta-ai/letta-code` (npm). Override `image`
-only when you need additional system tools the agent invokes.
+`image` is optional. When unset, the driver builds the base image on
+demand from the Dockerfile bundled at `letta_evals/sandbox/Dockerfile`
+via Modal's `Image.from_dockerfile` — it carries `letta-evals` (pip) and
+`@letta-ai/letta-code` (npm), and the build is cached so only the first
+sandbox after an edit pays the build cost. Override `image` only when you
+need additional system tools the agent invokes.
 
 The orchestrator (`letta-evals run`) keeps running on your host — same
 sample loop, same `max_concurrent`, same JSONL output, same gate
@@ -48,19 +50,20 @@ final `SampleResult` JSON back.
    in-sandbox processes need (`LETTA_API_KEY`, judge model keys, etc.).
 
 4. **Reference the secrets in your suite YAML.** See `suite.yaml` in
-   this directory. The default base image already carries `letta-evals`
+   this directory. The bundled base image already carries `letta-evals`
    and `@letta-ai/letta-code`, so most suites won't need a custom image.
 
 ### Building a custom image (optional)
 
 If your agent invokes system tools the base image doesn't ship with
 (compilers, language toolchains, project-specific binaries), build a
-derived image and reference it via `sandbox.image`. The reference
-`Dockerfile` in this directory is the base image's recipe — start from
-it and add what you need:
+derived image and reference it via `sandbox.image`. The bundled base
+recipe at `letta_evals/sandbox/Dockerfile` is a good starting point —
+copy it and add what you need:
 
 ```dockerfile
-FROM ghcr.io/letta-ai/letta-evals-runtime:latest
+FROM python:3.12-slim
+# ... letta-evals + @letta-ai/letta-code (see letta_evals/sandbox/Dockerfile) ...
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential rustc \
     && rm -rf /var/lib/apt/lists/*
