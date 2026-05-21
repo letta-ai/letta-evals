@@ -135,12 +135,11 @@ class ModalSandbox(AbstractSandbox):
     async def upload_file(self, local: Path, remote: str) -> None:
         if self._sandbox is None:
             raise RuntimeError("Sandbox not started — call start() first")
-        with open(local, "rb") as src:
-            data = src.read()
-        # open.aio(...) is a coroutine returning the FileIO handle; await it
-        # before entering the async context manager.
-        async with await self._sandbox.open.aio(remote, "wb") as dst:
-            await dst.write.aio(data)
+        # filesystem.copy_from_local streams the file in chunks; it's the
+        # supported API now that Sandbox.open()/FileIO are deprecated. The
+        # remote parent dir must already exist (it does: /tmp for the suite
+        # tarball, /mnt after upload_dir's mkdir for sample.json).
+        await self._sandbox.filesystem.copy_from_local.aio(str(local), remote)
 
     async def upload_dir(self, local: Path, remote: str) -> None:
         """Tar up ``local`` on the host, stream into the sandbox, extract at ``remote``.
@@ -175,11 +174,8 @@ class ModalSandbox(AbstractSandbox):
     async def download_file(self, remote: str, local: Path) -> None:
         if self._sandbox is None:
             raise RuntimeError("Sandbox not started — call start() first")
-        async with await self._sandbox.open.aio(remote, "rb") as src:
-            data = await src.read.aio()
         local.parent.mkdir(parents=True, exist_ok=True)
-        with open(local, "wb") as dst:
-            dst.write(data)
+        await self._sandbox.filesystem.copy_to_local.aio(remote, str(local))
 
     async def stop(self) -> None:
         if self._sandbox is None:
