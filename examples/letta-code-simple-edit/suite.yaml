@@ -12,7 +12,6 @@ target:
   max_retries: 3
   model_handles:
     - anthropic/claude-sonnet-4-5-20250929
-    - gpt-5-low
 
 graders:
   bug_fix_check:
@@ -25,3 +24,17 @@ gate:
   aggregation: avg_score
   op: gte
   value: 0.75
+
+# Run every sample inside a fresh Modal sandbox: the letta-code agent edits
+# the buggy file and the grader executes the fixed file, all in-sandbox. The
+# whole suite directory (including the staged sandbox/ files) is uploaded to
+# /mnt/suite, and the in-sandbox CLI runs from there so the agent's cwd holds
+# sandbox/task_*.py. Requires the `letta-api-key` Modal Secret (LETTA_API_KEY).
+sandbox:
+  kind: modal
+  secrets:
+    - letta-api-key
+  cpu: 2
+  memory_mb: 4096
+  timeout_sec: 1800
+  block_network: false
