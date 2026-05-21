@@ -8,13 +8,34 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
+from letta_evals import __version__
 from letta_evals.datasets.loader import load_dataset
-from letta_evals.models import GateKind, SuiteSpec
+from letta_evals.models import SuiteSpec
 from letta_evals.runner import run_suite
+from letta_evals.types import GateKind
 from letta_evals.visualization.factory import ProgressStyle
 
 app = typer.Typer(help="Letta Evals - Evaluation framework for Letta AI agents")
 console = Console()
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        console.print(f"letta-evals {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show the letta-evals version and exit.",
+    ),
+) -> None:
+    """Letta Evals - Evaluation framework for Letta AI agents."""
 
 
 @app.command()
