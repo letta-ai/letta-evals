@@ -22,10 +22,13 @@ gate:
 # Per-sample isolated execution. Each sample dispatches into a fresh
 # Modal sandbox; target + extractors + graders run inside it; the host
 # only sees the final SampleResult JSON.
+#
+# `image` is optional — when omitted, the runner uses the published
+# `ghcr.io/letta-ai/letta-evals-runtime:latest` base image, which carries
+# letta-evals (pip) and @letta-ai/letta-code (npm). Override `image`
+# only when you need extra system tools the agent invokes.
 sandbox:
   kind: modal
-  image: ghcr.io/your-org/letta-evals-runtime:0.17.0
-  letta_evals_version: "0.17.0"           # asserted against the image at start
   secrets:                                # named Modal Secrets, pre-uploaded
     - letta-api-key
     - openai-key

@@ -32,6 +32,7 @@ from letta_evals.models.results import (
 )
 from letta_evals.models.sample import Sample, SampleId
 from letta_evals.models.specs import (
+    DEFAULT_MODAL_IMAGE,
     BaseGraderSpec,
     BaseTargetSpec,
     GateSpec,
@@ -87,6 +88,7 @@ __all__ = [
     # specs — sandbox
     "ModalSandboxSpec",
     "SandboxSpec",
+    "DEFAULT_MODAL_IMAGE",
     # specs — suite
     "SuiteSpec",
     # specs — gate helpers

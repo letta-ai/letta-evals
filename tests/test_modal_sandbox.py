@@ -1,8 +1,9 @@
 """Unit tests for ModalSandboxSpec and the Modal sandbox driver.
 
-The live driver test is skipped unless MODAL_TOKEN_ID and MODAL_TOKEN_SECRET
-are set, and a test image is reachable. The spec-parsing tests do not touch
-Modal at all.
+The live driver test is skipped unless Modal credentials are configured
+(MODAL_TOKEN_ID / MODAL_TOKEN_SECRET or ~/.modal.toml). It uses the
+default published base image — no per-test image config required.
+The spec-parsing tests do not touch Modal at all.
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ import os
 
 import pytest
 
-from letta_evals.models import ModalSandboxSpec, SuiteSpec
+from letta_evals.models import DEFAULT_MODAL_IMAGE, ModalSandboxSpec, SuiteSpec
 from letta_evals.sandbox.base import ExecResult
 
 
@@ -38,9 +39,11 @@ def _minimal_suite_yaml(**sandbox_overrides):
 
 class TestModalSandboxSpec:
     def test_defaults(self):
-        spec = ModalSandboxSpec(image="img:latest")
+        """Image defaults to the published base runtime; everything else has
+        documented defaults so a minimal `sandbox: { kind: modal }` block works."""
+        spec = ModalSandboxSpec()
         assert spec.kind == "modal"
-        assert spec.image == "img:latest"
+        assert spec.image == DEFAULT_MODAL_IMAGE
         assert spec.cpu == 2
         assert spec.memory_mb == 2048
         assert spec.timeout_sec == 1800
@@ -49,6 +52,24 @@ class TestModalSandboxSpec:
         assert spec.secrets == []
         assert spec.volumes == {}
         assert spec.letta_evals_version is None
+
+    def test_image_override(self):
+        spec = ModalSandboxSpec(image="ghcr.io/custom/runtime:1.0")
+        assert spec.image == "ghcr.io/custom/runtime:1.0"
+
+    def test_yaml_without_image_uses_default(self):
+        """A suite YAML can declare `sandbox: { kind: modal }` with no image."""
+        yaml_data = {
+            "name": "u",
+            "dataset": "s.jsonl",
+            "target": {"kind": "letta_agent", "agent_id": "a"},
+            "graders": {"g": {"kind": "tool", "function": "exact_match"}},
+            "gate": {"kind": "simple", "metric_key": "g", "op": "gte", "value": 1.0},
+            "sandbox": {"kind": "modal"},
+        }
+        suite = SuiteSpec.from_yaml(yaml_data)
+        assert suite.sandbox is not None
+        assert suite.sandbox.image == DEFAULT_MODAL_IMAGE
 
     def test_overrides(self):
         spec = ModalSandboxSpec(
@@ -113,26 +134,32 @@ class TestModalDriverLazyImport:
 
 
 @pytest.mark.skipif(
+    not os.getenv("LETTA_EVALS_LIVE_MODAL_TESTS"),
+    reason=(
+        "Live Modal driver tests are opt-in (they pull a real image and "
+        "create a real sandbox). Set LETTA_EVALS_LIVE_MODAL_TESTS=1 to run."
+    ),
+)
+@pytest.mark.skipif(
     not (os.getenv("MODAL_TOKEN_ID") and os.getenv("MODAL_TOKEN_SECRET")) and not os.path.exists(
         os.path.expanduser("~/.modal.toml")
     ),
     reason="Modal credentials not configured",
 )
-@pytest.mark.skipif(
-    not os.getenv("LETTA_EVALS_MODAL_TEST_IMAGE"),
-    reason="Set LETTA_EVALS_MODAL_TEST_IMAGE to a reachable image to run live driver tests",
-)
 class TestModalDriverLive:
+    """Live driver test against the default base image.
+
+    Uses the default image (ghcr.io/letta-ai/letta-evals-runtime:latest)
+    so suite authors don't have to wire any project-specific image to
+    exercise this path.
+    """
+
     @pytest.mark.asyncio
     async def test_echo_round_trip(self):
         from letta_evals.sandbox.modal import ModalSandbox
 
-        spec = ModalSandboxSpec(
-            image=os.environ["LETTA_EVALS_MODAL_TEST_IMAGE"],
-            timeout_sec=120,
-            cpu=1,
-            memory_mb=512,
-        )
+        # No image override: defaults to the published runtime.
+        spec = ModalSandboxSpec(timeout_sec=120, cpu=1, memory_mb=512)
         sandbox = ModalSandbox(spec=spec, session_id="unit-echo")
         await sandbox.start()
         try:

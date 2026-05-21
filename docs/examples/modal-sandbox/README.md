@@ -6,11 +6,15 @@ your suite YAML:
 ```yaml
 sandbox:
   kind: modal
-  image: ghcr.io/your-org/letta-evals-runtime:0.17.0
   secrets: [letta-api-key, openai-key]
   cpu: 2
   memory_mb: 4096
 ```
+
+`image` is optional. When unset, the runner uses the published base
+image `ghcr.io/letta-ai/letta-evals-runtime:latest`, which carries
+`letta-evals` (pip) and `@letta-ai/letta-code` (npm). Override `image`
+only when you need additional system tools the agent invokes.
 
 The orchestrator (`letta-evals run`) keeps running on your host — same
 sample loop, same `max_concurrent`, same JSONL output, same gate
@@ -39,26 +43,31 @@ final `SampleResult` JSON back.
 2. **Authenticate to Modal.** Either run `modal token new` or set
    `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`.
 
-3. **Build and push the runtime image.** The image is project-specific —
-   it carries the *runtime*, not the suite itself. A minimal example
-   lives at `Dockerfile` in this directory:
-
-   ```dockerfile
-   FROM python:3.12-slim
-   RUN apt-get update && apt-get install -y --no-install-recommends git \
-       && rm -rf /var/lib/apt/lists/*
-   RUN pip install --no-cache-dir letta-evals==0.17.0 letta-client
-   # project-specific: letta CLI, agent binaries, OS packages, etc.
-   ```
-
-   Push it to any registry Modal can reach.
-
-4. **Upload Modal Secrets.** Each name in `sandbox.secrets` must
+3. **Upload Modal Secrets.** Each name in `sandbox.secrets` must
    correspond to a pre-uploaded Modal Secret containing the env vars the
    in-sandbox processes need (`LETTA_API_KEY`, judge model keys, etc.).
 
-5. **Reference the image and secrets in your suite YAML.** See
-   `suite.yaml` in this directory.
+4. **Reference the secrets in your suite YAML.** See `suite.yaml` in
+   this directory. The default base image already carries `letta-evals`
+   and `@letta-ai/letta-code`, so most suites won't need a custom image.
+
+### Building a custom image (optional)
+
+If your agent invokes system tools the base image doesn't ship with
+(compilers, language toolchains, project-specific binaries), build a
+derived image and reference it via `sandbox.image`. The reference
+`Dockerfile` in this directory is the base image's recipe — start from
+it and add what you need:
+
+```dockerfile
+FROM ghcr.io/letta-ai/letta-evals-runtime:latest
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential rustc \
+    && rm -rf /var/lib/apt/lists/*
+```
+
+Then push to any registry Modal can reach and set
+`sandbox.image: <your-registry>/<your-image>:<tag>` in the suite YAML.
 
 ## What the runner uploads per sample
 
@@ -113,7 +122,6 @@ target:
   kind: letta_code
 sandbox:
   kind: modal
-  image: ghcr.io/your-org/letta-evals-runtime:0.17.0
 ```
 
 The image's `WORKDIR` (set in the Dockerfile) replaces the role of

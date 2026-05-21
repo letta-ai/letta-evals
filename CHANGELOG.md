@@ -10,11 +10,15 @@ adding a top-level `sandbox` field to the suite YAML:
 ```yaml
 sandbox:
   kind: modal
-  image: my-org/letta-evals-runtime:0.17.0
   secrets: [letta-api-key, openai-key]
   cpu: 2
   memory_mb: 4096
 ```
+
+`image` is optional — when omitted, the runner uses the published base
+image `ghcr.io/letta-ai/letta-evals-runtime:latest`, which already
+carries `letta-evals` (pip) and `@letta-ai/letta-code` (npm). Override
+`image` only when the agent needs additional system tools.
 
 When `sandbox` is set, the runner uploads the entire suite directory tree
 to `/mnt/suite/` inside the sandbox, execs `letta-evals run --sample ...`,

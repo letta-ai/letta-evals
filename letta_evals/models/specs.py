@@ -110,6 +110,14 @@ TargetSpec = Annotated[
 # Sandbox specs
 
 
+# Default base image: built and published by letta-evals. Carries the letta-evals
+# Python package and the @letta-ai/letta-code npm CLI so a suite-level
+# `sandbox: { kind: modal }` works out of the box without the suite author
+# building anything. Override `image` only when the suite needs additional
+# runtime (e.g. extra system tools the agent invokes via Bash).
+DEFAULT_MODAL_IMAGE = "ghcr.io/letta-ai/letta-evals-runtime:latest"
+
+
 class ModalSandboxSpec(BaseModel):
     """Modal sandbox execution configuration.
 
@@ -118,7 +126,15 @@ class ModalSandboxSpec(BaseModel):
     """
 
     kind: Literal["modal"] = "modal"
-    image: str = Field(description="Registry reference for the runtime image (project-specific)")
+    image: str = Field(
+        default=DEFAULT_MODAL_IMAGE,
+        description=(
+            "Registry reference for the runtime image. Defaults to the "
+            "letta-evals-published base image which carries letta-evals "
+            "(pip) and @letta-ai/letta-code (npm). Override for project-"
+            "specific runtimes."
+        ),
+    )
     letta_evals_version: Optional[str] = Field(
         default=None,
         description=(
