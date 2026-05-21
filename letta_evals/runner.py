@@ -696,7 +696,13 @@ class Runner:
 
             import shlex as _shlex
 
-            command = " ".join(_shlex.quote(p) for p in cmd_parts)
+            # Run from the uploaded suite root so the in-sandbox cwd matches
+            # `letta-evals run suite.yaml` invoked from the suite directory on
+            # the host. Working-dir-relative files — e.g. a letta_code target
+            # editing local task files staged by setup_script — then resolve
+            # under /mnt/suite (the letta_code target uses Path.cwd()).
+            inner_command = " ".join(_shlex.quote(p) for p in cmd_parts)
+            command = f"cd /mnt/suite && {inner_command}"
 
             # Per-exec env mirrors host env vars that the in-sandbox CLI
             # expects. Named Modal Secrets supply API keys; we don't inline

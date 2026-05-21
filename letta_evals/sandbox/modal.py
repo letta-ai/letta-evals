@@ -137,7 +137,9 @@ class ModalSandbox(AbstractSandbox):
             raise RuntimeError("Sandbox not started — call start() first")
         with open(local, "rb") as src:
             data = src.read()
-        async with self._sandbox.open.aio(remote, "wb") as dst:
+        # open.aio(...) is a coroutine returning the FileIO handle; await it
+        # before entering the async context manager.
+        async with await self._sandbox.open.aio(remote, "wb") as dst:
             await dst.write.aio(data)
 
     async def upload_dir(self, local: Path, remote: str) -> None:
@@ -173,7 +175,7 @@ class ModalSandbox(AbstractSandbox):
     async def download_file(self, remote: str, local: Path) -> None:
         if self._sandbox is None:
             raise RuntimeError("Sandbox not started — call start() first")
-        async with self._sandbox.open.aio(remote, "rb") as src:
+        async with await self._sandbox.open.aio(remote, "rb") as src:
             data = await src.read.aio()
         local.parent.mkdir(parents=True, exist_ok=True)
         with open(local, "wb") as dst:
