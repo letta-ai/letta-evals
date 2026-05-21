@@ -2,6 +2,56 @@
 
 ## Unreleased
 
+### Modal sandboxes for per-sample execution
+
+Suites can opt into running every sample inside a fresh Modal sandbox by
+adding a top-level `sandbox` field to the suite YAML:
+
+```yaml
+sandbox:
+  kind: modal
+  secrets: [letta-api-key, openai-key]
+  cpu: 2
+  memory_mb: 4096
+```
+
+`image` is optional — when omitted, the driver builds the base image on
+demand from the bundled `letta_evals/sandbox/Dockerfile` (cached after the
+first build), which already carries `letta-evals` (pip) and
+`@letta-ai/letta-code` (npm). Override `image` with a pre-built registry
+reference only when the agent needs additional system tools.
+
+When `sandbox` is set, the runner uploads the entire suite directory tree
+to `/mnt/suite/` inside the sandbox, execs `letta-evals run --sample ...`,
+and round-trips a single `SampleResult` per sample. Concurrency, progress
+callbacks, and JSONL output continue to work on the host as before.
+
+**Secrets.** API keys reach the sandbox automatically: the runner forwards an
+allowlist of host environment variables — `LETTA_API_KEY` and common
+model-provider keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`,
+`GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `TINKER_API_KEY`) — whenever they're present, and
+`letta-evals run` now auto-loads `./.env` into the host process at startup. Add
+`forward_env: [NAME, ...]` to forward extra variables, or `secrets: [name, ...]`
+to attach pre-created named Modal Secrets (preferred for shared/CI use). Only
+allowlisted names are forwarded — never the whole environment.
+
+The Modal SDK ships as a base dependency, so `pip install letta-evals` is all
+you need to drive sandboxes. See `docs/examples/modal-sandbox/` for an example
+suite.
+
+### ⚠ BREAKING CHANGES — `target.sandbox` and `target.working_dir` removed
+
+The `sandbox: bool` and `working_dir: Path` fields on `LettaCodeTargetSpec`
+have been removed without a shim. They were a partial workaround for the
+same isolation problem the new suite-level `sandbox` field solves properly.
+
+**Migration:** delete these fields from your suite YAML. If you relied on
+`working_dir` to scope CLI writes, bake the working directory into your
+Modal image's `WORKDIR` (or run host-side from a directory of your choice).
+If you relied on `sandbox: true` for per-model isolation, switch to the
+suite-level `sandbox: { kind: modal }` field, which creates a fresh
+container per sample.
+
 ### Fixed — `letta-evals` CLI failed to import
 
 `cli.py` imported `GateKind` from `letta_evals.models`, but #254 moved it

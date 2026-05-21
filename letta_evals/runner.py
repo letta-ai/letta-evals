@@ -66,6 +66,20 @@ logger = logging.getLogger(__name__)
 # Sentinel model identifier used when a suite has no model_configs/model_handles.
 DEFAULT_MODEL_ID = "default"
 
+# Host env vars auto-forwarded into a Modal sandbox (when present) so the
+# in-sandbox target/graders can authenticate without pre-creating Modal
+# Secrets. Only these explicit names are forwarded — never the whole env.
+# Suite authors extend this via `sandbox.forward_env`. See _run_sample_in_sandbox.
+DEFAULT_SANDBOX_FORWARD_ENV = (
+    "LETTA_API_KEY",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GOOGLE_API_KEY",
+    "GEMINI_API_KEY",
+    "OPENROUTER_API_KEY",
+    "TINKER_API_KEY",
+)
+
 
 def _extract_model_name(llm_config) -> Optional[str]:
     """Extract model name from LlmConfig object or string handle."""
@@ -235,8 +249,6 @@ class Runner:
             return LettaCodeTarget(
                 client=self.client,
                 model_handle=model_handle,
-                working_dir=self.suite.target.working_dir,
-                sandbox=self.suite.target.sandbox,
                 allowed_tools=self.suite.target.allowed_tools,
                 disallowed_tools=self.suite.target.disallowed_tools,
                 timeout=int(self.suite.target.timeout),
@@ -573,6 +585,255 @@ class Runner:
 
         return None
 
+    # ── sandbox dispatch ──
+
+    async def _run_sample_in_sandbox(
+        self,
+        sample: Sample,
+        llm_config: Optional[LlmConfig | str],
+        return_token_data: bool,
+        t_sample_start: float,
+    ) -> SampleResult:
+        """Dispatch a single sample to a fresh Modal sandbox.
+
+        Creates a sandbox, uploads the whole suite directory tree to
+        /mnt/suite/, execs the in-sandbox ``letta-evals run --sample``
+        invocation, and round-trips the resulting SampleResult JSON. The
+        sandbox is torn down in a finally block.
+
+        v1 contract: the host only sees the final SampleResult per sample.
+        Mid-sample progress callbacks (``grading_started``, per-step token
+        streaming) are not emitted. Sandbox-internal stdout/stderr surface
+        only on nonzero return code (wrapped into ``Error``).
+        """
+        import uuid
+
+        from letta_evals.models import Sample as _Sample
+        from letta_evals.sandbox.modal import ModalSandbox
+
+        sample_id = sample.id
+        session_id = f"{self.suite.name}-{sample_id}-{uuid.uuid4().hex[:8]}"
+
+        if self.suite.base_dir is None:
+            return SampleResult(
+                sample_id=sample_id,
+                trajectory=[],
+                submissions={},
+                grades={},
+                timing=Timing(total=time.perf_counter() - t_sample_start, target=0.0),
+                error=Error(
+                    category=ErrorCategory.UNKNOWN,
+                    exception_type="SuiteConfigurationError",
+                    message="SuiteSpec.base_dir is unset — required for sandbox execution.",
+                ),
+            )
+
+        sandbox = ModalSandbox(self.suite.sandbox, session_id=session_id)
+        try:
+            try:
+                await sandbox.start()
+            except Exception as e:
+                logger.error(f"Sandbox start failed for sample {sample_id}: {e}")
+                return SampleResult(
+                    sample_id=sample_id,
+                    trajectory=[],
+                    submissions={},
+                    grades={},
+                    timing=Timing(total=time.perf_counter() - t_sample_start, target=0.0),
+                    error=Error(
+                        category=ErrorCategory.TARGET,
+                        exception_type=type(e).__name__,
+                        message=str(e) or type(e).__name__,
+                    ),
+                )
+
+            logger.info("Sandbox %s started for sample %s", sandbox.sandbox_id, sample_id)
+
+            # Version check (if pinned in the spec).
+            if self.suite.sandbox.letta_evals_version:
+                version_check = await sandbox.exec("letta-evals --version")
+                expected = self.suite.sandbox.letta_evals_version
+                if version_check.return_code != 0 or expected not in (version_check.stdout + version_check.stderr):
+                    return SampleResult(
+                        sample_id=sample_id,
+                        trajectory=[],
+                        submissions={},
+                        grades={},
+                        timing=Timing(total=time.perf_counter() - t_sample_start, target=0.0),
+                        error=Error(
+                            category=ErrorCategory.UNKNOWN,
+                            exception_type="VersionMismatch",
+                            message=(
+                                f"Sandbox image's letta-evals version does not match "
+                                f"pinned '{expected}': {version_check.stdout.strip() or version_check.stderr.strip()}"
+                            ),
+                        ),
+                    )
+
+            # Upload the entire suite tree to /mnt/suite (matches relative-path
+            # resolution on the host).
+            await sandbox.upload_dir(self.suite.base_dir, "/mnt/suite")
+
+            # Upload the single sample.
+            import json as _json
+            import tempfile
+
+            with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp:
+                # Pydantic v2: round-trip through model_dump_json for accurate types.
+                tmp.write(_Sample.model_validate(sample.model_dump()).model_dump_json())
+                tmp_path = Path(tmp.name)
+            try:
+                await sandbox.upload_file(tmp_path, "/mnt/sample.json")
+            finally:
+                tmp_path.unlink(missing_ok=True)
+
+            # Build the in-sandbox CLI invocation.
+            suite_yaml_remote = f"/mnt/suite/{self._suite_yaml_filename()}"
+            cmd_parts = [
+                "letta-evals",
+                "run",
+                suite_yaml_remote,
+                "--sample",
+                "/mnt/sample.json",
+                "--output-json",
+                "/mnt/result.json",
+            ]
+            if isinstance(llm_config, str):
+                cmd_parts += ["--model-handle", llm_config]
+            elif isinstance(llm_config, LlmConfig) and getattr(llm_config, "model", None):
+                # Best-effort: pass the model as a handle. If the suite uses
+                # model_configs (file-backed), suite authors should pre-bake
+                # them into the image and pass the config name explicitly.
+                cmd_parts += ["--model-handle", llm_config.model]
+
+            import shlex as _shlex
+
+            # Run from the uploaded suite root so the in-sandbox cwd matches
+            # `letta-evals run suite.yaml` invoked from the suite directory on
+            # the host. Working-dir-relative files — e.g. a letta_code target
+            # editing local task files staged by setup_script — then resolve
+            # under /mnt/suite (the letta_code target uses Path.cwd()).
+            inner_command = " ".join(_shlex.quote(p) for p in cmd_parts)
+            command = f"cd /mnt/suite && {inner_command}"
+
+            # Forward an explicit allowlist of host env vars (API keys etc.)
+            # into the sandbox so the in-sandbox target/graders authenticate
+            # without pre-creating Modal Secrets. Only listed names are sent —
+            # never the whole environment. Named Modal Secrets (sandbox.secrets)
+            # still apply on top for shared/CI use.
+            exec_env: Dict[str, str] = {}
+            forward_names = list(DEFAULT_SANDBOX_FORWARD_ENV) + list(self.suite.sandbox.forward_env or [])
+            for _name in forward_names:
+                _val = os.environ.get(_name)
+                if _val is not None:
+                    exec_env[_name] = _val
+            if exec_env:
+                logger.debug("Forwarding env vars to sandbox %s: %s", sandbox.sandbox_id, sorted(exec_env))
+
+            exec_timeout = self.suite.sandbox.timeout_sec
+            result_exec = await sandbox.exec(command, env=exec_env, timeout_sec=exec_timeout)
+
+            if result_exec.return_code != 0:
+                msg = (result_exec.stderr or result_exec.stdout or "sandbox exec returned non-zero").strip()
+                category = (
+                    ErrorCategory.GRADING
+                    if "grading" in msg.lower() or "rubric" in msg.lower()
+                    else ErrorCategory.TARGET
+                )
+                logger.error(
+                    "Sandbox %s exec failed for sample %s rc=%d: %s",
+                    sandbox.sandbox_id,
+                    sample_id,
+                    result_exec.return_code,
+                    msg[:1000],
+                )
+                return SampleResult(
+                    sample_id=sample_id,
+                    trajectory=[],
+                    submissions={},
+                    grades={},
+                    timing=Timing(total=time.perf_counter() - t_sample_start, target=0.0),
+                    error=Error(
+                        category=category,
+                        exception_type="SandboxExecError",
+                        message=msg,
+                    ),
+                )
+
+            # Pull the result JSON back.
+            with tempfile.NamedTemporaryFile("rb", suffix=".json", delete=False) as tmp_r:
+                local_result_path = Path(tmp_r.name)
+            try:
+                try:
+                    await sandbox.download_file("/mnt/result.json", local_result_path)
+                except Exception as e:
+                    return SampleResult(
+                        sample_id=sample_id,
+                        trajectory=[],
+                        submissions={},
+                        grades={},
+                        timing=Timing(total=time.perf_counter() - t_sample_start, target=0.0),
+                        error=Error(
+                            category=ErrorCategory.UNKNOWN,
+                            exception_type="ResultDeserializationError",
+                            message=f"Failed to download result: {e}",
+                        ),
+                    )
+
+                try:
+                    with open(local_result_path, "r") as f:
+                        result_data = _json.load(f)
+                    sample_result = SampleResult.model_validate(result_data)
+                except Exception as e:
+                    return SampleResult(
+                        sample_id=sample_id,
+                        trajectory=[],
+                        submissions={},
+                        grades={},
+                        timing=Timing(total=time.perf_counter() - t_sample_start, target=0.0),
+                        error=Error(
+                            category=ErrorCategory.UNKNOWN,
+                            exception_type="ResultDeserializationError",
+                            message=f"Failed to parse result JSON: {e}",
+                        ),
+                    )
+            finally:
+                local_result_path.unlink(missing_ok=True)
+
+            logger.info(
+                "Sandbox %s completed sample %s in %.2fs",
+                sandbox.sandbox_id,
+                sample_id,
+                time.perf_counter() - t_sample_start,
+            )
+            return sample_result
+        finally:
+            try:
+                await sandbox.stop()
+            except Exception as e:
+                logger.warning("Failed to terminate sandbox %s: %s", sandbox.sandbox_id, e)
+
+    def _suite_yaml_filename(self) -> str:
+        """Locate the suite YAML inside ``base_dir`` so we can reference it remotely.
+
+        Convention: the suite file lives directly inside ``base_dir`` (this is
+        how ``run_suite`` sets ``base_dir = suite_path.parent``). We pick the
+        first ``*.yaml``/``*.yml`` whose contents reference ``name: <suite.name>``
+        to avoid guessing the filename, falling back to a wildcard glob.
+        """
+        # The runner only stores base_dir, not the original filename. Most
+        # users name it suite.yaml; we glob to support alternatives.
+        base = self.suite.base_dir
+        if base is None:
+            return "suite.yaml"
+        candidates = sorted(list(base.glob("*.yaml")) + list(base.glob("*.yml")))
+        if not candidates:
+            return "suite.yaml"
+        # Prefer files whose name starts with 'suite'.
+        suite_like = [p for p in candidates if p.name.startswith("suite")]
+        chosen = suite_like[0] if suite_like else candidates[0]
+        return chosen.name
+
     # ── per-sample driver ──
 
     async def run_sample(
@@ -593,6 +854,39 @@ class Runner:
             try:  # noqa: SIM105 — outer try/finally for agent cleanup
                 if self.progress_callback:
                     await self.progress_callback.sample_started(sample_id, model_name=model_name)
+
+                if self.suite.sandbox is not None:
+                    result = await self._run_sample_in_sandbox(sample, llm_config, return_token_data, t_sample_start)
+                    # Fire post-completion callbacks based on the final result —
+                    # mid-sample events (grading_started, token streaming) are
+                    # not emitted in v1 because the host only sees the final
+                    # SampleResult JSON.
+                    if self.progress_callback:
+                        cost = result.usage.cost if (result.usage and result.usage.cost) else None
+                        if result.error is not None:
+                            await self.progress_callback.sample_error(
+                                sample_id,
+                                result.error.message,
+                                agent_id=result.agent_id,
+                                model_name=model_name,
+                                target_cost=cost,
+                            )
+                        else:
+                            primary_score = next(iter(result.grades.values())).score if result.grades else 0.0
+                            primary_rationale = next(iter(result.grades.values())).rationale if result.grades else None
+                            metric_scores = {k: v.score for k, v in result.grades.items()}
+                            metric_rationales = {k: (v.rationale or "") for k, v in result.grades.items()}
+                            await self.progress_callback.sample_completed(
+                                sample_id,
+                                agent_id=result.agent_id,
+                                score=primary_score,
+                                target_cost=cost,
+                                model_name=model_name,
+                                metric_scores=metric_scores,
+                                rationale=primary_rationale,
+                                metric_rationales=metric_rationales,
+                            )
+                    return result
 
                 phase = ErrorCategory.TARGET
                 retrieve_agent_state = self._requires_agent_state()

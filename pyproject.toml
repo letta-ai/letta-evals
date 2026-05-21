@@ -33,6 +33,7 @@ dependencies = [
     "anthropic>=0.80.0",
     "google-genai>=1.0.0",
     "python-dotenv>=1.0.0",
+    "modal>=0.65.0",
     "anyio==4.10.0",
     "pandas>=2.3.2",
     "matplotlib>=3.10.6",
@@ -88,5 +89,6 @@ include = [
     "letta_evals/**/*.py",
     "letta_evals/**/*.json",
     "letta_evals/**/*.af",
+    "letta_evals/sandbox/Dockerfile",
     "letta_evals/py.typed",
 ]

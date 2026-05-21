@@ -86,10 +86,6 @@ class LettaCodeTargetSpec(BaseTargetSpec):
 
     kind: Literal[TargetKind.LETTA_CODE] = TargetKind.LETTA_CODE
 
-    working_dir: Optional[Path] = Field(default=None, description="Working directory for letta code execution")
-    sandbox: bool = Field(
-        default=True, description="Create a per-model subdirectory under working_dir for isolated sandbox execution."
-    )
     allowed_tools: Optional[List[str]] = Field(
         default=None, description="List of allowed tools for letta code (e.g., ['Bash', 'Read'])"
     )
@@ -109,6 +105,65 @@ TargetSpec = Annotated[
     Union[LettaAgentTargetSpec, LettaCodeTargetSpec],
     Field(discriminator="kind"),
 ]
+
+
+# Sandbox specs
+
+
+class ModalSandboxSpec(BaseModel):
+    """Modal sandbox execution configuration.
+
+    When attached to a :class:`SuiteSpec` via the ``sandbox`` field, every
+    sample executes inside a fresh Modal sandbox driven by the host runner.
+
+    When ``image`` is unset (the default), the driver builds the sandbox
+    image from the Dockerfile bundled at ``letta_evals/sandbox/Dockerfile``
+    via Modal's ``Image.from_dockerfile``. The bundled recipe carries the
+    ``letta-evals`` Python package and the ``@letta-ai/letta-code`` npm
+    CLI, so no registry publishing is required for the common case.
+    """
+
+    kind: Literal["modal"] = "modal"
+    image: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional registry reference for the runtime image. When unset, "
+            "the driver builds an image from the bundled Dockerfile "
+            "(letta_evals/sandbox/Dockerfile) via Modal's Image.from_dockerfile. "
+            "Set this to point at a pre-built registry image when you need "
+            "extra runtime your derived image already ships with."
+        ),
+    )
+    letta_evals_version: Optional[str] = Field(
+        default=None,
+        description=(
+            "If set, the runner asserts the image's ``letta-evals --version`` "
+            "matches at sandbox start to guard against SampleResult schema drift."
+        ),
+    )
+    secrets: List[str] = Field(default_factory=list, description="Names of pre-uploaded Modal Secrets to attach")
+    forward_env: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Extra host environment variable names to forward into the sandbox, "
+            "in addition to a built-in allowlist (LETTA_API_KEY and common model-"
+            "provider keys). Values are read from the host process environment at "
+            "run time; only listed names are forwarded — never the whole environment."
+        ),
+    )
+    volumes: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of in-sandbox mount path -> Modal Volume name",
+    )
+    cpu: int = Field(default=2, description="vCPU count for the sandbox")
+    memory_mb: int = Field(default=2048, description="Memory in MiB for the sandbox")
+    timeout_sec: int = Field(default=1800, description="Hard sandbox timeout in seconds")
+    idle_timeout_sec: Optional[int] = Field(default=None, description="Idle timeout (seconds) before auto-termination")
+    block_network: bool = Field(default=False, description="If True, the sandbox is created without network access")
+    app_name: str = Field(default="letta-evals", description="Modal App name to attach sandboxes to")
+
+
+SandboxSpec = Annotated[ModalSandboxSpec, Field(discriminator="kind")]
 
 
 # Grader specs
@@ -375,6 +430,14 @@ class SuiteSpec(BaseModel):
         default=None, description="Path to Python script with setup function (e.g., setup.py:prepare_evaluation)"
     )
 
+    sandbox: Optional[ModalSandboxSpec] = Field(
+        default=None,
+        description=(
+            "Optional sandbox configuration. When set, every sample runs inside "
+            "a fresh per-sample sandbox. Only Modal is supported in v1."
+        ),
+    )
+
     # internal field for path resolution
     base_dir: Optional[Path] = Field(default=None, exclude=True)
 
@@ -396,12 +459,6 @@ class SuiteSpec(BaseModel):
                     if not Path(yaml_data["target"]["agent_file"]).is_absolute():
                         yaml_data["target"]["agent_file"] = str(
                             (base_dir / yaml_data["target"]["agent_file"]).resolve()
-                        )
-
-                if "working_dir" in yaml_data["target"] and yaml_data["target"]["working_dir"]:
-                    if not Path(yaml_data["target"]["working_dir"]).is_absolute():
-                        yaml_data["target"]["working_dir"] = str(
-                            (base_dir / yaml_data["target"]["working_dir"]).resolve()
                         )
 
                 # resolve path-valued flags (--skills, --import) relative to suite file

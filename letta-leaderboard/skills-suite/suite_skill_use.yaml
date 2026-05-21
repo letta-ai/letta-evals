@@ -5,7 +5,6 @@ dataset: data/dataset_use.csv
 target:
   kind: letta_code
   base_url: http://0.0.0.0:8283
-  working_dir: output-use
   flags: "--skills .skills"
   timeout: 300
   max_retries: 1

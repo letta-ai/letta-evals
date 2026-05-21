@@ -24,8 +24,6 @@ class LettaCodeTarget(AbstractAgentTarget):
         self,
         client: AsyncLetta,
         model_handle: str,
-        working_dir: Optional[Path] = None,
-        sandbox: bool = True,
         allowed_tools: Optional[list[str]] = None,
         disallowed_tools: Optional[list[str]] = None,
         timeout: int = 300,
@@ -41,9 +39,6 @@ class LettaCodeTarget(AbstractAgentTarget):
         Args:
             client: AsyncLetta client for retrieving messages after CLI execution
             model_handle: Model handle to use with letta code
-            working_dir: Working directory for letta command execution
-            sandbox: If True, create a per-model subdirectory under working_dir
-                for isolated execution. If False, use working_dir directly.
             allowed_tools: List of allowed tools (e.g., ["Bash", "Read"])
             disallowed_tools: List of disallowed tools
             timeout: Command timeout in seconds (default: 300)
@@ -61,6 +56,11 @@ class LettaCodeTarget(AbstractAgentTarget):
         Agent factories may set ``sample.extra_vars["env"]`` (dict) to inject
         per-sample env vars into the subprocess; user keys win over target-managed
         ones. See ``_build_subprocess_env``.
+
+        The CLI runs in the process's current working directory. For isolated
+        execution, configure ``suite.sandbox`` to dispatch each sample to a
+        fresh Modal sandbox — the image's ``WORKDIR`` becomes the per-sample
+        working directory.
         """
         self.client = client
         self.model_handle = model_handle
@@ -71,17 +71,12 @@ class LettaCodeTarget(AbstractAgentTarget):
         self.max_retries = max_retries
         self.base_url = base_url
         self.agent_script = agent_script
+        # base_dir is the suite directory (set by SuiteSpec.from_yaml). It
+        # resolves agent_script paths, the `{pwd}` prompt placeholder, and the
+        # letta-code subprocess cwd. Sandbox isolation is handled by
+        # suite.sandbox (Modal), which runs the in-sandbox CLI from /mnt/suite.
         self.base_dir = base_dir or Path.cwd()
         self.flags = shlex.split(flags) if flags else []
-
-        # Resolve the working directory, optionally creating a per-model sandbox
-        wd_base = working_dir or Path.cwd()
-        if sandbox:
-            model_name = model_handle.split("/")[-1]
-            self.working_dir = wd_base / model_name
-        else:
-            self.working_dir = wd_base
-        self.working_dir.mkdir(parents=True, exist_ok=True)
 
     def _build_subprocess_env(self, sample: Sample, agent_id: Optional[str]) -> dict[str, str]:
         """Build subprocess env: os.environ -> target-managed -> sample.extra_vars["env"]."""
@@ -166,7 +161,7 @@ class LettaCodeTarget(AbstractAgentTarget):
 
                 # for multiple inputs, concatenate with newlines
                 prompt = "\n".join(str(inp) for inp in inputs)
-                prompt = prompt.replace("{pwd}", self.working_dir.resolve().as_posix())
+                prompt = prompt.replace("{pwd}", self.base_dir.resolve().as_posix())
 
                 if factory_agent_id:
                     cmd.extend(["--agent", factory_agent_id])
@@ -204,7 +199,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                 if self.permission_mode == "memory" and factory_agent_id:
                     run_cwd = str(Path.home() / ".letta" / "agents" / factory_agent_id / "memory")
                 else:
-                    run_cwd = str(self.working_dir)
+                    run_cwd = str(self.base_dir)
 
                 # run the letta command with prompt piped via stdin
                 #

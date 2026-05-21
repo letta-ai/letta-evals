@@ -104,7 +104,6 @@ setup_script: setup.py:prepare_evaluation
 target:
   kind: letta_code
   base_url: https://api.letta.com/
-  working_dir: sandbox
   timeout: 300
   max_retries: 3
 graders:
@@ -116,10 +115,13 @@ graders:
 
 **Key fields:**
 - `kind: letta_code` - Uses the Letta Code CLI instead of SDK
-- `working_dir: sandbox` - Sets the working directory for letta CLI execution
 - `timeout: 300` - 5 minute timeout per sample
 - `max_retries: 3` - Retries failed CLI invocations
 - `setup_script` - Runs before evaluation to reset the sandbox
+
+For isolated per-sample execution, configure the suite-level
+[`sandbox: { kind: modal, image: ... }`](../../docs/examples/modal-sandbox/README.md)
+field, which dispatches each sample to a fresh Modal sandbox.
 
 ### `dataset.jsonl`
 
@@ -170,7 +172,7 @@ async def python_output_grader(sample: Sample, submission: str) -> GradeResult:
 2. **Custom async graders**: Can perform complex operations like running subprocesses
 3. **Suite setup scripts**: Prepare the environment before evaluation (resetting files, creating directories, etc.)
 4. **`extra_vars`**: Pass additional context to custom graders beyond input/ground_truth
-5. **Working directory control**: The `working_dir` field sets where letta CLI executes
+5. **Isolated per-sample execution**: Configure `suite.sandbox` (Modal) to run each sample in a fresh container
 
 ## Expected Results
 
