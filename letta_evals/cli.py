@@ -9,7 +9,8 @@ from rich.console import Console
 from rich.table import Table
 
 from letta_evals.datasets.loader import load_dataset
-from letta_evals.models import GateKind, SuiteSpec
+from letta_evals.models import SuiteSpec
+from letta_evals.types import GateKind
 from letta_evals.runner import run_suite
 from letta_evals.visualization.factory import ProgressStyle
 
@@ -56,6 +57,38 @@ def run(
         "--num-runs",
         help="Number of times to run the evaluation suite. Overrides suite config if provided.",
     ),
+    sample: Optional[Path] = typer.Option(
+        None,
+        "--sample",
+        help=(
+            "Path to a single Sample JSON. When set, the dataset loader is "
+            "skipped, the suite's sandbox: field is ignored (to prevent "
+            "re-entry), and a single SampleResult is written to --output-json. "
+            "Used by the sandbox driver as the in-sandbox entrypoint."
+        ),
+    ),
+    output_json: Optional[Path] = typer.Option(
+        None,
+        "--output-json",
+        help="Required with --sample: path where the resulting SampleResult JSON is written.",
+    ),
+    model_handle: Optional[str] = typer.Option(
+        None,
+        "--model-handle",
+        help=(
+            "Only valid with --sample: scope the single-sample run to this model handle "
+            "(e.g. 'openai/gpt-4.1'). Overrides the suite's model_handles list."
+        ),
+    ),
+    model_config: Optional[str] = typer.Option(
+        None,
+        "--model-config",
+        help=(
+            "Only valid with --sample: scope the single-sample run to this named "
+            "model config (matches a file under letta_evals/llm_model_configs/). "
+            "Overrides the suite's model_configs list."
+        ),
+    ),
 ):
     """Run an evaluation suite."""
 
@@ -67,6 +100,33 @@ def run(
     if not suite_path.exists():
         console.print(f"[red]Error: Suite file not found: {suite_path}[/red]")
         raise typer.Exit(1)
+
+    if sample is not None:
+        if output_json is None:
+            console.print("[red]Error: --sample requires --output-json[/red]")
+            raise typer.Exit(2)
+        if model_handle is not None and model_config is not None:
+            console.print("[red]Error: --model-handle and --model-config are mutually exclusive[/red]")
+            raise typer.Exit(2)
+        try:
+            anyio.run(  # type: ignore[arg-type]
+                _run_single_sample,
+                suite_path,
+                sample,
+                output_json,
+                api_key,
+                base_url,
+                project_id,
+                model_handle,
+                model_config,
+            )
+        except Exception as e:
+            console.print(f"[red]Error running single sample: {e}[/red]")
+            import traceback
+
+            traceback.print_exc()
+            raise typer.Exit(1)
+        return
 
     effective_max_concurrent = 15
     effective_output = output
@@ -278,6 +338,74 @@ def list_graders():
 
     console.print(table)
     console.print("\n[dim]You can also use 'model_judge' or 'letta_judge' graders with custom prompts[/dim]")
+
+
+async def _run_single_sample(
+    suite_path: Path,
+    sample_path: Path,
+    output_json_path: Path,
+    api_key: Optional[str],
+    base_url: Optional[str],
+    project_id: Optional[str],
+    model_handle: Optional[str],
+    model_config: Optional[str],
+) -> None:
+    """Short-circuit entrypoint: run one Sample, write one SampleResult.
+
+    Used as the in-sandbox invocation by the Modal sandbox driver. The suite's
+    ``sandbox:`` field is dropped on this side to prevent recursive re-entry,
+    the dataset loader is skipped, and JSONL writing / summary aggregation /
+    gate evaluation are owned by the host's outer loop.
+    """
+    import json as _json
+
+    from letta_evals.models import Sample
+    from letta_evals.runner import Runner
+
+    with open(suite_path, "r") as f:
+        yaml_data = yaml.safe_load(f)
+
+    # Drop sandbox: on this side to prevent re-entry; the host already
+    # dispatched us into this sandbox.
+    yaml_data.pop("sandbox", None)
+
+    # If a model was specified on the CLI, narrow the suite to just that one
+    # so Runner.run_sample dispatches against the right config.
+    if model_handle is not None:
+        yaml_data.setdefault("target", {})["model_handles"] = [model_handle]
+        yaml_data["target"].pop("model_configs", None)
+    if model_config is not None:
+        yaml_data.setdefault("target", {})["model_configs"] = [model_config]
+        yaml_data["target"].pop("model_handles", None)
+
+    suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent)
+
+    with open(sample_path, "r") as f:
+        sample = Sample.model_validate(_json.load(f))
+
+    runner = Runner(
+        suite=suite,
+        max_concurrent=1,
+        progress_callback=None,
+        cached_results=None,
+        output_path=None,
+        letta_api_key=api_key,
+        letta_base_url=base_url,
+        letta_project_id=project_id,
+    )
+
+    if len(runner.model_configs) > 1:
+        raise ValueError(
+            "In-sandbox run resolved to multiple models — pass --model-handle or "
+            "--model-config to scope to a single model."
+        )
+
+    llm_config = runner.model_configs[0]
+    result = await runner.run_sample(sample, llm_config=llm_config)
+
+    output_json_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_json_path, "w") as f:
+        f.write(result.model_dump_json())
 
 
 def display_multi_run_summary(summary):
