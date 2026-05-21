@@ -159,9 +159,8 @@ class TestModalDriverLazyImport:
     ),
 )
 @pytest.mark.skipif(
-    not (os.getenv("MODAL_TOKEN_ID") and os.getenv("MODAL_TOKEN_SECRET")) and not os.path.exists(
-        os.path.expanduser("~/.modal.toml")
-    ),
+    not (os.getenv("MODAL_TOKEN_ID") and os.getenv("MODAL_TOKEN_SECRET"))
+    and not os.path.exists(os.path.expanduser("~/.modal.toml")),
     reason="Modal credentials not configured",
 )
 class TestModalDriverLive:

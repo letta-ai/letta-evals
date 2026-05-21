@@ -653,9 +653,7 @@ class Runner:
             if self.suite.sandbox.letta_evals_version:
                 version_check = await sandbox.exec("letta-evals --version")
                 expected = self.suite.sandbox.letta_evals_version
-                if version_check.return_code != 0 or expected not in (
-                    version_check.stdout + version_check.stderr
-                ):
+                if version_check.return_code != 0 or expected not in (version_check.stdout + version_check.stderr):
                     return SampleResult(
                         sample_id=sample_id,
                         trajectory=[],
@@ -858,9 +856,7 @@ class Runner:
                     await self.progress_callback.sample_started(sample_id, model_name=model_name)
 
                 if self.suite.sandbox is not None:
-                    result = await self._run_sample_in_sandbox(
-                        sample, llm_config, return_token_data, t_sample_start
-                    )
+                    result = await self._run_sample_in_sandbox(sample, llm_config, return_token_data, t_sample_start)
                     # Fire post-completion callbacks based on the final result —
                     # mid-sample events (grading_started, token streaming) are
                     # not emitted in v1 because the host only sees the final
@@ -877,9 +873,7 @@ class Runner:
                             )
                         else:
                             primary_score = next(iter(result.grades.values())).score if result.grades else 0.0
-                            primary_rationale = (
-                                next(iter(result.grades.values())).rationale if result.grades else None
-                            )
+                            primary_rationale = next(iter(result.grades.values())).rationale if result.grades else None
                             metric_scores = {k: v.score for k, v in result.grades.items()}
                             metric_rationales = {k: (v.rationale or "") for k, v in result.grades.items()}
                             await self.progress_callback.sample_completed(

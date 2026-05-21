@@ -26,9 +26,7 @@ def _write_minimal_suite(tmp_path: Path, *, with_sandbox: bool = False) -> Path:
     suite_yaml = tmp_path / "suite.yaml"
     dataset_jsonl = tmp_path / "samples.jsonl"
 
-    dataset_jsonl.write_text(
-        json.dumps({"id": "s1", "input": "hello", "ground_truth": "hi"}) + "\n"
-    )
+    dataset_jsonl.write_text(json.dumps({"id": "s1", "input": "hello", "ground_truth": "hi"}) + "\n")
 
     yaml_text = """\
 name: cli-single-sample-test
@@ -58,9 +56,7 @@ sandbox:
 
 def _write_sample(tmp_path: Path) -> Path:
     sample_path = tmp_path / "sample.json"
-    sample_path.write_text(
-        json.dumps({"id": "s1", "input": "hello", "ground_truth": "hi"})
-    )
+    sample_path.write_text(json.dumps({"id": "s1", "input": "hello", "ground_truth": "hi"}))
     return sample_path
 
 
@@ -140,9 +136,7 @@ class TestRunSingleSampleHelper:
 
         # Write a suite with two model handles; pass --model-handle to scope.
         suite_yaml = tmp_path / "suite.yaml"
-        (tmp_path / "samples.jsonl").write_text(
-            json.dumps({"id": "s1", "input": "hello", "ground_truth": "hi"}) + "\n"
-        )
+        (tmp_path / "samples.jsonl").write_text(json.dumps({"id": "s1", "input": "hello", "ground_truth": "hi"}) + "\n")
         suite_yaml.write_text(
             """\
 name: multi-model

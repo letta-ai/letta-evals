@@ -76,9 +76,7 @@ class _StubSandbox:
             f.write(result.model_dump_json())
 
 
-def _make_runner_with_sandbox(
-    tmp_path: Path, *, sandbox_spec: Optional[ModalSandboxSpec] = None
-) -> Runner:
+def _make_runner_with_sandbox(tmp_path: Path, *, sandbox_spec: Optional[ModalSandboxSpec] = None) -> Runner:
     """Construct a Runner via __new__ with only what _run_sample_in_sandbox reads."""
     runner = Runner.__new__(Runner)
     runner.suite = MagicMock()
