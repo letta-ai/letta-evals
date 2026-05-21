@@ -71,12 +71,12 @@ class LettaCodeTarget(AbstractAgentTarget):
         self.max_retries = max_retries
         self.base_url = base_url
         self.agent_script = agent_script
+        # base_dir is the suite directory (set by SuiteSpec.from_yaml). It
+        # resolves agent_script paths, the `{pwd}` prompt placeholder, and the
+        # letta-code subprocess cwd. Sandbox isolation is handled by
+        # suite.sandbox (Modal), which runs the in-sandbox CLI from /mnt/suite.
         self.base_dir = base_dir or Path.cwd()
         self.flags = shlex.split(flags) if flags else []
-        # Bind once so per-sample call sites can still reference a stable path
-        # for {pwd} substitution and subprocess cwd; sandbox isolation is now
-        # handled by suite.sandbox (Modal) rather than per-model subdirs.
-        self.working_dir = Path.cwd()
 
     def _build_subprocess_env(self, sample: Sample, agent_id: Optional[str]) -> dict[str, str]:
         """Build subprocess env: os.environ -> target-managed -> sample.extra_vars["env"]."""
@@ -161,7 +161,7 @@ class LettaCodeTarget(AbstractAgentTarget):
 
                 # for multiple inputs, concatenate with newlines
                 prompt = "\n".join(str(inp) for inp in inputs)
-                prompt = prompt.replace("{pwd}", self.working_dir.resolve().as_posix())
+                prompt = prompt.replace("{pwd}", self.base_dir.resolve().as_posix())
 
                 if factory_agent_id:
                     cmd.extend(["--agent", factory_agent_id])
@@ -199,7 +199,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                 if self.permission_mode == "memory" and factory_agent_id:
                     run_cwd = str(Path.home() / ".letta" / "agents" / factory_agent_id / "memory")
                 else:
-                    run_cwd = str(self.working_dir)
+                    run_cwd = str(self.base_dir)
 
                 # run the letta command with prompt piped via stdin
                 #
