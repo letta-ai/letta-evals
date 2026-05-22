@@ -67,11 +67,14 @@ logger = logging.getLogger(__name__)
 DEFAULT_MODEL_ID = "default"
 
 # Host env vars auto-forwarded into a Modal sandbox (when present) so the
-# in-sandbox target/graders can authenticate without pre-creating Modal
-# Secrets. Only these explicit names are forwarded — never the whole env.
-# Suite authors extend this via `sandbox.forward_env`. See _run_sample_in_sandbox.
+# in-sandbox target/graders can authenticate and reach the right Letta server
+# without pre-creating Modal Secrets. Only these explicit names are forwarded —
+# never the whole env. LETTA_BASE_URL is forwarded as a convenience but is only
+# used when the suite's target.base_url is unset (target.base_url takes
+# precedence). Suite authors extend this via `sandbox.forward_env`.
 DEFAULT_SANDBOX_FORWARD_ENV = (
     "LETTA_API_KEY",
+    "LETTA_BASE_URL",
     "OPENAI_API_KEY",
     "ANTHROPIC_API_KEY",
     "GOOGLE_API_KEY",
