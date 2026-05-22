@@ -110,12 +110,10 @@ resolves to a real file under `/mnt/suite/`.
 
 ## Reaching a self-hosted Letta server
 
-By default the sandbox talks to Letta Cloud (`https://api.letta.com`). The
-sandbox runs in Modal's cloud and reaches the server over its normal
-**outbound** network (`block_network: false`), so any Letta endpoint reachable
-from Modal works. Point it with `target.base_url` in the suite YAML (or the
-`LETTA_BASE_URL` env var, which is auto-forwarded — `target.base_url` wins if
-both are set):
+The sandbox reaches the Letta server over its outbound network
+(`block_network: false`, the default), so any endpoint reachable from Modal
+works. Set it via `target.base_url` (or the auto-forwarded `LETTA_BASE_URL`;
+`target.base_url` wins if both are set):
 
 ```yaml
 target:
@@ -126,22 +124,17 @@ sandbox:
   block_network: false
 ```
 
-Depending on where the server runs:
+- **Public URL** (cloud VM / load balancer) → use it directly.
+- **Local / private** → expose it with a tunnel and use that URL, e.g.
+  `cloudflared tunnel --url http://localhost:9005`; or join the sandbox to a
+  mesh VPN ([Modal + Tailscale](https://modal.com/docs/examples/modal_tailscale))
+  and use the tailnet address.
+- **On Modal** → expose letta-server via `encrypted_ports` and use the tunnel URL.
 
-- **Publicly reachable** (cloud VM, load balancer, or a cloudflared/ngrok
-  tunnel in front of it) → set `base_url` to that URL.
-- **Private / on your own machine** → join the sandbox to your network with a
-  mesh VPN. Modal has a first-class Tailscale integration: install Tailscale in
-  a derived image, pass an auth key via a Modal Secret (`sandbox.secrets`),
-  bring it up at startup, and set `base_url` to the server's tailnet name/IP.
-  See [Add Modal Apps to Tailscale](https://modal.com/docs/examples/modal_tailscale).
-- **On Modal** → run letta-server in its own Modal app/sandbox exposed with a
-  tunnel (`encrypted_ports`) and point `base_url` at the tunnel URL.
-
-Modal's built-in tunnels are *inbound* (they expose a port running inside a
-container to the internet), not a reverse tunnel from the sandbox to your
-host's `localhost` — so a local server must be reachable via a mesh VPN or an
-exposed URL, not by pointing at `localhost`.
+Modal tunnels are inbound-only — no reverse tunnel to your host's `localhost`,
+so a local server needs a tunnel or VPN. The server must also be recent enough
+for the image's `@letta-ai/letta-code` CLI; an old one silently fails agent
+creation (`No agent_id found in letta stream output`).
 
 ## Common failure modes
 
