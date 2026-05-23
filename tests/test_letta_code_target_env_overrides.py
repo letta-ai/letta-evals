@@ -190,3 +190,46 @@ def test_build_env_does_not_mutate_os_environ(tmp_path):
 
     # The injected key must NOT have leaked into the process's actual environment.
     assert "NEW_TEST_VAR" not in os.environ
+
+
+# --- _resolve_run_cwd ------------------------------------------------------
+
+
+def test_run_cwd_defaults_to_base_dir_without_memory_mode(tmp_path):
+    target = _make_target(tmp_path)
+    sample = _make_sample()
+
+    assert target._resolve_run_cwd(sample, agent_id="agent-abc") == str(tmp_path)
+
+
+def test_run_cwd_uses_agent_memory_root_in_memory_mode(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    target = _make_target(tmp_path, permission_mode="memory")
+    sample = _make_sample()
+
+    expected = str(Path(tmp_path) / ".letta" / "agents" / "agent-abc" / "memory")
+    assert target._resolve_run_cwd(sample, agent_id="agent-abc") == expected
+
+
+def test_run_cwd_honors_injected_memory_dir_env(tmp_path):
+    target = _make_target(tmp_path, permission_mode="memory")
+    fake = str(tmp_path / "fake" / "repo")
+    sample = _make_sample(extra_vars={"env": {"MEMORY_DIR": fake}})
+
+    assert target._resolve_run_cwd(sample, agent_id="agent-abc") == fake
+
+
+def test_run_cwd_honors_injected_memory_dir_non_env_key(tmp_path):
+    target = _make_target(tmp_path, permission_mode="memory")
+    fake = str(tmp_path / "fake" / "repo")
+    sample = _make_sample(extra_vars={"memory_dir": fake})
+
+    assert target._resolve_run_cwd(sample, agent_id="agent-abc") == fake
+
+
+def test_run_cwd_without_agent_id_uses_base_dir(tmp_path):
+    target = _make_target(tmp_path, permission_mode="memory")
+    sample = _make_sample(extra_vars={"env": {"MEMORY_DIR": str(tmp_path / "x")}})
+
+    # No agent id -> cannot be in memory-cwd mode, fall back to base dir.
+    assert target._resolve_run_cwd(sample, agent_id=None) == str(tmp_path)
