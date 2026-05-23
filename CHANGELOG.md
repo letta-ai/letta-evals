@@ -126,6 +126,20 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.18.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.17.1...letta-evals-v0.18.0) (2026-05-23)
+
+
+### Features
+
+* **letta_code_target:** Honor factory-injected MEMORY_DIR for run cwd ([#264](https://github.com/letta-ai/letta-evals/issues/264)) ([1ad86d0](https://github.com/letta-ai/letta-evals/commit/1ad86d06b8548be344f4a2902f00a60871c8a8a4))
+* **sandbox:** Forward LETTA_BASE_URL and document self-hosted servers ([#263](https://github.com/letta-ai/letta-evals/issues/263)) ([e9a1880](https://github.com/letta-ai/letta-evals/commit/e9a1880ddfe7135f27dd8df41d0a7a528cb0eaa6))
+* **sandbox:** Run eval suites in per-sample Modal sandboxes ([#260](https://github.com/letta-ai/letta-evals/issues/260)) ([386ebb6](https://github.com/letta-ai/letta-evals/commit/386ebb63b1442d5fb9727f3323c67241010e1d92))
+
+
+### Bug Fixes
+
+* **sandbox:** Surface exec timeouts as SandboxTimeout ([#262](https://github.com/letta-ai/letta-evals/issues/262)) ([f714506](https://github.com/letta-ai/letta-evals/commit/f714506feb6313bef2e366112826fd9f8eff7fea))
+
 ## [0.17.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.17.0...letta-evals-v0.17.1) (2026-05-21)
 
 
