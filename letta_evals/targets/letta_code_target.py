@@ -114,6 +114,23 @@ class LettaCodeTarget(AbstractAgentTarget):
 
         return env
 
+    def _resolve_run_cwd(self, sample: Sample, agent_id: Optional[str]) -> str:
+        """Resolve the subprocess working directory.
+
+        In ``permission_mode == "memory"`` we cd into the memory root so relative
+        file paths resolve correctly. An agent factory may point memory operations
+        at a different repo than the agent's own MemFS (e.g. a seeded "fake" repo)
+        by injecting ``MEMORY_DIR`` via ``sample.extra_vars`` — honor that path so
+        the subprocess starts in the repo it will actually read/write. Otherwise
+        fall back to the agent's own memory root, or the configured base dir.
+        """
+        if self.permission_mode == "memory" and agent_id:
+            injected_memory_dir = ((sample.extra_vars or {}).get("env") or {}).get("MEMORY_DIR") or (
+                sample.extra_vars or {}
+            ).get("memory_dir")
+            return str(injected_memory_dir or Path.home() / ".letta" / "agents" / agent_id / "memory")
+        return str(self.base_dir)
+
     async def run(
         self,
         sample: Sample,
@@ -194,12 +211,9 @@ class LettaCodeTarget(AbstractAgentTarget):
                 events = []
                 stderr_chunks = []
 
-                # When using memory permission mode, also cd into the agent's
-                # memory root so relative file paths resolve correctly.
-                if self.permission_mode == "memory" and factory_agent_id:
-                    run_cwd = str(Path.home() / ".letta" / "agents" / factory_agent_id / "memory")
-                else:
-                    run_cwd = str(self.base_dir)
+                # Resolve the subprocess cwd (honors a factory-injected MEMORY_DIR
+                # in memory permission mode; see _resolve_run_cwd).
+                run_cwd = self._resolve_run_cwd(sample, factory_agent_id)
 
                 # run the letta command with prompt piped via stdin
                 #
