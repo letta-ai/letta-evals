@@ -5,8 +5,8 @@ target:
   kind: letta_code
   base_url: https://api.letta.com/
   model_handles:
-    - openai/gpt-4.1
     - openai/gpt-5-mini
+    - anthropic/claude-haiku-4-5
 graders:
   quality:
     kind: model_judge

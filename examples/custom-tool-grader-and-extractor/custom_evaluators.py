@@ -1,50 +1,38 @@
 import json
+import re
 from typing import List
 
-from letta_client.types.agents import ToolCallMessage
-
 from letta_evals.decorators import extractor, grader
+from letta_evals.extractors.builtin import last_assistant
 from letta_evals.models import GradeResult, LettaMessageUnion, Sample
 
 
 @extractor
-def memory_insert_extractor(trajectory: List[List[LettaMessageUnion]], config: dict) -> str:
-    """Extract memory_insert tool calls from trajectory."""
-    for turn in trajectory:
-        for message in turn:
-            if isinstance(message, ToolCallMessage):
-                # SDK v1.0 uses tool_calls (array), fall back to tool_call (singular) for compatibility
-                tool_calls = (
-                    message.tool_calls if message.tool_calls else ([message.tool_call] if message.tool_call else [])
-                )
-                for tool_call in tool_calls:
-                    if tool_call.name == "memory_insert":
-                        return tool_call.arguments
-
-    return "{}"
+def json_object_extractor(trajectory: List[List[LettaMessageUnion]], config: dict) -> str:
+    """Extract the first JSON object from the last assistant response."""
+    text = last_assistant(trajectory, config).strip()
+    match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+    return match.group(0) if match else text
 
 
 @grader
-def grade_fruit_preference(sample: Sample, submission: str) -> GradeResult:
-    """Grade if the fruit preference was correctly stored in memory."""
+def ticket_classification_grader(sample: Sample, submission: str) -> GradeResult:
+    """Grade a JSON ticket classification response."""
     try:
-        args = json.loads(submission)
+        observed = json.loads(submission)
     except json.JSONDecodeError:
-        return GradeResult(score=0.0, rationale="No valid memory_insert tool call found")
+        return GradeResult(score=0.0, rationale="Submission was not valid JSON")
 
-    # check label is user_fruit_preferences
-    label = args.get("label", "")
-    if label != "user_fruit_preferences":
-        return GradeResult(
-            score=0.0, rationale=f"Wrong memory block label: expected 'user_fruit_preferences', got '{label}'"
-        )
+    expected = sample.ground_truth
+    if not isinstance(expected, dict):
+        return GradeResult(score=0.0, rationale="Ground truth must be a JSON object")
 
-    # check fruit name is in memory content
-    # Support both key names used across tool payload variants.
-    fruit = sample.ground_truth.lower()
-    memory_content = str(args.get("new_str") or args.get("new_string") or "").lower()
+    category_ok = str(observed.get("category", "")).lower() == str(expected.get("category", "")).lower()
+    priority_ok = str(observed.get("priority", "")).lower() == str(expected.get("priority", "")).lower()
+    score = (float(category_ok) + float(priority_ok)) / 2
 
-    if fruit not in memory_content:
-        return GradeResult(score=0.0, rationale=f"Fruit '{fruit}' not found in memory_insert content")
-
-    return GradeResult(score=1.0, rationale="Fruit preference correctly stored")
+    return GradeResult(
+        score=score,
+        rationale=f"category_ok={category_ok}, priority_ok={priority_ok}",
+        metadata={"observed": observed, "expected": expected},
+    )
