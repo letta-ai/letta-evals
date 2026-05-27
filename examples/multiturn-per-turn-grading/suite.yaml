@@ -2,8 +2,9 @@ name: multiturn-per-turn-grading-test
 description: Test if agent answers each question correctly in a multi-turn conversation
 dataset: dataset.jsonl
 target:
-  kind: letta_agent
-  agent_file: test-qa-agent.af
+  kind: letta_code
+  model_handles:
+    - openai/gpt-4.1-mini
   base_url: https://api.letta.com/
 graders:
   correctness:

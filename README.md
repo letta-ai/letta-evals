@@ -54,8 +54,9 @@ pip install letta-evals
 name: my-eval-suite
 dataset: dataset.jsonl
 target:
-  kind: letta_agent
-  agent_file: my_agent.af  # or use agent_id for existing agents
+  kind: letta_code
+  model_handles:
+    - openai/gpt-4.1-mini
   base_url: http://localhost:8283
 graders:
   quality:
@@ -79,7 +80,7 @@ letta-evals run suite.yaml
 
 The core evaluation flow is:
 
-**Dataset → Target (Agent) → Extractor → Grader → Gate → Result**
+**Dataset → Letta Code Target → Extractor → Grader → Gate → Result**
 
 ```bash
 # run an evaluation suite with real-time progress
@@ -168,9 +169,9 @@ See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-a
   ```
   Each turn is graded independently against its corresponding ground truth, and the final score is the average across all turns (e.g., 2/3 correct = 0.67). Access per-turn results via `sample_result.grades["grader_key"].per_turn_grades`. See [`examples/multiturn-per-turn-grading/`](examples/multiturn-per-turn-grading/) for a complete example.
 
-**Can I test the same agent with different LLM models?**
+**Can I test the same eval with different LLM models?**
 
-* Yes! Use the multi-model configuration feature. See [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) for an example that tests one agent with multiple model configurations.
+* Yes! Use the multi-model configuration feature. See [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) for an example that tests one task suite with multiple model configurations.
 
 **Can I run evaluations multiple times to measure consistency?**
 
@@ -219,6 +220,19 @@ See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-a
 ## Contributing
 
 Contributions are welcome! If you have an interesting eval or feature, please submit an issue or contact us on [Discord](https://discord.gg/letta).
+
+## Migration note: `letta_agent` target removal
+
+`target.kind: letta_agent` has been removed. Use the Letta Code target for all target execution:
+
+```yaml
+target:
+  kind: letta_code
+  model_handles:
+    - openai/gpt-4.1-mini
+```
+
+Suites that previously used `agent_id` or `agent_file` on the target must migrate to `letta_code`. If you need per-sample setup or seeded agent state, use `agent_script` with an `@agent_factory` function that returns the agent ID for Letta Code to run with. The `letta_judge` grader is unchanged; `agent_file` / `agent_id` are still supported there for judge agents.
 
 ## License
 

@@ -77,8 +77,9 @@ name: remember-fruit-preferences-test
 description: Test if agent can remember a user's fruit preferences
 dataset: dataset.jsonl
 target:
-  kind: letta_agent
-  agent_file: test-fruit-pref-agent.af
+  kind: letta_code
+  model_handles:
+    - openai/gpt-4.1-mini
   base_url: http://localhost:8283
 graders:
   memory_check:

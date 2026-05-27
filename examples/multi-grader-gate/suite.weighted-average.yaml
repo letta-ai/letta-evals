@@ -2,8 +2,9 @@ name: ascii-art-weighted-average-gate
 description: Weighted average gate combining quality (70%) and ASCII validation (30%)
 dataset: dataset.csv
 target:
-  kind: letta_agent
-  agent_file: ascii-art-agent.af
+  kind: letta_code
+  model_handles:
+    - openai/gpt-4.1-mini
   base_url: https://api.letta.com/
 graders:
   quality:

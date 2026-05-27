@@ -11,7 +11,7 @@ This example demonstrates basic tool-based grading using the built-in `contains`
 
 ## Two Suites, Two Evaluation Strategies
 
-This example includes two separate suites that evaluate the same agent differently:
+This example includes two separate suites that evaluate the same task differently:
 
 ### 1. `last_assistant_suite.yaml` - Evaluating Agent Responses
 Uses the `last_assistant` extractor to check if the agent's final response contains the correct answer. This tests whether the agent can successfully fetch webpage content AND communicate the answer properly to the user.
@@ -103,8 +103,9 @@ name: fetch-webpage-last-assistant-test
 description: Test if agent's final response contains the correct answer from fetched webpage
 dataset: assistant_dataset.csv
 target:
-  kind: letta_agent
-  agent_file: test-fetch-webpage-simple-agent.af
+  kind: letta_code
+  model_handles:
+    - openai/gpt-4.1-mini
   base_url: http://localhost:8283
 graders:
   contains_check:
@@ -130,8 +131,9 @@ name: fetch-webpage-tool-output-test
 description: Test if the tool output from read_webpage_content contains the correct answer
 dataset: tool_output_dataset.csv
 target:
-  kind: letta_agent
-  agent_file: test-fetch-webpage-simple-agent.af
+  kind: letta_code
+  model_handles:
+    - openai/gpt-4.1-mini
   base_url: http://localhost:8283
 graders:
   tool_output_check:

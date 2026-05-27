@@ -25,7 +25,7 @@ def _minimal_suite_yaml(**sandbox_overrides):
     return {
         "name": "unit-suite",
         "dataset": "samples.jsonl",
-        "target": {"kind": "letta_agent", "agent_id": "agent-test"},
+        "target": {"kind": "letta_code", "model_handles": ["openai/gpt-4.1-mini"]},
         "graders": {
             "g": {
                 "kind": "tool",
@@ -64,7 +64,7 @@ class TestModalSandboxSpec:
         yaml_data = {
             "name": "u",
             "dataset": "s.jsonl",
-            "target": {"kind": "letta_agent", "agent_id": "a"},
+            "target": {"kind": "letta_code", "model_handles": ["openai/gpt-4.1-mini"]},
             "graders": {"g": {"kind": "tool", "function": "exact_match"}},
             "gate": {"kind": "simple", "metric_key": "g", "op": "gte", "value": 1.0},
             "sandbox": {"kind": "modal"},
@@ -112,6 +112,20 @@ class TestModalSandboxSpec:
 
 
 class TestSuiteSpecWithSandbox:
+    def test_legacy_agent_target_kind_is_rejected(self):
+        yaml_data = _minimal_suite_yaml()
+        yaml_data["target"] = {"kind": "letta" + "_agent", "agent_id": "agent-test"}
+
+        with pytest.raises(ValueError):
+            SuiteSpec.from_yaml(yaml_data)
+
+    def test_legacy_agent_file_target_field_is_rejected(self):
+        yaml_data = _minimal_suite_yaml()
+        yaml_data["target"]["agent_file"] = "agent.af"
+
+        with pytest.raises(ValueError):
+            SuiteSpec.from_yaml(yaml_data)
+
     def test_sandbox_absent_keeps_field_none(self):
         yaml_data = _minimal_suite_yaml()
         del yaml_data["sandbox"]

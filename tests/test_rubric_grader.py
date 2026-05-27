@@ -25,7 +25,7 @@ from letta_evals.datasets.loader import load_csv, load_jsonl
 from letta_evals.graders.prompt_utils import RESERVED_VARS, build_judge_prompt
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.models import (
-    LettaAgentTargetSpec,
+    LettaCodeTargetSpec,
     ModelJudgeGraderSpec,
     Sample,
     SimpleGateSpec,
@@ -304,7 +304,7 @@ def _minimal_suite(prompt: str, dataset: Path) -> SuiteSpec:
         name="t",
         description="t",
         dataset=str(dataset),
-        target=LettaAgentTargetSpec(agent_id="agent-test"),
+        target=LettaCodeTargetSpec(model_handles=["openai/gpt-4.1-mini"]),
         graders={
             "g": ModelJudgeGraderSpec(prompt=prompt, model="gpt-4o-mini"),
         },
@@ -368,8 +368,8 @@ name: legacy
 description: legacy
 dataset: data.jsonl
 target:
-  kind: letta_agent
-  agent_id: agent-test
+  kind: letta_code
+  model_handles: ["openai/gpt-4.1-mini"]
 graders:
   g:
     kind: model_judge

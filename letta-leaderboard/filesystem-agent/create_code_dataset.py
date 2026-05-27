@@ -1,7 +1,7 @@
 """
 Generate a JSONL dataset for the Letta Code filesystem evaluation.
 
-Reads the existing filesystem.jsonl (used by the letta_agent eval) and wraps
+Reads the existing filesystem.jsonl (used by the legacy agent eval) and wraps
 each question in a prompt template that tells the Letta Code agent where to
 find the data files on the local filesystem. All other fields (ground_truth,
 agent_args) are preserved as-is.

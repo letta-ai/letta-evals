@@ -3,8 +3,7 @@ description: Minimal example showing how to run every sample inside a Modal sand
 dataset: samples.jsonl
 
 target:
-  kind: letta_agent
-  agent_id: agent-test
+  kind: letta_code
   model_handles:
     - openai/gpt-4.1
 

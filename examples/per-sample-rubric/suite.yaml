@@ -2,8 +2,9 @@ name: per-sample-rubric-example
 description: Demonstrates per-sample rubric overrides (inline `rubric` and `rubric_path` on a dataset row override the grader-level rubric for that sample).
 dataset: dataset.jsonl
 target:
-  kind: letta_agent
-  agent_file: ascii-art-agent.af
+  kind: letta_code
+  model_handles:
+    - openai/gpt-4.1-mini
   base_url: https://api.letta.com/
 graders:
   quality:

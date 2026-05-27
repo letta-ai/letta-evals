@@ -2,8 +2,9 @@ name: ascii-art-logical-and-gate
 description: Logical AND gate requiring both high quality (avg_score >= 0.6) AND valid ASCII (accuracy >= 60%)
 dataset: dataset.csv
 target:
-  kind: letta_agent
-  agent_file: ascii-art-agent.af
+  kind: letta_code
+  model_handles:
+    - openai/gpt-4.1-mini
   base_url: https://api.letta.com/
 graders:
   quality:

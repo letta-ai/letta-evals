@@ -5,7 +5,7 @@ setup_script: setup_cloud_agent.py:prepare_evaluation
 num_runs: 3
 
 target:
-  kind: letta_agent
+  kind: letta_code
   base_url: http://localhost:9005  # local
   # base_url: https://api.letta.com/  # cloud
   agent_script: setup_cloud_agent.py:setup_agent

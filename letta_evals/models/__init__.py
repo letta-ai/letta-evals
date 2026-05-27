@@ -36,7 +36,6 @@ from letta_evals.models.specs import (
     BaseTargetSpec,
     GateSpec,
     GraderSpec,
-    LettaAgentTargetSpec,
     LettaCodeTargetSpec,
     LettaJudgeGraderSpec,
     LogicalGateSpec,
@@ -69,7 +68,6 @@ __all__ = [
     "SampleId",
     # specs — targets
     "BaseTargetSpec",
-    "LettaAgentTargetSpec",
     "LettaCodeTargetSpec",
     "TargetSpec",
     # specs — graders

@@ -2,7 +2,6 @@ from enum import Enum
 
 
 class TargetKind(str, Enum):
-    LETTA_AGENT = "letta_agent"
     LETTA_CODE = "letta_code"
 
 

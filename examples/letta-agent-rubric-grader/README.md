@@ -81,8 +81,9 @@ The simplest configuration uses the built-in default judge agent with pre-fetche
 name: fetch-webpage-default-judge-test
 dataset: dataset.csv
 target:
-  kind: letta_agent
-  agent_file: test-fetch-webpage-simple-agent.af
+  kind: letta_code
+  model_handles:
+    - openai/gpt-4.1-mini
 graders:
   agent_judge:
     kind: letta_judge                      # Use letta_judge kind
@@ -112,8 +113,9 @@ For advanced scenarios where the judge needs to dynamically verify information:
 name: fetch-webpage-agent-judge-test
 dataset: dataset.csv
 target:
-  kind: letta_agent
-  agent_file: test-fetch-webpage-simple-agent.af
+  kind: letta_code
+  model_handles:
+    - openai/gpt-4.1-mini
 graders:
   agent_judge:
     kind: letta_judge

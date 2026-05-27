@@ -23,7 +23,6 @@ from letta_evals.models import (
     AgentState,
     Error,
     GradeResult,
-    LettaAgentTargetSpec,
     LettaJudgeGraderSpec,
     LettaMessageUnion,
     LogicalGateSpec,
@@ -49,9 +48,8 @@ from letta_evals.models import (
 from letta_evals.pricing import calculate_cost_from_agent_usage
 from letta_evals.streaming import StreamingReader, StreamingWriter
 from letta_evals.targets.base import AbstractAgentTarget, TargetError
-from letta_evals.targets.letta_agent import LettaAgentTarget
 from letta_evals.targets.letta_code_target import LettaCodeTarget
-from letta_evals.types import Aggregation, ErrorCategory, LogicalOp, TargetKind
+from letta_evals.types import Aggregation, ErrorCategory, LogicalOp
 from letta_evals.utils import (
     build_turn_summary,
     extract_token_counts,
@@ -218,7 +216,7 @@ class Runner:
                 with open(config_path, "r") as f:
                     config_data = json.load(f)
                     llm_config = LlmConfig(**config_data)
-                    configs.append(llm_config)
+                    configs.append(llm_config.model)
 
         if has_handles:
             for handle in self.suite.target.model_handles:
@@ -228,42 +226,24 @@ class Runner:
 
     def _create_target(self, llm_config: Optional[LlmConfig | str] = None) -> AbstractAgentTarget:
         """Create target from spec, optionally with model config or handle."""
-        if self.suite.target.kind == TargetKind.LETTA_AGENT:
-            model_handle = llm_config if isinstance(llm_config, str) else None
-            actual_llm_config = llm_config if isinstance(llm_config, LlmConfig) else None
+        model_handle = llm_config if isinstance(llm_config, str) else None
 
-            return LettaAgentTarget(
-                client=self.client,
-                agent_id=self.suite.target.agent_id,
-                agent_file=self.suite.target.agent_file,
-                agent_script=self.suite.target.agent_script,
-                base_dir=self.suite.target.base_dir,
-                llm_config=actual_llm_config,
-                model_handle=model_handle,
-                max_retries=self.suite.target.max_retries,
-                timeout=int(self.suite.target.timeout),
-            )
-        elif self.suite.target.kind == TargetKind.LETTA_CODE:
-            model_handle = llm_config if isinstance(llm_config, str) else None
+        if not model_handle:
+            raise ValueError("LettaCodeTarget requires a model_handle (string), but got None")
 
-            if not model_handle:
-                raise ValueError("LettaCodeTarget requires a model_handle (string), but got None")
-
-            return LettaCodeTarget(
-                client=self.client,
-                model_handle=model_handle,
-                allowed_tools=self.suite.target.allowed_tools,
-                disallowed_tools=self.suite.target.disallowed_tools,
-                timeout=int(self.suite.target.timeout),
-                max_retries=self.suite.target.max_retries,
-                base_url=self.suite.target.base_url,
-                agent_script=self.suite.target.agent_script,
-                base_dir=self.suite.target.base_dir,
-                flags=self.suite.target.flags,
-                permission_mode=self.suite.target.permission_mode,
-            )
-        else:
-            raise ValueError(f"Unknown target kind: {self.suite.target.kind}")
+        return LettaCodeTarget(
+            client=self.client,
+            model_handle=model_handle,
+            allowed_tools=self.suite.target.allowed_tools,
+            disallowed_tools=self.suite.target.disallowed_tools,
+            timeout=int(self.suite.target.timeout),
+            max_retries=self.suite.target.max_retries,
+            base_url=self.suite.target.base_url,
+            agent_script=self.suite.target.agent_script,
+            base_dir=self.suite.target.base_dir,
+            flags=self.suite.target.flags,
+            permission_mode=self.suite.target.permission_mode,
+        )
 
     def _init_graders(self) -> None:
         """Initialize grader(s) from spec."""
@@ -324,11 +304,7 @@ class Runner:
         return False
 
     def _should_cleanup_agent(self) -> bool:
-        if not self.suite.cleanup:
-            return False
-        if isinstance(self.suite.target, LettaAgentTargetSpec) and self.suite.target.agent_id:
-            return False
-        return True
+        return self.suite.cleanup
 
     # ── setup ──
 

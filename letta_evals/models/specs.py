@@ -10,7 +10,7 @@ import shlex
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from letta_evals.types import (
     Aggregation,
@@ -28,12 +28,14 @@ from letta_evals.types import (
 class BaseTargetSpec(BaseModel):
     """Base target configuration with common fields."""
 
-    kind: TargetKind = Field(description="Type of target (agent)")
+    model_config = ConfigDict(extra="forbid")
+
+    kind: TargetKind = Field(description="Type of target")
     base_url: str = Field(default="http://localhost:8283", description="Letta server URL")
     api_key: Optional[str] = Field(default=None, description="API key for authentication")
     timeout: float = Field(default=300.0, description="Request timeout in seconds")
     project_id: Optional[str] = Field(default=None, description="Letta project ID")
-    max_retries: int = Field(default=0, description="Maximum number of retries for failed create_stream calls")
+    max_retries: int = Field(default=0, description="Maximum number of retries for failed target runs")
 
     # model configs to test (names without .json extension)
     model_configs: Optional[List[str]] = Field(
@@ -51,34 +53,6 @@ class BaseTargetSpec(BaseModel):
 
     # internal field for path resolution
     base_dir: Optional[Path] = Field(default=None, exclude=True)
-
-
-class LettaAgentTargetSpec(BaseTargetSpec):
-    """Letta agent target configuration."""
-
-    kind: Literal[TargetKind.LETTA_AGENT] = TargetKind.LETTA_AGENT
-
-    agent_id: Optional[str] = Field(default=None, description="ID of existing agent to use")
-    agent_file: Optional[Path] = Field(default=None, description="Path to .af agent file to upload")
-
-    @field_validator("agent_file")
-    @classmethod
-    def validate_agent_file(cls, v: Optional[Path]) -> Optional[Path]:
-        if v and not str(v).endswith(".af"):
-            raise ValueError("Agent file must have .af extension")
-        return v
-
-    @model_validator(mode="after")
-    def validate_agent_source(self):
-        sources = [self.agent_id, self.agent_file, self.agent_script]
-        provided = sum(1 for s in sources if s is not None)
-
-        if provided == 0:
-            raise ValueError("Agent target requires one of: agent_id, agent_file, or agent_script")
-        if provided > 1:
-            raise ValueError("Agent target can only have one of: agent_id, agent_file, or agent_script")
-
-        return self
 
 
 class LettaCodeTargetSpec(BaseTargetSpec):
@@ -101,10 +75,7 @@ class LettaCodeTargetSpec(BaseTargetSpec):
     )
 
 
-TargetSpec = Annotated[
-    Union[LettaAgentTargetSpec, LettaCodeTargetSpec],
-    Field(discriminator="kind"),
-]
+TargetSpec = LettaCodeTargetSpec
 
 
 # Sandbox specs
@@ -455,12 +426,6 @@ class SuiteSpec(BaseModel):
 
             # resolve target paths
             if "target" in yaml_data:
-                if "agent_file" in yaml_data["target"] and yaml_data["target"]["agent_file"]:
-                    if not Path(yaml_data["target"]["agent_file"]).is_absolute():
-                        yaml_data["target"]["agent_file"] = str(
-                            (base_dir / yaml_data["target"]["agent_file"]).resolve()
-                        )
-
                 # resolve path-valued flags (--skills, --import) relative to suite file
                 if "flags" in yaml_data["target"] and yaml_data["target"]["flags"]:
                     PATH_FLAGS = {"--skills", "--import"}
