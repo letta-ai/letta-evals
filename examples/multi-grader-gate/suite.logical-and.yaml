@@ -1,0 +1,37 @@
+name: ascii-art-logical-and-gate
+description: Demonstrates a logical AND gate combining rubric quality and ASCII validation
+dataset: dataset.csv
+target:
+  kind: letta_code
+  model_handles:
+    - openai/gpt-5-mini
+  base_url: https://api.letta.com/
+graders:
+  quality:
+    kind: model_judge
+    display_name: "rubric score"
+    prompt_path: rubric.txt
+    model: gpt-5-mini
+    temperature: 0.0
+    provider: openai
+    max_retries: 3
+    timeout: 120.0
+    extractor: last_assistant
+  ascii_only:
+    kind: tool
+    display_name: "ascii character check"
+    function: ascii_printable_only
+    extractor: last_assistant
+gate:
+  kind: logical
+  operator: and
+  conditions:
+    - metric_key: quality
+      aggregation: avg_score
+      op: gte
+      value: 0.0
+    - metric_key: ascii_only
+      aggregation: accuracy
+      pass_threshold: 1
+      op: gte
+      value: 0
