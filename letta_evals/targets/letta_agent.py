@@ -231,11 +231,13 @@ class LettaAgentTarget(AbstractAgentTarget):
                 )
                 for msg in messages:
                     output_ids = getattr(msg, "output_ids", None)
+                    input_ids = getattr(msg, "input_ids", None)
                     output_token_logprobs = getattr(msg, "output_token_logprobs", None)
                     if output_ids:
                         token_data.append(
                             TurnTokenData(
                                 role=getattr(msg, "role", "assistant"),
+                                input_ids=input_ids,
                                 output_ids=output_ids,
                                 output_token_logprobs=output_token_logprobs,
                             )
