@@ -391,6 +391,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                         token_data.append(
                             TurnTokenData(
                                 role=role,
+                                input_ids=turn.get("input_ids"),
                                 output_ids=output_ids,
                                 output_token_logprobs=turn.get("output_token_logprobs"),
                             )

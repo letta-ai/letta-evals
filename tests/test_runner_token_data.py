@@ -160,6 +160,7 @@ def test_t0_3_sample_result_validates_with_token_data_populated():
         TurnTokenData(
             role="assistant_message",
             content="hello",
+            input_ids=[100, 101],
             output_ids=[1, 2, 3],
             output_token_logprobs=[(-0.1,), (-0.2,), (-0.3,)],
         )
@@ -173,6 +174,7 @@ def test_t0_3_sample_result_validates_with_token_data_populated():
         token_data=token_data,
     )
     assert result.token_data == token_data
+    assert result.token_data[0].input_ids == [100, 101]
     assert result.token_data[0].output_ids == [1, 2, 3]
 
 
@@ -190,11 +192,19 @@ def test_t0_3_sample_result_round_trips_through_pydantic():
         submissions={"acc": "x"},
         grades={"acc": GradeResult(score=1.0)},
         timing=Timing(total=0.0, target=0.0),
-        token_data=[TurnTokenData(role="tool_call_message", content="t", output_ids=[9, 10])],
+        token_data=[
+            TurnTokenData(
+                role="tool_call_message",
+                content="t",
+                input_ids=[7, 8],
+                output_ids=[9, 10],
+            )
+        ],
     )
     dumped = original.model_dump()
     revived = SampleResult.model_validate(dumped)
     assert revived.token_data is not None
+    assert revived.token_data[0].input_ids == [7, 8]
     assert revived.token_data[0].output_ids == [9, 10]
 
 

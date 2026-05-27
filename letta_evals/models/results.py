@@ -55,6 +55,10 @@ class TurnTokenData(BaseModel):
 
     role: str = Field(description="Message role: assistant, tool, tool_call, tool_return, etc.")
     content: Optional[str] = Field(default=None, description="Text content of this message")
+    input_ids: Optional[List[int]] = Field(
+        default=None,
+        description="Exact token IDs used as the model input/prefix for this generation",
+    )
     output_ids: Optional[List[int]] = Field(
         default=None, description="Token IDs produced by the model for this message"
     )
