@@ -4,6 +4,7 @@ import logging
 import os
 import time
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -60,6 +61,7 @@ from letta_evals.utils import (
 )
 from letta_evals.visualization.base import ProgressCallback
 from letta_evals.visualization.factory import ProgressStyle, create_progress_callback
+from letta_evals.workspaces import GitWorktreeWorkspace
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +184,7 @@ class Runner:
         self.stream_writer: Optional[StreamingWriter] = stream_writer
         self.current_run: int = current_run
         self.output_path = output_path
+        self.git_worktree_run_name = f"run-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 
     # ── partition helpers ──
 
@@ -380,6 +383,30 @@ class Runner:
                     cache[result.sample_id][model_id] = result
         return cache
 
+    def _prepare_git_worktree(self, sample: Sample, llm_config: Optional[LlmConfig | str]) -> Optional[dict]:
+        if self.suite.git_worktree is None:
+            return None
+        if self.suite.target.kind != TargetKind.LETTA_CODE:
+            raise ValueError("git_worktree is only supported for letta_code targets")
+        parent_root = self.suite.git_worktree.root or self.suite.target.base_dir
+        if parent_root is None:
+            raise ValueError("git_worktree requires git_worktree.root or suite base_dir")
+        parent_root = Path(parent_root).expanduser().resolve()
+        metadata = GitWorktreeWorkspace(
+            self.suite.git_worktree,
+            parent_root,
+            self.git_worktree_run_name,
+            sample.id,
+            _extract_model_name(llm_config),
+        ).create()
+        extra_vars = dict(sample.extra_vars or {})
+        env = dict(extra_vars.get("env") or {})
+        env.update({"GIT_WORKTREE_ROOT": metadata["root"], "WORKTREE_ROOT": metadata["root"], "ARTIFACT_DIR": metadata["artifact_dir"]})
+        extra_vars["env"] = env
+        extra_vars["git_worktree"] = metadata
+        sample.extra_vars = extra_vars
+        return metadata
+
     async def _get_or_run_trajectory(
         self,
         sample: Sample,
@@ -393,8 +420,9 @@ class Runner:
         Optional[list[dict]],
         Optional[AgentState],
         Optional[list],
+        Optional[str],
     ]:
-        """Return (trajectory, agent_id, model_name, agent_usage, agent_state, token_data)."""
+        """Return (trajectory, agent_id, model_name, agent_usage, agent_state, token_data, conversation_id)."""
         sample_id = sample.id
         model_name = _extract_model_name(llm_config)
 
@@ -421,6 +449,7 @@ class Runner:
                     getattr(cached_result, "agent_usage", None),
                     getattr(cached_result, "agent_state", None),
                     getattr(cached_result, "token_data", None),
+                    getattr(cached_result, "conversation_id", None),
                 )
 
         target = self._create_target(llm_config)
@@ -438,6 +467,7 @@ class Runner:
             target_result.agent_usage,
             target_result.agent_state,
             target_result.token_data,
+            target_result.conversation_id,
         )
 
     # ── grading ──
@@ -876,6 +906,7 @@ class Runner:
         async with self.semaphore:
             agent_id = None
             agent_usage = None
+            git_worktree_metadata = None
             phase = ErrorCategory.UNKNOWN
             t_sample_start = time.perf_counter()
             try:  # noqa: SIM105 — outer try/finally for agent cleanup
@@ -915,6 +946,7 @@ class Runner:
                             )
                     return result
 
+                git_worktree_metadata = self._prepare_git_worktree(sample, llm_config)
                 phase = ErrorCategory.TARGET
                 retrieve_agent_state = self._requires_agent_state()
                 (
@@ -924,6 +956,7 @@ class Runner:
                     agent_usage,
                     agent_state,
                     token_data,
+                    conversation_id,
                 ) = await self._get_or_run_trajectory(
                     sample,
                     llm_config,
@@ -1002,6 +1035,8 @@ class Runner:
                     agent_usage=agent_usage,
                     agent_state=agent_state,
                     token_data=token_data,
+                    conversation_id=conversation_id,
+                    git_worktree=git_worktree_metadata,
                 )
             except Exception as e:
                 if isinstance(e, TargetError) and e.agent_id:
@@ -1051,6 +1086,7 @@ class Runner:
                     timing=timing,
                     error=error,
                     agent_usage=agent_usage,
+                    git_worktree=git_worktree_metadata,
                 )
             finally:
                 if self._should_cleanup_agent() and agent_id:

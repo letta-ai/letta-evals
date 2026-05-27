@@ -75,6 +75,7 @@ class LettaCodeTarget(AbstractAgentTarget):
         # resolves agent_script paths, the `{pwd}` prompt placeholder, and the
         # letta-code subprocess cwd. Sandbox isolation is handled by
         # suite.sandbox (Modal), which runs the in-sandbox CLI from /mnt/suite.
+        # Per-sample worktree cwd overrides are read from sample.extra_vars["git_worktree"]["working_dir"] when present.
         self.base_dir = base_dir or Path.cwd()
         self.flags = shlex.split(flags) if flags else []
 
@@ -114,6 +115,34 @@ class LettaCodeTarget(AbstractAgentTarget):
 
         return env
 
+    async def _list_conversation_messages(self, agent_id: str, conversation_id: str) -> list:
+        """List messages scoped to a single conversation."""
+        messages = []
+        after = None
+        while True:
+            kwargs = {
+                "agent_id": agent_id,
+                "conversation_id": conversation_id,
+                "limit": 200,
+                "order": "asc",
+            }
+            if after is not None:
+                kwargs["after"] = after
+            page = await self.client.agents.messages.list(**kwargs)
+            items = getattr(page, "items", None) or []
+            if not items:
+                break
+            messages.extend(items)
+            last_id = getattr(items[-1], "id", None)
+            if not last_id or last_id == after:
+                break
+            after = last_id
+        return messages
+
+    def _sample_working_dir(self, sample: Sample) -> Optional[Path]:
+        working_dir = ((sample.extra_vars or {}).get("git_worktree") or {}).get("working_dir")
+        return Path(working_dir) if working_dir else None
+
     def _resolve_run_cwd(self, sample: Sample, agent_id: Optional[str]) -> str:
         """Resolve the subprocess working directory.
 
@@ -129,7 +158,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                 sample.extra_vars or {}
             ).get("memory_dir")
             return str(injected_memory_dir or Path.home() / ".letta" / "agents" / agent_id / "memory")
-        return str(self.base_dir)
+        return str(self._sample_working_dir(sample) or self.base_dir)
 
     async def run(
         self,
@@ -178,7 +207,8 @@ class LettaCodeTarget(AbstractAgentTarget):
 
                 # for multiple inputs, concatenate with newlines
                 prompt = "\n".join(str(inp) for inp in inputs)
-                prompt = prompt.replace("{pwd}", self.base_dir.resolve().as_posix())
+                prompt_pwd = self._sample_working_dir(sample) or self.base_dir
+                prompt = prompt.replace("{pwd}", prompt_pwd.resolve().as_posix())
 
                 if factory_agent_id:
                     cmd.extend(["--agent", factory_agent_id])
@@ -210,6 +240,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                 agent_id = factory_agent_id
                 events = []
                 stderr_chunks = []
+                conversation_id = None
 
                 # Resolve the subprocess cwd (honors a factory-injected MEMORY_DIR
                 # in memory permission mode; see _resolve_run_cwd).
@@ -243,7 +274,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                 # from the init event as soon as it arrives. This ensures we
                 # have the agent_id even if the process later times out.
                 async def _read_stdout():
-                    nonlocal agent_id
+                    nonlocal agent_id, conversation_id
                     async for raw_line in process.stdout:
                         line = raw_line.decode().strip()
                         if not line:
@@ -259,6 +290,9 @@ class LettaCodeTarget(AbstractAgentTarget):
                                         await progress_callback.agent_created(
                                             sample.id, agent_id=agent_id, model_name=self.model_handle
                                         )
+                                if event.get("conversation_id"):
+                                    conversation_id = event.get("conversation_id")
+                                    logger.info(f"Captured conversation_id {conversation_id} from stream init event")
                                 if progress_callback and agent_id:
                                     await progress_callback.message_sending(
                                         sample.id, 1, len(inputs), agent_id=agent_id, model_name=self.model_handle
@@ -302,10 +336,13 @@ class LettaCodeTarget(AbstractAgentTarget):
                 if not agent_id:
                     raise RuntimeError("No agent_id found in letta stream output")
 
-                # retrieve the full message history using the agent_id
-                logger.info(f"Retrieving messages for agent {agent_id}")
-
-                messages = await list_all_agent_messages(self.client, agent_id)
+                # retrieve message history scoped to this run's conversation when possible
+                if conversation_id:
+                    logger.info(f"Retrieving messages for agent {agent_id}, conversation {conversation_id}")
+                    messages = await self._list_conversation_messages(agent_id, conversation_id)
+                else:
+                    logger.info(f"Retrieving messages for agent {agent_id}")
+                    messages = await list_all_agent_messages(self.client, agent_id)
 
                 # wrap messages in a single turn
                 trajectory = [messages] if messages else []
@@ -343,6 +380,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                     model_name=self.model_handle,
                     agent_usage=usage_stats if usage_stats else None,
                     agent_state=agent_state,
+                    conversation_id=conversation_id,
                     token_data=token_data,
                 )
 

@@ -16,6 +16,7 @@ grouped into focused submodules:
 """
 
 from letta_client.types import AgentState
+from letta_evals.types import GateKind
 
 from letta_evals.models.results import (
     Error,
@@ -38,6 +39,7 @@ from letta_evals.models.specs import (
     GraderSpec,
     LettaAgentTargetSpec,
     LettaCodeTargetSpec,
+    GitWorktreeSpec,
     LettaJudgeGraderSpec,
     LogicalGateSpec,
     ModalSandboxSpec,
@@ -71,6 +73,7 @@ __all__ = [
     "BaseTargetSpec",
     "LettaAgentTargetSpec",
     "LettaCodeTargetSpec",
+    "GitWorktreeSpec",
     "TargetSpec",
     # specs — graders
     "BaseGraderSpec",
@@ -79,6 +82,7 @@ __all__ = [
     "LettaJudgeGraderSpec",
     "GraderSpec",
     # specs — gates
+    "GateKind",
     "SimpleCondition",
     "SimpleGateSpec",
     "WeightedAverageGateSpec",

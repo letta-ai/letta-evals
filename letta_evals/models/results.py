@@ -85,6 +85,7 @@ class TargetResult(BaseModel):
     run_ids: Optional[List[str]] = Field(
         default=None, description="Run IDs for each input turn (needed for token-level data fetching in training)"
     )
+    conversation_id: Optional[str] = Field(default=None, description="Conversation ID used for this target run")
     token_data: Optional[List[TurnTokenData]] = Field(
         default=None,
         description=(
@@ -188,6 +189,7 @@ class SampleResult(BaseModel):
 
     sample_id: SampleId = Field(description="ID of the sample (look up the full Sample in suite.json)")
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
+    conversation_id: Optional[str] = Field(default=None, description="Conversation ID used for this sample")
     trajectory: List[List[LettaMessageUnion]] = Field(description="Full conversation trajectory from the agent")
     submissions: Dict[str, str] = Field(
         default_factory=dict,
@@ -217,4 +219,8 @@ class SampleResult(BaseModel):
             "Per-token IDs and logprobs across all turns in the trajectory. "
             "Only populated when run_sample(return_token_data=True) is called."
         ),
+    )
+    git_worktree: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Git worktree metadata for this sample, when suite.git_worktree is configured.",
     )

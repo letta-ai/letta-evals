@@ -166,6 +166,25 @@ class ModalSandboxSpec(BaseModel):
 SandboxSpec = Annotated[ModalSandboxSpec, Field(discriminator="kind")]
 
 
+class GitWorktreeSpec(BaseModel):
+    """Per-sample git worktree setup."""
+
+    root: Optional[Path] = Field(default=None, description="Parent directory for generated worktrees")
+    repo: Optional[Union[str, Path]] = Field(default=None, description="Single repository source path")
+    repos: Optional[Any] = Field(
+        default=None,
+        description="Repository source paths, either a list or a mapping of checkout name to source path",
+    )
+
+    @model_validator(mode="after")
+    def validate_repos(self):
+        if self.repo is None and self.repos is None:
+            raise ValueError("git_worktree requires either 'repo' or 'repos'")
+        if self.repo is not None and self.repos is not None:
+            raise ValueError("git_worktree cannot specify both 'repo' and 'repos'")
+        return self
+
+
 # Grader specs
 
 
@@ -438,6 +457,11 @@ class SuiteSpec(BaseModel):
         ),
     )
 
+    git_worktree: Optional[GitWorktreeSpec] = Field(
+        default=None,
+        description="Optional per-sample git worktree setup.",
+    )
+
     # internal field for path resolution
     base_dir: Optional[Path] = Field(default=None, exclude=True)
 
@@ -481,6 +505,20 @@ class SuiteSpec(BaseModel):
 
                 # store base_dir in target for agent_script resolution
                 yaml_data["target"]["base_dir"] = base_dir
+
+            if "git_worktree" in yaml_data and yaml_data["git_worktree"]:
+                gw = yaml_data["git_worktree"]
+                if "root" in gw and gw["root"] and not Path(gw["root"]).is_absolute():
+                    gw["root"] = str((base_dir / gw["root"]).resolve())
+                if "repo" in gw and gw["repo"] and not Path(gw["repo"]).is_absolute():
+                    gw["repo"] = str((base_dir / gw["repo"]).resolve())
+                if isinstance(gw.get("repos"), list):
+                    gw["repos"] = [str((base_dir / r).resolve()) if not Path(r).is_absolute() else r for r in gw["repos"]]
+                elif isinstance(gw.get("repos"), dict):
+                    gw["repos"] = {
+                        name: str((base_dir / path).resolve()) if not Path(path).is_absolute() else path
+                        for name, path in gw["repos"].items()
+                    }
 
             # resolve multi-graders (required)
             if "graders" in yaml_data and isinstance(yaml_data["graders"], dict):
