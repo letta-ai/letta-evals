@@ -126,6 +126,13 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.19.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.18.0...letta-evals-v0.19.0) (2026-05-27)
+
+
+### Features
+
+* **token-data:** Preserve model input token data ([#265](https://github.com/letta-ai/letta-evals/issues/265)) ([fa4bfaf](https://github.com/letta-ai/letta-evals/commit/fa4bfafb625d70559490adb20cda5d57b02809b6))
+
 ## [0.18.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.17.1...letta-evals-v0.18.0) (2026-05-23)
 
 
