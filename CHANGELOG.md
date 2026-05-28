@@ -132,6 +132,29 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.19.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.19.0...letta-evals-v0.19.1) (2026-05-28)
+
+
+### Bug Fixes
+
+* **sandbox:** Repair letta-code simple edit e2e ([#269](https://github.com/letta-ai/letta-evals/issues/269)) ([3ff7504](https://github.com/letta-ai/letta-evals/commit/3ff75044a58affdccddcf19382a298ad3956472e))
+
+
+### Refactors
+
+* **graders:** Remove Letta judge grader ([#271](https://github.com/letta-ai/letta-evals/issues/271)) ([05f31ac](https://github.com/letta-ai/letta-evals/commit/05f31acc49036bfece600a25d6b98fee880b69fe))
+* **models:** Remove model config support ([#272](https://github.com/letta-ai/letta-evals/issues/272)) ([cb14454](https://github.com/letta-ai/letta-evals/commit/cb144546b4ec8ef720f0d8ae1e7f9a3b5ad9d7d9))
+* **models:** Standardize model handle naming ([#273](https://github.com/letta-ai/letta-evals/issues/273)) ([0512117](https://github.com/letta-ai/letta-evals/commit/0512117b56764af857a11d5367f466190bc25ea7))
+* **rubric:** Drop legacy rubric_vars shim ([#275](https://github.com/letta-ai/letta-evals/issues/275)) ([4742a40](https://github.com/letta-ai/letta-evals/commit/4742a4060e5916a76989e30f3f7858420b998601))
+* **targets:** Remove letta agent target ([#268](https://github.com/letta-ai/letta-evals/issues/268)) ([66c8181](https://github.com/letta-ai/letta-evals/commit/66c81813304317a001fd26592aedf921f3fb91ec))
+* **targets:** Simplify letta_code target spec ([#276](https://github.com/letta-ai/letta-evals/issues/276)) ([49ce199](https://github.com/letta-ai/letta-evals/commit/49ce19954b5d8482ac042649fcb57ef3aab393b3))
+* **targets:** Simplify target construction ([#277](https://github.com/letta-ai/letta-evals/issues/277)) ([1b960da](https://github.com/letta-ai/letta-evals/commit/1b960da3adf9d4910876e038f53627e0e086cfd8))
+
+
+### Chores
+
+* **cleanup:** Remove stale migration checks ([#274](https://github.com/letta-ai/letta-evals/issues/274)) ([d32bbf0](https://github.com/letta-ai/letta-evals/commit/d32bbf04db4989f4714f0a149150646152a6d3c2))
+
 ## [0.19.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.18.0...letta-evals-v0.19.0) (2026-05-27)
 
 
