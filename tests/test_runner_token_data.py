@@ -98,7 +98,7 @@ def _make_target_result(
     return TargetResult(
         trajectory=[[]],
         agent_id="agent-fake-1",
-        model_name="fake/model",
+        model_handle="fake/model",
         agent_usage=None,
         agent_state=agent_state,
         run_ids=None,

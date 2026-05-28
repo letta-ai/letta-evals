@@ -70,7 +70,7 @@ async def prepare_evaluation(client: AsyncLetta) -> None:
 - Supports three signatures:
   - `() -> None` - No parameters
   - `(client: AsyncLetta) -> None` - With client (shown above)
-  - `(client: AsyncLetta, model_name: str) -> None` - With client and model name (runs once per model when testing multiple models)
+  - `(client: AsyncLetta, model_handle: str) -> None` - With client and model handle (runs once per model when testing multiple models)
 
 ### Step 2: Agent Factory (`create_agent.py:create_inventory_agent`)
 

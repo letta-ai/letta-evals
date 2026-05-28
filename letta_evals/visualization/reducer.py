@@ -53,35 +53,35 @@ class ProgressStateReducer:
         sample_id: SampleId,
         *,
         agent_id: Optional[str] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
     ) -> SampleProgress:
-        key = (sample_id, model_name)
+        key = (sample_id, model_handle)
 
-        if model_name is not None:
+        if model_handle is not None:
             old_key = (sample_id, None)
             if old_key in self.state.samples and key not in self.state.samples:
                 self.state.samples[key] = self.state.samples.pop(old_key)
-                self.state.samples[key].model_name = model_name
+                self.state.samples[key].model_handle = model_handle
 
         if key not in self.state.samples:
-            self.state.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_name=model_name)
+            self.state.samples[key] = SampleProgress(sample_id, agent_id=agent_id, model_handle=model_handle)
 
         sample = self.state.samples[key]
         if agent_id is not None and sample.agent_id != agent_id:
             sample.agent_id = agent_id
-        if model_name is not None and sample.model_name != model_name:
-            sample.model_name = model_name
+        if model_handle is not None and sample.model_handle != model_handle:
+            sample.model_handle = model_handle
         return sample
 
-    def get_from_cache(self, sample_id: SampleId, model_name: Optional[str] = None) -> bool:
-        sample = self.get_sample(sample_id, model_name)
+    def get_from_cache(self, sample_id: SampleId, model_handle: Optional[str] = None) -> bool:
+        sample = self.get_sample(sample_id, model_handle)
         return sample.from_cache if sample is not None else False
 
-    def get_sample(self, sample_id: SampleId, model_name: Optional[str] = None) -> Optional[SampleProgress]:
-        key = (sample_id, model_name)
+    def get_sample(self, sample_id: SampleId, model_handle: Optional[str] = None) -> Optional[SampleProgress]:
+        key = (sample_id, model_handle)
         if key in self.state.samples:
             return self.state.samples[key]
-        if model_name is not None:
+        if model_handle is not None:
             return self.state.samples.get((sample_id, None))
         return None
 
@@ -94,9 +94,9 @@ class ProgressStateReducer:
         turn_score: float,
         grader_key: Optional[str] = None,
         agent_id: Optional[str] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
     ) -> SampleProgress:
-        sample = self.ensure_sample(sample_id, agent_id=agent_id, model_name=model_name)
+        sample = self.ensure_sample(sample_id, agent_id=agent_id, model_handle=model_handle)
         if sample.turn_scores is None:
             sample.turn_scores = {}
 
@@ -119,11 +119,11 @@ class ProgressStateReducer:
         sample_id: SampleId,
         state: SampleState,
         agent_id: Optional[str] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
         **kwargs,
     ) -> ReducerResult:
         """Apply a state transition inside the single-threaded reducer."""
-        sample = self.ensure_sample(sample_id, agent_id=agent_id, model_name=model_name)
+        sample = self.ensure_sample(sample_id, agent_id=agent_id, model_handle=model_handle)
         previous_state = sample.state
         sample.state = state
 

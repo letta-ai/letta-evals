@@ -196,7 +196,7 @@ def suite_setup(func: Callable) -> Callable:
     Supports three signatures:
     - async () -> None (no parameters)
     - async (client: AsyncLetta) -> None (with client parameter)
-    - async (client: AsyncLetta, model_name: str) -> None (with client and model_name parameters)
+    - async (client: AsyncLetta, model_handle: str) -> None (with client and model_handle parameters)
     Also supports sync versions of all three.
 
     Usage:
@@ -211,16 +211,16 @@ def suite_setup(func: Callable) -> Callable:
             pass
 
         @suite_setup
-        async def prepare_evaluation_with_model(client: AsyncLetta, model_name: str) -> None:
-            # perform setup operations with client and model_name
-            print(f"Setting up for model: {model_name}")
+        async def prepare_evaluation_with_model(client: AsyncLetta, model_handle: str) -> None:
+            # perform setup operations with client and model_handle
+            print(f"Setting up for model: {model_handle}")
     """
     sig = inspect.signature(func)
     params = list(sig.parameters.values())
 
     if len(params) not in (0, 1, 2):
         raise TypeError(
-            f"Suite setup {func.__name__} must have 0, 1, or 2 parameters (client, model_name), got {len(params)}"
+            f"Suite setup {func.__name__} must have 0, 1, or 2 parameters (client, model_handle), got {len(params)}"
         )
 
     if len(params) == 1:
@@ -229,9 +229,9 @@ def suite_setup(func: Callable) -> Callable:
             raise TypeError(f"Suite setup {func.__name__} must have parameter named 'client', got {param_names}")
     elif len(params) == 2:
         param_names = [p.name for p in params]
-        if param_names != ["client", "model_name"]:
+        if param_names != ["client", "model_handle"]:
             raise TypeError(
-                f"Suite setup {func.__name__} must have parameters named 'client' and 'model_name', got {param_names}"
+                f"Suite setup {func.__name__} must have parameters named 'client' and 'model_handle', got {param_names}"
             )
 
     if sig.return_annotation != inspect.Signature.empty:

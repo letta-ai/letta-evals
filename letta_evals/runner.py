@@ -245,7 +245,7 @@ class Runner:
 
     # ── setup ──
 
-    async def _run_setup(self, model_name: Optional[str] = None) -> None:
+    async def _run_setup(self, model_handle: Optional[str] = None) -> None:
         if not self.suite.setup_script:
             return
 
@@ -257,20 +257,20 @@ class Runner:
             param_count = getattr(setup_func, "_suite_setup_param_count", 1)
 
             log_msg = f"Running setup script: {self.suite.setup_script}"
-            if model_name and param_count == 2:
-                log_msg += f" for model: {model_name}"
+            if model_handle and param_count == 2:
+                log_msg += f" for model: {model_handle}"
             logger.info(log_msg)
 
             if inspect.iscoroutinefunction(setup_func):
                 if param_count == 2:
-                    await setup_func(self.client, model_name)
+                    await setup_func(self.client, model_handle)
                 elif param_count == 1:
                     await setup_func(self.client)
                 else:
                     await setup_func()
             else:
                 if param_count == 2:
-                    setup_func(self.client, model_name)
+                    setup_func(self.client, model_handle)
                 elif param_count == 1:
                     setup_func(self.client)
                 else:
@@ -307,7 +307,7 @@ class Runner:
         Optional[AgentState],
         Optional[list],
     ]:
-        """Return (trajectory, agent_id, model_name, agent_usage, agent_state, token_data)."""
+        """Return (trajectory, agent_id, model_handle, agent_usage, agent_state, token_data)."""
         sample_id = sample.id
 
         if self.cached_results:
@@ -324,7 +324,7 @@ class Runner:
             if cached_result is not None:
                 if self.progress_callback:
                     await self.progress_callback.agent_created(
-                        sample_id, agent_id=cached_result.agent_id, model_name=model_handle, from_cache=True
+                        sample_id, agent_id=cached_result.agent_id, model_handle=model_handle, from_cache=True
                     )
                 return (
                     cached_result.trajectory,
@@ -346,7 +346,7 @@ class Runner:
         return (
             target_result.trajectory,
             target_result.agent_id,
-            target_result.model_name,
+            target_result.model_handle,
             target_result.agent_usage,
             target_result.agent_state,
             target_result.token_data,
@@ -363,7 +363,7 @@ class Runner:
         grader_key: str,
         sample_id: SampleId,
         agent_id: str,
-        model_name: str,
+        model_handle: str,
     ) -> tuple[GradeResult, str]:
         """Grade each turn independently and return averaged GradeResult + combined submission."""
         ground_truths = sample.ground_truth  # type: List[str]
@@ -406,7 +406,7 @@ class Runner:
                     turn_score=turn_grade.score,
                     grader_key=grader_key,
                     agent_id=agent_id,
-                    model_name=model_name,
+                    model_handle=model_handle,
                 )
 
         turn_scores = [g.score for g in per_turn_grades]
@@ -436,7 +436,7 @@ class Runner:
         agent_state: Optional[AgentState],
         sample_id: SampleId,
         agent_id: str,
-        model_name: str,
+        model_handle: str,
     ) -> tuple[Dict[str, GradeResult], Dict[str, str], Dict[str, float]]:
         """Grade a sample across all graders. Returns (grades, submissions, per_grader_time)."""
         grades_dict: Dict[str, GradeResult] = {}
@@ -450,7 +450,7 @@ class Runner:
 
             if is_per_turn:
                 grade, submission = await self._grade_per_turn(
-                    sample, trajectory, agent_state, grader, key, sample_id, agent_id, model_name
+                    sample, trajectory, agent_state, grader, key, sample_id, agent_id, model_handle
                 )
             else:
                 grade, submission = await grader.grade(sample, trajectory, agent_state=agent_state)
@@ -786,7 +786,7 @@ class Runner:
             t_sample_start = time.perf_counter()
             try:  # noqa: SIM105 — outer try/finally for agent cleanup
                 if self.progress_callback:
-                    await self.progress_callback.sample_started(sample_id, model_name=model_handle)
+                    await self.progress_callback.sample_started(sample_id, model_handle=model_handle)
 
                 if self.suite.sandbox is not None:
                     result = await self._run_sample_in_sandbox(sample, model_handle, return_token_data, t_sample_start)
@@ -801,7 +801,7 @@ class Runner:
                                 sample_id,
                                 result.error.message,
                                 agent_id=result.agent_id,
-                                model_name=model_handle,
+                                model_handle=model_handle,
                                 target_cost=cost,
                             )
                         else:
@@ -814,7 +814,7 @@ class Runner:
                                 agent_id=result.agent_id,
                                 score=primary_score,
                                 target_cost=cost,
-                                model_name=model_handle,
+                                model_handle=model_handle,
                                 metric_scores=metric_scores,
                                 rationale=primary_rationale,
                                 metric_rationales=metric_rationales,
@@ -826,7 +826,7 @@ class Runner:
                 (
                     trajectory,
                     agent_id,
-                    model_name,
+                    model_handle,
                     agent_usage,
                     agent_state,
                     token_data,
@@ -837,18 +837,20 @@ class Runner:
                     return_token_data=return_token_data,
                 )
 
-                cost = calculate_cost_from_agent_usage(model_name, agent_usage) if model_name else None
+                cost = calculate_cost_from_agent_usage(model_handle, agent_usage) if model_handle else None
                 prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
                     extract_token_counts(agent_usage)
                 )
                 target_time = time.perf_counter() - t_sample_start
 
                 if self.progress_callback:
-                    await self.progress_callback.grading_started(sample_id, agent_id=agent_id, model_name=model_name)
+                    await self.progress_callback.grading_started(
+                        sample_id, agent_id=agent_id, model_handle=model_handle
+                    )
 
                 phase = ErrorCategory.GRADING
                 grades_dict, submissions_dict, per_grader_time = await self._grade_sample(
-                    sample, trajectory, agent_state, sample_id, agent_id, model_name
+                    sample, trajectory, agent_state, sample_id, agent_id, model_handle
                 )
 
                 error = self._detect_errors(grades_dict, trajectory, submissions_dict)
@@ -860,7 +862,7 @@ class Runner:
                         sample_id,
                         error.message,
                         agent_id=agent_id,
-                        model_name=model_name,
+                        model_handle=model_handle,
                         target_cost=cost if cost and cost > 0 else None,
                     )
 
@@ -872,7 +874,7 @@ class Runner:
                         agent_id=agent_id,
                         score=primary_score,
                         target_cost=cost if cost and cost > 0 else None,
-                        model_name=model_name,
+                        model_handle=model_handle,
                         metric_scores=metric_scores,
                         rationale=primary_rationale,
                         metric_rationales=metric_rationales,
@@ -923,10 +925,10 @@ class Runner:
                     exception_type=type(cause).__name__,
                     message=error_message,
                 )
-                result_model_name = locals().get("model_name") or model_handle
+                result_model_handle = locals().get("model_handle") or model_handle
                 cost = (
-                    calculate_cost_from_agent_usage(result_model_name, agent_usage)
-                    if result_model_name and agent_usage
+                    calculate_cost_from_agent_usage(result_model_handle, agent_usage)
+                    if result_model_handle and agent_usage
                     else None
                 )
                 prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
@@ -937,7 +939,7 @@ class Runner:
                         sample_id,
                         error_message,
                         agent_id=agent_id,
-                        model_name=result_model_name,
+                        model_handle=result_model_handle,
                         target_cost=cost if cost and cost > 0 else None,
                     )
                 usage = _build_usage(
@@ -1017,7 +1019,7 @@ class Runner:
         For multi-run mode the orchestrator (``_execute_runs``) constructs a
         Runner per run and shares one StreamingWriter across them.
         """
-        # Setup-once (when setup doesn't need model_name).
+        # Setup-once (when setup doesn't need model_handle).
         setup_needs_model = False
         if self.suite.setup_script:
             setup_func = load_object(self.suite.setup_script, self.suite.base_dir)
@@ -1054,7 +1056,7 @@ class Runner:
             async with anyio.create_task_group() as tg:
                 for model_handle in self.model_handles:
                     if setup_needs_model:
-                        await self._run_setup(model_name=model_handle)
+                        await self._run_setup(model_handle=model_handle)
 
                     model_id = _model_id_for(model_handle)
 

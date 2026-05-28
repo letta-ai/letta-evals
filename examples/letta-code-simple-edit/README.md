@@ -28,7 +28,7 @@ This ensures each test starts with the original buggy code.
 **Note:** The `@suite_setup` decorator supports three signatures:
 - `() -> None` - No parameters (shown above)
 - `(client: AsyncLetta) -> None` - With client access
-- `(client: AsyncLetta, model_name: str) -> None` - With client and model name (runs once per model when testing multiple models)
+- `(client: AsyncLetta, model_handle: str) -> None` - With client and model handle (runs once per model when testing multiple models)
 
 ### 2. Evaluation Phase
 

@@ -75,7 +75,7 @@ class TargetResult(BaseModel):
         description="List of conversation turns, each containing Letta messages"
     )
     agent_id: str = Field(description="ID of the agent that generated this trajectory")
-    model_name: str = Field(description="Model configuration name used for this target")
+    model_handle: str = Field(description="Model handle used for this target")
     agent_usage: Optional[List[dict]] = Field(
         default=None, description="Usage statistics emitted by the agent during the run"
     )

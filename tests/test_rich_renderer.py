@@ -77,7 +77,7 @@ def test_model_judge_renderer_moves_rubric_model_into_header_and_uses_fixed_colu
         sample_id=0,
         state=SampleState.COMPLETED,
         agent_id="agent-with-a-very-long-id",
-        model_name="target-model-with-a-long-name",
+        model_handle="target-model-with-a-long-name",
         metric_scores={"accuracy": 1.0},
         metric_rationales={"accuracy": "This is a deliberately long rationale that should be truncated by Rich."},
         rationale="unused",

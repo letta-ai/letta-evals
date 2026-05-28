@@ -10,7 +10,7 @@ class NoOpProgress(ProgressCallback):
     """No-output progress callback (silent)."""
 
     async def sample_started(
-        self, sample_id: SampleId, agent_id: Optional[str] = None, model_name: Optional[str] = None
+        self, sample_id: SampleId, agent_id: Optional[str] = None, model_handle: Optional[str] = None
     ) -> None:
         pass
 
@@ -20,7 +20,7 @@ class NoOpProgress(ProgressCallback):
         agent_id: Optional[str] = None,
         score: Optional[float] = None,
         target_cost: Optional[float] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
         metric_scores: Optional[Dict[str, float]] = None,
         rationale: Optional[str] = None,
         metric_rationales: Optional[Dict[str, str]] = None,
@@ -32,7 +32,7 @@ class NoOpProgress(ProgressCallback):
         sample_id: SampleId,
         error: str,
         agent_id: Optional[str] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
         target_cost: Optional[float] = None,
     ) -> None:
         pass
