@@ -138,6 +138,8 @@ SandboxSpec = Annotated[ModalSandboxSpec, Field(discriminator="kind")]
 class BaseGraderSpec(BaseModel):
     """Base grader configuration with common fields."""
 
+    model_config = ConfigDict(extra="forbid")
+
     kind: GraderKind = Field(description="Type of grader (tool or model_judge)")
     display_name: Optional[str] = Field(default=None, description="Human-friendly name for this metric")
     extractor: str = Field(default="last_assistant", description="Strategy for extracting submission from trajectory")
@@ -396,25 +398,11 @@ class SuiteSpec(BaseModel):
 
             # resolve multi-graders (required)
             if "graders" in yaml_data and isinstance(yaml_data["graders"], dict):
-                import warnings as _warnings
-
                 resolved_graders: Dict[str, Any] = {}
                 for key, gspec in yaml_data["graders"].items():
                     if "prompt_path" in gspec and gspec["prompt_path"]:
                         if not Path(gspec["prompt_path"]).is_absolute():
                             gspec["prompt_path"] = str((base_dir / gspec["prompt_path"]).resolve())
-                    # Deprecation: drop legacy grader-level rubric_vars allow-list.
-                    # Variables are now auto-substituted from sample.rubric_vars.
-                    if "rubric_vars" in gspec:
-                        _warnings.warn(
-                            f"Grader '{key}': 'rubric_vars' on the grader is "
-                            "deprecated and ignored. Variables in sample.rubric_vars "
-                            "are now substituted into the rubric automatically. "
-                            "Remove this field from your suite YAML.",
-                            DeprecationWarning,
-                            stacklevel=3,
-                        )
-                        gspec.pop("rubric_vars", None)
                     gspec["base_dir"] = base_dir
                     resolved_graders[key] = gspec
                 yaml_data["graders"] = resolved_graders
