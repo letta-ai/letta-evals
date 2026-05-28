@@ -75,14 +75,21 @@ jobs:
         run: |
           uv sync --extra dev
 
+      - name: Configure Modal
+        if: matrix.suite-path == 'examples/letta-code-simple-edit/suite.yaml'
+        env:
+          MODAL_TOKEN_ID: ${{ vars.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          printf '[letta]\ntoken_id = "%s"\ntoken_secret = "%s"\nactive = true\nenvironment = "main"\nimage_builder_version = "2025.06"\n' \
+            "$MODAL_TOKEN_ID" "$MODAL_TOKEN_SECRET" > ~/.modal.toml
+
       - name: Run e2e test for ${{ matrix.suite-path }}
         env:
           LETTA_API_KEY: ${{ secrets.LETTA_API_KEY }}
           LETTA_PROJECT_ID: ${{ secrets.LETTA_PROJECT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
-          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
         run: |
           .venv/bin/pytest tests/test_examples_e2e_live.py::test_single_suite \
             --suite-path=${{ github.workspace }}/${{ matrix.suite-path }} \
