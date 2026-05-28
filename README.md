@@ -211,19 +211,6 @@ See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-a
 
 Contributions are welcome! If you have an interesting eval or feature, please submit an issue or contact us on [Discord](https://discord.gg/letta).
 
-## Migration note: `letta_agent` target removal
-
-`target.kind: letta_agent` has been removed. Use the Letta Code target for all target execution:
-
-```yaml
-target:
-  kind: letta_code
-  model_handles:
-    - openai/gpt-4.1-mini
-```
-
-Suites that previously used `agent_id` or `agent_file` on the target must migrate to `letta_code`. If you need per-sample setup or seeded agent state, use `agent_script` with an `@agent_factory` function that returns the agent ID for Letta Code to run with.
-
 ## License
 
 This project is licensed under the MIT License. By contributing to evals, you are agreeing to make your evaluation logic and data under the same MIT license as this repository. You must have adequate rights to upload any data used in an eval. Letta reserves the right to use this data in future service improvements to our product.
