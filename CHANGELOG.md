@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### ⚠ BREAKING CHANGES — Letta judge grader removed
+
+The `letta_judge` grader kind and Letta agent-as-judge implementation have
+been removed without a backwards-compatibility shim. Suites should use
+`model_judge` or `tool` graders instead.
+
 ### Modal sandboxes for per-sample execution
 
 Suites can opt into running every sample inside a fresh Modal sandbox by

@@ -123,7 +123,6 @@ We suggest getting started with these examples:
 - **Basic tool grading**: [`examples/simple-tool-grader/`](examples/simple-tool-grader/) - Simple string matching with `exact_match` and `contains` functions
 - **LLM-as-judge grading**: [`examples/simple-rubric-grader/`](examples/simple-rubric-grader/) - Using rubric graders with custom prompts for nuanced evaluation
 - **Per-sample rubric overrides**: [`examples/per-sample-rubric/`](examples/per-sample-rubric/) - Use a different rubric for each dataset row via inline `rubric` or `rubric_path` fields
-- **Agent-as-judge grading**: [`examples/letta-agent-rubric-grader/`](examples/letta-agent-rubric-grader/) - Using a Letta agent as an LLM judge (no API keys required!)
 - **Multi-grader gates**: [`examples/multi-grader-gate/`](examples/multi-grader-gate/) - Combining multiple graders with logical AND/OR gates, weighted averages, and advanced aggregation functions
 - **Memory block extraction**: [`examples/multiturn-memory-block-extractor/`](examples/multiturn-memory-block-extractor/) - Extracting and evaluating agent memory across multiturn conversations
 - **Per-turn evaluation**: [`examples/multiturn-per-turn-grading/`](examples/multiturn-per-turn-grading/) - Grade each turn independently in multi-turn conversations with proportional scoring
@@ -208,15 +207,6 @@ See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-a
 
 * Absolutely! Letta Evals is designed to integrate seamlessly into continuous integration workflows. Check out our [`.github/workflows/e2e-tests.yml`](.github/workflows/e2e-tests.yml) for an example of running evaluations in GitHub Actions. The workflow automatically discovers and runs all suite files, making it easy to gate releases or validate changes to your agents.
 
-**I don't have access to LLM provider API keys - can I still use LLM-as-judge / rubric grading?**
-
-* Yes! Use the **agent-as-judge** feature instead of the standard rubric grader. With agent-as-judge, you configure a Letta agent (with its own LLM access) to act as the evaluator. This is perfect for:
-  - Teams without direct LLM API access (using Letta Cloud or managed instances)
-  - Scenarios where you want the judge to use tools (e.g., web search, database queries) during evaluation
-  - Organizations with centralized LLM access through Letta
-
-  See [`examples/letta-agent-rubric-grader/`](examples/letta-agent-rubric-grader/) for a complete working example. The judge agent just needs a `submit_grade(score: float, rationale: str)` tool, and the framework handles the rest!
-
 ## Contributing
 
 Contributions are welcome! If you have an interesting eval or feature, please submit an issue or contact us on [Discord](https://discord.gg/letta).
@@ -232,7 +222,7 @@ target:
     - openai/gpt-4.1-mini
 ```
 
-Suites that previously used `agent_id` or `agent_file` on the target must migrate to `letta_code`. If you need per-sample setup or seeded agent state, use `agent_script` with an `@agent_factory` function that returns the agent ID for Letta Code to run with. The `letta_judge` grader is unchanged; `agent_file` / `agent_id` are still supported there for judge agents.
+Suites that previously used `agent_id` or `agent_file` on the target must migrate to `letta_code`. If you need per-sample setup or seeded agent state, use `agent_script` with an `@agent_factory` function that returns the agent ID for Letta Code to run with.
 
 ## License
 

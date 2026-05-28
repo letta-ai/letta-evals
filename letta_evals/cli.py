@@ -368,7 +368,7 @@ def list_graders():
         table.add_row(name, "tool")
 
     console.print(table)
-    console.print("\n[dim]You can also use 'model_judge' or 'letta_judge' graders with custom prompts[/dim]")
+    console.print("\n[dim]You can also use 'model_judge' graders with custom prompts[/dim]")
 
 
 async def _run_single_sample(
