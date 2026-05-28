@@ -58,8 +58,7 @@ The `model_handles` field in `suite.yaml` specifies which models to test:
 
 ```yaml
 target:
-  kind: letta_agent
-  agent_file: ascii-art-agent.af
+  kind: letta_code
   base_url: http://localhost:8283
   model_handles:
     - openai/gpt-4.1
@@ -68,17 +67,14 @@ target:
 
 **Key points:**
 - Each model in `model_handles` creates separate evaluation runs
-- Same agent configuration, different underlying model
+- Same evaluation suite, different underlying model
 - Format: `provider/model-name` (e.g., `openai/gpt-4.1`, `anthropic/claude-3-5-sonnet-20241022`)
 - All samples run against all models (N samples × M models = N×M evaluations)
 
 ### How It Works
 
-1. The framework loads the agent from `agent_file`
-2. For each model in `model_handles`:
-   - Creates a copy of the agent with that model
-   - Runs all samples against that model
-   - Tracks results separately per model
+1. The framework reads each model from `model_handles`
+2. For each model, it runs all samples through the Letta Code target
 3. Results include per-model metrics for comparison
 
 ### Results Output

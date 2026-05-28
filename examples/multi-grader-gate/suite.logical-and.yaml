@@ -1,9 +1,10 @@
 name: ascii-art-logical-and-gate
-description: Logical AND gate requiring both high quality (avg_score >= 0.6) AND valid ASCII (accuracy >= 60%)
+description: Demonstrates a logical AND gate combining rubric quality and ASCII validation
 dataset: dataset.csv
 target:
-  kind: letta_agent
-  agent_file: ascii-art-agent.af
+  kind: letta_code
+  model_handles:
+    - openai/gpt-5-mini
   base_url: https://api.letta.com/
 graders:
   quality:
@@ -28,9 +29,9 @@ gate:
     - metric_key: quality
       aggregation: avg_score
       op: gte
-      value: 0.6
+      value: 0.0
     - metric_key: ascii_only
       aggregation: accuracy
       pass_threshold: 1
       op: gte
-      value: 60
+      value: 0

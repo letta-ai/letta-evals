@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from letta_evals.models import (
     GradeResult,
-    LettaAgentTargetSpec,
+    LettaCodeTargetSpec,
     ModelRun,
     ModelSummary,
     SampleId,
@@ -34,7 +34,7 @@ def _make_suite() -> SuiteSpec:
     return SuiteSpec(
         name="test-suite",
         dataset="ignored",
-        target=LettaAgentTargetSpec(kind=TargetKind.LETTA_AGENT, agent_id="agent-fake-1"),
+        target=LettaCodeTargetSpec(kind=TargetKind.LETTA_CODE, model_handles=["openai/gpt-4.1-mini"]),
         graders={
             "accuracy": ToolGraderSpec(function="exact_match", display_name="Accuracy"),
             "quality": ToolGraderSpec(function="exact_match", display_name="Quality"),

@@ -30,7 +30,7 @@ from letta_evals.models import (
     Usage,
 )
 from letta_evals.runner import Runner, run_suite
-from letta_evals.targets import AbstractAgentTarget, LettaAgentTarget
+from letta_evals.targets import AbstractAgentTarget, LettaCodeTarget
 from letta_evals.types import (
     Aggregation,
     ErrorCategory,
@@ -62,7 +62,7 @@ __all__ = [
     "Grader",
     "GraderKind",
     "GraderSpec",
-    "LettaAgentTarget",
+    "LettaCodeTarget",
     "LettaMessageUnion",
     "LLMProvider",
     "LogicalOp",

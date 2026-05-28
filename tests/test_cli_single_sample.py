@@ -32,8 +32,8 @@ def _write_minimal_suite(tmp_path: Path, *, with_sandbox: bool = False) -> Path:
 name: cli-single-sample-test
 dataset: samples.jsonl
 target:
-  kind: letta_agent
-  agent_id: agent-test
+  kind: letta_code
+  model_handles: ["openai/gpt-4.1-mini"]
 graders:
   acc:
     kind: tool
@@ -142,8 +142,8 @@ class TestRunSingleSampleHelper:
 name: multi-model
 dataset: samples.jsonl
 target:
-  kind: letta_agent
-  agent_id: agent-test
+  kind: letta_code
+  model_handles: ["openai/gpt-4.1-mini"]
   model_handles: ["openai/gpt-a", "openai/gpt-b"]
 graders:
   acc:

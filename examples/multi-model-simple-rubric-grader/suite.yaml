@@ -2,12 +2,11 @@ name: ascii-art-rubric-test
 description: Test if agent can generate ASCII art correctly using rubric grading
 dataset: dataset.jsonl
 target:
-  kind: letta_agent
-  agent_file: ascii-art-agent.af
+  kind: letta_code
   base_url: https://api.letta.com/
   model_handles:
-    - openai/gpt-4.1
     - openai/gpt-5-mini
+    - anthropic/claude-haiku-4-5
 graders:
   quality:
     kind: model_judge

@@ -1,6 +1,6 @@
 # Programmatic Agent Creation Example
 
-This example demonstrates dynamic agent creation using Python scripts instead of pre-saved agent files.
+This example demonstrates dynamic setup for Letta Code runs using Python agent factory scripts.
 
 ## What This Example Shows
 
@@ -11,7 +11,7 @@ This example demonstrates dynamic agent creation using Python scripts instead of
 
 ## Key Takeaway
 
-Programmatic agent creation is useful when you need to test agent creation logic itself, customize agents per sample, or don't have pre-saved agent files. In this example, each sample gets a unique agent with item-specific memory blocks.
+Programmatic agent creation is useful when you need to seed a Letta Code run with custom agent state or customize agents per sample. In this example, each sample gets a unique agent with item-specific memory blocks.
 
 ## Running This Example
 
@@ -156,6 +156,8 @@ In `suite.yaml`, specify the setup and factory scripts:
 ```yaml
 setup_script: setup.py:prepare_evaluation
 target:
-  kind: letta_agent
+  kind: letta_code
+  model_handles:
+    - openai/gpt-4.1-mini
   agent_script: create_agent.py:create_inventory_agent
 ```

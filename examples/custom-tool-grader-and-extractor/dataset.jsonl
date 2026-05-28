@@ -1,5 +1,3 @@
-{"input": "Insert into your core memory that I like apples", "ground_truth": "apples"}
-{"input": "Insert into your core memory that I like bananas", "ground_truth": "bananas"}
-{"input": "Insert into your core memory that I like oranges", "ground_truth": "oranges"}
-{"input": "Insert into your core memory that I like strawberries", "ground_truth": "strawberries"}
-{"input": "Insert into your core memory that I like grapes", "ground_truth": "grapes"}
+{"input": "Classify this ticket. Reply exactly as JSON with keys category and priority: 'Production checkout is down for all users.'", "ground_truth": "{\"category\": \"incident\", \"priority\": \"high\"}"}
+{"input": "Classify this ticket. Reply exactly as JSON with keys category and priority: 'Please add dark mode to the dashboard someday.'", "ground_truth": "{\"category\": \"feature\", \"priority\": \"low\"}"}
+{"input": "Classify this ticket. Reply exactly as JSON with keys category and priority: 'The export button returns a 500 for finance admins.'", "ground_truth": "{\"category\": \"bug\", \"priority\": \"medium\"}"}

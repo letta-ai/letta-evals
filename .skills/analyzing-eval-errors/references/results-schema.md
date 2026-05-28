@@ -98,7 +98,7 @@ Contains the suite config and target config. Key fields:
     "config": {
         "suite": "filesystem-code",
         "target": {
-            "kind": "letta_code",          # or "letta_agent"
+            "kind": "letta_code",
             "base_url": "https://api.letta.com/",
             "model_handles": ["minimax-m2.5", "glm-5"],
             "timeout": 600,
