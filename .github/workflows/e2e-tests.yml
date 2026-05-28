@@ -78,7 +78,7 @@ jobs:
       - name: Configure Modal
         if: matrix.suite-path == 'examples/letta-code-simple-edit/suite.yaml'
         env:
-          MODAL_TOKEN_ID: ${{ vars.MODAL_TOKEN_ID || secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
           MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
         run: |
           test -n "$MODAL_TOKEN_ID" || (echo "MODAL_TOKEN_ID is not configured" >&2; exit 1)
