@@ -6,9 +6,9 @@ target:
   kind: letta_code
   base_url: http://localhost:8283
   agent_script: ../setup_agent.py:setup_agent
-  model_configs:
-    - openai-gpt-4.1
-    - openai-gpt-4.1-nano
+  model_handles:
+    - gpt-4.1-2025-04-14
+    - gpt-4.1-2025-04-14-nano
 grader:
   kind: tool
   function: contains

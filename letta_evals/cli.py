@@ -100,15 +100,6 @@ def run(
             "(e.g. 'openai/gpt-4.1'). Overrides the suite's model_handles list."
         ),
     ),
-    model_config: Optional[str] = typer.Option(
-        None,
-        "--model-config",
-        help=(
-            "Only valid with --sample: scope the single-sample run to this named "
-            "model config (matches a file under letta_evals/llm_model_configs/). "
-            "Overrides the suite's model_configs list."
-        ),
-    ),
 ):
     """Run an evaluation suite."""
 
@@ -136,9 +127,6 @@ def run(
         if output_json is None:
             console.print("[red]Error: --sample requires --output-json[/red]")
             raise typer.Exit(2)
-        if model_handle is not None and model_config is not None:
-            console.print("[red]Error: --model-handle and --model-config are mutually exclusive[/red]")
-            raise typer.Exit(2)
         try:
             anyio.run(  # type: ignore[arg-type]
                 _run_single_sample,
@@ -149,7 +137,6 @@ def run(
                 base_url,
                 project_id,
                 model_handle,
-                model_config,
             )
         except Exception as e:
             console.print(f"[red]Error running single sample: {e}[/red]")
@@ -178,9 +165,7 @@ def run(
         num_samples = len(samples)
 
         # calculate total evaluations (samples × models)
-        if suite.target.model_configs:
-            num_models = len(suite.target.model_configs)
-        elif suite.target.model_handles:
+        if suite.target.model_handles:
             num_models = len(suite.target.model_handles)
         else:
             num_models = 1
@@ -379,7 +364,6 @@ async def _run_single_sample(
     base_url: Optional[str],
     project_id: Optional[str],
     model_handle: Optional[str],
-    model_config: Optional[str],
 ) -> None:
     """Short-circuit entrypoint: run one Sample, write one SampleResult.
 
@@ -404,10 +388,6 @@ async def _run_single_sample(
     # so Runner.run_sample dispatches against the right config.
     if model_handle is not None:
         yaml_data.setdefault("target", {})["model_handles"] = [model_handle]
-        yaml_data["target"].pop("model_configs", None)
-    if model_config is not None:
-        yaml_data.setdefault("target", {})["model_configs"] = [model_config]
-        yaml_data["target"].pop("model_handles", None)
 
     suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent)
 
@@ -425,13 +405,10 @@ async def _run_single_sample(
         letta_project_id=project_id,
     )
 
-    if len(runner.model_configs) > 1:
-        raise ValueError(
-            "In-sandbox run resolved to multiple models — pass --model-handle or "
-            "--model-config to scope to a single model."
-        )
+    if len(runner.model_handles) > 1:
+        raise ValueError("In-sandbox run resolved to multiple models — pass --model-handle to scope to a single model.")
 
-    llm_config = runner.model_configs[0]
+    llm_config = runner.model_handles[0]
     result = await runner.run_sample(sample, llm_config=llm_config)
 
     output_json_path.parent.mkdir(parents=True, exist_ok=True)

@@ -170,7 +170,7 @@ See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-a
 
 **Can I test the same eval with different LLM models?**
 
-* Yes! Use the multi-model configuration feature. See [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) for an example that tests one task suite with multiple model configurations.
+* Yes! Use the multi-model support. See [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) for an example that tests one task suite with multiple model handles.
 
 **Can I run evaluations multiple times to measure consistency?**
 

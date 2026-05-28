@@ -9,35 +9,35 @@ target:
   base_url: http://localhost:9005  # local
   # base_url: https://api.letta.com/  # cloud
   agent_script: setup_cloud_agent.py:setup_agent
-  model_configs:
-    - openai-gpt-5.2-medium
-    - openai-gpt-5.2-high
-    - openai-gpt-5.2-xhigh
-    - openai-gpt-5.1
-    - openai-gpt-5.1-codex
-    - openai-gpt-5.1-codex-mini
-    - openai-gpt-4.1
-    - openai-gpt-4.1-mini
-    - openai-gpt-4.1-nano
-    - openai-gpt-5
-    - openai-gpt-5-mini
-    - openai-gpt-5-nano
-    - claude-4-6-opus
-    - claude-4-5-opus
-    - claude-4-5-sonnet
-    - claude-4-5-haiku
-    - claude-4-1-opus
-    - together-gpt-oss-120b
-    - together-gpt-oss-20b
-    - openrouter-kimi-k2-0905
-    - openrouter-deepseek-v3.1
-    - openrouter-glm-4.6
-    - openrouter-minimax-m2
-    - gemini-3-pro
-    - gemini-3-flash
+  model_handles:
+    - gpt-5.2-2025-12-11
+    - gpt-5.2-2025-12-11
+    - gpt-5.2-2025-12-11
+    - gpt-5.1-2025-11-13
+    - gpt-5.1-2025-11-13-codex
+    - gpt-5.1-2025-11-13-codex-mini
+    - gpt-4.1-2025-04-14
+    - gpt-4.1-2025-04-14-mini
+    - gpt-4.1-2025-04-14-nano
+    - gpt-5-2025-08-07
+    - gpt-5-2025-08-07-mini
+    - gpt-5-2025-08-07-nano
+    - claude-opus-4-6
+    - claude-opus-4-5-20251101
+    - claude-sonnet-4-5-20250929
+    - claude-haiku-4-5-20251001
+    - claude-opus-4-1-20250805
+    - openai/gpt-oss-120b
+    - openai/gpt-oss-20b
+    - moonshotai/kimi-k2-0905
+    - deepseek/deepseek-chat-v3.1
+    - z-ai/glm-4.6
+    - minimax/minimax-m2
+    - gemini-3-pro-preview
+    - gemini-3-flash-preview
     - deepseek-reasoner
     - deepseek-chat
-    - openrouter-mistral-large-3
+    - mistralai/mistral-large-2512
 
 graders:
   rubric_check:

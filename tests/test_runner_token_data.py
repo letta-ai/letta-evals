@@ -14,7 +14,7 @@ Three contracts:
         populated objects.
 
 These tests bypass ``Runner.__init__`` (which builds an AsyncLetta client and
-loads model configs from disk) and inject only the attributes
+loads model handles) and inject only the attributes
 ``run_sample`` actually reads. The goal is to lock down the wire-up between
 ``Runner`` and the new fields, not to re-test target/grader internals.
 """
@@ -124,7 +124,7 @@ def _make_runner(grader: _FakeGrader, target: MagicMock) -> Runner:
     runner.max_concurrent = 1
     runner.semaphore = anyio.Semaphore(1)
     runner.progress_callback = None
-    runner.model_configs = [None]
+    runner.model_handles = [None]
     runner.cached_results = None
     runner._cached_trajectories = {}
     runner.stream_writer = None

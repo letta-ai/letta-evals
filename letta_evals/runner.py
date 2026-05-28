@@ -1,5 +1,4 @@
 import inspect
-import json
 import logging
 import os
 import time
@@ -10,7 +9,6 @@ from typing import Dict, List, Optional
 import anyio
 import yaml
 from letta_client import AsyncLetta
-from letta_client.types import LlmConfig
 from rich.console import Console
 
 from letta_evals.datasets.loader import load_dataset
@@ -59,7 +57,7 @@ from letta_evals.visualization.factory import ProgressStyle, create_progress_cal
 
 logger = logging.getLogger(__name__)
 
-# Sentinel model identifier used when a suite has no model_configs/model_handles.
+# Sentinel model identifier used when a suite has no model_handles.
 DEFAULT_MODEL_ID = "default"
 
 # Host env vars auto-forwarded into a Modal sandbox (when present) so the
@@ -80,18 +78,14 @@ DEFAULT_SANDBOX_FORWARD_ENV = (
 )
 
 
-def _extract_model_name(llm_config) -> Optional[str]:
-    """Extract model name from LlmConfig object or string handle."""
-    if isinstance(llm_config, LlmConfig):
-        return llm_config.model
-    elif isinstance(llm_config, str):
-        return llm_config
-    return None
+def _extract_model_name(model_handle: Optional[str]) -> Optional[str]:
+    """Extract model name from a model handle."""
+    return model_handle
 
 
-def _model_id_for(llm_config) -> str:
-    """Stable bucket/path identifier for a model config or handle."""
-    return _extract_model_name(llm_config) or DEFAULT_MODEL_ID
+def _model_id_for(model_handle: Optional[str]) -> str:
+    """Stable bucket/path identifier for a model handle."""
+    return model_handle or DEFAULT_MODEL_ID
 
 
 def _build_usage(
@@ -166,7 +160,7 @@ class Runner:
         self.max_concurrent = max_concurrent
         self.semaphore = anyio.Semaphore(max_concurrent)
         self.progress_callback = progress_callback
-        self.model_configs = self._load_model_configs()
+        self.model_handles = self._load_model_handles()
         self.cached_results = cached_results
         self._cached_trajectories: Dict[SampleId, Dict[str, SampleResult]] = (
             self._build_trajectory_cache() if cached_results else {}
@@ -183,7 +177,7 @@ class Runner:
 
     @property
     def model_ids(self) -> List[str]:
-        return [_model_id_for(cfg) for cfg in self.model_configs]
+        return [_model_id_for(handle) for handle in self.model_handles]
 
     @property
     def grader_keys(self) -> List[str]:
@@ -191,40 +185,15 @@ class Runner:
 
     # ── target setup ──
 
-    def _load_model_configs(self) -> List[Optional[LlmConfig | str]]:
-        """Load model configurations and handles if specified."""
-        has_configs = self.suite.target.model_configs is not None
-        has_handles = self.suite.target.model_handles is not None
-
-        if not has_configs and not has_handles:
+    def _load_model_handles(self) -> List[Optional[str]]:
+        """Load model handles if specified."""
+        if self.suite.target.model_handles is None:
             return [None]
+        return list(self.suite.target.model_handles)
 
-        if has_configs and has_handles:
-            raise ValueError("Cannot specify both model_configs and model_handles in target spec")
-
-        configs: List[LlmConfig | str] = []
-
-        if has_configs:
-            model_configs_dir = Path(__file__).parent / "llm_model_configs"
-            for config_name in self.suite.target.model_configs:
-                config_path = model_configs_dir / f"{config_name}.json"
-                if not config_path.exists():
-                    raise ValueError(f"Model config not found at path: {config_path}")
-
-                with open(config_path, "r") as f:
-                    config_data = json.load(f)
-                    llm_config = LlmConfig(**config_data)
-                    configs.append(llm_config.model)
-
-        if has_handles:
-            for handle in self.suite.target.model_handles:
-                configs.append(handle)
-
-        return configs
-
-    def _create_target(self, llm_config: Optional[LlmConfig | str] = None) -> AbstractAgentTarget:
-        """Create target from spec, optionally with model config or handle."""
-        model_handle = llm_config if isinstance(llm_config, str) else None
+    def _create_target(self, llm_config: Optional[str] = None) -> AbstractAgentTarget:
+        """Create target from spec, optionally with a model handle."""
+        model_handle = llm_config
 
         if not model_handle:
             raise ValueError("LettaCodeTarget requires a model_handle (string), but got None")
@@ -334,7 +303,7 @@ class Runner:
     async def _get_or_run_trajectory(
         self,
         sample: Sample,
-        llm_config: Optional[LlmConfig | str],
+        llm_config: Optional[str],
         retrieve_agent_state: bool = False,
         return_token_data: bool = False,
     ) -> tuple[
@@ -544,7 +513,7 @@ class Runner:
     async def _run_sample_in_sandbox(
         self,
         sample: Sample,
-        llm_config: Optional[LlmConfig | str],
+        llm_config: Optional[str],
         return_token_data: bool,
         t_sample_start: float,
     ) -> SampleResult:
@@ -654,11 +623,6 @@ class Runner:
             ]
             if isinstance(llm_config, str):
                 cmd_parts += ["--model-handle", llm_config]
-            elif isinstance(llm_config, LlmConfig) and getattr(llm_config, "model", None):
-                # Best-effort: pass the model as a handle. If the suite uses
-                # model_configs (file-backed), suite authors should pre-bake
-                # them into the image and pass the config name explicitly.
-                cmd_parts += ["--model-handle", llm_config.model]
 
             import shlex as _shlex
 
@@ -817,7 +781,7 @@ class Runner:
     async def run_sample(
         self,
         sample: Sample,
-        llm_config: Optional[LlmConfig | str] = None,
+        llm_config: Optional[str] = None,
         return_token_data: bool = False,
     ) -> SampleResult:
         """Run a single sample through target and grader."""
@@ -1092,7 +1056,7 @@ class Runner:
 
         try:
             async with anyio.create_task_group() as tg:
-                for llm_config in self.model_configs:
+                for llm_config in self.model_handles:
                     if setup_needs_model:
                         await self._run_setup(model_name=_extract_model_name(llm_config))
 
@@ -1315,9 +1279,7 @@ async def run_suite(
                     )
 
     samples = list(load_dataset(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
-    if suite.target.model_configs:
-        num_models = len(suite.target.model_configs)
-    elif suite.target.model_handles:
+    if suite.target.model_handles:
         num_models = len(suite.target.model_handles)
     else:
         num_models = 1
@@ -1390,9 +1352,7 @@ async def _execute_runs(
     letta_project_id: Optional[str],
 ) -> RunnerResult:
     """Execute single or multiple evaluation runs sharing one streaming writer."""
-    if suite.target.model_configs:
-        model_ids = [_model_id_for(c) for c in (suite.target.model_configs or [])]
-    elif suite.target.model_handles:
+    if suite.target.model_handles:
         model_ids = list(suite.target.model_handles or [])
     else:
         model_ids = [DEFAULT_MODEL_ID]

@@ -91,7 +91,7 @@ def _make_runner_with_sandbox(tmp_path: Path, *, sandbox_spec: Optional[ModalSan
     runner.max_concurrent = 1
     runner.semaphore = anyio.Semaphore(1)
     runner.progress_callback = None
-    runner.model_configs = [None]
+    runner.model_handles = [None]
     runner.cached_results = None
     runner._cached_trajectories = {}
     runner.stream_writer = None
