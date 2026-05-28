@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 
 from letta_evals.models import (
     LettaCodeTargetSpec,
-    Sample,
     SimpleGateSpec,
     SuiteSpec,
     ToolGraderSpec,
