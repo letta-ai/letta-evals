@@ -37,7 +37,6 @@ from letta_evals.models.specs import (
     GateSpec,
     GraderSpec,
     LettaCodeTargetSpec,
-    LettaJudgeGraderSpec,
     LogicalGateSpec,
     ModalSandboxSpec,
     ModelJudgeGraderSpec,
@@ -74,7 +73,6 @@ __all__ = [
     "BaseGraderSpec",
     "ToolGraderSpec",
     "ModelJudgeGraderSpec",
-    "LettaJudgeGraderSpec",
     "GraderSpec",
     # specs — gates
     "SimpleCondition",

@@ -14,7 +14,6 @@ from letta_client.types import LlmConfig
 from rich.console import Console
 
 from letta_evals.datasets.loader import load_dataset
-from letta_evals.graders.agent_judge import AgentJudgeGrader
 from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
@@ -23,7 +22,6 @@ from letta_evals.models import (
     AgentState,
     Error,
     GradeResult,
-    LettaJudgeGraderSpec,
     LettaMessageUnion,
     LogicalGateSpec,
     ModelJudgeGraderSpec,
@@ -269,29 +267,6 @@ class Runner:
                         extractor_config=gspec.extractor_config,
                         base_dir=gspec.base_dir,
                         system_prompt=gspec.system_prompt,
-                    )
-                elif isinstance(gspec, LettaJudgeGraderSpec):
-                    agent_file = None
-                    agent_id = gspec.agent_id
-                    judge_tool_name = gspec.judge_tool_name
-
-                    if agent_id is None:
-                        agent_file = gspec.agent_file
-                        if agent_file is None:
-                            agent_file = Path(__file__).parent / "graders/letta-evals-judge-agent.af"
-                            judge_tool_name = "submit_grade"
-
-                    self.graders[key] = AgentJudgeGrader(
-                        prompt=gspec.prompt,
-                        client=self.client,
-                        agent_file=agent_file,
-                        agent_id=agent_id,
-                        cleanup=self.suite.cleanup,
-                        project_id=self.project_id,
-                        judge_tool_name=judge_tool_name,
-                        extractor=gspec.extractor,
-                        extractor_config=gspec.extractor_config,
-                        base_dir=gspec.base_dir,
                     )
                 else:
                     raise ValueError(f"Unknown grader spec type: {type(gspec)}")
@@ -1045,7 +1020,7 @@ class Runner:
         import string as _string
 
         for grader_key, grader_spec in self.suite.graders.items():
-            if not isinstance(grader_spec, (ModelJudgeGraderSpec, LettaJudgeGraderSpec)):
+            if not isinstance(grader_spec, ModelJudgeGraderSpec):
                 continue
             rubric_text = grader_spec.prompt
             if rubric_text is None:

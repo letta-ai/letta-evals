@@ -4,7 +4,7 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 
 from letta_evals.decorators import agent_factory, extractor, grader, suite_setup
-from letta_evals.graders import AgentJudgeGrader, Grader, RubricGrader, ToolGrader
+from letta_evals.graders import Grader, RubricGrader, ToolGrader
 from letta_evals.models import (
     AgentState,
     Error,
@@ -50,7 +50,6 @@ except PackageNotFoundError:
 
 __all__ = [
     "AbstractAgentTarget",
-    "AgentJudgeGrader",
     "AgentState",
     "Aggregation",
     "Error",

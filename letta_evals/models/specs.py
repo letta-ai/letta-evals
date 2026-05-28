@@ -1,7 +1,7 @@
 """Configuration specs.
 
 Pydantic models for the suite YAML: target (agent), graders (tool / model
-judge / letta judge), gates (simple / weighted_average / logical), and the
+judge), gates (simple / weighted_average / logical), and the
 top-level :class:`SuiteSpec`. Also includes small gate helper functions used
 by metrics computation.
 """
@@ -143,7 +143,7 @@ SandboxSpec = Annotated[ModalSandboxSpec, Field(discriminator="kind")]
 class BaseGraderSpec(BaseModel):
     """Base grader configuration with common fields."""
 
-    kind: GraderKind = Field(description="Type of grader (tool, model_judge, or letta_judge)")
+    kind: GraderKind = Field(description="Type of grader (tool or model_judge)")
     display_name: Optional[str] = Field(default=None, description="Human-friendly name for this metric")
     extractor: str = Field(default="last_assistant", description="Strategy for extracting submission from trajectory")
     extractor_config: Optional[Dict[str, Any]] = Field(default=None, description="Configuration for the extractor")
@@ -198,56 +198,8 @@ class ModelJudgeGraderSpec(BaseGraderSpec):
         return self
 
 
-class LettaJudgeGraderSpec(BaseGraderSpec):
-    """Letta judge grader configuration."""
-
-    kind: Literal[GraderKind.LETTA_JUDGE] = GraderKind.LETTA_JUDGE
-    prompt: Optional[str] = Field(default=None, description="Prompt for letta judge")
-    prompt_path: Optional[Path] = Field(default=None, description="Path to file containing prompt")
-    agent_file: Optional[Path] = Field(default=None, description="Path to .af agent file to use as judge")
-    agent_id: Optional[str] = Field(default=None, description="Letta Cloud agent ID to use as judge")
-    judge_tool_name: str = Field(
-        default="submit_grade", description="Name of tool that agent uses to submit score/rationale"
-    )
-
-    @field_validator("agent_file")
-    @classmethod
-    def validate_agent_file(cls, v: Optional[Path]) -> Optional[Path]:
-        if v and not str(v).endswith(".af"):
-            raise ValueError("Agent file must have .af extension")
-        return v
-
-    @model_validator(mode="after")
-    def validate_letta_judge_config(self):
-        if not self.prompt and not self.prompt_path:
-            raise ValueError("Letta judge requires either prompt or prompt_path")
-        if self.prompt and self.prompt_path:
-            raise ValueError("Letta judge cannot have both prompt and prompt_path")
-
-        # Ensure either agent_file or agent_id is provided (but not both)
-        if self.agent_file and self.agent_id:
-            raise ValueError("Cannot provide both agent_file and agent_id. Use one or the other.")
-        if not self.agent_file and not self.agent_id:
-            # If neither is provided, use default agent file
-            pass
-
-        # if using default agent (agent_file is None and agent_id is None), cannot specify judge_tool_name
-        if self.agent_file is None and self.agent_id is None and self.judge_tool_name != "submit_grade":
-            raise ValueError(
-                "Cannot specify judge_tool_name when using default Letta judge (agent_file and agent_id are None). "
-                "To use a custom judge_tool_name, provide a custom agent_file or agent_id."
-            )
-
-        # load prompt from file if needed
-        if self.prompt_path:
-            with open(self.prompt_path, "r") as f:
-                self.prompt = f.read()
-
-        return self
-
-
 GraderSpec = Annotated[
-    Union[ToolGraderSpec, ModelJudgeGraderSpec, LettaJudgeGraderSpec],
+    Union[ToolGraderSpec, ModelJudgeGraderSpec],
     Field(discriminator="kind"),
 ]
 
@@ -456,9 +408,6 @@ class SuiteSpec(BaseModel):
                     if "prompt_path" in gspec and gspec["prompt_path"]:
                         if not Path(gspec["prompt_path"]).is_absolute():
                             gspec["prompt_path"] = str((base_dir / gspec["prompt_path"]).resolve())
-                    if "agent_file" in gspec and gspec["agent_file"]:
-                        if not Path(gspec["agent_file"]).is_absolute():
-                            gspec["agent_file"] = str((base_dir / gspec["agent_file"]).resolve())
                     # Deprecation: drop legacy grader-level rubric_vars allow-list.
                     # Variables are now auto-substituted from sample.rubric_vars.
                     if "rubric_vars" in gspec:

@@ -66,7 +66,7 @@ A top-level `--version` flag prints the installed version (e.g.
 
 ### ⚠ BREAKING CHANGES — rubric grader redesign
 
-The `model_judge` and `letta_judge` graders now send the rubric **verbatim**
+The `model_judge` grader now sends the rubric **verbatim**
 to the judge after template substitution. The framework no longer wraps the
 rubric, injects a system prompt, or auto-appends sections like "Original
 Question / Expected Answer / Agent's Submission". This eliminates hidden
@@ -99,7 +99,7 @@ sample. The two fields are mutually exclusive. See
 addition to the rubric. No system prompt is sent by default.
 
 **Removed.** The grader-level `rubric_vars: [...]` allow-list on
-`model_judge` / `letta_judge` specs is removed. All keys in
+`model_judge` specs is removed. All keys in
 `sample.rubric_vars` are auto-substituted into the rubric. Suite YAMLs that
 still include this field will emit a `DeprecationWarning` and the field is
 dropped on load.
