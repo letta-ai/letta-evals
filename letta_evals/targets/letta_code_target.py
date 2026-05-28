@@ -10,14 +10,14 @@ import anyio
 from letta_client import AsyncLetta
 
 from letta_evals.models import Sample, TargetResult, TurnTokenData
-from letta_evals.targets.base import AbstractAgentTarget, TargetError
+from letta_evals.targets.errors import TargetError
 from letta_evals.utils import list_all_agent_messages, load_object
 from letta_evals.visualization.base import ProgressCallback
 
 logger = logging.getLogger(__name__)
 
 
-class LettaCodeTarget(AbstractAgentTarget):
+class LettaCodeTarget:
     """Letta code target that invokes the letta CLI command."""
 
     def __init__(

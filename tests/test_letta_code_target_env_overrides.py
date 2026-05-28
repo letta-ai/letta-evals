@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from letta_evals.models import Sample
-from letta_evals.targets.base import TargetError
+from letta_evals.targets.errors import TargetError
 from letta_evals.targets.letta_code_target import LettaCodeTarget
 
 

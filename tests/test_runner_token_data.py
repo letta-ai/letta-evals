@@ -131,8 +131,8 @@ def _make_runner(grader: _FakeGrader, target: MagicMock) -> Runner:
     runner.output_path = None
     runner.project_id = None
 
-    # Patch _create_target so _get_or_run_trajectory returns our canned target.
-    runner._create_target = lambda model_handle=None: target  # type: ignore[method-assign]
+    # Patch _create_letta_code_target so _get_or_run_trajectory returns our canned target.
+    runner._create_letta_code_target = lambda model_handle=None: target  # type: ignore[method-assign]
     return runner
 
 

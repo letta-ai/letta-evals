@@ -29,7 +29,7 @@ from letta_evals.models import (
     Usage,
 )
 from letta_evals.runner import Runner, run_suite
-from letta_evals.targets import AbstractAgentTarget, LettaCodeTarget
+from letta_evals.targets import LettaCodeTarget, TargetError
 from letta_evals.types import (
     Aggregation,
     ErrorCategory,
@@ -47,7 +47,6 @@ except PackageNotFoundError:
     __version__ = "0.19.0"
 
 __all__ = [
-    "AbstractAgentTarget",
     "AgentState",
     "Aggregation",
     "Error",
@@ -76,6 +75,7 @@ __all__ = [
     "SampleResult",
     "Summary",
     "SuiteSpec",
+    "TargetError",
     "TargetResult",
     "Timing",
     "TimingStats",

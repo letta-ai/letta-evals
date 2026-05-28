@@ -43,7 +43,7 @@ from letta_evals.models import (
 )
 from letta_evals.pricing import calculate_cost_from_agent_usage
 from letta_evals.streaming import StreamingReader, StreamingWriter
-from letta_evals.targets.base import AbstractAgentTarget, TargetError
+from letta_evals.targets.errors import TargetError
 from letta_evals.targets.letta_code_target import LettaCodeTarget
 from letta_evals.types import Aggregation, ErrorCategory, LogicalOp
 from letta_evals.utils import (
@@ -186,8 +186,8 @@ class Runner:
             return [None]
         return list(self.suite.target.model_handles)
 
-    def _create_target(self, model_handle: Optional[str] = None) -> AbstractAgentTarget:
-        """Create target from spec, optionally with a model handle."""
+    def _create_letta_code_target(self, model_handle: Optional[str] = None) -> LettaCodeTarget:
+        """Create the letta_code target for a model handle."""
         if not model_handle:
             raise ValueError("LettaCodeTarget requires a model_handle (string), but got None")
 
@@ -335,7 +335,7 @@ class Runner:
                     getattr(cached_result, "token_data", None),
                 )
 
-        target = self._create_target(model_handle)
+        target = self._create_letta_code_target(model_handle)
         target_result = await target.run(
             sample,
             progress_callback=self.progress_callback,
