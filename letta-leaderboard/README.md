@@ -18,16 +18,15 @@ The benchmark has three suites:
 
 To add a new model to the leaderboard:
 
-1. Create a model config in [../letta_evals/llm_model_configs](../letta_evals/llm_model_configs).
-2. Add the model to the benchmark config in either [filesystem-agent/filesystem.yaml](filesystem-agent/filesystem.yaml) or [skills-suite/suite_skill_select_use.yaml](skills-suite/suite_skill_select_use.yaml):
+1. Add the model handle to the benchmark config in either [filesystem-agent/filesystem.yaml](filesystem-agent/filesystem.yaml) or [skills-suite/suite_skill_select_use.yaml](skills-suite/suite_skill_select_use.yaml):
 
 ```yaml
 target:
-  model_configs:
-    - provider-model-name
+  model_handles:
+    - provider/model-name
 ```
 
-3. Run the evaluation suite:
+2. Run the evaluation suite:
 Filesystem (Cloud) Suite:
 ```bash
 letta-evals run letta-leaderboard/filesystem-agent/filesystem_cloud.yaml \
@@ -46,7 +45,7 @@ letta-evals run letta-leaderboard/skills-suite/suite_skill_select_use.yaml \
   --output letta-leaderboard/skills-suite/results/{provider}-{model-name}
 ```
 
-4. Generate the updated leaderboard:
+3. Generate the updated leaderboard:
 
 The `generate_leaderboard_results.py` script reads evaluation results from the unified `summary.json` produced by `letta-evals` and merges them into the leaderboard YAML file. `summary.json` has the same shape for single-run and multi-run; the script mean-aggregates across runs automatically.
 
@@ -70,7 +69,7 @@ The script will:
 - `summary.json`: Top-level fields `{ suite, gates_passed, models: [...], runs_passed? }`
 - Each entry in `models` has `{ model, n_total, n_attempted, score, per_metric, usage, timing, ... }` (multi-run also has `score_std` and `per_metric_std`)
 
-5. Update leaderboard site
+4. Update leaderboard site
 - Add new models and any analysis / commentary to [updates.md](../leaderboard_site/src/_includes/updates.md).
 - In case of a new provider, add their logo to [leaderboard_site/src/icons](../leaderboard_site/src/icons).
 

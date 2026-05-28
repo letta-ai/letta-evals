@@ -89,7 +89,6 @@ class TestRunSingleSampleHelper:
                 None,  # base_url
                 None,  # project_id
                 None,  # model_handle
-                None,  # model_config
             )
 
         assert out_path.exists()
@@ -112,7 +111,7 @@ class TestRunSingleSampleHelper:
 
         seen_sandbox = {}
 
-        async def fake_run_sample(self, sample, llm_config=None, return_token_data=False):
+        async def fake_run_sample(self, sample, model_handle=None, return_token_data=False):
             seen_sandbox["value"] = self.suite.sandbox
             return _canned_result()
 
@@ -122,7 +121,6 @@ class TestRunSingleSampleHelper:
                 suite_path,
                 sample_path,
                 out_path,
-                None,
                 None,
                 None,
                 None,
@@ -161,9 +159,9 @@ gate:
 
         seen_models = {}
 
-        async def fake_run_sample(self, sample, llm_config=None, return_token_data=False):
-            seen_models["configs"] = list(self.model_configs)
-            seen_models["llm_config"] = llm_config
+        async def fake_run_sample(self, sample, model_handle=None, return_token_data=False):
+            seen_models["handles"] = list(self.model_handles)
+            seen_models["model_handle"] = model_handle
             return _canned_result()
 
         with patch("letta_evals.runner.Runner.run_sample", new=fake_run_sample):
@@ -176,11 +174,10 @@ gate:
                 None,
                 None,
                 "openai/gpt-a",
-                None,
             )
 
-        assert seen_models["configs"] == ["openai/gpt-a"]
-        assert seen_models["llm_config"] == "openai/gpt-a"
+        assert seen_models["handles"] == ["openai/gpt-a"]
+        assert seen_models["model_handle"] == "openai/gpt-a"
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="subprocess invocation differences")
@@ -199,33 +196,3 @@ class TestCLIInvocation:
             text=True,
         )
         assert result.returncode != 0, result.stdout + result.stderr
-
-    def test_conflicting_model_args_fail(self, tmp_path):
-        suite_path = _write_minimal_suite(tmp_path)
-        sample_path = _write_sample(tmp_path)
-        out_path = tmp_path / "out.json"
-
-        env = os.environ.copy()
-        env["NO_COLOR"] = "1"
-        result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "letta_evals",
-                "run",
-                str(suite_path),
-                "--sample",
-                str(sample_path),
-                "--output-json",
-                str(out_path),
-                "--model-handle",
-                "openai/gpt-a",
-                "--model-config",
-                "some-config",
-            ],
-            cwd=str(tmp_path),
-            env=env,
-            capture_output=True,
-            text=True,
-        )
-        assert result.returncode != 0

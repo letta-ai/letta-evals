@@ -91,7 +91,7 @@ def _make_runner_with_sandbox(tmp_path: Path, *, sandbox_spec: Optional[ModalSan
     runner.max_concurrent = 1
     runner.semaphore = anyio.Semaphore(1)
     runner.progress_callback = None
-    runner.model_configs = [None]
+    runner.model_handles = [None]
     runner.cached_results = None
     runner._cached_trajectories = {}
     runner.stream_writer = None
@@ -269,9 +269,9 @@ class TestRunSampleInSandbox:
         # called instead.
         called = {}
 
-        async def fake_in_sandbox(self, sample, llm_config, return_token_data, t_sample_start):
+        async def fake_in_sandbox(self, sample, model_handle, return_token_data, t_sample_start):
             called["sample"] = sample
-            called["llm_config"] = llm_config
+            called["model_handle"] = model_handle
             return _canned_result(sample.id)
 
         monkeypatch.setattr(Runner, "_run_sample_in_sandbox", fake_in_sandbox)
@@ -280,5 +280,5 @@ class TestRunSampleInSandbox:
         result = anyio.run(runner.run_sample, sample, "openai/gpt-a")
 
         assert called["sample"].id == "s1"
-        assert called["llm_config"] == "openai/gpt-a"
+        assert called["model_handle"] == "openai/gpt-a"
         assert result.grades["acc"].score == 1.0

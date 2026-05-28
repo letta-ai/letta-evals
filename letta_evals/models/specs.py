@@ -37,11 +37,6 @@ class BaseTargetSpec(BaseModel):
     project_id: Optional[str] = Field(default=None, description="Letta project ID")
     max_retries: int = Field(default=0, description="Maximum number of retries for failed target runs")
 
-    # model configs to test (names without .json extension)
-    model_configs: Optional[List[str]] = Field(
-        default=None, description="List of model config names from llm_model_configs directory"
-    )
-
     # model handles to test (cloud-compatible model identifiers)
     model_handles: Optional[List[str]] = Field(
         default=None, description="List of model handles (e.g., 'openai/gpt-4.1') for cloud deployments"

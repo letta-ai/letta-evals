@@ -1,6 +1,0 @@
-{
-    "context_window": 1048576,
-    "model": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
-    "model_endpoint_type": "together",
-    "model_endpoint": "https://api.together.ai/v1"
-}

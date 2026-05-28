@@ -14,7 +14,7 @@ Three contracts:
         populated objects.
 
 These tests bypass ``Runner.__init__`` (which builds an AsyncLetta client and
-loads model configs from disk) and inject only the attributes
+loads model handles) and inject only the attributes
 ``run_sample`` actually reads. The goal is to lock down the wire-up between
 ``Runner`` and the new fields, not to re-test target/grader internals.
 """
@@ -124,7 +124,7 @@ def _make_runner(grader: _FakeGrader, target: MagicMock) -> Runner:
     runner.max_concurrent = 1
     runner.semaphore = anyio.Semaphore(1)
     runner.progress_callback = None
-    runner.model_configs = [None]
+    runner.model_handles = [None]
     runner.cached_results = None
     runner._cached_trajectories = {}
     runner.stream_writer = None
@@ -132,7 +132,7 @@ def _make_runner(grader: _FakeGrader, target: MagicMock) -> Runner:
     runner.project_id = None
 
     # Patch _create_target so _get_or_run_trajectory returns our canned target.
-    runner._create_target = lambda llm_config=None: target  # type: ignore[method-assign]
+    runner._create_target = lambda model_handle=None: target  # type: ignore[method-assign]
     return runner
 
 
@@ -223,7 +223,7 @@ async def test_t0_1_return_token_data_flag_propagates_to_target():
     runner = _make_runner(grader, target)
     sample = Sample(id=0, input="hi", ground_truth="ok")
 
-    await runner.run_sample(sample, llm_config=None, return_token_data=True)
+    await runner.run_sample(sample, model_handle=None, return_token_data=True)
 
     target.run.assert_awaited_once()
     kwargs = target.run.await_args.kwargs
@@ -250,7 +250,7 @@ async def test_t0_1_token_data_surfaces_on_sample_result():
     runner = _make_runner(grader, target)
     sample = Sample(id=0, input="hi", ground_truth="ok")
 
-    result = await runner.run_sample(sample, llm_config=None, return_token_data=True)
+    result = await runner.run_sample(sample, model_handle=None, return_token_data=True)
 
     assert result.token_data == token_data, (
         "T0.1: SampleResult.token_data must equal the list returned by the target. "
@@ -274,7 +274,7 @@ async def test_t0_1_default_keeps_token_data_none():
     runner = _make_runner(grader, target)
     sample = Sample(id=0, input="hi", ground_truth="ok")
 
-    result = await runner.run_sample(sample, llm_config=None)
+    result = await runner.run_sample(sample, model_handle=None)
 
     assert target.run.await_args.kwargs.get("return_token_data") is False
     assert result.token_data is None
@@ -296,7 +296,7 @@ async def test_t0_2_agent_state_requested_when_grader_needs_it():
     runner = _make_runner(grader, target)
     sample = Sample(id=0, input="hi", ground_truth="ok")
 
-    result = await runner.run_sample(sample, llm_config=None)
+    result = await runner.run_sample(sample, model_handle=None)
 
     target.run.assert_awaited_once()
     kwargs = target.run.await_args.kwargs
@@ -321,7 +321,7 @@ async def test_t0_2_agent_state_skipped_when_no_grader_needs_it():
     runner = _make_runner(grader, target)
     sample = Sample(id=0, input="hi", ground_truth="ok")
 
-    result = await runner.run_sample(sample, llm_config=None)
+    result = await runner.run_sample(sample, model_handle=None)
 
     kwargs = target.run.await_args.kwargs
     assert kwargs.get("retrieve_agent_state") is False
@@ -345,7 +345,7 @@ async def test_t0_2_agent_state_and_token_data_combine_in_one_call():
     runner = _make_runner(grader, target)
     sample = Sample(id=0, input="hi", ground_truth="ok")
 
-    result = await runner.run_sample(sample, llm_config=None, return_token_data=True)
+    result = await runner.run_sample(sample, model_handle=None, return_token_data=True)
 
     assert target.run.await_count == 1, "T0.2 + T0.1: combined RL fetch must be a single target.run call."
     kwargs = target.run.await_args.kwargs
