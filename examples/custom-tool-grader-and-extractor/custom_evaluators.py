@@ -23,7 +23,11 @@ def ticket_classification_grader(sample: Sample, submission: str) -> GradeResult
     except json.JSONDecodeError:
         return GradeResult(score=0.0, rationale="Submission was not valid JSON")
 
-    expected = sample.ground_truth
+    try:
+        expected = json.loads(sample.ground_truth or "{}")
+    except json.JSONDecodeError:
+        return GradeResult(score=0.0, rationale="Ground truth was not valid JSON")
+
     if not isinstance(expected, dict):
         return GradeResult(score=0.0, rationale="Ground truth must be a JSON object")
 
