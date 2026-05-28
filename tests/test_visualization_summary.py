@@ -16,12 +16,7 @@ from letta_evals.models import (
     ToolGraderSpec,
     Usage,
 )
-from letta_evals.types import (
-    Aggregation,
-    GateKind,
-    MetricOp,
-    TargetKind,
-)
+from letta_evals.types import Aggregation, GateKind, MetricOp
 from letta_evals.visualization.summary import (
     build_rich_sample_results_table,
     build_simple_sample_results_table,
@@ -34,7 +29,7 @@ def _make_suite() -> SuiteSpec:
     return SuiteSpec(
         name="test-suite",
         dataset="ignored",
-        target=LettaCodeTargetSpec(kind=TargetKind.LETTA_CODE, model_handles=["openai/gpt-4.1-mini"]),
+        target=LettaCodeTargetSpec(model_handles=["openai/gpt-4.1-mini"]),
         graders={
             "accuracy": ToolGraderSpec(function="exact_match", display_name="Accuracy"),
             "quality": ToolGraderSpec(function="exact_match", display_name="Quality"),

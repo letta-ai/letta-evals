@@ -19,14 +19,14 @@ from letta_evals.models import (
     ToolGraderSpec,
 )
 from letta_evals.streaming import StreamingReader, StreamingWriter
-from letta_evals.types import Aggregation, GateKind, MetricOp, TargetKind
+from letta_evals.types import Aggregation, GateKind, MetricOp
 
 
 def _make_suite() -> SuiteSpec:
     return SuiteSpec(
         name="test-suite",
         dataset="ignored",
-        target=LettaCodeTargetSpec(kind=TargetKind.LETTA_CODE, model_handles=["openai/gpt-4.1-mini"]),
+        target=LettaCodeTargetSpec(model_handles=["openai/gpt-4.1-mini"]),
         graders={"check": ToolGraderSpec(function="exact_match", display_name="Check")},
         gate=SimpleGateSpec(
             kind=GateKind.SIMPLE,

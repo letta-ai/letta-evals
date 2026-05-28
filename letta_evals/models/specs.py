@@ -19,18 +19,17 @@ from letta_evals.types import (
     LLMProvider,
     LogicalOp,
     MetricOp,
-    TargetKind,
 )
 
-# Target specs
+# Target spec
 
 
-class BaseTargetSpec(BaseModel):
-    """Base target configuration with common fields."""
+class LettaCodeTargetSpec(BaseModel):
+    """Letta code target configuration."""
 
     model_config = ConfigDict(extra="forbid")
 
-    kind: TargetKind = Field(description="Type of target")
+    kind: Literal["letta_code"] = "letta_code"
     base_url: str = Field(default="http://localhost:8283", description="Letta server URL")
     api_key: Optional[str] = Field(default=None, description="API key for authentication")
     timeout: float = Field(default=300.0, description="Request timeout in seconds")
@@ -49,12 +48,6 @@ class BaseTargetSpec(BaseModel):
     # internal field for path resolution
     base_dir: Optional[Path] = Field(default=None, exclude=True)
 
-
-class LettaCodeTargetSpec(BaseTargetSpec):
-    """Letta code target configuration."""
-
-    kind: Literal[TargetKind.LETTA_CODE] = TargetKind.LETTA_CODE
-
     allowed_tools: Optional[List[str]] = Field(
         default=None, description="List of allowed tools for letta code (e.g., ['Bash', 'Read'])"
     )
@@ -68,9 +61,6 @@ class LettaCodeTargetSpec(BaseTargetSpec):
         default=None,
         description="Permission mode for letta code (e.g., 'memory' to scope writes to memory roots).",
     )
-
-
-TargetSpec = LettaCodeTargetSpec
 
 
 # Sandbox specs
@@ -333,7 +323,7 @@ class SuiteSpec(BaseModel):
     name: str = Field(description="Name of the evaluation suite")
     description: Optional[str] = Field(default=None, description="Description of what this suite evaluates")
     dataset: Path = Field(description="Path to JSONL dataset file")
-    target: TargetSpec = Field(description="Target configuration")
+    target: LettaCodeTargetSpec = Field(description="Target configuration")
     graders: Optional[Dict[str, GraderSpec]] = Field(default=None, description="Multiple graders keyed by metric name")
     gate: GateSpec = Field(description="Pass/fail criteria for avg_score (required)")
 
