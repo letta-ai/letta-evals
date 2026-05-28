@@ -75,6 +75,17 @@ jobs:
         run: |
           uv sync --extra dev
 
+      - name: Configure Modal
+        if: matrix.suite-path == 'examples/letta-code-simple-edit/suite.yaml'
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          test -n "$MODAL_TOKEN_ID" || (echo "MODAL_TOKEN_ID is not configured" >&2; exit 1)
+          test -n "$MODAL_TOKEN_SECRET" || (echo "MODAL_TOKEN_SECRET is not configured" >&2; exit 1)
+          printf '[letta]\ntoken_id = "%s"\ntoken_secret = "%s"\nactive = true\nenvironment = "main"\nimage_builder_version = "2025.06"\n' \
+            "$MODAL_TOKEN_ID" "$MODAL_TOKEN_SECRET" > ~/.modal.toml
+
       - name: Run e2e test for ${{ matrix.suite-path }}
         env:
           LETTA_API_KEY: ${{ secrets.LETTA_API_KEY }}
