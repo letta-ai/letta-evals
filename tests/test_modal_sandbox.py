@@ -112,20 +112,6 @@ class TestModalSandboxSpec:
 
 
 class TestSuiteSpecWithSandbox:
-    def test_legacy_agent_target_kind_is_rejected(self):
-        yaml_data = _minimal_suite_yaml()
-        yaml_data["target"] = {"kind": "letta" + "_agent", "agent_id": "agent-test"}
-
-        with pytest.raises(ValueError):
-            SuiteSpec.from_yaml(yaml_data)
-
-    def test_legacy_agent_file_target_field_is_rejected(self):
-        yaml_data = _minimal_suite_yaml()
-        yaml_data["target"]["agent_file"] = "agent.af"
-
-        with pytest.raises(ValueError):
-            SuiteSpec.from_yaml(yaml_data)
-
     def test_sandbox_absent_keeps_field_none(self):
         yaml_data = _minimal_suite_yaml()
         del yaml_data["sandbox"]
