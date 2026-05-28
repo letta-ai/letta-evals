@@ -186,10 +186,8 @@ class Runner:
             return [None]
         return list(self.suite.target.model_handles)
 
-    def _create_target(self, llm_config: Optional[str] = None) -> AbstractAgentTarget:
+    def _create_target(self, model_handle: Optional[str] = None) -> AbstractAgentTarget:
         """Create target from spec, optionally with a model handle."""
-        model_handle = llm_config
-
         if not model_handle:
             raise ValueError("LettaCodeTarget requires a model_handle (string), but got None")
 
@@ -298,7 +296,7 @@ class Runner:
     async def _get_or_run_trajectory(
         self,
         sample: Sample,
-        llm_config: Optional[str],
+        model_handle: Optional[str],
         retrieve_agent_state: bool = False,
         return_token_data: bool = False,
     ) -> tuple[
@@ -311,14 +309,13 @@ class Runner:
     ]:
         """Return (trajectory, agent_id, model_name, agent_usage, agent_state, token_data)."""
         sample_id = sample.id
-        model_name = llm_config
 
         if self.cached_results:
             cached_result: Optional[SampleResult] = None
             cached_models = self._cached_trajectories.get(sample_id)
 
             if cached_models:
-                lookup_key = model_name or DEFAULT_MODEL_ID
+                lookup_key = model_handle or DEFAULT_MODEL_ID
                 if lookup_key in cached_models:
                     cached_result = cached_models[lookup_key]
                 elif len(cached_models) == 1:
@@ -327,18 +324,18 @@ class Runner:
             if cached_result is not None:
                 if self.progress_callback:
                     await self.progress_callback.agent_created(
-                        sample_id, agent_id=cached_result.agent_id, model_name=model_name, from_cache=True
+                        sample_id, agent_id=cached_result.agent_id, model_name=model_handle, from_cache=True
                     )
                 return (
                     cached_result.trajectory,
                     cached_result.agent_id,
-                    model_name or DEFAULT_MODEL_ID,
+                    model_handle or DEFAULT_MODEL_ID,
                     getattr(cached_result, "agent_usage", None),
                     getattr(cached_result, "agent_state", None),
                     getattr(cached_result, "token_data", None),
                 )
 
-        target = self._create_target(llm_config)
+        target = self._create_target(model_handle)
         target_result = await target.run(
             sample,
             progress_callback=self.progress_callback,
@@ -508,7 +505,7 @@ class Runner:
     async def _run_sample_in_sandbox(
         self,
         sample: Sample,
-        llm_config: Optional[str],
+        model_handle: Optional[str],
         return_token_data: bool,
         t_sample_start: float,
     ) -> SampleResult:
@@ -616,8 +613,8 @@ class Runner:
                 "--output-json",
                 "/mnt/result.json",
             ]
-            if isinstance(llm_config, str):
-                cmd_parts += ["--model-handle", llm_config]
+            if isinstance(model_handle, str):
+                cmd_parts += ["--model-handle", model_handle]
 
             import shlex as _shlex
 
@@ -776,12 +773,11 @@ class Runner:
     async def run_sample(
         self,
         sample: Sample,
-        llm_config: Optional[str] = None,
+        model_handle: Optional[str] = None,
         return_token_data: bool = False,
     ) -> SampleResult:
         """Run a single sample through target and grader."""
         sample_id = sample.id
-        model_name = llm_config
 
         async with self.semaphore:
             agent_id = None
@@ -790,10 +786,10 @@ class Runner:
             t_sample_start = time.perf_counter()
             try:  # noqa: SIM105 — outer try/finally for agent cleanup
                 if self.progress_callback:
-                    await self.progress_callback.sample_started(sample_id, model_name=model_name)
+                    await self.progress_callback.sample_started(sample_id, model_name=model_handle)
 
                 if self.suite.sandbox is not None:
-                    result = await self._run_sample_in_sandbox(sample, llm_config, return_token_data, t_sample_start)
+                    result = await self._run_sample_in_sandbox(sample, model_handle, return_token_data, t_sample_start)
                     # Fire post-completion callbacks based on the final result —
                     # mid-sample events (grading_started, token streaming) are
                     # not emitted in v1 because the host only sees the final
@@ -805,7 +801,7 @@ class Runner:
                                 sample_id,
                                 result.error.message,
                                 agent_id=result.agent_id,
-                                model_name=model_name,
+                                model_name=result.model_name,
                                 target_cost=cost,
                             )
                         else:
@@ -818,7 +814,7 @@ class Runner:
                                 agent_id=result.agent_id,
                                 score=primary_score,
                                 target_cost=cost,
-                                model_name=model_name,
+                                model_name=result.model_name,
                                 metric_scores=metric_scores,
                                 rationale=primary_rationale,
                                 metric_rationales=metric_rationales,
@@ -836,7 +832,7 @@ class Runner:
                     token_data,
                 ) = await self._get_or_run_trajectory(
                     sample,
-                    llm_config,
+                    model_handle,
                     retrieve_agent_state=retrieve_agent_state,
                     return_token_data=return_token_data,
                 )
@@ -918,7 +914,7 @@ class Runner:
                     agent_id = e.agent_id
                 agent_str = f" ({agent_id})" if agent_id else ""
                 log_message = str(e) or type(e).__name__
-                logger.error(f"Error running sample {sample_id}{agent_str} with model {model_name}: {log_message}")
+                logger.error(f"Error running sample {sample_id}{agent_str} with model {model_handle}: {log_message}")
                 category = ErrorCategory.TARGET if isinstance(e, TargetError) else phase
                 cause = e.__cause__ if e.__cause__ else e
                 error_message = str(e) or type(cause).__name__
@@ -927,7 +923,12 @@ class Runner:
                     exception_type=type(cause).__name__,
                     message=error_message,
                 )
-                cost = calculate_cost_from_agent_usage(model_name, agent_usage) if model_name and agent_usage else None
+                result_model_name = locals().get("model_name") or model_handle
+                cost = (
+                    calculate_cost_from_agent_usage(result_model_name, agent_usage)
+                    if result_model_name and agent_usage
+                    else None
+                )
                 prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
                     extract_token_counts(agent_usage)
                 )
@@ -936,7 +937,7 @@ class Runner:
                         sample_id,
                         error_message,
                         agent_id=agent_id,
-                        model_name=model_name,
+                        model_name=result_model_name,
                         target_cost=cost if cost and cost > 0 else None,
                     )
                 usage = _build_usage(
@@ -1051,22 +1052,22 @@ class Runner:
 
         try:
             async with anyio.create_task_group() as tg:
-                for llm_config in self.model_handles:
+                for model_handle in self.model_handles:
                     if setup_needs_model:
-                        await self._run_setup(model_name=llm_config)
+                        await self._run_setup(model_name=model_handle)
 
-                    model_id = _model_id_for(llm_config)
+                    model_id = _model_id_for(model_handle)
 
                     for sample in samples:
 
                         async def run_and_append(s, cfg, mid):
-                            result = await self.run_sample(s, llm_config=cfg)
+                            result = await self.run_sample(s, model_handle=cfg)
                             self.results_by_model[mid].append(result)
                             self.results.append(result)
                             if self.stream_writer:
                                 await self.stream_writer.append_result(result, model=mid, run=self.current_run)
 
-                        tg.start_soon(run_and_append, sample, llm_config, model_id)
+                        tg.start_soon(run_and_append, sample, model_handle, model_id)
 
             # Per-model summaries
             model_summaries: List[ModelSummary] = []

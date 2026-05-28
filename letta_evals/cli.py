@@ -408,8 +408,8 @@ async def _run_single_sample(
     if len(runner.model_handles) > 1:
         raise ValueError("In-sandbox run resolved to multiple models — pass --model-handle to scope to a single model.")
 
-    llm_config = runner.model_handles[0]
-    result = await runner.run_sample(sample, llm_config=llm_config)
+    model_handle = runner.model_handles[0]
+    result = await runner.run_sample(sample, model_handle=model_handle)
 
     output_json_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_json_path, "w") as f:

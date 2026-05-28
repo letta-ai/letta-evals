@@ -111,7 +111,7 @@ class TestRunSingleSampleHelper:
 
         seen_sandbox = {}
 
-        async def fake_run_sample(self, sample, llm_config=None, return_token_data=False):
+        async def fake_run_sample(self, sample, model_handle=None, return_token_data=False):
             seen_sandbox["value"] = self.suite.sandbox
             return _canned_result()
 
@@ -159,9 +159,9 @@ gate:
 
         seen_models = {}
 
-        async def fake_run_sample(self, sample, llm_config=None, return_token_data=False):
+        async def fake_run_sample(self, sample, model_handle=None, return_token_data=False):
             seen_models["handles"] = list(self.model_handles)
-            seen_models["llm_config"] = llm_config
+            seen_models["model_handle"] = model_handle
             return _canned_result()
 
         with patch("letta_evals.runner.Runner.run_sample", new=fake_run_sample):
@@ -177,7 +177,7 @@ gate:
             )
 
         assert seen_models["handles"] == ["openai/gpt-a"]
-        assert seen_models["llm_config"] == "openai/gpt-a"
+        assert seen_models["model_handle"] == "openai/gpt-a"
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="subprocess invocation differences")
