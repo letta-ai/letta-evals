@@ -1,10 +1,6 @@
 from enum import Enum
 
 
-class TargetKind(str, Enum):
-    LETTA_CODE = "letta_code"
-
-
 class GraderKind(str, Enum):
     TOOL = "tool"
     MODEL_JUDGE = "model_judge"

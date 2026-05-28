@@ -33,7 +33,6 @@ from letta_evals.models.results import (
 from letta_evals.models.sample import Sample, SampleId
 from letta_evals.models.specs import (
     BaseGraderSpec,
-    BaseTargetSpec,
     GateSpec,
     GraderSpec,
     LettaCodeTargetSpec,
@@ -44,7 +43,6 @@ from letta_evals.models.specs import (
     SimpleCondition,
     SimpleGateSpec,
     SuiteSpec,
-    TargetSpec,
     ToolGraderSpec,
     WeightedAverageGateSpec,
     _compare,
@@ -66,9 +64,7 @@ __all__ = [
     "Sample",
     "SampleId",
     # specs — targets
-    "BaseTargetSpec",
     "LettaCodeTargetSpec",
-    "TargetSpec",
     # specs — graders
     "BaseGraderSpec",
     "ToolGraderSpec",

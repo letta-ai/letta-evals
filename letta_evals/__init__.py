@@ -23,7 +23,6 @@ from letta_evals.models import (
     SuiteSpec,
     Summary,
     TargetResult,
-    TargetSpec,
     Timing,
     TimingStats,
     TurnTokenData,
@@ -39,7 +38,6 @@ from letta_evals.types import (
     LLMProvider,
     LogicalOp,
     MetricOp,
-    TargetKind,
 )
 from letta_evals.visualization.factory import ProgressStyle, create_progress_callback
 
@@ -78,9 +76,7 @@ __all__ = [
     "SampleResult",
     "Summary",
     "SuiteSpec",
-    "TargetKind",
     "TargetResult",
-    "TargetSpec",
     "Timing",
     "TimingStats",
     "ToolGrader",

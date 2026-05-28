@@ -9,7 +9,7 @@ from letta_evals.models import (
     SuiteSpec,
     ToolGraderSpec,
 )
-from letta_evals.types import GateKind, GraderKind, MetricOp, TargetKind
+from letta_evals.types import GateKind, GraderKind, MetricOp
 
 
 def _make_suite(target_spec, cleanup: bool = False) -> SuiteSpec:
@@ -30,20 +30,20 @@ def _make_suite(target_spec, cleanup: bool = False) -> SuiteSpec:
 class TestSuiteSpecCleanupField:
     def test_defaults_to_false(self):
         suite = _make_suite(
-            LettaCodeTargetSpec(kind=TargetKind.LETTA_CODE, model_handles=["openai/gpt-4.1-mini"]),
+            LettaCodeTargetSpec(model_handles=["openai/gpt-4.1-mini"]),
         )
         assert suite.cleanup is False
 
     def test_explicit_true(self):
         suite = _make_suite(
-            LettaCodeTargetSpec(kind=TargetKind.LETTA_CODE, model_handles=["openai/gpt-4.1-mini"]),
+            LettaCodeTargetSpec(model_handles=["openai/gpt-4.1-mini"]),
             cleanup=True,
         )
         assert suite.cleanup is True
 
     def test_explicit_false(self):
         suite = _make_suite(
-            LettaCodeTargetSpec(kind=TargetKind.LETTA_CODE, model_handles=["openai/gpt-4.1-mini"]),
+            LettaCodeTargetSpec(model_handles=["openai/gpt-4.1-mini"]),
             cleanup=False,
         )
         assert suite.cleanup is False
@@ -67,7 +67,7 @@ class TestShouldCleanupAgent:
 
     def test_cleanup_false_letta_code(self):
         suite = _make_suite(
-            LettaCodeTargetSpec(kind=TargetKind.LETTA_CODE, model_handles=["openai/gpt-4.1-mini"]),
+            LettaCodeTargetSpec(model_handles=["openai/gpt-4.1-mini"]),
             cleanup=False,
         )
         runner = self._make_runner(suite)
@@ -75,7 +75,7 @@ class TestShouldCleanupAgent:
 
     def test_cleanup_true_letta_code(self):
         suite = _make_suite(
-            LettaCodeTargetSpec(kind=TargetKind.LETTA_CODE, model_handles=["openai/gpt-4.1-mini"]),
+            LettaCodeTargetSpec(model_handles=["openai/gpt-4.1-mini"]),
             cleanup=True,
         )
         runner = self._make_runner(suite)
@@ -84,7 +84,6 @@ class TestShouldCleanupAgent:
     def test_cleanup_true_letta_code_agent_script(self):
         suite = _make_suite(
             LettaCodeTargetSpec(
-                kind=TargetKind.LETTA_CODE,
                 agent_script="setup.py:factory",
                 model_handles=["openai/gpt-4.1-mini"],
             ),
