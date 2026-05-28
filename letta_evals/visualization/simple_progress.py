@@ -45,16 +45,16 @@ class SimpleProgress(ProgressCallback):
         """Reset state for a new run."""
 
     async def sample_started(
-        self, sample_id: SampleId, agent_id: Optional[str] = None, model_name: Optional[str] = None
+        self, sample_id: SampleId, agent_id: Optional[str] = None, model_handle: Optional[str] = None
     ) -> None:
-        model_text = f" [dim]({model_name})[/]" if model_name else ""
+        model_text = f" [dim]({model_handle})[/]" if model_handle else ""
         agent_text = f" [dim]agent={agent_id}[/]" if agent_id else ""
         self.console.print(f"[bold cyan]▸ Sample [{sample_id}]{model_text}{agent_text}[/]")
 
     async def agent_created(
-        self, sample_id: SampleId, agent_id: str, model_name: Optional[str] = None, from_cache: bool = False
+        self, sample_id: SampleId, agent_id: str, model_handle: Optional[str] = None, from_cache: bool = False
     ) -> None:
-        prefix = self._format_prefix(sample_id, agent_id, model_name)
+        prefix = self._format_prefix(sample_id, agent_id, model_handle)
         cache_text = " [dim](cached)[/]" if from_cache else ""
         self.console.print(f"{prefix} [dim]•[/] Agent created{cache_text}")
 
@@ -64,15 +64,15 @@ class SimpleProgress(ProgressCallback):
         message_num: int,
         total_messages: int,
         agent_id: Optional[str] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
     ) -> None:
-        prefix = self._format_prefix(sample_id, agent_id, model_name)
+        prefix = self._format_prefix(sample_id, agent_id, model_handle)
         self.console.print(f"{prefix} [dim]•[/] Sending messages {message_num}/{total_messages}")
 
     async def grading_started(
-        self, sample_id: SampleId, agent_id: Optional[str] = None, model_name: Optional[str] = None
+        self, sample_id: SampleId, agent_id: Optional[str] = None, model_handle: Optional[str] = None
     ) -> None:
-        prefix = self._format_prefix(sample_id, agent_id, model_name)
+        prefix = self._format_prefix(sample_id, agent_id, model_handle)
         self.console.print(f"{prefix} [dim]•[/] Grading...")
 
     async def sample_completed(
@@ -81,12 +81,12 @@ class SimpleProgress(ProgressCallback):
         agent_id: Optional[str] = None,
         score: Optional[float] = None,
         target_cost: Optional[float] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
         metric_scores: Optional[Dict[str, float]] = None,
         rationale: Optional[str] = None,
         metric_rationales: Optional[Dict[str, str]] = None,
     ) -> None:
-        prefix = self._format_prefix(sample_id, agent_id, model_name)
+        prefix = self._format_prefix(sample_id, agent_id, model_handle)
         status = "[bold cyan]✓ DONE[/]"
         parts = [f"{prefix} {status}"]
 
@@ -104,10 +104,10 @@ class SimpleProgress(ProgressCallback):
         sample_id: SampleId,
         error: str,
         agent_id: Optional[str] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
         target_cost: Optional[float] = None,
     ) -> None:
-        prefix = self._format_prefix(sample_id, agent_id, model_name)
+        prefix = self._format_prefix(sample_id, agent_id, model_handle)
         self.console.print(f"{prefix} [bold yellow]⚠ ERROR[/]: {error}")
 
     async def suite_completed(self, result):
@@ -132,11 +132,11 @@ class SimpleProgress(ProgressCallback):
         self.console.print(build_simple_sample_results_table(suite_spec, displayed_rows))
         print_remaining_samples_notice(self.console, total_samples, len(displayed_rows))
 
-    def _format_prefix(self, sample_id: SampleId, agent_id: Optional[str], model_name: Optional[str]) -> str:
+    def _format_prefix(self, sample_id: SampleId, agent_id: Optional[str], model_handle: Optional[str]) -> str:
         """format a compact prefix for substeps to show which sample they belong to."""
         parts = [f"[dim]\\[[/][cyan]{sample_id}[/][dim]][/]"]
-        if model_name:
-            parts.append(f"[dim]({model_name})[/]")
+        if model_handle:
+            parts.append(f"[dim]({model_handle})[/]")
         if agent_id:
             parts.append(f"[dim]agent={agent_id}[/]")
         return "".join(parts)

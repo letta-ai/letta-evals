@@ -200,12 +200,12 @@ def load_pricing_table() -> Dict[str, ModelPricing]:
     return _PRICING
 
 
-def _candidate_keys(model_name: str) -> List[str]:
-    """Generate the ordered list of litellm keys to probe for a Letta model name."""
-    candidates: List[str] = [model_name]
+def _candidate_keys(model_handle: str) -> List[str]:
+    """Generate the ordered list of litellm keys to probe for a Letta model handle."""
+    candidates: List[str] = [model_handle]
 
-    if "/" in model_name:
-        provider, model_part = model_name.split("/", 1)
+    if "/" in model_handle:
+        provider, model_part = model_handle.split("/", 1)
         prefixes = _PROVIDER_CANDIDATES.get(provider, [""])
         for prefix in prefixes:
             candidates.append(f"{prefix}{model_part}")
@@ -217,11 +217,11 @@ def _candidate_keys(model_name: str) -> List[str]:
     else:
         # No provider prefix - try each known pattern based on the leading token
         for marker, prefixes in _BARE_NAME_PROVIDERS.items():
-            if model_name.startswith(marker):
+            if model_handle.startswith(marker):
                 for prefix in prefixes:
-                    candidates.append(f"{prefix}{model_name}")
-                    stripped = _DATE_PATTERN.sub("", model_name)
-                    if stripped != model_name:
+                    candidates.append(f"{prefix}{model_handle}")
+                    stripped = _DATE_PATTERN.sub("", model_handle)
+                    if stripped != model_handle:
                         candidates.append(f"{prefix}{stripped}")
                 break
 
@@ -235,27 +235,27 @@ def _candidate_keys(model_name: str) -> List[str]:
     return deduped
 
 
-def resolve_model(model_name: str) -> Optional[ModelPricing]:
-    """Resolve a Letta-style model name to a ModelPricing entry, or None if unknown.
+def resolve_model(model_handle: str) -> Optional[ModelPricing]:
+    """Resolve a Letta-style model handle to a ModelPricing entry, or None if unknown.
 
     Resolution order:
         1. ``MODEL_PRICE_OVERRIDES`` exact match.
         2. Strip effort suffix (-low, -medium, -high, -xhigh, -max) and recurse.
         3. Try provider-prefix candidates against the litellm JSON.
     """
-    if not model_name:
+    if not model_handle:
         return None
 
-    if model_name in MODEL_PRICE_OVERRIDES:
-        return MODEL_PRICE_OVERRIDES[model_name]
+    if model_handle in MODEL_PRICE_OVERRIDES:
+        return MODEL_PRICE_OVERRIDES[model_handle]
 
     # Strip effort suffix and try again (recursively, once)
-    stripped = _EFFORT_PATTERN.sub("", model_name)
-    if stripped != model_name:
+    stripped = _EFFORT_PATTERN.sub("", model_handle)
+    if stripped != model_handle:
         return resolve_model(stripped)
 
     table = load_pricing_table()
-    for candidate in _candidate_keys(model_name):
+    for candidate in _candidate_keys(model_handle):
         if candidate in table:
             return table[candidate]
 
@@ -319,14 +319,14 @@ def _bill_record(
     return non_cached * in_rate + cached * cache_read_rate + cache_write * cache_create_rate + completion * out_rate
 
 
-def calculate_cost_from_agent_usage(model_name: str, agent_usage: Optional[List[dict]]) -> float:
+def calculate_cost_from_agent_usage(model_handle: str, agent_usage: Optional[List[dict]]) -> float:
     """Calculate total cost from agent_usage data.
 
     Bills cache reads, cache writes, and tiered (>200k context) pricing per LLM
     call, using rates from the litellm pricing JSON.
 
     Args:
-        model_name: Name of the model
+        model_handle: Name of the model
         agent_usage: List of usage statistics from the agent run
 
     Returns:
@@ -336,9 +336,9 @@ def calculate_cost_from_agent_usage(model_name: str, agent_usage: Optional[List[
     if not agent_usage:
         return 0.0
 
-    pricing = resolve_model(model_name)
+    pricing = resolve_model(model_handle)
     if pricing is None:
-        logger.debug(f"No pricing information available for model: {model_name}")
+        logger.debug(f"No pricing information available for model: {model_handle}")
         return 0.0
 
     total_cost = 0.0

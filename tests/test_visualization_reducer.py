@@ -64,20 +64,20 @@ def test_duplicate_terminal_updates_do_not_double_count_target_cost() -> None:
     assert reducer.state.total_target_cost == 0.02
 
 
-def test_ensure_sample_migrates_placeholder_when_model_name_arrives() -> None:
+def test_ensure_sample_migrates_placeholder_when_model_handle_arrives() -> None:
     reducer = ProgressStateReducer(ProgressRuntimeState())
     reducer.ensure_sample(2, agent_id="agent-1")
 
-    sample = reducer.ensure_sample(2, agent_id="agent-1", model_name="gpt-5")
+    sample = reducer.ensure_sample(2, agent_id="agent-1", model_handle="gpt-5")
 
     assert (2, None) not in reducer.state.samples
     assert reducer.state.samples[(2, "gpt-5")] is sample
-    assert sample.model_name == "gpt-5"
+    assert sample.model_handle == "gpt-5"
 
 
 def test_get_from_cache_checks_model_specific_and_placeholder_entries() -> None:
     reducer = ProgressStateReducer(ProgressRuntimeState())
-    reducer.ensure_sample(3, model_name=None).from_cache = True
+    reducer.ensure_sample(3, model_handle=None).from_cache = True
 
     assert reducer.get_from_cache(3, None) is True
     assert reducer.get_from_cache(3, "gpt-5") is True
@@ -94,9 +94,9 @@ def test_record_turn_grade_initializes_and_updates_turn_scores() -> None:
         turn_score=0.8,
         grader_key="safety",
         agent_id="agent-4",
-        model_name="gpt-5",
+        model_handle="gpt-5",
     )
 
     assert sample.agent_id == "agent-4"
-    assert sample.model_name == "gpt-5"
+    assert sample.model_handle == "gpt-5"
     assert sample.turn_scores == {"safety": [None, 0.8, None]}

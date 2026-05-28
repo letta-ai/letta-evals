@@ -190,7 +190,7 @@ class TestSingleRun:
 
     @pytest.mark.asyncio
     async def test_safe_segment_for_slash_in_model(self):
-        """Model names with slashes are sanitised to filenames."""
+        """Model handles with slashes are sanitised to filenames."""
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir)
             writer = StreamingWriter(

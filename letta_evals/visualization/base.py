@@ -35,13 +35,13 @@ class ProgressCallback(ABC):
 
     @abstractmethod
     async def sample_started(
-        self, sample_id: SampleId, agent_id: Optional[str] = None, model_name: Optional[str] = None
+        self, sample_id: SampleId, agent_id: Optional[str] = None, model_handle: Optional[str] = None
     ) -> None:
         """Called when a sample evaluation starts."""
         ...
 
     async def agent_created(
-        self, sample_id: SampleId, agent_id: str, model_name: Optional[str] = None, from_cache: bool = False
+        self, sample_id: SampleId, agent_id: str, model_handle: Optional[str] = None, from_cache: bool = False
     ) -> None:
         """Called when an agent has been created/provisioned or resolved from cache.
 
@@ -55,13 +55,13 @@ class ProgressCallback(ABC):
         message_num: int,
         total_messages: int,
         agent_id: Optional[str] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
     ) -> None:
         """Called when sending messages to the agent."""
         pass
 
     async def grading_started(
-        self, sample_id: SampleId, agent_id: Optional[str] = None, model_name: Optional[str] = None
+        self, sample_id: SampleId, agent_id: Optional[str] = None, model_handle: Optional[str] = None
     ) -> None:
         """Called when grading of a sample begins."""
         pass
@@ -74,7 +74,7 @@ class ProgressCallback(ABC):
         turn_score: float,
         grader_key: Optional[str] = None,
         agent_id: Optional[str] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
     ) -> None:
         """Called when a single turn is graded in per-turn evaluation mode."""
         pass
@@ -86,7 +86,7 @@ class ProgressCallback(ABC):
         agent_id: Optional[str] = None,
         score: Optional[float] = None,
         target_cost: Optional[float] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
         metric_scores: Optional[Dict[str, float]] = None,
         rationale: Optional[str] = None,
         metric_rationales: Optional[Dict[str, str]] = None,
@@ -100,7 +100,7 @@ class ProgressCallback(ABC):
         sample_id: SampleId,
         error: str,
         agent_id: Optional[str] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
         target_cost: Optional[float] = None,
     ) -> None:
         """Called when a sample evaluation encounters an error."""

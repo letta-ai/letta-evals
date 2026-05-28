@@ -142,7 +142,7 @@ Letta Evals provides Python decorators for extending the framework:
 - **@suite_setup**: Run initialization code before evaluation starts. Supports three signatures:
   - `() -> None` - Run once at the start with no parameters
   - `(client: AsyncLetta) -> None` - Run once at the start with client access
-  - `(client: AsyncLetta, model_name: str) -> None` - Run once per model when evaluating multiple models (useful for model-specific setup like creating isolated working directories)
+  - `(client: AsyncLetta, model_handle: str) -> None` - Run once per model when evaluating multiple models (useful for model-specific setup like creating isolated working directories)
 
 See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-and-extractor/) for implementation examples.
 
@@ -201,7 +201,7 @@ See [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-a
       - anthropic/claude-sonnet-4-5-20250929
       - gpt-5-low
   ```
-  The framework automatically creates isolated working directories for each model to prevent interference between concurrent evaluations. When combined with `@suite_setup` functions that accept `model_name`, you can perform model-specific initialization for each evaluation run.
+  The framework automatically creates isolated working directories for each model to prevent interference between concurrent evaluations. When combined with `@suite_setup` functions that accept `model_handle`, you can perform model-specific initialization for each evaluation run.
 
 **Can I use this in CI/CD pipelines?**
 

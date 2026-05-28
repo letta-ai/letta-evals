@@ -169,7 +169,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                     logger.info(f"Created agent {factory_agent_id} via agent_factory for sample {sample.id}")
                     if progress_callback:
                         await progress_callback.agent_created(
-                            sample.id, agent_id=factory_agent_id, model_name=self.model_handle
+                            sample.id, agent_id=factory_agent_id, model_handle=self.model_handle
                         )
 
                 # construct prompt after factory call so agent_factory can modify sample if needed
@@ -257,11 +257,11 @@ class LettaCodeTarget(AbstractAgentTarget):
                                     logger.info(f"Captured agent_id {agent_id} from stream init event")
                                     if progress_callback and agent_id:
                                         await progress_callback.agent_created(
-                                            sample.id, agent_id=agent_id, model_name=self.model_handle
+                                            sample.id, agent_id=agent_id, model_handle=self.model_handle
                                         )
                                 if progress_callback and agent_id:
                                     await progress_callback.message_sending(
-                                        sample.id, 1, len(inputs), agent_id=agent_id, model_name=self.model_handle
+                                        sample.id, 1, len(inputs), agent_id=agent_id, model_handle=self.model_handle
                                     )
                         except json.JSONDecodeError:
                             logger.warning(f"Non-JSON stream output: {line[:200]}")
@@ -340,7 +340,7 @@ class LettaCodeTarget(AbstractAgentTarget):
                 return TargetResult(
                     trajectory=trajectory,
                     agent_id=agent_id,
-                    model_name=self.model_handle,
+                    model_handle=self.model_handle,
                     agent_usage=usage_stats if usage_stats else None,
                     agent_state=agent_state,
                     token_data=token_data,

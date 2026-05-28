@@ -117,7 +117,7 @@ class EvalProgress(ProgressCallback):
         )
 
         # initialize samples placeholder - actual entries will be created as evaluations start
-        # no longer pre-populate since we need model_name for the key
+        # no longer pre-populate since we need model_handle for the key
 
         self.live = Live(
             console=self.console,
@@ -249,7 +249,7 @@ class EvalProgress(ProgressCallback):
         sample_id: SampleId,
         state: SampleState,
         agent_id: Optional[str] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
         **kwargs,
     ):
         """Queue a state transition for the reducer task."""
@@ -258,27 +258,27 @@ class EvalProgress(ProgressCallback):
             sample_id=sample_id,
             state=state,
             agent_id=agent_id,
-            model_name=model_name,
+            model_handle=model_handle,
             **kwargs,
         )
 
     async def sample_started(
-        self, sample_id: SampleId, agent_id: Optional[str] = None, model_name: Optional[str] = None
+        self, sample_id: SampleId, agent_id: Optional[str] = None, model_handle: Optional[str] = None
     ):
         """Mark sample as started"""
-        self._reducer.ensure_sample(sample_id, agent_id=agent_id, model_name=model_name)
+        self._reducer.ensure_sample(sample_id, agent_id=agent_id, model_handle=model_handle)
         # skip loading state if using cached trajectories
         if not self.cached_mode:
             await self.update_sample_state(
-                sample_id, SampleState.LOADING_AGENT, agent_id=agent_id, model_name=model_name
+                sample_id, SampleState.LOADING_AGENT, agent_id=agent_id, model_handle=model_handle
             )
 
     async def agent_created(
-        self, sample_id: SampleId, agent_id: str, model_name: Optional[str] = None, from_cache: bool = False
+        self, sample_id: SampleId, agent_id: str, model_handle: Optional[str] = None, from_cache: bool = False
     ):
         """Update sample with agent_id once agent is provisioned."""
         await self.update_sample_state(
-            sample_id, SampleState.LOADING_AGENT, agent_id=agent_id, model_name=model_name, from_cache=from_cache
+            sample_id, SampleState.LOADING_AGENT, agent_id=agent_id, model_handle=model_handle, from_cache=from_cache
         )
 
     async def message_sending(
@@ -287,26 +287,26 @@ class EvalProgress(ProgressCallback):
         message_num: int,
         total_messages: int,
         agent_id: Optional[str] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
     ):
         """Update message sending progress"""
         await self.update_sample_state(
             sample_id,
             SampleState.SENDING_MESSAGES,
             agent_id=agent_id,
-            model_name=model_name,
+            model_handle=model_handle,
             messages_sent=message_num,
             total_messages=total_messages,
         )
 
     async def grading_started(
-        self, sample_id: SampleId, agent_id: Optional[str] = None, model_name: Optional[str] = None
+        self, sample_id: SampleId, agent_id: Optional[str] = None, model_handle: Optional[str] = None
     ):
         """Mark sample as being graded"""
-        existing_from_cache = self._reducer.get_from_cache(sample_id, model_name)
+        existing_from_cache = self._reducer.get_from_cache(sample_id, model_handle)
 
         await self.update_sample_state(
-            sample_id, SampleState.GRADING, agent_id=agent_id, model_name=model_name, from_cache=existing_from_cache
+            sample_id, SampleState.GRADING, agent_id=agent_id, model_handle=model_handle, from_cache=existing_from_cache
         )
 
     async def turn_graded(
@@ -317,7 +317,7 @@ class EvalProgress(ProgressCallback):
         turn_score: float,
         grader_key: Optional[str] = None,
         agent_id: Optional[str] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
     ):
         """Update progress for per-turn grading"""
         sample = self._reducer.record_turn_grade(
@@ -327,14 +327,14 @@ class EvalProgress(ProgressCallback):
             turn_score=turn_score,
             grader_key=grader_key,
             agent_id=agent_id,
-            model_name=model_name,
+            model_handle=model_handle,
         )
 
         await self.update_sample_state(
             sample_id,
             SampleState.GRADING_TURNS,
             agent_id=agent_id,
-            model_name=model_name,
+            model_handle=model_handle,
             from_cache=sample.from_cache,
             turns_graded=turn_num + 1,  # turn_num is 0-indexed
             total_turns=total_turns,
@@ -346,19 +346,19 @@ class EvalProgress(ProgressCallback):
         agent_id: Optional[str] = None,
         score: Optional[float] = None,
         target_cost: Optional[float] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
         metric_scores: Optional[Dict[str, float]] = None,
         rationale: Optional[str] = None,
         metric_rationales: Optional[Dict[str, str]] = None,
     ):
         """Mark sample as completed"""
-        existing_from_cache = self._reducer.get_from_cache(sample_id, model_name)
+        existing_from_cache = self._reducer.get_from_cache(sample_id, model_handle)
 
         await self.update_sample_state(
             sample_id,
             SampleState.COMPLETED,
             agent_id=agent_id,
-            model_name=model_name,
+            model_handle=model_handle,
             score=score,
             target_cost=target_cost,
             rationale=rationale,
@@ -372,7 +372,7 @@ class EvalProgress(ProgressCallback):
         sample_id: SampleId,
         error: str,
         agent_id: Optional[str] = None,
-        model_name: Optional[str] = None,
+        model_handle: Optional[str] = None,
         target_cost: Optional[float] = None,
     ):
         """Mark sample as having an error"""
@@ -380,7 +380,7 @@ class EvalProgress(ProgressCallback):
             sample_id,
             SampleState.ERROR,
             agent_id=agent_id,
-            model_name=model_name,
+            model_handle=model_handle,
             error=error,
             target_cost=target_cost,
         )

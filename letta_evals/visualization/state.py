@@ -43,7 +43,7 @@ class SampleProgress:
     sample_id: SampleId
     state: SampleState = SampleState.QUEUED
     agent_id: Optional[str] = None
-    model_name: Optional[str] = None
+    model_handle: Optional[str] = None
     score: Optional[float] = None
     target_cost: Optional[float] = None
     rationale: Optional[str] = None

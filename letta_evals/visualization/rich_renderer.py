@@ -87,7 +87,7 @@ class RichProgressRenderer:
     ) -> List[SampleProgress]:
         """Select only currently active rows for the live top panel."""
         rows = [sample for sample in runtime_state.samples.values() if is_active_state(sample.state)]
-        rows.sort(key=lambda sample: (sample.model_name or "", _sample_id_sort_key(sample.sample_id)))
+        rows.sort(key=lambda sample: (sample.model_handle or "", _sample_id_sort_key(sample.sample_id)))
         if limit is None:
             return rows
         return rows[:limit]
@@ -100,7 +100,7 @@ class RichProgressRenderer:
         rows.sort(
             key=lambda sample: (
                 -get_last_update_key(sample),
-                sample.model_name or "",
+                sample.model_handle or "",
                 _sample_id_sort_key(sample.sample_id),
             )
         )
@@ -412,7 +412,7 @@ class RichProgressRenderer:
             row_data = [
                 sample_num,
                 sample.agent_id or "-",
-                sample.model_name or "-",
+                sample.model_handle or "-",
             ]
             row_data.extend([self._get_state_text(sample), *cells, time_text, details])
             table.add_row(*row_data)
