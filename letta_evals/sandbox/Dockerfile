@@ -26,7 +26,9 @@ RUN apt-get update \
 
 # letta-evals provides the in-sandbox `letta-evals run --sample ...` entrypoint.
 # letta-client is its Letta SDK dependency.
-RUN pip install --no-cache-dir letta-evals letta-client
+RUN pip install --no-cache-dir letta-evals letta-client \
+    && pip install --no-cache-dir --upgrade --force-reinstall typing_extensions==4.15.0 \
+    && python -c "import typing_extensions; assert hasattr(typing_extensions, 'Sentinel')"
 
 # letta-code is the agent harness invoked by the LettaCodeTarget.
 # Install globally so the `letta` CLI is on $PATH inside the sandbox.
