@@ -801,7 +801,7 @@ class Runner:
                                 sample_id,
                                 result.error.message,
                                 agent_id=result.agent_id,
-                                model_name=result.model_name,
+                                model_name=model_handle,
                                 target_cost=cost,
                             )
                         else:
@@ -814,7 +814,7 @@ class Runner:
                                 agent_id=result.agent_id,
                                 score=primary_score,
                                 target_cost=cost,
-                                model_name=result.model_name,
+                                model_name=model_handle,
                                 metric_scores=metric_scores,
                                 rationale=primary_rationale,
                                 metric_rationales=metric_rationales,
