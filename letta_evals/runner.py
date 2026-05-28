@@ -78,11 +78,6 @@ DEFAULT_SANDBOX_FORWARD_ENV = (
 )
 
 
-def _extract_model_name(model_handle: Optional[str]) -> Optional[str]:
-    """Extract model name from a model handle."""
-    return model_handle
-
-
 def _model_id_for(model_handle: Optional[str]) -> str:
     """Stable bucket/path identifier for a model handle."""
     return model_handle or DEFAULT_MODEL_ID
@@ -316,7 +311,7 @@ class Runner:
     ]:
         """Return (trajectory, agent_id, model_name, agent_usage, agent_state, token_data)."""
         sample_id = sample.id
-        model_name = _extract_model_name(llm_config)
+        model_name = llm_config
 
         if self.cached_results:
             cached_result: Optional[SampleResult] = None
@@ -786,7 +781,7 @@ class Runner:
     ) -> SampleResult:
         """Run a single sample through target and grader."""
         sample_id = sample.id
-        model_name = _extract_model_name(llm_config)
+        model_name = llm_config
 
         async with self.semaphore:
             agent_id = None
@@ -1058,7 +1053,7 @@ class Runner:
             async with anyio.create_task_group() as tg:
                 for llm_config in self.model_handles:
                     if setup_needs_model:
-                        await self._run_setup(model_name=_extract_model_name(llm_config))
+                        await self._run_setup(model_name=llm_config)
 
                     model_id = _model_id_for(llm_config)
 
