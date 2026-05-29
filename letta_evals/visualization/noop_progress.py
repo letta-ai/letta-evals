@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Optional
 
+from letta_evals.models import SampleResult
 from letta_evals.models.sample import SampleId
 from letta_evals.visualization.base import ProgressCallback
 
@@ -14,25 +15,8 @@ class NoOpProgress(ProgressCallback):
     ) -> None:
         pass
 
-    async def sample_completed(
-        self,
-        sample_id: SampleId,
-        agent_id: Optional[str] = None,
-        score: Optional[float] = None,
-        target_cost: Optional[float] = None,
-        model_handle: Optional[str] = None,
-        metric_scores: Optional[Dict[str, float]] = None,
-        rationale: Optional[str] = None,
-        metric_rationales: Optional[Dict[str, str]] = None,
-    ) -> None:
+    async def sample_completed(self, result: SampleResult, model_handle: Optional[str] = None) -> None:
         pass
 
-    async def sample_error(
-        self,
-        sample_id: SampleId,
-        error: str,
-        agent_id: Optional[str] = None,
-        model_handle: Optional[str] = None,
-        target_cost: Optional[float] = None,
-    ) -> None:
+    async def sample_error(self, result: SampleResult, model_handle: Optional[str] = None) -> None:
         pass

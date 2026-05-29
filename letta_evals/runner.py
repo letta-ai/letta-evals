@@ -362,30 +362,10 @@ class Runner:
                     # not emitted in v1 because the host only sees the final
                     # SampleResult JSON.
                     if self.progress_callback:
-                        cost = result.usage.cost if (result.usage and result.usage.cost) else None
                         if result.error is not None:
-                            await self.progress_callback.sample_error(
-                                sample_id,
-                                result.error.message,
-                                agent_id=result.agent_id,
-                                model_handle=model_handle,
-                                target_cost=cost,
-                            )
+                            await self.progress_callback.sample_error(result, model_handle=model_handle)
                         else:
-                            primary_score = next(iter(result.grades.values())).score if result.grades else 0.0
-                            primary_rationale = next(iter(result.grades.values())).rationale if result.grades else None
-                            metric_scores = {k: v.score for k, v in result.grades.items()}
-                            metric_rationales = {k: (v.rationale or "") for k, v in result.grades.items()}
-                            await self.progress_callback.sample_completed(
-                                sample_id,
-                                agent_id=result.agent_id,
-                                score=primary_score,
-                                target_cost=cost,
-                                model_handle=model_handle,
-                                metric_scores=metric_scores,
-                                rationale=primary_rationale,
-                                metric_rationales=metric_rationales,
-                            )
+                            await self.progress_callback.sample_completed(result, model_handle=model_handle)
                     return result
 
                 phase = ErrorCategory.TARGET
@@ -428,32 +408,6 @@ class Runner:
                 )
 
                 error = detect_errors(grades_dict, trajectory, submissions_dict)
-                primary_score = next(iter(grades_dict.values())).score if grades_dict else 0.0
-                primary_rationale = next(iter(grades_dict.values())).rationale if grades_dict else None
-
-                if error and self.progress_callback:
-                    await self.progress_callback.sample_error(
-                        sample_id,
-                        error.message,
-                        agent_id=agent_id,
-                        model_handle=model_handle,
-                        target_cost=cost if cost and cost > 0 else None,
-                    )
-
-                if error is None and self.progress_callback:
-                    metric_scores = {k: v.score for k, v in grades_dict.items()}
-                    metric_rationales = {k: (v.rationale or "") for k, v in grades_dict.items()}
-                    await self.progress_callback.sample_completed(
-                        sample_id,
-                        agent_id=agent_id,
-                        score=primary_score,
-                        target_cost=cost if cost and cost > 0 else None,
-                        model_handle=model_handle,
-                        metric_scores=metric_scores,
-                        rationale=primary_rationale,
-                        metric_rationales=metric_rationales,
-                    )
-
                 total_time = time.perf_counter() - t_sample_start
                 extraction_time = sum(gr.metadata.get("extraction_time", 0.0) for gr in grades_dict.values())
 
@@ -472,7 +426,7 @@ class Runner:
                     per_grader=per_grader_time if per_grader_time else None,
                 )
 
-                return SampleResult(
+                result = SampleResult(
                     sample_id=sample_id,
                     agent_id=agent_id,
                     trajectory=trajectory,
@@ -485,6 +439,12 @@ class Runner:
                     agent_state=agent_state,
                     token_data=token_data,
                 )
+                if self.progress_callback:
+                    if result.error is not None:
+                        await self.progress_callback.sample_error(result, model_handle=model_handle)
+                    else:
+                        await self.progress_callback.sample_completed(result, model_handle=model_handle)
+                return result
             except Exception as e:
                 if isinstance(e, TargetError) and e.agent_id:
                     agent_id = e.agent_id
@@ -508,14 +468,6 @@ class Runner:
                 prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
                     extract_token_counts(agent_usage)
                 )
-                if self.progress_callback:
-                    await self.progress_callback.sample_error(
-                        sample_id,
-                        error_message,
-                        agent_id=agent_id,
-                        model_handle=result_model_handle,
-                        target_cost=cost if cost and cost > 0 else None,
-                    )
                 usage = _build_usage(
                     cost=cost,
                     prompt_tokens=prompt_tokens,
@@ -528,7 +480,7 @@ class Runner:
                     total=time.perf_counter() - t_sample_start,
                     target=0.0,
                 )
-                return SampleResult(
+                result = SampleResult(
                     sample_id=sample_id,
                     agent_id=agent_id,
                     trajectory=[],
@@ -539,6 +491,9 @@ class Runner:
                     error=error,
                     agent_usage=agent_usage,
                 )
+                if self.progress_callback:
+                    await self.progress_callback.sample_error(result, model_handle=result_model_handle)
+                return result
             finally:
                 if self._should_cleanup_agent() and agent_id:
                     try:

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Optional
 
 from rich.console import Console
 
+from letta_evals.models import SampleResult, SuiteSpec
 from letta_evals.models.sample import SampleId
 from letta_evals.visualization.base import ProgressCallback
+from letta_evals.visualization.progress_fields import sample_progress_fields
 from letta_evals.visualization.summary import (
     build_simple_sample_results_table,
     format_gate_description,
@@ -23,8 +25,9 @@ class SimpleProgress(ProgressCallback):
     evaluation progress easy to scan in logs.
     """
 
-    def __init__(self, suite_name: str, total_samples: int, console: Optional[Console] = None):
-        self.suite_name = suite_name
+    def __init__(self, suite: SuiteSpec, total_samples: int, console: Optional[Console] = None):
+        self.suite = suite
+        self.suite_name = suite.name
         self.total_samples = total_samples
         self.console = console or Console()
 
@@ -75,40 +78,22 @@ class SimpleProgress(ProgressCallback):
         prefix = self._format_prefix(sample_id, agent_id, model_handle)
         self.console.print(f"{prefix} [dim]•[/] Grading...")
 
-    async def sample_completed(
-        self,
-        sample_id: SampleId,
-        agent_id: Optional[str] = None,
-        score: Optional[float] = None,
-        target_cost: Optional[float] = None,
-        model_handle: Optional[str] = None,
-        metric_scores: Optional[Dict[str, float]] = None,
-        rationale: Optional[str] = None,
-        metric_rationales: Optional[Dict[str, str]] = None,
-    ) -> None:
-        prefix = self._format_prefix(sample_id, agent_id, model_handle)
+    async def sample_completed(self, result: SampleResult, model_handle: Optional[str] = None) -> None:
+        fields = sample_progress_fields(self.suite.gate, result)
+        prefix = self._format_prefix(result.sample_id, result.agent_id, model_handle)
         status = "[bold cyan]✓ DONE[/]"
-        parts = [f"{prefix} {status}"]
+        parts = [f"{prefix} {status}", f"score={fields.score:.2f}"]
 
-        if score is not None:
-            parts.append(f"score={score:.2f}")
-
-        if metric_scores:
-            metric_bits = ", ".join(f"{k}={v:.2f}" for k, v in metric_scores.items())
+        if fields.metric_scores:
+            metric_bits = ", ".join(f"{k}={v:.2f}" for k, v in fields.metric_scores.items())
             parts.append(metric_bits)
 
         self.console.print("  ".join(parts))
 
-    async def sample_error(
-        self,
-        sample_id: SampleId,
-        error: str,
-        agent_id: Optional[str] = None,
-        model_handle: Optional[str] = None,
-        target_cost: Optional[float] = None,
-    ) -> None:
-        prefix = self._format_prefix(sample_id, agent_id, model_handle)
-        self.console.print(f"{prefix} [bold yellow]⚠ ERROR[/]: {error}")
+    async def sample_error(self, result: SampleResult, model_handle: Optional[str] = None) -> None:
+        prefix = self._format_prefix(result.sample_id, result.agent_id, model_handle)
+        message = result.error.message if result.error else "Unknown error"
+        self.console.print(f"{prefix} [bold yellow]⚠ ERROR[/]: {message}")
 
     async def suite_completed(self, result):
         """Display summary results after evaluation completes"""
