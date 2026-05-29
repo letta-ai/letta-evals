@@ -1,4 +1,4 @@
-"""Tests for the Runner._run_sample_in_sandbox dispatch path.
+"""Tests for the sandbox dispatch path.
 
 These tests mock out ``ModalSandbox`` so we exercise the orchestration code
 (version check, suite-dir upload, command construction, result round-trip,
@@ -22,6 +22,7 @@ from letta_evals.models import (
 )
 from letta_evals.runner import Runner
 from letta_evals.sandbox.base import ExecResult
+from letta_evals.sandbox.dispatch import run_sample_in_sandbox
 
 
 def _canned_result(sample_id) -> SampleResult:
@@ -37,7 +38,7 @@ def _canned_result(sample_id) -> SampleResult:
 class _StubSandbox:
     """Stand-in for ModalSandbox that records calls."""
 
-    def __init__(self, *, version_output: str = "letta-evals 0.17.0", exec_return_code: int = 0):
+    def __init__(self, version_output: str = "letta-evals 0.17.0", exec_return_code: int = 0):
         self.started = False
         self.stopped = False
         self.uploaded_files: list[tuple[Path, str]] = []
@@ -76,8 +77,8 @@ class _StubSandbox:
             f.write(result.model_dump_json())
 
 
-def _make_runner_with_sandbox(tmp_path: Path, *, sandbox_spec: Optional[ModalSandboxSpec] = None) -> Runner:
-    """Construct a Runner via __new__ with only what _run_sample_in_sandbox reads."""
+def _make_runner_with_sandbox(tmp_path: Path, sandbox_spec: Optional[ModalSandboxSpec] = None) -> Runner:
+    """Construct a Runner via __new__ with only what run_sample dispatch reads."""
     runner = Runner.__new__(Runner)
     runner.suite = MagicMock()
     runner.suite.name = "test-suite"
@@ -101,7 +102,7 @@ def _make_runner_with_sandbox(tmp_path: Path, *, sandbox_spec: Optional[ModalSan
 
 
 def _write_suite_yaml(base: Path) -> None:
-    """Drop a suite.yaml in base so _suite_yaml_filename has something to glob."""
+    """Drop a suite.yaml in base so suite_yaml_filename has something to glob."""
     (base / "suite.yaml").write_text("name: test-suite\n")
 
 
@@ -110,11 +111,12 @@ class TestRunSampleInSandbox:
         _write_suite_yaml(tmp_path)
         runner = _make_runner_with_sandbox(tmp_path)
         stub = _StubSandbox()
-        monkeypatch.setattr("letta_evals.sandbox.modal.ModalSandbox", lambda spec, session_id: stub)
+        monkeypatch.setattr("letta_evals.sandbox.dispatch.ModalSandbox", lambda spec, session_id: stub)
 
         sample = Sample(id="s1", input="hi", ground_truth="hi")
         result = anyio.run(
-            runner._run_sample_in_sandbox,
+            run_sample_in_sandbox,
+            runner.suite,
             sample,
             "openai/gpt-a",
             False,
@@ -147,7 +149,7 @@ class TestRunSampleInSandbox:
             sandbox_spec=ModalSandboxSpec(image="img:test", timeout_sec=60, forward_env=["MY_EXTRA"]),
         )
         stub = _StubSandbox()
-        monkeypatch.setattr("letta_evals.sandbox.modal.ModalSandbox", lambda spec, session_id: stub)
+        monkeypatch.setattr("letta_evals.sandbox.dispatch.ModalSandbox", lambda spec, session_id: stub)
 
         monkeypatch.setenv("LETTA_API_KEY", "sk-letta")  # default allowlist
         monkeypatch.setenv("MY_EXTRA", "extra-val")  # via forward_env
@@ -155,7 +157,7 @@ class TestRunSampleInSandbox:
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)  # absent -> skipped
 
         sample = Sample(id="s1", input="hi", ground_truth="hi")
-        anyio.run(runner._run_sample_in_sandbox, sample, "openai/gpt-a", False, 0.0)
+        anyio.run(run_sample_in_sandbox, runner.suite, sample, "openai/gpt-a", False, 0.0)
 
         cli_execs = [c for c in stub.execs if "--sample" in c[0]]
         assert cli_execs, stub.execs
@@ -169,11 +171,12 @@ class TestRunSampleInSandbox:
         _write_suite_yaml(tmp_path)
         runner = _make_runner_with_sandbox(tmp_path)
         stub = _StubSandbox(exec_return_code=1)
-        monkeypatch.setattr("letta_evals.sandbox.modal.ModalSandbox", lambda spec, session_id: stub)
+        monkeypatch.setattr("letta_evals.sandbox.dispatch.ModalSandbox", lambda spec, session_id: stub)
 
         sample = Sample(id="s1", input="hi", ground_truth="hi")
         result = anyio.run(
-            runner._run_sample_in_sandbox,
+            run_sample_in_sandbox,
+            runner.suite,
             sample,
             "openai/gpt-a",
             False,
@@ -190,11 +193,12 @@ class TestRunSampleInSandbox:
         _write_suite_yaml(tmp_path)
         runner = _make_runner_with_sandbox(tmp_path)
         stub = _StubSandbox(exec_return_code=-1)
-        monkeypatch.setattr("letta_evals.sandbox.modal.ModalSandbox", lambda spec, session_id: stub)
+        monkeypatch.setattr("letta_evals.sandbox.dispatch.ModalSandbox", lambda spec, session_id: stub)
 
         sample = Sample(id="s1", input="hi", ground_truth="hi")
         result = anyio.run(
-            runner._run_sample_in_sandbox,
+            run_sample_in_sandbox,
+            runner.suite,
             sample,
             "openai/gpt-a",
             False,
@@ -217,11 +221,12 @@ class TestRunSampleInSandbox:
             ),
         )
         stub = _StubSandbox(version_output="letta-evals 0.17.0")
-        monkeypatch.setattr("letta_evals.sandbox.modal.ModalSandbox", lambda spec, session_id: stub)
+        monkeypatch.setattr("letta_evals.sandbox.dispatch.ModalSandbox", lambda spec, session_id: stub)
 
         sample = Sample(id="s1", input="hi", ground_truth="hi")
         result = anyio.run(
-            runner._run_sample_in_sandbox,
+            run_sample_in_sandbox,
+            runner.suite,
             sample,
             "openai/gpt-a",
             False,
@@ -243,11 +248,12 @@ class TestRunSampleInSandbox:
                 raise RuntimeError("modal create boom")
 
         bad = _BadStartSandbox()
-        monkeypatch.setattr("letta_evals.sandbox.modal.ModalSandbox", lambda spec, session_id: bad)
+        monkeypatch.setattr("letta_evals.sandbox.dispatch.ModalSandbox", lambda spec, session_id: bad)
 
         sample = Sample(id="s1", input="hi", ground_truth="hi")
         result = anyio.run(
-            runner._run_sample_in_sandbox,
+            run_sample_in_sandbox,
+            runner.suite,
             sample,
             "openai/gpt-a",
             False,
@@ -269,16 +275,18 @@ class TestRunSampleInSandbox:
         # called instead.
         called = {}
 
-        async def fake_in_sandbox(self, sample, model_handle, return_token_data, t_sample_start):
+        async def fake_in_sandbox(suite, sample, model_handle, return_token_data, t_sample_start):
+            called["suite"] = suite
             called["sample"] = sample
             called["model_handle"] = model_handle
             return _canned_result(sample.id)
 
-        monkeypatch.setattr(Runner, "_run_sample_in_sandbox", fake_in_sandbox)
+        monkeypatch.setattr("letta_evals.runner.run_sample_in_sandbox", fake_in_sandbox)
 
         sample = Sample(id="s1", input="hi", ground_truth="hi")
         result = anyio.run(runner.run_sample, sample, "openai/gpt-a")
 
+        assert called["suite"] is runner.suite
         assert called["sample"].id == "s1"
         assert called["model_handle"] == "openai/gpt-a"
         assert result.grades["acc"].score == 1.0
