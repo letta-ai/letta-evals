@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
+from typing import Optional
 
+from letta_evals.models import SampleResult
 from letta_evals.models.sample import SampleId
 
 
@@ -80,28 +81,11 @@ class ProgressCallback(ABC):
         pass
 
     @abstractmethod
-    async def sample_completed(
-        self,
-        sample_id: SampleId,
-        agent_id: Optional[str] = None,
-        score: Optional[float] = None,
-        target_cost: Optional[float] = None,
-        model_handle: Optional[str] = None,
-        metric_scores: Optional[Dict[str, float]] = None,
-        rationale: Optional[str] = None,
-        metric_rationales: Optional[Dict[str, str]] = None,
-    ) -> None:
+    async def sample_completed(self, result: SampleResult, model_handle: Optional[str] = None) -> None:
         """Called when a sample evaluation completes successfully."""
         ...
 
     @abstractmethod
-    async def sample_error(
-        self,
-        sample_id: SampleId,
-        error: str,
-        agent_id: Optional[str] = None,
-        model_handle: Optional[str] = None,
-        target_cost: Optional[float] = None,
-    ) -> None:
+    async def sample_error(self, result: SampleResult, model_handle: Optional[str] = None) -> None:
         """Called when a sample evaluation encounters an error."""
         ...

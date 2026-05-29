@@ -6,8 +6,19 @@ import time
 import pytest
 from rich.console import Console
 
+from letta_evals.models import LettaCodeTargetSpec, SimpleGateSpec, SuiteSpec
 from letta_evals.visualization.rich_progress import EvalProgress
 from letta_evals.visualization.state import SampleState
+
+
+def _suite() -> SuiteSpec:
+    return SuiteSpec(
+        name="demo",
+        dataset="ignored",
+        target=LettaCodeTargetSpec(model_handles=["openai/gpt-4.1-mini"]),
+        graders={},
+        gate=SimpleGateSpec(kind="simple", metric_key="score", aggregation="avg_score", op="gte", value=0.5),
+    )
 
 
 class DummyLive:
@@ -25,6 +36,7 @@ class DummyLive:
 @pytest.mark.asyncio
 async def test_event_loop_batches_burst_updates_into_single_refresh() -> None:
     progress = EvalProgress(
+        suite=_suite(),
         suite_name="demo",
         total_samples=1,
         console=Console(width=120, height=20, force_terminal=False),
@@ -54,6 +66,7 @@ async def test_event_loop_batches_burst_updates_into_single_refresh() -> None:
 @pytest.mark.asyncio
 async def test_stop_flushes_dirty_state_immediately() -> None:
     progress = EvalProgress(
+        suite=_suite(),
         suite_name="demo",
         total_samples=1,
         console=Console(width=120, height=20, force_terminal=False),
@@ -80,6 +93,7 @@ async def test_stop_flushes_dirty_state_immediately() -> None:
 @pytest.mark.asyncio
 async def test_stats_capture_queue_pressure_under_concurrency() -> None:
     progress = EvalProgress(
+        suite=_suite(),
         suite_name="demo",
         total_samples=15,
         console=Console(width=120, height=20, force_terminal=False),
@@ -107,6 +121,7 @@ async def test_stats_capture_queue_pressure_under_concurrency() -> None:
 @pytest.mark.asyncio
 async def test_render_loop_refreshes_timer_without_new_events() -> None:
     progress = EvalProgress(
+        suite=_suite(),
         suite_name="demo",
         total_samples=1,
         console=Console(width=120, height=20, force_terminal=False),

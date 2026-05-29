@@ -17,8 +17,10 @@ from rich.progress import (
 )
 from rich.table import Table
 
+from letta_evals.models import SampleResult
 from letta_evals.models.sample import SampleId
 from letta_evals.visualization.base import ProgressCallback
+from letta_evals.visualization.progress_fields import sample_progress_fields
 from letta_evals.visualization.reducer import ProgressRuntimeState, ProgressStateReducer
 from letta_evals.visualization.rich_renderer import RichProgressRenderer
 from letta_evals.visualization.state import (
@@ -42,6 +44,7 @@ class EvalProgress(ProgressCallback):
 
     def __init__(
         self,
+        suite,
         suite_name: str,
         total_samples: int,
         target_kind: str = "agent",
@@ -53,6 +56,7 @@ class EvalProgress(ProgressCallback):
         cached_mode: bool = False,
         metric_labels: Optional[Dict[str, str]] = None,
     ):
+        self.suite = suite
         self.total_samples = total_samples
         self.console = console or Console()
         self.frame_interval = (1.0 / update_freq) if update_freq > 0 else 0.25
@@ -340,46 +344,32 @@ class EvalProgress(ProgressCallback):
             total_turns=total_turns,
         )
 
-    async def sample_completed(
-        self,
-        sample_id: SampleId,
-        agent_id: Optional[str] = None,
-        score: Optional[float] = None,
-        target_cost: Optional[float] = None,
-        model_handle: Optional[str] = None,
-        metric_scores: Optional[Dict[str, float]] = None,
-        rationale: Optional[str] = None,
-        metric_rationales: Optional[Dict[str, str]] = None,
-    ):
+    async def sample_completed(self, result: SampleResult, model_handle: Optional[str] = None):
         """Mark sample as completed"""
-        existing_from_cache = self._reducer.get_from_cache(sample_id, model_handle)
+        fields = sample_progress_fields(self.suite.gate, result)
+        existing_from_cache = self._reducer.get_from_cache(result.sample_id, model_handle)
 
         await self.update_sample_state(
-            sample_id,
+            result.sample_id,
             SampleState.COMPLETED,
-            agent_id=agent_id,
+            agent_id=result.agent_id,
             model_handle=model_handle,
-            score=score,
-            target_cost=target_cost,
-            rationale=rationale,
+            score=fields.score,
+            target_cost=fields.target_cost,
+            rationale=fields.rationale,
             from_cache=existing_from_cache,
-            metric_scores=metric_scores,
-            metric_rationales=metric_rationales,
+            metric_scores=fields.metric_scores,
+            metric_rationales=fields.metric_rationales,
         )
 
-    async def sample_error(
-        self,
-        sample_id: SampleId,
-        error: str,
-        agent_id: Optional[str] = None,
-        model_handle: Optional[str] = None,
-        target_cost: Optional[float] = None,
-    ):
+    async def sample_error(self, result: SampleResult, model_handle: Optional[str] = None):
         """Mark sample as having an error"""
+        target_cost = result.usage.cost if result.usage and result.usage.cost and result.usage.cost > 0 else None
+        error = result.error.message if result.error else "Unknown error"
         await self.update_sample_state(
-            sample_id,
+            result.sample_id,
             SampleState.ERROR,
-            agent_id=agent_id,
+            agent_id=result.agent_id,
             model_handle=model_handle,
             error=error,
             target_cost=target_cost,

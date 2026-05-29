@@ -40,7 +40,7 @@ def create_progress_callback(
         return NoOpProgress()
 
     if style == ProgressStyle.SIMPLE:
-        return SimpleProgress(suite_name=suite.name, total_samples=total_evaluations, console=console)
+        return SimpleProgress(suite=suite, total_samples=total_evaluations, console=console)
 
     # RICH (default for CLI)
     # Determine grader kind label for header
@@ -59,9 +59,10 @@ def create_progress_callback(
                 break
 
     progress = EvalProgress(
+        suite=suite,
         suite_name=suite.name,
         total_samples=total_evaluations,
-        target_kind=suite.target.kind.value,
+        target_kind=suite.target.kind,
         grader_kind=grader_kind_label,
         rubric_model=rubric_model,
         max_concurrent=max_concurrent,
