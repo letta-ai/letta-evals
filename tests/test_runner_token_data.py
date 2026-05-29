@@ -91,7 +91,7 @@ def _make_target_result(
     SampleResult/TargetResult only accept ``LettaMessageUnion`` instances
     in trajectory — building a real one drags in the Letta SDK. The fake
     grader in this file does not inspect trajectory contents, and
-    ``_detect_errors`` only flags empty trajectories when score is 0.0,
+    ``detect_errors`` only flags empty trajectories when score is 0.0,
     so we use an empty turn list and ensure the fake grader returns a
     non-zero score.
     """

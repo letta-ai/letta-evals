@@ -7,7 +7,7 @@ Covers:
 - ``RubricGrader.grade`` precedence (per-sample rubric > grader prompt),
   optional system prompt threading, and the absence of legacy wrapper
   injection in the prompt sent to the judge.
-- The pre-run validator (``InternalRunner._validate_rubric_vars``) catching
+- The pre-run validator (``validate_rubric_vars``) catching
   missing ``sample.rubric_vars`` keys before any judge call.
 """
 
@@ -314,43 +314,34 @@ def _minimal_suite(prompt: str, dataset: Path) -> SuiteSpec:
 
 class TestValidateRubricVarsPreRun:
     def test_missing_rubric_var_raises_with_clear_message(self, tmp_path: Path):
-        from letta_evals.runner import Runner
+        from letta_evals.runner_grading import validate_rubric_vars
 
         dataset = tmp_path / "d.jsonl"
         dataset.write_text(json.dumps({"input": "Q?"}) + "\n")
 
         suite = _minimal_suite("rubric needs {category}", dataset)
-        runner = Runner.__new__(Runner)
-        runner.suite = suite
-
         samples = [Sample(id=0, input="Q?")]
         with pytest.raises(ValueError, match="missing rubric variables"):
-            runner._validate_rubric_vars(samples)
+            validate_rubric_vars(suite, samples)
 
     def test_sample_provides_rubric_var(self, tmp_path: Path):
-        from letta_evals.runner import Runner
+        from letta_evals.runner_grading import validate_rubric_vars
 
         dataset = tmp_path / "d.jsonl"
         dataset.write_text(json.dumps({"input": "Q?"}) + "\n")
 
         suite = _minimal_suite("rubric needs {category}", dataset)
-        runner = Runner.__new__(Runner)
-        runner.suite = suite
-
         samples = [Sample(id=0, input="Q?", rubric_vars={"category": "x"})]
         # Should not raise.
-        runner._validate_rubric_vars(samples)
+        validate_rubric_vars(suite, samples)
 
     def test_per_sample_rubric_skips_static_validation(self, tmp_path: Path):
-        from letta_evals.runner import Runner
+        from letta_evals.runner_grading import validate_rubric_vars
 
         dataset = tmp_path / "d.jsonl"
         dataset.write_text(json.dumps({"input": "Q?"}) + "\n")
 
         suite = _minimal_suite("rubric needs {category}", dataset)
-        runner = Runner.__new__(Runner)
-        runner.suite = suite
-
         # Sample overrides the rubric; pre-run check skips it.
         samples = [Sample(id=0, input="Q?", rubric="no vars used")]
-        runner._validate_rubric_vars(samples)
+        validate_rubric_vars(suite, samples)

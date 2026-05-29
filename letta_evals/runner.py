@@ -19,13 +19,11 @@ from letta_evals.metrics import summarize_model, summarize_runs
 from letta_evals.models import (
     AgentState,
     Error,
-    GradeResult,
     LettaMessageUnion,
     LogicalGateSpec,
     ModelJudgeGraderSpec,
     ModelRun,
     ModelSummary,
-    PerTurnGrade,
     RunnerResult,
     Sample,
     SampleId,
@@ -42,15 +40,14 @@ from letta_evals.models import (
     normalize_weights,
 )
 from letta_evals.pricing import calculate_cost_from_agent_usage
+from letta_evals.runner_grading import detect_errors, grade_sample, validate_rubric_vars
 from letta_evals.sandbox.dispatch import run_sample_in_sandbox
 from letta_evals.streaming import StreamingReader, StreamingWriter
 from letta_evals.targets.errors import TargetError
 from letta_evals.targets.letta_code_target import LettaCodeTarget
 from letta_evals.types import Aggregation, ErrorCategory, LogicalOp
 from letta_evals.utils import (
-    build_turn_summary,
     extract_token_counts,
-    is_per_turn_evaluation,
     load_object,
 )
 from letta_evals.visualization.base import ProgressCallback
@@ -336,154 +333,6 @@ class Runner:
             target_result.token_data,
         )
 
-    # ── grading ──
-
-    async def _grade_per_turn(
-        self,
-        sample: Sample,
-        trajectory: List[List[LettaMessageUnion]],
-        agent_state: Optional[AgentState],
-        grader: Grader,
-        grader_key: str,
-        sample_id: SampleId,
-        agent_id: str,
-        model_handle: str,
-    ) -> tuple[GradeResult, str]:
-        """Grade each turn independently and return averaged GradeResult + combined submission."""
-        ground_truths = sample.ground_truth  # type: List[str]
-        num_turns = len(ground_truths)
-        per_turn_grades: List[PerTurnGrade] = []
-        grader_extraction_time = 0.0
-
-        for turn_idx in range(num_turns):
-            single_turn_trajectory = [trajectory[turn_idx]] if turn_idx < len(trajectory) else []
-
-            turn_sample = Sample(
-                id=sample.id,
-                input=sample.input[turn_idx] if isinstance(sample.input, list) else sample.input,
-                ground_truth=ground_truths[turn_idx],
-                agent_args=sample.agent_args,
-                rubric_vars=sample.rubric_vars,
-                extra_vars=sample.extra_vars,
-                rubric=sample.rubric,
-            )
-
-            turn_grade, turn_submission = await grader.grade(
-                turn_sample, single_turn_trajectory, agent_state=agent_state
-            )
-            grader_extraction_time += turn_grade.metadata.get("extraction_time", 0.0)
-
-            per_turn_grades.append(
-                PerTurnGrade(
-                    turn=turn_idx,
-                    score=turn_grade.score,
-                    rationale=turn_grade.rationale,
-                    submission=turn_submission,
-                )
-            )
-
-            if self.progress_callback:
-                await self.progress_callback.turn_graded(
-                    sample_id=sample_id,
-                    turn_num=turn_idx,
-                    total_turns=num_turns,
-                    turn_score=turn_grade.score,
-                    grader_key=grader_key,
-                    agent_id=agent_id,
-                    model_handle=model_handle,
-                )
-
-        turn_scores = [g.score for g in per_turn_grades]
-        final_score = sum(turn_scores) / num_turns if num_turns > 0 else 0.0
-        turns_passed = sum(1 for sc in turn_scores if sc >= 1.0)
-
-        summary_rationale = build_turn_summary(turn_scores)
-
-        combined_submission = " | ".join(f"[Turn {g.turn}] {g.submission}" for g in per_turn_grades)
-
-        grade = GradeResult(
-            score=final_score,
-            rationale=summary_rationale,
-            per_turn_grades=per_turn_grades,
-            metadata={
-                "turns_passed": turns_passed,
-                "turns_total": num_turns,
-                "extraction_time": grader_extraction_time,
-            },
-        )
-        return grade, combined_submission
-
-    async def _grade_sample(
-        self,
-        sample: Sample,
-        trajectory: List[List[LettaMessageUnion]],
-        agent_state: Optional[AgentState],
-        sample_id: SampleId,
-        agent_id: str,
-        model_handle: str,
-    ) -> tuple[Dict[str, GradeResult], Dict[str, str], Dict[str, float]]:
-        """Grade a sample across all graders. Returns (grades, submissions, per_grader_time)."""
-        grades_dict: Dict[str, GradeResult] = {}
-        submissions_dict: Dict[str, str] = {}
-        per_grader_time: Dict[str, float] = {}
-
-        is_per_turn = is_per_turn_evaluation(sample)
-
-        for key, grader in self.graders.items():  # type: ignore[union-attr]
-            t_grader_start = time.perf_counter()
-
-            if is_per_turn:
-                grade, submission = await self._grade_per_turn(
-                    sample, trajectory, agent_state, grader, key, sample_id, agent_id, model_handle
-                )
-            else:
-                grade, submission = await grader.grade(sample, trajectory, agent_state=agent_state)
-
-            per_grader_time[key] = time.perf_counter() - t_grader_start
-            grades_dict[key] = grade
-            submissions_dict[key] = submission
-
-        return grades_dict, submissions_dict, per_grader_time
-
-    @staticmethod
-    def _detect_errors(
-        grades_dict: Dict[str, GradeResult],
-        trajectory: list,
-        submissions: Dict[str, str],
-    ) -> Optional[Error]:
-        """Detect extraction or grading errors from results."""
-        # Pick a representative grade for extraction-error detection (any will
-        # do since extraction-empty signals come from the shared extractor).
-        if grades_dict:
-            first_key = next(iter(grades_dict.keys()))
-            first_grade = grades_dict[first_key]
-            first_submission = submissions.get(first_key, "")
-            is_extraction_error = first_grade.score == 0.0 and (
-                not trajectory
-                or not first_submission
-                or (
-                    first_grade.rationale
-                    and ("Empty trajectory" in first_grade.rationale or "Empty submission" in first_grade.rationale)
-                )
-            )
-            if is_extraction_error:
-                return Error(
-                    category=ErrorCategory.EXTRACTION,
-                    exception_type="ExtractionError",
-                    message=first_grade.rationale or "Empty trajectory or submission",
-                )
-
-        grading_errors = {k: gr.metadata["error"] for k, gr in grades_dict.items() if gr.metadata.get("error")}
-        if grading_errors:
-            details = "; ".join(f"{k}: {v}" for k, v in grading_errors.items())
-            return Error(
-                category=ErrorCategory.GRADING,
-                exception_type="GradingError",
-                message=f"Grading failed for: {details}",
-            )
-
-        return None
-
     # ── per-sample driver ──
 
     async def run_sample(
@@ -567,11 +416,18 @@ class Runner:
                     )
 
                 phase = ErrorCategory.GRADING
-                grades_dict, submissions_dict, per_grader_time = await self._grade_sample(
-                    sample, trajectory, agent_state, sample_id, agent_id, model_handle
+                grades_dict, submissions_dict, per_grader_time = await grade_sample(
+                    sample,
+                    trajectory,
+                    agent_state,
+                    self.graders,
+                    sample_id,
+                    agent_id,
+                    model_handle,
+                    self.progress_callback,
                 )
 
-                error = self._detect_errors(grades_dict, trajectory, submissions_dict)
+                error = detect_errors(grades_dict, trajectory, submissions_dict)
                 primary_score = next(iter(grades_dict.values())).score if grades_dict else 0.0
                 primary_rationale = next(iter(grades_dict.values())).rationale if grades_dict else None
 
@@ -691,44 +547,6 @@ class Runner:
                     except Exception as cleanup_err:
                         logger.warning(f"Failed to cleanup agent {agent_id}: {cleanup_err}")
 
-    # ── rubric validation ──
-
-    def _validate_rubric_vars(self, samples: List[Sample]) -> None:
-        if not self.suite.graders:
-            return
-
-        import string as _string
-
-        for grader_key, grader_spec in self.suite.graders.items():
-            if not isinstance(grader_spec, ModelJudgeGraderSpec):
-                continue
-            rubric_text = grader_spec.prompt
-            if rubric_text is None:
-                continue
-
-            referenced: set = set()
-            for _, field_name, _, _ in _string.Formatter().parse(rubric_text):
-                if field_name:
-                    referenced.add(field_name.split(".")[0].split("[")[0])
-
-            reserved = {"input", "ground_truth", "submission"}
-            extras_needed = referenced - reserved
-            if not extras_needed:
-                continue
-
-            for sample in samples:
-                if sample.rubric is not None:
-                    continue
-                provided = set((sample.rubric_vars or {}).keys())
-                missing = extras_needed - provided
-                if missing:
-                    raise ValueError(
-                        f"Sample {sample.id} is missing rubric variables required by "
-                        f"grader '{grader_key}': {sorted(missing)}. "
-                        f"Add them to sample.rubric_vars, or override the rubric "
-                        f"via sample.rubric / sample.rubric_path."
-                    )
-
     # ── orchestration ──
 
     async def run(self) -> RunnerResult:
@@ -752,7 +570,7 @@ class Runner:
         )
         self._sample_lookup = {s.id: s for s in samples}
 
-        self._validate_rubric_vars(samples)
+        validate_rubric_vars(self.suite, samples)
 
         self.results_by_model.clear()
         self.results = []
