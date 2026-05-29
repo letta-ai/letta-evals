@@ -314,7 +314,7 @@ def _minimal_suite(prompt: str, dataset: Path) -> SuiteSpec:
 
 class TestValidateRubricVarsPreRun:
     def test_missing_rubric_var_raises_with_clear_message(self, tmp_path: Path):
-        from letta_evals.runner_support.grading import validate_rubric_vars
+        from letta_evals.execution.grading import validate_rubric_vars
 
         dataset = tmp_path / "d.jsonl"
         dataset.write_text(json.dumps({"input": "Q?"}) + "\n")
@@ -325,7 +325,7 @@ class TestValidateRubricVarsPreRun:
             validate_rubric_vars(suite, samples)
 
     def test_sample_provides_rubric_var(self, tmp_path: Path):
-        from letta_evals.runner_support.grading import validate_rubric_vars
+        from letta_evals.execution.grading import validate_rubric_vars
 
         dataset = tmp_path / "d.jsonl"
         dataset.write_text(json.dumps({"input": "Q?"}) + "\n")
@@ -336,7 +336,7 @@ class TestValidateRubricVarsPreRun:
         validate_rubric_vars(suite, samples)
 
     def test_per_sample_rubric_skips_static_validation(self, tmp_path: Path):
-        from letta_evals.runner_support.grading import validate_rubric_vars
+        from letta_evals.execution.grading import validate_rubric_vars
 
         dataset = tmp_path / "d.jsonl"
         dataset.write_text(json.dumps({"input": "Q?"}) + "\n")

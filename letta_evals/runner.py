@@ -12,6 +12,7 @@ from letta_client import AsyncLetta
 from rich.console import Console
 
 from letta_evals.datasets.loader import load_dataset
+from letta_evals.execution.grading import detect_errors, grade_sample, validate_rubric_vars
 from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
@@ -40,7 +41,6 @@ from letta_evals.models import (
     normalize_weights,
 )
 from letta_evals.pricing import calculate_cost_from_agent_usage
-from letta_evals.runner_support.grading import detect_errors, grade_sample, validate_rubric_vars
 from letta_evals.sandbox.dispatch import run_sample_in_sandbox
 from letta_evals.streaming import StreamingReader, StreamingWriter
 from letta_evals.targets.errors import TargetError
