@@ -40,7 +40,7 @@ from letta_evals.models import (
     normalize_weights,
 )
 from letta_evals.pricing import calculate_cost_from_agent_usage
-from letta_evals.runner_grading import detect_errors, grade_sample, validate_rubric_vars
+from letta_evals.runner_support.grading import detect_errors, grade_sample, validate_rubric_vars
 from letta_evals.sandbox.dispatch import run_sample_in_sandbox
 from letta_evals.streaming import StreamingReader, StreamingWriter
 from letta_evals.targets.errors import TargetError
