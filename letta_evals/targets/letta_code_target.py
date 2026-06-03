@@ -374,12 +374,19 @@ class LettaCodeTarget(AbstractAgentTarget):
         token_data: list[TurnTokenData] = []
         try:
             # Fetch ALL runs for this agent — client tools cause each tool-call
-            # round-trip to be a separate run, so token IDs are scattered.
-            runs_page = await self.client.runs.list(agent_id=agent_id, limit=100)
+            # round-trip to be a separate run, so token IDs are scattered. Ask
+            # the API for chronological order so we reconstruct the rollout in
+            # the same order it happened.
+            runs_page = await self.client.runs.list(
+                agent_id=agent_id,
+                limit=100,
+                order_by="created_at",
+                order="asc",
+            )
             if not runs_page.items:
                 return token_data
 
-            # Token IDs are stored in run.metadata.result.turns (populated by SGLang native adapter)
+            # Token IDs are stored in run.metadata.result.turns (populated by SGLang native adapter).
             for run_summary in runs_page.items:
                 run = await self.client.runs.retrieve(run_id=run_summary.id)
                 result = (run.metadata or {}).get("result", {})
