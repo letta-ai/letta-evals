@@ -101,7 +101,6 @@ def _make_target_result(
         model_handle="fake/model",
         agent_usage=None,
         agent_state=agent_state,
-        run_ids=None,
         token_data=token_data,
     )
 

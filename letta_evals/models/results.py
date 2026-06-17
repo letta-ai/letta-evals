@@ -82,9 +82,6 @@ class TargetResult(BaseModel):
     agent_state: Optional[AgentState] = Field(
         default=None, description="Agent state after running the target (includes memory blocks)"
     )
-    run_ids: Optional[List[str]] = Field(
-        default=None, description="Run IDs for each input turn (needed for token-level data fetching in training)"
-    )
     token_data: Optional[List[TurnTokenData]] = Field(
         default=None,
         description=(
