@@ -4,7 +4,7 @@ import logging
 import os
 import shlex
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import anyio
 from letta_client import AsyncLetta
@@ -77,6 +77,25 @@ class LettaCodeTarget:
         # suite.sandbox (Modal), which runs the in-sandbox CLI from /mnt/suite.
         self.base_dir = base_dir or Path.cwd()
         self.flags = shlex.split(flags) if flags else []
+
+    @staticmethod
+    def _run_sort_key(run_summary: Any) -> tuple[str, str]:
+        """Return a stable chronological sort key for run summaries.
+
+        Letta server defaults for ``runs.list`` have varied across local
+        development branches. Token data must be processed oldest-to-newest so
+        Tinker sequence-extension can merge consecutive assistant generations.
+        Normalize timestamps to strings so mixed SDK/server timestamp types do
+        not make sorting fail.
+        """
+        created_at = getattr(run_summary, "created_at", None)
+        if hasattr(created_at, "isoformat"):
+            created_key = created_at.isoformat()
+        elif created_at is None:
+            created_key = ""
+        else:
+            created_key = str(created_at)
+        return created_key, str(getattr(run_summary, "id", ""))
 
     def _build_subprocess_env(self, sample: Sample, agent_id: Optional[str]) -> dict[str, str]:
         """Build subprocess env: os.environ -> target-managed -> sample.extra_vars["env"]."""
@@ -375,12 +394,17 @@ class LettaCodeTarget:
         try:
             # Fetch ALL runs for this agent — client tools cause each tool-call
             # round-trip to be a separate run, so token IDs are scattered.
-            runs_page = await self.client.runs.list(agent_id=agent_id, limit=100)
+            try:
+                runs_page = await self.client.runs.list(agent_id=agent_id, limit=100, order="asc")
+            except TypeError:
+                # Older generated clients may not expose the ``order`` kwarg.
+                # Fall back to the legacy call and sort locally below.
+                runs_page = await self.client.runs.list(agent_id=agent_id, limit=100)
             if not runs_page.items:
                 return token_data
 
             # Token IDs are stored in run.metadata.result.turns (populated by SGLang native adapter)
-            for run_summary in runs_page.items:
+            for run_summary in sorted(runs_page.items, key=self._run_sort_key):
                 run = await self.client.runs.retrieve(run_id=run_summary.id)
                 result = (run.metadata or {}).get("result", {})
                 for turn in result.get("turns") or []:
