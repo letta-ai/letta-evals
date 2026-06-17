@@ -132,6 +132,20 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.19.2](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.19.1...letta-evals-v0.19.2) (2026-06-17)
+
+
+### Bug Fixes
+
+* **targets:** Fetch token-data runs oldest-first for sequence extension ([#284](https://github.com/letta-ai/letta-evals/issues/284)) ([f3b473c](https://github.com/letta-ai/letta-evals/commit/f3b473c254df9b5b192f3969d528da87478fbfd8))
+
+
+### Refactors
+
+* **progress:** Pass SampleResult to completion callbacks ([#281](https://github.com/letta-ai/letta-evals/issues/281)) ([0d92ae5](https://github.com/letta-ai/letta-evals/commit/0d92ae5d7c541e3801e51d8d78a730ecd2fc4a36))
+* **runner:** Extract grading flow ([#280](https://github.com/letta-ai/letta-evals/issues/280)) ([1adb20d](https://github.com/letta-ai/letta-evals/commit/1adb20d796f156889ac8f4a6ba1169fe3d03196a))
+* **sandbox:** Extract sandbox dispatch ([#278](https://github.com/letta-ai/letta-evals/issues/278)) ([269fc4d](https://github.com/letta-ai/letta-evals/commit/269fc4d569b8aed7d83432c6cb6d0d4e3dad1dc1))
+
 ## [0.19.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.19.0...letta-evals-v0.19.1) (2026-05-28)
 
 
