@@ -284,7 +284,7 @@ def validate(suite_path: Path = typer.Argument(..., help="Path to suite YAML fil
 
         console.print("\n[bold]Configuration:[/bold]")
         console.print(f"  Dataset: {suite.dataset}")
-        console.print(f"  Target: {suite.target.kind.value}")
+        console.print(f"  Target: {suite.target.kind}")
         if suite.graders:
             console.print("  Graders:")
             for key, gspec in suite.graders.items():
