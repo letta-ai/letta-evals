@@ -45,10 +45,10 @@ pytest -k expr -vv  # filter/verbose
 
 ```bash
 # validate a suite
-letta-evals validate examples/simple-rubric-grader/suite.yaml
+letta-evals validate examples/multi-model-simple-rubric-grader/suite.yaml
 
 # run a suite
-letta-evals run examples/simple-rubric-grader/suite.yaml
+letta-evals run examples/multi-model-simple-rubric-grader/suite.yaml
 ```
 
 ## Commit Messages (Conventional Commits)

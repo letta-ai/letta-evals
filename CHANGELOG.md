@@ -42,7 +42,7 @@ to attach pre-created named Modal Secrets (preferred for shared/CI use). Only
 allowlisted names are forwarded — never the whole environment.
 
 The Modal SDK ships as a base dependency, so `pip install letta-evals` is all
-you need to drive sandboxes. See `docs/examples/modal-sandbox/` for an example
+you need to drive sandboxes. See `docs/modal-sandbox.md` for details
 suite.
 
 ### ⚠ BREAKING CHANGES — `target.sandbox` and `target.working_dir` removed
