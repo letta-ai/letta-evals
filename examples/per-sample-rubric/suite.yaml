@@ -17,9 +17,6 @@ graders:
     max_retries: 3
     timeout: 120.0
     extractor: last_assistant
-gate:
-  kind: simple
+reward:
+  kind: metric
   metric_key: quality
-  aggregation: avg_score
-  op: gte
-  value: 0.6

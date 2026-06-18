@@ -11,9 +11,6 @@ graders:
     kind: tool
     function: custom_evaluators.py:ticket_classification_grader
     extractor: custom_evaluators.py:json_object_extractor
-gate:
-  kind: simple
+reward:
+  kind: metric
   metric_key: ticket_classification
-  aggregation: avg_score
-  op: gte
-  value: 0.3

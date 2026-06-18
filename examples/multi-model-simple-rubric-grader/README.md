@@ -84,20 +84,19 @@ Each model gets its own per-sample results file (`<model>.jsonl`), and `summary.
 ```json
 {
   "suite": "multi-model-rubric-grader",
-  "gates_passed": true,
   "models": [
     {
       "model": "openai/gpt-4.1",
       "n_total": 20,
       "n_attempted": 20,
-      "score": 0.82,
+      "reward": 0.82,
       "per_metric": { "quality": 0.82 }
     },
     {
       "model": "openai/gpt-4.1-mini",
       "n_total": 20,
       "n_attempted": 20,
-      "score": 0.71,
+      "reward": 0.71,
       "per_metric": { "quality": 0.71 }
     }
   ]

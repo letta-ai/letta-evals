@@ -30,7 +30,6 @@ graders:
     provider: openai
     extractor: last_assistant
 
-gate:
-  metric_key: contains_check
-  op: gte
-  value: 0.75  # Require 75% accuracy
+reward:
+  kind: metric
+  metric_key: accuracy

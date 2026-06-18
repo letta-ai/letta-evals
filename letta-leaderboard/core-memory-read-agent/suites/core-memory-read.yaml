@@ -13,6 +13,6 @@ grader:
   kind: tool
   function: contains
   extractor: last_assistant
-gate:
-  op: gte
-  value: 0.75  # Require 75% accuracy
+reward:
+  kind: metric
+  metric_key: accuracy
