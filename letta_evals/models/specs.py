@@ -233,8 +233,9 @@ class SuiteSpec(BaseModel):
         ),
     )
 
-    # internal field for path resolution
+    # internal fields for path resolution / dispatch
     base_dir: Optional[Path] = Field(default=None, exclude=True)
+    suite_path: Optional[Path] = Field(default=None, exclude=True)
 
     @model_validator(mode="before")
     @classmethod
@@ -244,7 +245,12 @@ class SuiteSpec(BaseModel):
         return data
 
     @classmethod
-    def from_yaml(cls, yaml_data: Dict[str, Any], base_dir: Optional[Path] = None) -> "SuiteSpec":
+    def from_yaml(
+        cls,
+        yaml_data: Dict[str, Any],
+        base_dir: Optional[Path] = None,
+        suite_path: Optional[Path] = None,
+    ) -> "SuiteSpec":
         """Create from parsed YAML data."""
         if base_dir:
             # resolve dataset path
@@ -290,5 +296,8 @@ class SuiteSpec(BaseModel):
                 yaml_data["graders"] = resolved_graders
 
             yaml_data["base_dir"] = base_dir
+
+        if suite_path is not None:
+            yaml_data["suite_path"] = suite_path
 
         return cls(**yaml_data)

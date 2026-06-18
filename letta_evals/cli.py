@@ -151,7 +151,7 @@ def run(
     try:
         with open(suite_path, "r") as f:
             yaml_data = yaml.safe_load(f)
-        suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent)
+        suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent, suite_path=suite_path)
 
         effective_max_concurrent = (
             max_concurrent
@@ -273,7 +273,7 @@ def validate(suite_path: Path = typer.Argument(..., help="Path to suite YAML fil
         with open(suite_path, "r") as f:
             yaml_data = yaml.safe_load(f)
 
-        suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent)
+        suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent, suite_path=suite_path)
         console.print(f"[green]✓ Suite '{suite.name}' is valid[/green]")
 
         console.print("\n[bold]Configuration:[/bold]")
@@ -375,7 +375,7 @@ async def _run_single_sample(
     if model_handle is not None:
         yaml_data.setdefault("target", {})["model_handles"] = [model_handle]
 
-    suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent)
+    suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent, suite_path=suite_path)
 
     with open(sample_path, "r") as f:
         sample = Sample.model_validate(_json.load(f))

@@ -12,6 +12,7 @@ from typing import Optional
 from unittest.mock import MagicMock
 
 import anyio
+import pytest
 
 from letta_evals.models import (
     GradeResult,
@@ -21,7 +22,7 @@ from letta_evals.models import (
     SampleResult,
     Timing,
 )
-from letta_evals.runner import Runner
+from letta_evals.runner import Runner, run_suite
 from letta_evals.sandbox.base import ExecResult
 from letta_evals.sandbox.dispatch import run_sample_in_sandbox
 
@@ -79,12 +80,17 @@ class _StubSandbox:
             f.write(result.model_dump_json())
 
 
-def _make_runner_with_sandbox(tmp_path: Path, sandbox_spec: Optional[ModalSandboxSpec] = None) -> Runner:
+def _make_runner_with_sandbox(
+    tmp_path: Path,
+    sandbox_spec: Optional[ModalSandboxSpec] = None,
+    suite_filename: str = "suite.yaml",
+) -> Runner:
     """Construct a Runner via __new__ with only what run_sample dispatch reads."""
     runner = Runner.__new__(Runner)
     runner.suite = MagicMock()
     runner.suite.name = "test-suite"
     runner.suite.base_dir = tmp_path
+    runner.suite.suite_path = tmp_path / suite_filename
     runner.suite.sandbox = sandbox_spec or ModalSandboxSpec(image="img:test", timeout_sec=60)
     runner.suite.cleanup = False
     runner.suite.target = MagicMock()
@@ -103,9 +109,15 @@ def _make_runner_with_sandbox(tmp_path: Path, sandbox_spec: Optional[ModalSandbo
     return runner
 
 
-def _write_suite_yaml(base: Path) -> None:
-    """Drop a suite.yaml in base so suite_yaml_filename has something to glob."""
-    (base / "suite.yaml").write_text("name: test-suite\n")
+def _write_suite_yaml(base: Path, filename: str = "suite.yaml") -> None:
+    """Drop a suite YAML in base so the sandbox command can reference it."""
+    (base / filename).write_text("name: test-suite\n")
+
+
+def _sandbox_cli_command(stub: _StubSandbox) -> str:
+    cli_commands = [c[0] for c in stub.execs if "letta-evals" in c[0] and "--sample" in c[0]]
+    assert cli_commands, stub.execs
+    return cli_commands[0]
 
 
 class TestRunSampleInSandbox:
@@ -131,9 +143,7 @@ class TestRunSampleInSandbox:
         # Sample JSON uploaded to /mnt/sample.json.
         assert any(remote == "/mnt/sample.json" for _, remote in stub.uploaded_files)
         # CLI command references the suite + sample + output paths and the model handle.
-        cli_commands = [c[0] for c in stub.execs if "letta-evals" in c[0] and "--sample" in c[0]]
-        assert cli_commands, stub.execs
-        cmd = cli_commands[0]
+        cmd = _sandbox_cli_command(stub)
         assert "/mnt/suite/suite.yaml" in cmd
         assert "/mnt/sample.json" in cmd
         assert "/mnt/result.json" in cmd
@@ -141,6 +151,61 @@ class TestRunSampleInSandbox:
         # Result round-tripped.
         assert result.sample_id == "s1"
         assert result.grades["acc"].score == 1.0
+
+    @pytest.mark.parametrize("suite_filename", ["suite.yaml", "suite-mini.yaml"])
+    def test_preserves_exact_suite_file_when_multiple_suite_yamls_exist(
+        self, tmp_path, monkeypatch, suite_filename
+    ):
+        _write_suite_yaml(tmp_path, "suite.yaml")
+        _write_suite_yaml(tmp_path, "suite-mini.yaml")
+        runner = _make_runner_with_sandbox(tmp_path, suite_filename=suite_filename)
+        stub = _StubSandbox()
+        monkeypatch.setattr("letta_evals.sandbox.dispatch.ModalSandbox", lambda spec, session_id: stub)
+
+        sample = Sample(id="s1", input="hi", ground_truth="hi")
+        anyio.run(run_sample_in_sandbox, runner.suite, sample, "openai/gpt-a", False, 0.0)
+
+        cmd = _sandbox_cli_command(stub)
+        assert f"/mnt/suite/{suite_filename}" in cmd
+
+        other_suite_filename = "suite-mini.yaml" if suite_filename == "suite.yaml" else "suite.yaml"
+        assert f"/mnt/suite/{other_suite_filename}" not in cmd
+
+    def test_run_suite_records_loaded_suite_path(self, tmp_path, monkeypatch):
+        dataset = tmp_path / "data.jsonl"
+        dataset.write_text('{"input": "hi", "ground_truth": "hi"}\n')
+        suite_path = tmp_path / "suite-mini.yaml"
+        suite_path.write_text(
+            """
+name: test-suite
+dataset: data.jsonl
+target:
+  kind: letta_code
+  model_handles:
+    - openai/gpt-4.1-mini
+graders:
+  acc:
+    kind: tool
+    function: exact_match
+reward:
+  kind: metric
+  metric_key: acc
+sandbox:
+  kind: modal
+  image: img:test
+"""
+        )
+        captured = {}
+
+        async def fake_execute_runs(**kwargs):
+            captured["suite"] = kwargs["suite"]
+            return object()
+
+        monkeypatch.setattr("letta_evals.runner._execute_runs", fake_execute_runs)
+
+        anyio.run(run_suite, suite_path, 1)
+
+        assert captured["suite"].suite_path == suite_path
 
     def test_forwards_allowlisted_env_vars(self, tmp_path, monkeypatch):
         """Allowlisted host env vars (+ forward_env extras) reach the in-sandbox
