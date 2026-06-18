@@ -28,22 +28,21 @@ DEFAULT_SANDBOX_FORWARD_ENV = (
 )
 
 
-def suite_yaml_filename(suite: SuiteSpec) -> str:
-    """Locate the suite YAML inside ``base_dir`` so we can reference it remotely.
+def suite_yaml_remote_path(suite: SuiteSpec) -> str:
+    """Return the in-sandbox path for the suite file the host loaded."""
+    if suite.suite_path is None:
+        return "/mnt/suite/suite.yaml"
 
-    Convention: the suite file lives directly inside ``base_dir`` (this is how
-    ``run_suite`` sets ``base_dir = suite_path.parent``). Prefer files whose
-    name starts with ``suite`` and fall back to the first YAML file.
-    """
     base = suite.base_dir
     if base is None:
-        return "suite.yaml"
-    candidates = sorted(list(base.glob("*.yaml")) + list(base.glob("*.yml")))
-    if not candidates:
-        return "suite.yaml"
-    suite_like = [p for p in candidates if p.name.startswith("suite")]
-    chosen = suite_like[0] if suite_like else candidates[0]
-    return chosen.name
+        return f"/mnt/suite/{suite.suite_path.name}"
+
+    try:
+        relative_suite_path = suite.suite_path.relative_to(base)
+    except ValueError:
+        relative_suite_path = suite.suite_path.resolve().relative_to(base.resolve())
+
+    return f"/mnt/suite/{relative_suite_path.as_posix()}"
 
 
 def sandbox_error_result(
@@ -64,7 +63,7 @@ def sandbox_error_result(
 
 
 def build_sandbox_command(suite: SuiteSpec, model_handle: Optional[str]) -> str:
-    suite_yaml_remote = f"/mnt/suite/{suite_yaml_filename(suite)}"
+    suite_yaml_remote = suite_yaml_remote_path(suite)
     cmd_parts = [
         "letta-evals",
         "run",

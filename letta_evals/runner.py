@@ -676,7 +676,7 @@ async def run_suite(
     with open(suite_path, "r") as f:
         yaml_data = yaml.safe_load(f)
 
-    suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent)
+    suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent, suite_path=suite_path)
 
     actual_num_runs = num_runs if num_runs is not None else (suite.num_runs or 1)
 
