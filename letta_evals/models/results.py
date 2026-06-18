@@ -173,6 +173,20 @@ class ErrorSummary(BaseModel):
     by_exception_type: Dict[str, int] = Field(default_factory=dict, description="Error count by exception type")
 
 
+class RewardOutput(BaseModel):
+    """Composed reward for one sample.
+
+    ``metadata`` is intentionally sparse: store only derived composer decisions
+    that are not already recoverable from ``grades``, ``submissions``, or the
+    sample.
+    """
+
+    score: float = Field(ge=0.0, le=1.0, description="Composed reward score between 0.0 and 1.0")
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None, description="Optional derived reward metadata; do not duplicate raw grader scores"
+    )
+
+
 # Per-sample result. Lives in <model>.jsonl or <model>/run_<n>.jsonl.
 #
 # The model that produced this result is implicit in the file path; the
@@ -193,6 +207,10 @@ class SampleResult(BaseModel):
     grades: Dict[str, GradeResult] = Field(
         default_factory=dict,
         description="Per-grader grading results (keyed by grader name)",
+    )
+    reward: Optional[RewardOutput] = Field(
+        default=None,
+        description="Composed per-sample reward. Null when the sample has a framework, target, grading, or reward error.",
     )
     usage: Optional[Usage] = Field(default=None, description="Token usage and cost for this sample")
     timing: Timing = Field(description="Wall-clock timing for this sample")

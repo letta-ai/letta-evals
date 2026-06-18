@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, patch
 import anyio
 import pytest
 
-from letta_evals.models import GradeResult, SampleResult, Timing
+from letta_evals.models import GradeResult, RewardOutput, SampleResult, Timing
 
 
 def _write_minimal_suite(tmp_path: Path, *, with_sandbox: bool = False) -> Path:
@@ -38,11 +38,9 @@ graders:
   acc:
     kind: tool
     function: exact_match
-gate:
-  kind: simple
+reward:
+  kind: metric
   metric_key: acc
-  op: gte
-  value: 1.0
 """
     if with_sandbox:
         yaml_text += """\
@@ -66,6 +64,7 @@ def _canned_result() -> SampleResult:
         trajectory=[[]],
         submissions={"acc": "hi"},
         grades={"acc": GradeResult(score=1.0, rationale="canned")},
+        reward=RewardOutput(score=1.0),
         timing=Timing(total=0.01, target=0.005),
     )
 
@@ -147,11 +146,9 @@ graders:
   acc:
     kind: tool
     function: exact_match
-gate:
-  kind: simple
+reward:
+  kind: metric
   metric_key: acc
-  op: gte
-  value: 1.0
 """
         )
         sample_path = _write_sample(tmp_path)

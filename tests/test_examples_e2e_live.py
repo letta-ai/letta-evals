@@ -45,12 +45,10 @@ async def test_single_suite(request, tmp_path: Path, caplog) -> None:
     # Aggregate across all model partitions for the summary log line.
     total = sum(ms.n_total for ms in result.summary.models)
     attempted = sum(ms.n_attempted for ms in result.summary.models)
-    # Simple unweighted mean of model scores (parity with the prior log line).
-    mean_score = (
-        sum(ms.score for ms in result.summary.models) / len(result.summary.models) if result.summary.models else 0.0
+    mean_reward = (
+        sum(ms.reward for ms in result.summary.models) / len(result.summary.models) if result.summary.models else 0.0
     )
-    logger.info(f"\n{'=' * 60}\nResults: {attempted}/{total} attempted, avg score: {mean_score:.2f}\n{'=' * 60}")
+    logger.info(f"\n{'=' * 60}\nResults: {attempted}/{total} attempted, avg reward: {mean_reward:.2f}\n{'=' * 60}")
 
-    assert result.gates_passed, f"Gate failed for suite: {suite_path}"
     assert total > 0
     assert output_path.exists()

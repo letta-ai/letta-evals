@@ -1,27 +1,20 @@
 """Configuration specs.
 
 Pydantic models for the suite YAML: target (agent), graders (tool / model
-judge), gates (simple / weighted_average / logical), and the
-top-level :class:`SuiteSpec`. Also includes small gate helper functions used
-by metrics computation.
+judge), reward composition, and the top-level :class:`SuiteSpec`.
 """
 
 import shlex
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from letta_evals.types import (
-    Aggregation,
-    GateKind,
     GraderKind,
     LLMProvider,
-    LogicalOp,
-    MetricOp,
+    RewardKind,
 )
-
-# Target spec
 
 
 class LettaCodeTargetSpec(BaseModel):
@@ -61,9 +54,6 @@ class LettaCodeTargetSpec(BaseModel):
         default=None,
         description="Permission mode for letta code (e.g., 'memory' to scope writes to memory roots).",
     )
-
-
-# Sandbox specs
 
 
 class ModalSandboxSpec(BaseModel):
@@ -120,9 +110,6 @@ class ModalSandboxSpec(BaseModel):
 
 
 SandboxSpec = Annotated[ModalSandboxSpec, Field(discriminator="kind")]
-
-
-# Grader specs
 
 
 class BaseGraderSpec(BaseModel):
@@ -191,130 +178,28 @@ GraderSpec = Annotated[
 ]
 
 
-# Gate helper functions
+class MetricRewardSpec(BaseModel):
+    """Use one grader's score directly as the sample reward."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal[RewardKind.METRIC] = Field(description="reward type")
+    metric_key: str = Field(description="grader name whose score becomes the reward")
 
 
-def _compare(a: float, op: MetricOp, b: float) -> bool:
-    """compare two values using the given operator."""
-    if op == MetricOp.GT:
-        return a > b
-    elif op == MetricOp.GTE:
-        return a >= b
-    elif op == MetricOp.LT:
-        return a < b
-    elif op == MetricOp.LTE:
-        return a <= b
-    elif op == MetricOp.EQ:
-        return a == b
-    return False
+class CustomRewardSpec(BaseModel):
+    """Call a user-defined Python reward composer."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal[RewardKind.CUSTOM] = Field(description="reward type")
+    function: str = Field(description="Path to reward composer function, e.g. rewards.py:compose_reward")
 
 
-def normalize_weights(weights: Dict[str, float]) -> Dict[str, float]:
-    """normalize weights to sum to 1.0."""
-    total = sum(weights.values())
-    if total == 0:
-        raise ValueError("weights must sum to a non-zero value")
-    return {k: v / total for k, v in weights.items()}
-
-
-def compute_gate_score(gate: "GateSpec", scores: Dict[str, float]) -> float:
-    """Compute a single reward score from per-grader scores using the gate config.
-
-    For simple gates, returns the score of the gate's metric_key.
-    For weighted_average gates, returns the normalized weighted sum.
-    For logical gates or unknown, falls back to averaging all scores.
-    """
-    if not scores:
-        return 0.0
-    if hasattr(gate, "metric_key") and not hasattr(gate, "weights"):
-        # SimpleGateSpec
-        return scores.get(gate.metric_key, 0.0)
-    elif hasattr(gate, "weights"):
-        # WeightedAverageGateSpec
-        normalized = normalize_weights(gate.weights)
-        return sum(normalized.get(k, 0) * scores.get(k, 0) for k in normalized)
-    else:
-        # LogicalGateSpec or unknown — fall back to average
-        return sum(scores.values()) / len(scores)
-
-
-# Gate specs
-
-
-class SimpleCondition(BaseModel):
-    """simple condition for logical gates (leaf node)."""
-
-    metric_key: str = Field(description="grader name to evaluate")
-    aggregation: Aggregation = Field(description="aggregation function to apply")
-    op: MetricOp = Field(description="comparison operator")
-    value: float = Field(description="threshold value")
-    pass_threshold: Optional[float] = Field(
-        default=None, description="per-sample pass threshold for accuracy aggregation (defaults to 1.0)"
-    )
-
-    def __hash__(self):
-        """make simple condition hashable for set operations."""
-        return hash((self.metric_key, self.aggregation, self.op, self.value, self.pass_threshold))
-
-
-class SimpleGateSpec(BaseModel):
-    """single-metric gate."""
-
-    kind: Literal[GateKind.SIMPLE] = Field(description="gate type")
-    metric_key: str = Field(description="grader name to gate on")
-    aggregation: Aggregation = Field(default=Aggregation.AVG_SCORE, description="aggregation function")
-    op: MetricOp = Field(description="comparison operator")
-    value: float = Field(description="threshold value")
-    pass_threshold: Optional[float] = Field(
-        default=None, description="per-sample pass threshold for accuracy aggregation (defaults to 1.0)"
-    )
-
-
-class WeightedAverageGateSpec(BaseModel):
-    """weighted average of multiple grader metrics."""
-
-    kind: Literal[GateKind.WEIGHTED_AVERAGE] = Field(description="gate type")
-    aggregation: Aggregation = Field(description="aggregation function applied to each metric before weighting")
-    weights: Dict[str, float] = Field(description="weights for each metric_key (grader name)")
-    op: MetricOp = Field(description="comparison operator")
-    value: float = Field(description="threshold value")
-
-    @field_validator("weights")
-    @classmethod
-    def validate_weights(cls, v: Dict[str, float]) -> Dict[str, float]:
-        if not v:
-            raise ValueError("weights dict cannot be empty")
-        if any(w < 0 for w in v.values()):
-            raise ValueError("weights must be non-negative")
-        if sum(v.values()) == 0:
-            raise ValueError("weights must sum to a non-zero value")
-        return v
-
-
-class LogicalGateSpec(BaseModel):
-    """logical combination of conditions."""
-
-    kind: Literal[GateKind.LOGICAL] = Field(description="gate type")
-    operator: LogicalOp = Field(description="logical operator (and/or)")
-    conditions: List[Union["SimpleCondition", "LogicalGateSpec"]] = Field(
-        description="list of conditions (can be simple or nested logical)"
-    )
-
-    @field_validator("conditions")
-    @classmethod
-    def validate_conditions(cls, v: List) -> List:
-        if not v:
-            raise ValueError("conditions list cannot be empty")
-        return v
-
-
-GateSpec = Annotated[
-    Union[SimpleGateSpec, WeightedAverageGateSpec, LogicalGateSpec],
+RewardSpec = Annotated[
+    Union[MetricRewardSpec, CustomRewardSpec],
     Field(discriminator="kind"),
 ]
-
-
-# Suite spec (top-level)
 
 
 class SuiteSpec(BaseModel):
@@ -325,7 +210,7 @@ class SuiteSpec(BaseModel):
     dataset: Path = Field(description="Path to JSONL dataset file")
     target: LettaCodeTargetSpec = Field(description="Target configuration")
     graders: Optional[Dict[str, GraderSpec]] = Field(default=None, description="Multiple graders keyed by metric name")
-    gate: GateSpec = Field(description="Pass/fail criteria for avg_score (required)")
+    reward: RewardSpec = Field(description="Per-sample reward composition contract")
 
     max_samples: Optional[int] = Field(default=None, description="Maximum number of samples to evaluate")
     sample_tags: Optional[List[str]] = Field(default=None, description="Only evaluate samples with these tags")
@@ -350,6 +235,13 @@ class SuiteSpec(BaseModel):
 
     # internal field for path resolution
     base_dir: Optional[Path] = Field(default=None, exclude=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_gate_config(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "gate" in data:
+            raise ValueError("Top-level 'gate' has been removed; use top-level 'reward' instead")
+        return data
 
     @classmethod
     def from_yaml(cls, yaml_data: Dict[str, Any], base_dir: Optional[Path] = None) -> "SuiteSpec":

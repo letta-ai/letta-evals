@@ -10,16 +10,17 @@ from letta_evals.metrics import summarize_model, summarize_runs
 from letta_evals.models import (
     GradeResult,
     LettaCodeTargetSpec,
+    MetricRewardSpec,
+    RewardOutput,
     Sample,
     SampleResult,
-    SimpleGateSpec,
     SuiteSpec,
     Summary,
     Timing,
     ToolGraderSpec,
 )
 from letta_evals.streaming import StreamingReader, StreamingWriter
-from letta_evals.types import Aggregation, GateKind, MetricOp
+from letta_evals.types import RewardKind
 
 
 def _make_suite() -> SuiteSpec:
@@ -28,13 +29,7 @@ def _make_suite() -> SuiteSpec:
         dataset="ignored",
         target=LettaCodeTargetSpec(model_handles=["openai/gpt-4.1-mini"]),
         graders={"check": ToolGraderSpec(function="exact_match", display_name="Check")},
-        gate=SimpleGateSpec(
-            kind=GateKind.SIMPLE,
-            metric_key="check",
-            aggregation=Aggregation.AVG_SCORE,
-            op=MetricOp.GTE,
-            value=0.5,
-        ),
+        reward=MetricRewardSpec(kind=RewardKind.METRIC, metric_key="check"),
     )
 
 
@@ -49,17 +44,9 @@ def _make_result(sample_id, score: float) -> SampleResult:
         trajectory=[[]],
         submissions={"check": "x"},
         grades={"check": GradeResult(score=score, rationale="r")},
+        reward=RewardOutput(score=score),
         timing=Timing(total=1.0, target=0.8),
     )
-
-
-_GATE = SimpleGateSpec(
-    kind=GateKind.SIMPLE,
-    metric_key="check",
-    aggregation=Aggregation.AVG_SCORE,
-    op=MetricOp.GTE,
-    value=0.5,
-)
 
 
 def _summary_for(model: str, results):
@@ -67,7 +54,6 @@ def _summary_for(model: str, results):
         model=model,
         results=results,
         grader_keys=["check"],
-        gate=_GATE,
     )
 
 
@@ -107,7 +93,6 @@ class TestSingleRun:
             summary = Summary(
                 suite="test-suite",
                 models=[_summary_for("default", [r1, r2])],
-                gates_passed=True,
             )
             await writer.write_summary(summary)
 
@@ -120,7 +105,6 @@ class TestSingleRun:
             result = await StreamingReader.to_runner_result(output_path)
             assert result.suite_spec.name == "test-suite"
             assert len(result.samples) == 2
-            assert result.gates_passed is True
             assert "default" in result.runs
             assert result.runs["default"].results[0].grades["check"].score == 1.0
 
@@ -144,7 +128,6 @@ class TestSingleRun:
                 Summary(
                     suite="test-suite",
                     models=[_summary_for("default", [r])],
-                    gates_passed=True,
                 )
             )
 
@@ -176,7 +159,6 @@ class TestSingleRun:
                     _summary_for("gpt-4o", [r_a]),
                     _summary_for("claude-3-opus", [r_b]),
                 ],
-                gates_passed=True,
             )
             await writer.write_summary(summary)
 
@@ -208,7 +190,6 @@ class TestSingleRun:
             summary = Summary(
                 suite="test-suite",
                 models=[_summary_for("openai/gpt-4", [r])],
-                gates_passed=True,
             )
             await writer.write_summary(summary)
 
@@ -245,15 +226,12 @@ class TestMultiRun:
                 model="m1",
                 per_run_results=run_results,
                 grader_keys=["check"],
-                gate=_GATE,
             )
             await writer.write_model_summary(model_summary)
 
             top = Summary(
                 suite="test-suite",
                 models=[model_summary],
-                gates_passed=True,
-                runs_passed=2,
             )
             await writer.write_summary(top)
 
@@ -286,7 +264,7 @@ class TestReaderErrors:
     async def test_missing_suite_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir)
-            (output_path / "summary.json").write_text('{"suite":"x","models":[],"gates_passed":false}')
+            (output_path / "summary.json").write_text('{"suite":"x","models":[]}')
             with pytest.raises(FileNotFoundError):
                 await StreamingReader.to_runner_result(output_path)
 

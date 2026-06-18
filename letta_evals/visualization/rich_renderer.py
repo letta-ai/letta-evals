@@ -292,6 +292,7 @@ class RichProgressRenderer:
             allow_expand=True,
         )
         self._add_fixed_width_column(table, "Status", width=self.STATUS_WIDTH, style="white")
+        self._add_fixed_width_column(table, "Reward", width=8, style="white", justify="right")
 
         metric_keys = list(self.metric_labels.keys())
         metric_count = len(metric_keys) if metric_keys else 1
@@ -318,7 +319,6 @@ class RichProgressRenderer:
                     allow_expand=True,
                 )
         else:
-            self._add_fixed_width_column(table, "Score", width=8, style="white", justify="right")
             self._add_fixed_width_column(table, "Rationale", width=18, style="dim", ratio=3, allow_expand=True)
         self._add_fixed_width_column(table, "Time", width=self.TIME_WIDTH, style="white", justify="right")
         self._add_fixed_width_column(
@@ -340,7 +340,7 @@ class RichProgressRenderer:
             else:
                 time_text = "-"
 
-            cells: List[str] = []
+            cells: List[str] = [f"{sample.score:.2f}" if sample.score is not None else "-"]
             if sample.state == SampleState.GRADING_TURNS and sample.turn_scores:
                 if self.metric_labels:
                     for metric_key in metric_keys:
@@ -376,9 +376,8 @@ class RichProgressRenderer:
                     )
                     cells.extend([score_cell, rationale])
             else:
-                score_cell = f"{sample.score:.2f}" if sample.score is not None else "-"
                 rationale = sample.rationale or ""
-                cells.extend([score_cell, rationale])
+                cells.append(rationale)
 
             if sample.state == SampleState.SENDING_MESSAGES and sample.total_messages > 0:
                 progress = sample.messages_sent / sample.total_messages

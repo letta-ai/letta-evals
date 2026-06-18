@@ -146,6 +146,39 @@ def extractor(func: Callable = None, *, name: str = None):
         return decorator(func)
 
 
+def reward_composer(func: Callable) -> Callable:
+    """Decorator for custom reward composer functions.
+
+    Reward composers must accept exactly one parameter named ``ctx``. They may
+    be sync or async and should return either ``RewardOutput`` or a raw float
+    reward. The YAML ``reward.function`` path remains the source of truth; this
+    decorator marks the function as intentionally usable as a reward composer.
+    """
+    sig = inspect.signature(func)
+    params = list(sig.parameters.values())
+
+    if len(params) != 1:
+        raise TypeError(f"Reward composer {func.__name__} must have exactly 1 parameter (ctx), got {len(params)}")
+
+    param_names = [p.name for p in params]
+    if param_names != ["ctx"]:
+        raise TypeError(f"Reward composer {func.__name__} must have parameter named 'ctx', got {param_names}")
+
+    if inspect.iscoroutinefunction(func):
+
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            return await func(*args, **kwargs)
+    else:
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+
+    wrapper._is_reward_composer = True
+    return wrapper
+
+
 def agent_factory(func: Callable) -> Callable:
     """
     Decorator for agent factory functions.

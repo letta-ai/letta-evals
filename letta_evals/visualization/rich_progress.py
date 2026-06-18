@@ -30,7 +30,6 @@ from letta_evals.visualization.state import (
 )
 from letta_evals.visualization.summary import (
     build_rich_sample_results_table,
-    format_gate_description,
     get_displayed_sample_results,
     get_metric_labels,
     print_basic_overall_metrics,
@@ -346,7 +345,7 @@ class EvalProgress(ProgressCallback):
 
     async def sample_completed(self, result: SampleResult, model_handle: Optional[str] = None):
         """Mark sample as completed"""
-        fields = sample_progress_fields(self.suite.gate, result)
+        fields = sample_progress_fields(result)
         existing_from_cache = self._reducer.get_from_cache(result.sample_id, model_handle)
 
         await self.update_sample_state(
@@ -354,7 +353,7 @@ class EvalProgress(ProgressCallback):
             SampleState.COMPLETED,
             agent_id=result.agent_id,
             model_handle=model_handle,
-            score=fields.score,
+            score=fields.reward,
             target_cost=fields.target_cost,
             rationale=fields.rationale,
             from_cache=existing_from_cache,
@@ -422,7 +421,7 @@ class EvalProgress(ProgressCallback):
             model_table.add_column("Model", style="cyan")
             model_table.add_column("Samples", style="white")
             model_table.add_column("Attempted", style="white")
-            model_table.add_column("Score", style="white")
+            model_table.add_column("Reward", style="white")
             for metric_key in label_map.keys():
                 model_table.add_column(label_map[metric_key], style="white")
 
@@ -431,7 +430,7 @@ class EvalProgress(ProgressCallback):
                     ms.model,
                     str(ms.n_total),
                     str(ms.n_attempted),
-                    f"{ms.score:.2f}",
+                    f"{ms.reward:.2f}",
                 ]
                 for metric_key in label_map.keys():
                     row.append(f"{ms.per_metric.get(metric_key, 0.0):.2f}")
@@ -467,17 +466,6 @@ class EvalProgress(ProgressCallback):
                     )
 
                 self.console.print(usage_table)
-
-        # gate status
-        status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
-        gate_desc = format_gate_description(
-            suite_spec,
-            prefer_display_label=True,
-            quote_metric_label=True,
-            default_metric_label="metric",
-        )
-
-        self.console.print(f"\n[bold]Gate:[/bold] {gate_desc} → {status}")
 
         # sample results table
         self.console.print("\n[bold]Sample Results:[/bold]")

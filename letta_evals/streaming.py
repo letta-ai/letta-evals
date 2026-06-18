@@ -142,7 +142,7 @@ class StreamingWriter:
     ) -> None:
         """Append a per-sample record to the appropriate jsonl file."""
         path = self.results_path(model=model, run=run)
-        line = result.model_dump_json() + "\n"
+        line = result.model_dump_json(exclude_none=True) + "\n"
 
         def _append() -> None:
             with open(path, "a", encoding="utf-8") as f:
@@ -246,7 +246,6 @@ class StreamingReader:
                 samples=samples,
                 runs=runs,
                 summary=summary,
-                gates_passed=summary.gates_passed,
             )
 
         return await anyio.to_thread.run_sync(_read)

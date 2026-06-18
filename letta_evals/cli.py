@@ -12,7 +12,6 @@ from letta_evals import __version__
 from letta_evals.datasets.loader import load_dataset
 from letta_evals.models import SuiteSpec
 from letta_evals.runner import run_suite
-from letta_evals.types import GateKind
 from letta_evals.visualization.factory import ProgressStyle
 
 app = typer.Typer(help="Letta Evals - Evaluation framework for Letta AI agents")
@@ -232,7 +231,7 @@ def run(
     try:
         result = anyio.run(run_with_progress)  # type: ignore[arg-type]
 
-        is_multi_run = result.summary.runs_passed is not None
+        is_multi_run = any(ms.runs for ms in result.summary.models)
 
         if not quiet and is_multi_run:
             display_multi_run_summary(result.summary)
@@ -249,14 +248,9 @@ def run(
                 files = ", ".join(f"{ms.model}.jsonl" for ms in result.summary.models)
                 console.print(f"[green]Per-model results streamed to {effective_output}/{{{files}}}[/green]")
 
-        if result.gates_passed:
-            if not quiet:
-                console.print("[green]✓ All gates passed[/green]")
-            sys.exit(0)
-        else:
-            if not quiet:
-                console.print("[red]✗ Some gates failed[/red]")
-            sys.exit(1)
+        if not quiet:
+            console.print("[green]✓ Evaluation completed[/green]")
+        sys.exit(0)
 
     except Exception as e:
         console.print(f"[red]Error running suite: {e}[/red]")
@@ -290,21 +284,13 @@ def validate(suite_path: Path = typer.Argument(..., help="Path to suite YAML fil
             for key, gspec in suite.graders.items():
                 label = gspec.display_name or key
                 console.print(f"    - {label}: {gspec.kind.value}")
-        if suite.gate:
-            gate = suite.gate
-            if gate.kind == GateKind.SIMPLE:
-                console.print(
-                    f"  Gate: kind=simple metric_key={gate.metric_key} aggregate={gate.aggregation.value} {gate.op.value} {gate.value}"
-                )
-            elif gate.kind == GateKind.WEIGHTED_AVERAGE:
-                weights_str = ", ".join(f"{k}={v}" for k, v in gate.weights.items())
-                console.print(
-                    f"  Gate: kind=weighted_average weights=({weights_str}) aggregate={gate.aggregation.value} {gate.op.value} {gate.value}"
-                )
-            elif gate.kind == GateKind.LOGICAL:
-                console.print(f"  Gate: kind=logical operator={gate.operator.value} conditions={len(gate.conditions)}")
-            else:
-                console.print(f"  Gate: kind={gate.kind.value}")
+        reward = suite.reward
+        if reward.kind.value == "metric":
+            console.print(f"  Reward: kind=metric metric_key={reward.metric_key}")
+        elif reward.kind.value == "custom":
+            console.print(f"  Reward: kind=custom function={reward.function}")
+        else:
+            console.print(f"  Reward: kind={reward.kind.value}")
 
     except Exception as e:
         console.print(f"[red]Invalid suite configuration: {e}[/red]")
@@ -370,7 +356,7 @@ async def _run_single_sample(
     Used as the in-sandbox invocation by the Modal sandbox driver. The suite's
     ``sandbox:`` field is dropped on this side to prevent recursive re-entry,
     the dataset loader is skipped, and JSONL writing / summary aggregation /
-    gate evaluation are owned by the host's outer loop.
+    reward aggregation is owned by the host's outer loop.
     """
     import json as _json
 
@@ -413,27 +399,22 @@ async def _run_single_sample(
 
     output_json_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_json_path, "w") as f:
-        f.write(result.model_dump_json())
+        f.write(result.model_dump_json(exclude_none=True))
 
 
 def display_multi_run_summary(summary):
     """Display aggregate statistics across multiple runs from a Summary."""
     num_runs = max((len(ms.runs) for ms in summary.models if ms.runs), default=0)
-    runs_passed = summary.runs_passed or 0
 
     console.print(f"\n[bold]Aggregate Statistics (across {num_runs} runs):[/bold]")
     console.print("=" * 50)
 
     console.print("\n[bold]Run Summary:[/bold]")
     console.print(f"  Total runs: {num_runs}")
-    console.print(f"  Runs passed: {runs_passed}")
-    console.print(f"  Runs failed: {num_runs - runs_passed}")
-    pass_rate = (runs_passed / num_runs * 100.0) if num_runs > 0 else 0.0
-    console.print(f"  Pass rate: {pass_rate:.1f}%")
 
     for ms in summary.models:
         console.print(f"\n[bold cyan]Model: {ms.model}[/]")
-        console.print(f"  Score: mean={ms.score:.4f} std={ms.score_std or 0.0:.4f}")
+        console.print(f"  Reward: mean={ms.reward:.4f} std={ms.reward_std or 0.0:.4f}")
         if ms.per_metric:
             table = Table()
             table.add_column("Metric", style="cyan")

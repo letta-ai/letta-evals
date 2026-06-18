@@ -6,40 +6,9 @@ class GraderKind(str, Enum):
     MODEL_JUDGE = "model_judge"
 
 
-class MetricOp(str, Enum):
-    GT = "gt"
-    GTE = "gte"
-    LT = "lt"
-    LTE = "lte"
-    EQ = "eq"
-
-
-class Aggregation(str, Enum):
-    """supported aggregation functions for gate metrics."""
-
-    AVG_SCORE = "avg_score"
-    ACCURACY = "accuracy"
-    MIN = "min"
-    MAX = "max"
-    MEDIAN = "median"
-    P50 = "p50"
-    P95 = "p95"
-    P99 = "p99"
-
-
-class GateKind(str, Enum):
-    """types of gates for multi-grader support."""
-
-    SIMPLE = "simple"
-    WEIGHTED_AVERAGE = "weighted_average"
-    LOGICAL = "logical"
-
-
-class LogicalOp(str, Enum):
-    """logical operators for combining gate conditions."""
-
-    AND = "and"
-    OR = "or"
+class RewardKind(str, Enum):
+    METRIC = "metric"
+    CUSTOM = "custom"
 
 
 class LLMProvider(str, Enum):
@@ -54,4 +23,5 @@ class ErrorCategory(str, Enum):
     TARGET = "target"  # Agent/target failed (timeout, API error, connection)
     EXTRACTION = "extraction"  # Empty trajectory or empty submission
     GRADING = "grading"  # Grader itself failed (LLM judge error, tool grader exception)
+    REWARD = "reward"  # Reward composition failed
     UNKNOWN = "unknown"  # Catch-all

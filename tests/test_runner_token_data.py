@@ -114,7 +114,7 @@ def _make_runner(grader: _FakeGrader, target: MagicMock) -> Runner:
     runner = Runner.__new__(Runner)
     runner.suite = MagicMock()
     runner.suite.cleanup = False  # _should_cleanup_agent → False, no client.delete
-    runner.suite.sandbox = None  # _run_sample sandbox gate → in-process path
+    runner.suite.sandbox = None  # _run_sample sandbox dispatch → in-process path
     runner.suite.target = MagicMock()
     runner.suite.target.kind = MagicMock()
     runner.client = MagicMock()

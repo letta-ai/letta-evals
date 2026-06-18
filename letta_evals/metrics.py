@@ -12,20 +12,13 @@ from typing import Dict, List, Optional
 from letta_evals.models import (
     Error,
     ErrorSummary,
-    GateSpec,
     ModelSummary,
     PerRunSummary,
     SampleResult,
-    SimpleGateSpec,
     Timing,
     TimingStats,
     Usage,
-    WeightedAverageGateSpec,
-    compute_gate_score,
-    normalize_weights,
 )
-
-# ── per-sample aggregation primitives ──
 
 
 def aggregate_usage(results: List[SampleResult]) -> Usage:
@@ -106,9 +99,6 @@ def aggregate_errors(results: List[SampleResult]) -> Optional[ErrorSummary]:
     )
 
 
-# ── per-grader score aggregation ──
-
-
 def _per_metric_average(results: List[SampleResult], grader_keys: List[str]) -> Dict[str, float]:
     """Mean score per grader across attempted (non-error) samples, 0-1 scale."""
     attempted = [r for r in results if r.error is None]
@@ -119,27 +109,10 @@ def _per_metric_average(results: List[SampleResult], grader_keys: List[str]) -> 
     return out
 
 
-def _gate_primary_score(per_metric: Dict[str, float], gate: Optional[GateSpec]) -> float:
-    """Pick a single 0-1 score representing the gate's primary metric.
-
-    - SimpleGateSpec → per_metric[gate.metric_key]
-    - WeightedAverageGateSpec → normalized weighted sum
-    - LogicalGateSpec / no gate → arithmetic mean of per_metric values
-    """
-    if not per_metric:
-        return 0.0
-    if gate is None:
-        return sum(per_metric.values()) / len(per_metric)
-    if isinstance(gate, SimpleGateSpec):
-        return per_metric.get(gate.metric_key, 0.0)
-    if isinstance(gate, WeightedAverageGateSpec):
-        weights = normalize_weights(gate.weights)
-        return sum(weights.get(k, 0.0) * per_metric.get(k, 0.0) for k in weights)
-    # Fall back to gate-helper logic for any other shape
-    return compute_gate_score(gate, per_metric)
-
-
-# ── public summarization API ──
+def _reward_average(results: List[SampleResult]) -> float:
+    """Mean composed reward across successful samples."""
+    rewards = [r.reward.score for r in results if r.error is None and r.reward is not None]
+    return sum(rewards) / len(rewards) if rewards else 0.0
 
 
 def summarize_model(
@@ -147,7 +120,6 @@ def summarize_model(
     model: str,
     results: List[SampleResult],
     grader_keys: List[str],
-    gate: Optional[GateSpec],
 ) -> ModelSummary:
     """Build a ModelSummary from a single run's worth of results for one model.
 
@@ -157,7 +129,7 @@ def summarize_model(
     n_total = len(results)
     n_attempted = sum(1 for r in results if r.error is None)
     per_metric = _per_metric_average(results, grader_keys)
-    score = _gate_primary_score(per_metric, gate)
+    reward = _reward_average(results)
     usage = aggregate_usage(results)
     timing = aggregate_timing(results) or TimingStats(
         mean_total=0.0, mean_target=0.0, mean_extraction=None, p50_total=0.0, p95_total=0.0
@@ -168,7 +140,7 @@ def summarize_model(
         model=model,
         n_total=n_total,
         n_attempted=n_attempted,
-        score=score,
+        reward=reward,
         per_metric=per_metric,
         usage=usage,
         timing=timing,
@@ -181,11 +153,10 @@ def summarize_run(
     run: int,
     results: List[SampleResult],
     grader_keys: List[str],
-    gate: Optional[GateSpec],
 ) -> PerRunSummary:
     """Build a per-run summary for one model and one run."""
     per_metric = _per_metric_average(results, grader_keys)
-    score = _gate_primary_score(per_metric, gate)
+    reward = _reward_average(results)
     usage = aggregate_usage(results)
     timing = aggregate_timing(results) or TimingStats(
         mean_total=0.0, mean_target=0.0, mean_extraction=None, p50_total=0.0, p95_total=0.0
@@ -193,7 +164,7 @@ def summarize_run(
     n_errors = sum(1 for r in results if r.error is not None)
     return PerRunSummary(
         run=run,
-        score=score,
+        reward=reward,
         per_metric=per_metric,
         usage=usage,
         timing=timing,
@@ -206,11 +177,10 @@ def summarize_runs(
     model: str,
     per_run_results: List[List[SampleResult]],
     grader_keys: List[str],
-    gate: Optional[GateSpec],
 ) -> ModelSummary:
     """Build a ModelSummary aggregating across multiple runs for one model.
 
-    Populates ``score_std``, ``per_metric_std``, and ``runs`` on the returned
+    Populates ``reward_std``, ``per_metric_std``, and ``runs`` on the returned
     summary. Per-run usage is summed; per-run timing stats are averaged across
     runs (mean of means/percentiles).
     """
@@ -218,16 +188,16 @@ def summarize_runs(
         raise ValueError("summarize_runs requires at least one run")
 
     run_summaries: List[PerRunSummary] = [
-        summarize_run(run=i + 1, results=run_results, grader_keys=grader_keys, gate=gate)
+        summarize_run(run=i + 1, results=run_results, grader_keys=grader_keys)
         for i, run_results in enumerate(per_run_results)
     ]
 
     n_total = sum(len(r) for r in per_run_results) // len(per_run_results)  # per-run sample count
     n_attempted = sum(sum(1 for r in run_results if r.error is None) for run_results in per_run_results)
 
-    scores = [rs.score for rs in run_summaries]
-    score_mean = _statistics.mean(scores)
-    score_std = _statistics.stdev(scores) if len(scores) > 1 else 0.0
+    rewards = [rs.reward for rs in run_summaries]
+    reward_mean = _statistics.mean(rewards)
+    reward_std = _statistics.stdev(rewards) if len(rewards) > 1 else 0.0
 
     per_metric_mean: Dict[str, float] = {}
     per_metric_std: Dict[str, float] = {}
@@ -261,12 +231,12 @@ def summarize_runs(
         model=model,
         n_total=n_total,
         n_attempted=n_attempted,
-        score=score_mean,
+        reward=reward_mean,
         per_metric=per_metric_mean,
         usage=usage,
         timing=timing,
         errors=errors,
-        score_std=score_std,
+        reward_std=reward_std,
         per_metric_std=per_metric_std,
         runs=run_summaries,
     )

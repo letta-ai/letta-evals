@@ -21,7 +21,7 @@ from letta_evals.models import (
     AgentState,
     Error,
     LettaMessageUnion,
-    LogicalGateSpec,
+    MetricRewardSpec,
     ModelJudgeGraderSpec,
     ModelRun,
     ModelSummary,
@@ -29,23 +29,19 @@ from letta_evals.models import (
     Sample,
     SampleId,
     SampleResult,
-    SimpleCondition,
-    SimpleGateSpec,
     SuiteSpec,
     Summary,
     Timing,
     ToolGraderSpec,
     Usage,
-    WeightedAverageGateSpec,
-    _compare,
-    normalize_weights,
 )
 from letta_evals.pricing import calculate_cost_from_agent_usage
+from letta_evals.rewards import LoadedRewardComposer, RewardContext, load_reward_composer
 from letta_evals.sandbox.dispatch import run_sample_in_sandbox
 from letta_evals.streaming import StreamingReader, StreamingWriter
 from letta_evals.targets.errors import TargetError
 from letta_evals.targets.letta_code_target import LettaCodeTarget
-from letta_evals.types import Aggregation, ErrorCategory, LogicalOp
+from letta_evals.types import ErrorCategory
 from letta_evals.utils import (
     extract_token_counts,
     load_object,
@@ -129,6 +125,8 @@ class Runner:
 
         self.graders: Optional[Dict[str, Grader]] = None
         self._init_graders()
+        self._validate_reward_config()
+        self.reward_composer: LoadedRewardComposer = load_reward_composer(self.suite.reward, self.suite.base_dir)
 
         # results bucketed by model_id; flat list for cross-cutting computations.
         self.results_by_model: Dict[str, List[SampleResult]] = defaultdict(list)
@@ -215,6 +213,11 @@ class Runner:
                     raise ValueError(f"Unknown grader spec type: {type(gspec)}")
         else:
             raise ValueError("Suite must define 'graders'")
+
+    def _validate_reward_config(self) -> None:
+        if isinstance(self.suite.reward, MetricRewardSpec):
+            if self.graders is None or self.suite.reward.metric_key not in self.graders:
+                raise ValueError(f"reward metric_key '{self.suite.reward.metric_key}' not found in graders")
 
     def _requires_agent_state(self) -> bool:
         if self.graders:
@@ -426,12 +429,40 @@ class Runner:
                     per_grader=per_grader_time if per_grader_time else None,
                 )
 
+                reward = None
+                if error is None:
+                    try:
+                        reward = await self.reward_composer(
+                            RewardContext(
+                                sample=sample,
+                                grades=grades_dict,
+                                submissions=submissions_dict,
+                                trajectory=trajectory,
+                                agent_id=agent_id,
+                                model_handle=model_handle,
+                                agent_state=agent_state,
+                                usage=usage,
+                                timing=timing,
+                            )
+                        )
+                    except Exception as reward_err:
+                        logger.error(
+                            f"Error composing reward for sample {sample_id} with model {model_handle}: {reward_err}"
+                        )
+                        cause = reward_err.__cause__ if reward_err.__cause__ else reward_err
+                        error = Error(
+                            category=ErrorCategory.REWARD,
+                            exception_type=type(cause).__name__,
+                            message=str(reward_err) or type(cause).__name__,
+                        )
+
                 result = SampleResult(
                     sample_id=sample_id,
                     agent_id=agent_id,
                     trajectory=trajectory,
                     submissions=submissions_dict,
                     grades=grades_dict,
+                    reward=reward,
                     usage=usage,
                     timing=timing,
                     error=error,
@@ -569,15 +600,12 @@ class Runner:
                     model=model_id,
                     results=self.results_by_model.get(model_id, []),
                     grader_keys=self.grader_keys,
-                    gate=self.suite.gate,
                 )
                 model_summaries.append(ms)
 
-            gates_passed = self._check_gates_flat(self.results)
             summary = Summary(
                 suite=self.suite.name,
                 models=model_summaries,
-                gates_passed=gates_passed,
             )
 
             # Build per-model in-memory runs.
@@ -597,7 +625,6 @@ class Runner:
                 samples=samples,
                 runs=runs,
                 summary=summary,
-                gates_passed=gates_passed,
             )
         except BaseException:
             # Best-effort summary on interruption.
@@ -610,108 +637,15 @@ class Runner:
                                 model=model_id,
                                 results=self.results_by_model.get(model_id, []),
                                 grader_keys=self.grader_keys,
-                                gate=self.suite.gate,
                             )
                         )
-                    gates_passed = self._check_gates_flat(self.results)
                     summary = Summary(
                         suite=self.suite.name,
                         models=model_summaries,
-                        gates_passed=gates_passed,
                     )
                     await self.stream_writer.write_summary(summary)
             finally:
                 raise
-
-    # ── gate evaluation ──
-
-    def _compute_aggregation(
-        self,
-        results: List[SampleResult],
-        metric_key: str,
-        aggregation: Aggregation,
-        pass_threshold: Optional[float] = None,
-    ) -> float:
-        scores = [r.grades[metric_key].score for r in results if metric_key in r.grades]
-
-        if not scores:
-            return 0.0
-
-        if aggregation == Aggregation.AVG_SCORE:
-            return sum(scores) / len(scores)
-        elif aggregation == Aggregation.MIN:
-            return min(scores)
-        elif aggregation == Aggregation.MAX:
-            return max(scores)
-        elif aggregation in (Aggregation.MEDIAN, Aggregation.P50):
-            import statistics
-
-            return statistics.median(scores)
-        elif aggregation in (Aggregation.P95, Aggregation.P99):
-            import numpy as np
-
-            percentile = 95 if aggregation == Aggregation.P95 else 99
-            return float(np.percentile(scores, percentile))
-        elif aggregation == Aggregation.ACCURACY:
-            threshold = pass_threshold if pass_threshold is not None else 1.0
-            passed = sum(1 for s in scores if s >= threshold)
-            return (passed / len(scores)) * 100.0
-        else:
-            return 0.0
-
-    def _evaluate_simple_condition(self, results: List[SampleResult], condition: SimpleCondition) -> bool:
-        if condition.metric_key not in self.graders:
-            raise ValueError(f"metric_key '{condition.metric_key}' not found in graders")
-        value = self._compute_aggregation(
-            results, condition.metric_key, condition.aggregation, condition.pass_threshold
-        )
-        return _compare(value, condition.op, condition.value)
-
-    def _evaluate_logical_gate(self, results: List[SampleResult], gate: LogicalGateSpec) -> bool:
-        sub_results = []
-        for condition in gate.conditions:
-            if isinstance(condition, SimpleCondition):
-                sub_results.append(self._evaluate_simple_condition(results, condition))
-            elif isinstance(condition, LogicalGateSpec):
-                sub_results.append(self._evaluate_logical_gate(results, condition))
-            else:
-                raise ValueError(f"unknown condition type: {type(condition)}")
-
-        if gate.operator == LogicalOp.AND:
-            return all(sub_results)
-        elif gate.operator == LogicalOp.OR:
-            return any(sub_results)
-        else:
-            raise ValueError(f"unknown logical operator: {gate.operator}")
-
-    def _check_gates_flat(self, results: List[SampleResult]) -> bool:
-        """Evaluate the suite's gate against a flat list of sample results."""
-        gate = self.suite.gate
-
-        if isinstance(gate, SimpleGateSpec):
-            if gate.metric_key not in self.graders:
-                raise ValueError(f"metric_key '{gate.metric_key}' not found in graders")
-            value = self._compute_aggregation(results, gate.metric_key, gate.aggregation, gate.pass_threshold)
-            return _compare(value, gate.op, gate.value)
-
-        elif isinstance(gate, WeightedAverageGateSpec):
-            for metric_key in gate.weights.keys():
-                if metric_key not in self.graders:
-                    raise ValueError(f"metric_key '{metric_key}' not found in graders")
-
-            normalized = normalize_weights(gate.weights)
-            weighted_sum = 0.0
-            for metric_key, weight in normalized.items():
-                agg_value = self._compute_aggregation(results, metric_key, gate.aggregation)
-                weighted_sum += weight * agg_value
-
-            return _compare(weighted_sum, gate.op, gate.value)
-
-        elif isinstance(gate, LogicalGateSpec):
-            return self._evaluate_logical_gate(results, gate)
-
-        else:
-            raise ValueError(f"unknown gate type: {type(gate)}")
 
 
 # ── top-level run_suite ──
@@ -860,7 +794,6 @@ async def _execute_runs(
 
     # Accumulate per-run results per model for multi-run aggregation.
     per_run_results: Dict[str, List[List[SampleResult]]] = defaultdict(list)
-    runs_passed = 0
     last_runner_result: Optional[RunnerResult] = None
 
     for run_idx in range(actual_num_runs):
@@ -888,8 +821,6 @@ async def _execute_runs(
             last_runner_result = result
             for model_id, model_run in result.runs.items():
                 per_run_results[model_id].append(model_run.results)
-            if result.gates_passed:
-                runs_passed += 1
         finally:
             if progress_cb is not None and run_idx == actual_num_runs - 1:
                 progress_cb.stop()
@@ -907,7 +838,6 @@ async def _execute_runs(
                 model=model_id,
                 per_run_results=per_run_results.get(model_id, []),
                 grader_keys=grader_keys,
-                gate=suite.gate,
             )
             aggregated_models.append(ms)
             # Write per-model summary.json with the per-run breakdown.
@@ -917,8 +847,6 @@ async def _execute_runs(
         final_summary = Summary(
             suite=suite.name,
             models=aggregated_models,
-            gates_passed=runs_passed > 0,
-            runs_passed=runs_passed,
         )
         if shared_writer is not None:
             await shared_writer.write_summary(final_summary)
@@ -939,7 +867,6 @@ async def _execute_runs(
             samples=samples,
             runs=final_runs,
             summary=final_summary,
-            gates_passed=runs_passed > 0,
         )
 
         if progress_cb is not None:
