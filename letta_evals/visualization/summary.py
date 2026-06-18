@@ -24,7 +24,7 @@ def print_basic_overall_metrics(console: Console, summary: Summary) -> None:
         console.print(f"    Total samples: {ms.n_total}")
         console.print(f"    Total attempted: {ms.n_attempted}")
         console.print(f"    Errored: {errors_pct:.1f}% ({n_errors}/{ms.n_total})")
-        console.print(f"    Score: {ms.score:.2f}")
+        console.print(f"    Reward: {ms.reward:.2f}")
 
 
 def get_metric_labels(suite: SuiteSpec) -> Dict[str, str]:
@@ -36,51 +36,19 @@ def get_metric_labels(suite: SuiteSpec) -> Dict[str, str]:
     return metric_labels
 
 
-def format_gate_description(
-    suite: SuiteSpec,
-    *,
-    prefer_display_label: bool = False,
-    quote_metric_label: bool = False,
-    default_metric_label: str = "",
-    fixed_decimal_value: bool = False,
-) -> str:
-    """Format the gate description for final summaries."""
-    gate = suite.gate
-    op_symbols = {"gt": ">", "gte": "≥", "lt": "<", "lte": "≤", "eq": "="}
-
-    # Inspect using attribute access (works for any GateSpec variant).
-    gate_kind = getattr(gate, "kind", None)
-    gate_kind_value = getattr(gate_kind, "value", gate_kind)
-
-    if gate_kind_value == "simple":
-        op_value = getattr(gate.op, "value", gate.op)
-        agg_value = getattr(getattr(gate, "aggregation", None), "value", "avg_score")
-        op_symbol = op_symbols.get(op_value, op_value)
-        gate_metric_key = getattr(gate, "metric_key", None)
-
-        metric_label = gate_metric_key or default_metric_label
-        if prefer_display_label and gate_metric_key:
-            metric_label = get_metric_labels(suite).get(gate_metric_key, gate_metric_key)
-
+def format_reward_description(suite: SuiteSpec, *, prefer_display_label: bool = False, quote_metric_label: bool = False) -> str:
+    """Format the reward description for summaries and validation output."""
+    reward = suite.reward
+    kind = getattr(getattr(reward, "kind", None), "value", getattr(reward, "kind", None))
+    if kind == "metric":
+        metric_key = getattr(reward, "metric_key", "")
+        metric_label = get_metric_labels(suite).get(metric_key, metric_key) if prefer_display_label else metric_key
         if quote_metric_label and metric_label:
             metric_label = f"'{metric_label}'"
-
-        gate_value_text = f"{gate.value:.2f}" if fixed_decimal_value else f"{gate.value}"
-        return f"{metric_label} {agg_value} {op_symbol} {gate_value_text}".strip()
-
-    if gate_kind_value == "weighted_average":
-        op_value = getattr(gate.op, "value", gate.op)
-        agg_value = getattr(getattr(gate, "aggregation", None), "value", "avg_score")
-        op_symbol = op_symbols.get(op_value, op_value)
-        weight_strs = [f"{k}({w})" for k, w in gate.weights.items()]
-        return f"weighted_average[{', '.join(weight_strs)}] {agg_value} {op_symbol} {gate.value}"
-
-    if gate_kind_value == "logical":
-        operator = getattr(gate.operator, "value", str(gate.operator)).upper()
-        num_conditions = len(gate.conditions)
-        return f"logical {operator} with {num_conditions} conditions"
-
-    return f"unknown gate kind: {gate_kind_value}"
+        return f"metric {metric_label}".strip()
+    if kind == "custom":
+        return f"custom {getattr(reward, 'function', '')}".strip()
+    return f"unknown reward kind: {kind}"
 
 
 def print_truncated_samples_notice(console: Console, total_samples: int, displayed_samples: int) -> None:
@@ -135,12 +103,17 @@ def get_displayed_sample_results(result: Any) -> tuple[int, List[DisplayRow]]:
     return len(rows), rows[:MAX_SAMPLES_DISPLAY]
 
 
+def _format_reward(sample_result: SampleResult) -> str:
+    return f"{sample_result.reward.score:.2f}" if sample_result.reward is not None else "-"
+
+
 def build_simple_sample_results_table(suite: SuiteSpec, displayed_rows: List[DisplayRow]) -> Table:
     """Build the simple summary sample-results table."""
     table = Table(show_header=True)
     table.add_column("Sample", style="cyan")
     table.add_column("Agent ID", style="dim cyan")
     table.add_column("Model", style="yellow")
+    table.add_column("Reward", style="white")
 
     metric_labels = get_metric_labels(suite)
     metric_keys = list(metric_labels.keys())
@@ -149,7 +122,7 @@ def build_simple_sample_results_table(suite: SuiteSpec, displayed_rows: List[Dis
         table.add_column(f"{metric_labels[metric_key]} score", style="white")
 
     for model_id, sample_result in displayed_rows:
-        cells = []
+        cells = [_format_reward(sample_result)]
         for metric_key in metric_keys:
             grade = sample_result.grades.get(metric_key) if sample_result.grades else None
             if grade is None:
@@ -174,6 +147,7 @@ def build_rich_sample_results_table(suite: SuiteSpec, displayed_rows: List[Displ
     table.add_column("Sample", style="cyan", no_wrap=True)
     table.add_column("Agent ID", style="dim cyan", no_wrap=False)
     table.add_column("Model", style="yellow", no_wrap=True)
+    table.add_column("Reward", style="white", no_wrap=True)
 
     metric_labels = get_metric_labels(suite)
     metric_keys = list(metric_labels.keys())
@@ -184,7 +158,7 @@ def build_rich_sample_results_table(suite: SuiteSpec, displayed_rows: List[Displ
         table.add_column(f"{label} rationale", style="dim", no_wrap=False)
 
     for model_id, sample_result in displayed_rows:
-        cells = []
+        cells = [_format_reward(sample_result)]
         for metric_key in metric_keys:
             grade = sample_result.grades.get(metric_key) if sample_result.grades else None
             if grade is None:

@@ -19,7 +19,7 @@ class PerRunSummary(BaseModel):
     """Per-run summary for a single model (multi-run only)."""
 
     run: int = Field(description="Run index (1-based)")
-    score: float = Field(description="Primary gate metric score for this run (0-1)")
+    reward: float = Field(description="Mean reward for this run (0-1)")
     per_metric: Dict[str, float] = Field(description="Per-grader average score for this run (0-1)")
     usage: Usage = Field(description="Aggregate usage for this run")
     timing: TimingStats = Field(description="Aggregate timing for this run")
@@ -32,9 +32,9 @@ class ModelSummary(BaseModel):
     model: str = Field(description="Model identifier")
     n_total: int = Field(description="Total samples scheduled (success + error) per run")
     n_attempted: int = Field(description="Samples completed without error (sum across runs)")
-    score: float = Field(description="Primary gate metric score (0-1, mean across runs)")
-    score_std: Optional[float] = Field(
-        default=None, description="Standard deviation of score across runs (multi-run only)"
+    reward: float = Field(description="Mean composed reward (0-1, mean across runs)")
+    reward_std: Optional[float] = Field(
+        default=None, description="Standard deviation of reward across runs (multi-run only)"
     )
     per_metric: Dict[str, float] = Field(description="Per-grader average score (0-1, mean across runs)")
     per_metric_std: Optional[Dict[str, float]] = Field(
@@ -55,8 +55,6 @@ class Summary(BaseModel):
 
     suite: str = Field(description="Name of the evaluation suite")
     models: List[ModelSummary] = Field(description="Per-model summary (one entry per model)")
-    gates_passed: bool = Field(description="Whether all gate criteria were satisfied")
-    runs_passed: Optional[int] = Field(default=None, description="Number of runs that passed the gate (multi-run only)")
 
 
 # In-memory holders. ``RunnerResult`` is what ``run_suite`` returns and what
@@ -85,4 +83,3 @@ class RunnerResult(BaseModel):
     samples: List[Sample] = Field(description="The dataset, loaded once and shared across all model runs")
     runs: Dict[str, ModelRun] = Field(description="Per-model run data, keyed by model identifier")
     summary: Summary = Field(description="Top-level summary across all models")
-    gates_passed: bool = Field(description="Whether all gate criteria were satisfied")

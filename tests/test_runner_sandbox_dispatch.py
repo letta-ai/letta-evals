@@ -16,6 +16,7 @@ import anyio
 from letta_evals.models import (
     GradeResult,
     ModalSandboxSpec,
+    RewardOutput,
     Sample,
     SampleResult,
     Timing,
@@ -31,6 +32,7 @@ def _canned_result(sample_id) -> SampleResult:
         trajectory=[[]],
         submissions={"acc": "hi"},
         grades={"acc": GradeResult(score=1.0, rationale="canned")},
+        reward=RewardOutput(score=1.0),
         timing=Timing(total=0.01, target=0.005),
     )
 
@@ -265,12 +267,12 @@ class TestRunSampleInSandbox:
         assert "modal create boom" in result.error.message
 
     def test_run_sample_dispatches_to_sandbox_when_configured(self, tmp_path, monkeypatch):
-        """High-level gate: run_sample with sandbox-configured suite must
+        """High-level dispatch: run_sample with sandbox-configured suite must
         delegate to the sandbox path and return its result without touching
         the in-process target/grader pipeline."""
         _write_suite_yaml(tmp_path)
         runner = _make_runner_with_sandbox(tmp_path)
-        # If the gate slipped, the in-process path would blow up because
+        # If the dispatch slipped, the in-process path would blow up because
         # graders/target are not set up. We assert the dispatched method is
         # called instead.
         called = {}

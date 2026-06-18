@@ -1,16 +1,4 @@
-"""Unit tests for letta_evals.metrics module (post data-model overhaul).
-
-The new API is built around four primitives:
-
-  - ``aggregate_usage``    : sum token/cost fields across samples
-  - ``aggregate_timing``   : produce TimingStats from per-sample Timing
-  - ``aggregate_errors``   : produce ErrorSummary (or None)
-  - ``summarize_model``    : single-run ModelSummary
-  - ``summarize_run``      : single PerRunSummary
-  - ``summarize_runs``     : multi-run ModelSummary (with std + per-run list)
-
-All scores live on a 0-1 scale.
-"""
+"""Unit tests for letta_evals.metrics module."""
 
 import pytest
 
@@ -25,40 +13,41 @@ from letta_evals.metrics import (
 from letta_evals.models import (
     Error,
     GradeResult,
+    RewardOutput,
     SampleResult,
-    SimpleGateSpec,
     Timing,
     Usage,
-    WeightedAverageGateSpec,
 )
-from letta_evals.types import Aggregation, ErrorCategory, GateKind, MetricOp
+from letta_evals.types import ErrorCategory
 
 _DEFAULT_GRADER = "default"
+_SENTINEL = object()
 
 
 def _make_result(
     sample_id: int = 0,
     score: float = 1.0,
     *,
+    reward: float | None | object = _SENTINEL,
     grades: dict | None = None,
-    usage: Usage | None | object = object(),
+    usage: Usage | None | object = _SENTINEL,
     total_time: float | None = 5.0,
     target_time: float | None = 4.5,
     extraction_time: float | None = 0.001,
-    per_grader_time: dict | None | object = object(),
+    per_grader_time: dict | None | object = _SENTINEL,
     error: Error | None = None,
 ) -> SampleResult:
     if grades is None:
         grades = {_DEFAULT_GRADER: GradeResult(score=score, rationale="test")}
 
-    if usage is object:  # sentinel = use default Usage
-        usage = Usage()
-    if isinstance(usage, object) and not isinstance(usage, (Usage, type(None))):
-        # the sentinel default
+    if usage is _SENTINEL:
         usage = Usage(prompt_tokens=100, completion_tokens=50, cost=0.01)
 
-    if per_grader_time is object:
+    if per_grader_time is _SENTINEL:
         per_grader_time = {"grader_a": 0.01}
+
+    if reward is _SENTINEL:
+        reward = score
 
     timing = None
     if total_time is not None:
@@ -74,13 +63,11 @@ def _make_result(
         trajectory=[[]],
         submissions={k: "x" for k in grades},
         grades=grades,
+        reward=RewardOutput(score=reward) if isinstance(reward, (int, float)) and error is None else None,
         usage=usage if isinstance(usage, Usage) else None,
         timing=timing or Timing(total=0.0, target=0.0),
         error=error,
     )
-
-
-# ── aggregate_usage ──
 
 
 class TestAggregateUsage:
@@ -133,9 +120,6 @@ class TestAggregateUsage:
         assert u.cost is None
 
 
-# ── aggregate_errors ──
-
-
 class TestAggregateErrors:
     def test_no_errors_returns_none(self):
         assert aggregate_errors([_make_result(), _make_result()]) is None
@@ -162,9 +146,6 @@ class TestAggregateErrors:
         assert s.by_exception_type == {"TimeoutError": 1, "ValueError": 1}
 
 
-# ── aggregate_timing ──
-
-
 class TestAggregateTiming:
     def test_basic(self):
         t = aggregate_timing([_make_result(total_time=5.0, target_time=4.0, extraction_time=0.01)])
@@ -177,7 +158,6 @@ class TestAggregateTiming:
         results = [_make_result(total_time=float(i)) for i in range(1, 101)]
         t = aggregate_timing(results)
         assert t is not None
-        # p95 index = min(int(100 * 0.95), 99) = 95, sorted_totals[95] = 96
         assert t.p95_total == 96.0
 
     def test_per_grader_mean(self):
@@ -195,21 +175,12 @@ class TestAggregateTiming:
         assert aggregate_timing([]) is None
 
 
-# ── summarize_model (single run) ──
-
-
 class TestSummarizeModel:
-    def test_simple_gate_score(self):
-        gate = SimpleGateSpec(
-            kind=GateKind.SIMPLE,
-            metric_key="accuracy",
-            aggregation=Aggregation.AVG_SCORE,
-            op=MetricOp.GTE,
-            value=0.5,
-        )
+    def test_reward_mean_uses_composed_reward(self):
         results = [
             _make_result(
                 sample_id=0,
+                reward=0.2,
                 grades={
                     "accuracy": GradeResult(score=0.8, rationale="ok"),
                     "quality": GradeResult(score=0.6, rationale="ok"),
@@ -217,117 +188,64 @@ class TestSummarizeModel:
             ),
             _make_result(
                 sample_id=1,
+                reward=1.0,
                 grades={
                     "accuracy": GradeResult(score=1.0, rationale="great"),
                     "quality": GradeResult(score=0.9, rationale="great"),
                 },
             ),
         ]
-        s = summarize_model(model="gpt-4o", results=results, grader_keys=["accuracy", "quality"], gate=gate)
+        s = summarize_model(model="gpt-4o", results=results, grader_keys=["accuracy", "quality"])
         assert s.model == "gpt-4o"
         assert s.n_total == 2
         assert s.n_attempted == 2
-        assert s.score == pytest.approx(0.9)  # accuracy mean
+        assert s.reward == pytest.approx(0.6)
         assert s.per_metric["accuracy"] == pytest.approx(0.9)
         assert s.per_metric["quality"] == pytest.approx(0.75)
 
-    def test_weighted_average_gate_score(self):
-        gate = WeightedAverageGateSpec(
-            kind=GateKind.WEIGHTED_AVERAGE,
-            weights={"accuracy": 0.7, "quality": 0.3},
-            aggregation=Aggregation.AVG_SCORE,
-            op=MetricOp.GTE,
-            value=0.5,
-        )
-        results = [
-            _make_result(
-                grades={
-                    "accuracy": GradeResult(score=0.8),
-                    "quality": GradeResult(score=0.4),
-                }
-            ),
-        ]
-        s = summarize_model(model="m", results=results, grader_keys=["accuracy", "quality"], gate=gate)
-        assert s.score == pytest.approx(0.7 * 0.8 + 0.3 * 0.4)
-
-    def test_no_gate_uses_mean(self):
-        results = [
-            _make_result(
-                grades={
-                    "a": GradeResult(score=1.0),
-                    "b": GradeResult(score=0.5),
-                }
-            ),
-        ]
-        s = summarize_model(model="m", results=results, grader_keys=["a", "b"], gate=None)
-        assert s.score == pytest.approx(0.75)
-
-    def test_errors_excluded_from_attempted(self):
+    def test_errors_excluded_from_attempted_and_reward(self):
         err = Error(category=ErrorCategory.TARGET, exception_type="X", message="boom")
-        gate = SimpleGateSpec(
-            kind=GateKind.SIMPLE,
-            metric_key="default",
-            aggregation=Aggregation.AVG_SCORE,
-            op=MetricOp.GTE,
-            value=0.5,
-        )
         results = [
-            _make_result(sample_id=0, score=1.0),
-            _make_result(sample_id=1, score=0.0, error=err),
+            _make_result(sample_id=0, reward=1.0),
+            _make_result(sample_id=1, reward=None, error=err),
         ]
-        s = summarize_model(model="m", results=results, grader_keys=[_DEFAULT_GRADER], gate=gate)
+        s = summarize_model(model="m", results=results, grader_keys=[_DEFAULT_GRADER])
         assert s.n_total == 2
         assert s.n_attempted == 1
         assert s.errors is not None
         assert s.errors.total_errors == 1
-        # Score over attempted only
-        assert s.score == pytest.approx(1.0)
+        assert s.reward == pytest.approx(1.0)
 
     def test_empty_results(self):
-        s = summarize_model(model="m", results=[], grader_keys=["default"], gate=None)
+        s = summarize_model(model="m", results=[], grader_keys=["default"])
         assert s.n_total == 0
         assert s.n_attempted == 0
-        assert s.score == 0.0
-        # Timing falls back to zeroed TimingStats
+        assert s.reward == 0.0
         assert s.timing.mean_total == 0.0
 
 
-# ── summarize_run / summarize_runs (multi-run) ──
-
-
 class TestSummarizeRuns:
-    def _gate(self) -> SimpleGateSpec:
-        return SimpleGateSpec(
-            kind=GateKind.SIMPLE,
-            metric_key="accuracy",
-            aggregation=Aggregation.AVG_SCORE,
-            op=MetricOp.GTE,
-            value=0.5,
-        )
-
     def test_summarize_run_returns_per_run_summary(self):
-        results = [_make_result(grades={"accuracy": GradeResult(score=1.0)})]
-        ps = summarize_run(run=1, results=results, grader_keys=["accuracy"], gate=self._gate())
+        results = [_make_result(reward=0.75, grades={"accuracy": GradeResult(score=1.0)})]
+        ps = summarize_run(run=1, results=results, grader_keys=["accuracy"])
         assert ps.run == 1
-        assert ps.score == pytest.approx(1.0)
+        assert ps.reward == pytest.approx(0.75)
         assert ps.per_metric["accuracy"] == pytest.approx(1.0)
         assert ps.n_errors == 0
 
-    def test_summarize_runs_score_std(self):
-        gate = self._gate()
-        run1 = [_make_result(grades={"accuracy": GradeResult(score=1.0)})]
-        run2 = [_make_result(grades={"accuracy": GradeResult(score=0.0)})]
-        s = summarize_runs(model="m", per_run_results=[run1, run2], grader_keys=["accuracy"], gate=gate)
-        assert s.score == pytest.approx(0.5)
-        assert s.score_std == pytest.approx(0.7071067811865476, rel=1e-3)  # stdev([1, 0])
+    def test_summarize_runs_reward_std(self):
+        run1 = [_make_result(reward=1.0, grades={"accuracy": GradeResult(score=1.0)})]
+        run2 = [_make_result(reward=0.0, grades={"accuracy": GradeResult(score=0.0)})]
+        s = summarize_runs(model="m", per_run_results=[run1, run2], grader_keys=["accuracy"])
+        assert s.reward == pytest.approx(0.5)
+        assert s.reward_std == pytest.approx(0.7071067811865476, rel=1e-3)
         assert s.runs is not None and len(s.runs) == 2
-        assert s.runs[0].score == 1.0 and s.runs[1].score == 0.0
+        assert s.runs[0].reward == 1.0 and s.runs[1].reward == 0.0
 
     def test_summarize_runs_per_metric_std(self):
-        gate = self._gate()
         run1 = [_make_result(grades={"accuracy": GradeResult(score=0.8), "quality": GradeResult(score=0.5)})]
         run2 = [_make_result(grades={"accuracy": GradeResult(score=0.4), "quality": GradeResult(score=0.5)})]
-        s = summarize_runs(model="m", per_run_results=[run1, run2], grader_keys=["accuracy", "quality"], gate=gate)
+        s = summarize_runs(model="m", per_run_results=[run1, run2], grader_keys=["accuracy", "quality"])
         assert s.per_metric["accuracy"] == pytest.approx(0.6)
         assert s.per_metric["quality"] == pytest.approx(0.5)
         assert s.per_metric_std is not None
@@ -336,4 +254,4 @@ class TestSummarizeRuns:
 
     def test_summarize_runs_empty_raises(self):
         with pytest.raises(ValueError):
-            summarize_runs(model="m", per_run_results=[], grader_keys=["x"], gate=None)
+            summarize_runs(model="m", per_run_results=[], grader_keys=["x"])

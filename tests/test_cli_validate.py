@@ -20,11 +20,9 @@ def test_validate_command_accepts_letta_code_target(tmp_path: Path) -> None:
                 "  exact:",
                 "    kind: tool",
                 "    function: exact_match",
-                "gate:",
-                "  kind: simple",
+                "reward:",
+                "  kind: metric",
                 "  metric_key: exact",
-                "  op: gte",
-                "  value: 1.0",
                 "",
             ]
         )

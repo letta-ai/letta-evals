@@ -26,9 +26,9 @@ from letta_evals.graders.prompt_utils import RESERVED_VARS, build_judge_prompt
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.models import (
     LettaCodeTargetSpec,
+    MetricRewardSpec,
     ModelJudgeGraderSpec,
     Sample,
-    SimpleGateSpec,
     SuiteSpec,
 )
 
@@ -308,7 +308,7 @@ def _minimal_suite(prompt: str, dataset: Path) -> SuiteSpec:
         graders={
             "g": ModelJudgeGraderSpec(prompt=prompt, model="gpt-4o-mini"),
         },
-        gate=SimpleGateSpec(kind="simple", metric_key="g", aggregation="avg_score", op="gte", value=0.5),
+        reward=MetricRewardSpec(kind="metric", metric_key="g"),
     )
 
 

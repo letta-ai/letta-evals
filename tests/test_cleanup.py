@@ -5,11 +5,11 @@ from unittest.mock import MagicMock, patch
 
 from letta_evals.models import (
     LettaCodeTargetSpec,
-    SimpleGateSpec,
+    MetricRewardSpec,
     SuiteSpec,
     ToolGraderSpec,
 )
-from letta_evals.types import GateKind, GraderKind, MetricOp
+from letta_evals.types import GraderKind, RewardKind
 
 
 def _make_suite(target_spec, cleanup: bool = False) -> SuiteSpec:
@@ -19,7 +19,7 @@ def _make_suite(target_spec, cleanup: bool = False) -> SuiteSpec:
         dataset=Path("fake.jsonl"),
         target=target_spec,
         graders={"accuracy": ToolGraderSpec(kind=GraderKind.TOOL, function="exact_match")},
-        gate=SimpleGateSpec(kind=GateKind.SIMPLE, metric_key="accuracy", op=MetricOp.GTE, value=0.5),
+        reward=MetricRewardSpec(kind=RewardKind.METRIC, metric_key="accuracy"),
         cleanup=cleanup,
     )
 

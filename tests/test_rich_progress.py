@@ -6,7 +6,8 @@ import time
 import pytest
 from rich.console import Console
 
-from letta_evals.models import LettaCodeTargetSpec, SimpleGateSpec, SuiteSpec
+from letta_evals.models import LettaCodeTargetSpec, MetricRewardSpec, SuiteSpec
+from letta_evals.types import RewardKind
 from letta_evals.visualization.rich_progress import EvalProgress
 from letta_evals.visualization.state import SampleState
 
@@ -17,7 +18,7 @@ def _suite() -> SuiteSpec:
         dataset="ignored",
         target=LettaCodeTargetSpec(model_handles=["openai/gpt-4.1-mini"]),
         graders={},
-        gate=SimpleGateSpec(kind="simple", metric_key="score", aggregation="avg_score", op="gte", value=0.5),
+        reward=MetricRewardSpec(kind=RewardKind.METRIC, metric_key="score"),
     )
 
 

@@ -32,7 +32,7 @@ def _minimal_suite_yaml(**sandbox_overrides):
                 "function": "exact_match",
             }
         },
-        "gate": {"kind": "simple", "metric_key": "g", "op": "gte", "value": 1.0},
+        "reward": {"kind": "metric", "metric_key": "g"},
         "sandbox": sandbox,
     }
 
@@ -66,7 +66,7 @@ class TestModalSandboxSpec:
             "dataset": "s.jsonl",
             "target": {"kind": "letta_code", "model_handles": ["openai/gpt-4.1-mini"]},
             "graders": {"g": {"kind": "tool", "function": "exact_match"}},
-            "gate": {"kind": "simple", "metric_key": "g", "op": "gte", "value": 1.0},
+            "reward": {"kind": "metric", "metric_key": "g"},
             "sandbox": {"kind": "modal"},
         }
         suite = SuiteSpec.from_yaml(yaml_data)

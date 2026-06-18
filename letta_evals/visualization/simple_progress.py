@@ -10,7 +10,6 @@ from letta_evals.visualization.base import ProgressCallback
 from letta_evals.visualization.progress_fields import sample_progress_fields
 from letta_evals.visualization.summary import (
     build_simple_sample_results_table,
-    format_gate_description,
     get_displayed_sample_results,
     print_basic_overall_metrics,
     print_remaining_samples_notice,
@@ -79,10 +78,10 @@ class SimpleProgress(ProgressCallback):
         self.console.print(f"{prefix} [dim]•[/] Grading...")
 
     async def sample_completed(self, result: SampleResult, model_handle: Optional[str] = None) -> None:
-        fields = sample_progress_fields(self.suite.gate, result)
+        fields = sample_progress_fields(result)
         prefix = self._format_prefix(result.sample_id, result.agent_id, model_handle)
         status = "[bold cyan]✓ DONE[/]"
-        parts = [f"{prefix} {status}", f"score={fields.score:.2f}"]
+        parts = [f"{prefix} {status}", f"reward={fields.reward:.2f}"]
 
         if fields.metric_scores:
             metric_bits = ", ".join(f"{k}={v:.2f}" for k, v in fields.metric_scores.items())
@@ -103,12 +102,6 @@ class SimpleProgress(ProgressCallback):
 
         suite_spec = result.suite_spec
         print_basic_overall_metrics(self.console, result.summary)
-
-        # gate status
-        status = "[green]PASSED[/green]" if result.gates_passed else "[red]FAILED[/red]"
-        gate_desc = format_gate_description(suite_spec, fixed_decimal_value=True)
-
-        self.console.print(f"\n[bold]Gate:[/bold] {gate_desc} → {status}")
 
         # sample results table
         self.console.print("\n[bold]Sample Results:[/bold]")
