@@ -153,9 +153,7 @@ class TestRunSampleInSandbox:
         assert result.grades["acc"].score == 1.0
 
     @pytest.mark.parametrize("suite_filename", ["suite.yaml", "suite-mini.yaml"])
-    def test_preserves_exact_suite_file_when_multiple_suite_yamls_exist(
-        self, tmp_path, monkeypatch, suite_filename
-    ):
+    def test_preserves_exact_suite_file_when_multiple_suite_yamls_exist(self, tmp_path, monkeypatch, suite_filename):
         _write_suite_yaml(tmp_path, "suite.yaml")
         _write_suite_yaml(tmp_path, "suite-mini.yaml")
         runner = _make_runner_with_sandbox(tmp_path, suite_filename=suite_filename)
