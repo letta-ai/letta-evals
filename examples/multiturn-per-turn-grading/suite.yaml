@@ -12,9 +12,6 @@ graders:
     display_name: "Correctness"
     function: contains
     extractor: last_assistant
-gate:
-  kind: simple
+reward:
+  kind: metric
   metric_key: correctness
-  aggregation: avg_score
-  op: gte
-  value: 0.3

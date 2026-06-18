@@ -62,9 +62,6 @@ graders:
     timeout: 120.0
     extractor: custom_extractor.py:skill_extractor
 
-gate:
-  kind: simple
+reward:
+  kind: metric
   metric_key: task_completion
-  aggregation: avg_score
-  op: gte
-  value: 0.6

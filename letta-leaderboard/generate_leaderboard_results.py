@@ -73,13 +73,13 @@ def extract_model_results_from_summary(summary: Dict) -> List[Dict]:
     """Extract per-model leaderboard rows from a unified ``summary.json``.
 
     ``summary.json`` has the same shape for single-run and multi-run; for
-    multi-run, ``score`` is the mean across runs (penalizing errors/timeouts).
+    multi-run, ``reward`` is the mean across runs (penalizing errors/timeouts).
     All scores are on a 0–1 scale; the leaderboard reports them ×100.
     """
     model_results: List[Dict] = []
     for model_info in summary.get("models", []):
         model_name = normalize_model_name(model_info["model"])
-        score = float(model_info.get("score", 0.0)) * 100
+        score = float(model_info.get("reward", 0.0)) * 100
         usage = model_info.get("usage") or {}
         cost = float(usage.get("cost") or 0.0)
         per_metric = {k: float(v) * 100 for k, v in (model_info.get("per_metric") or {}).items()}

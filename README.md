@@ -1,6 +1,6 @@
 # Letta Evals
 
-Letta Evals is a framework for evaluating [Letta](https://github.com/letta-ai/letta) and Letta Code agents. It lets you define an evaluation suite with a dataset, target, extractors, graders, and gate, then run that suite against one or more model configurations.
+Letta Evals is a framework for evaluating [Letta](https://github.com/letta-ai/letta) and Letta Code agents. It lets you define an evaluation suite with a dataset, target, extractors, graders, and a reward contract, then run that suite against one or more model configurations.
 
 <img width="596" src="https://github.com/user-attachments/assets/4471f0b0-8353-48b7-8f52-b51bbf0482cb" alt="Letta Evals running an evaluation suite with real-time progress tracking">
 
@@ -60,12 +60,9 @@ graders:
     function: contains
     extractor: last_assistant
 
-gate:
-  kind: simple
+reward:
+  kind: metric
   metric_key: correctness
-  aggregation: avg_score
-  op: gte
-  value: 0.75
 ```
 
 3. Validate and run:
@@ -79,7 +76,7 @@ letta-evals run suite.yaml
 
 The core flow is:
 
-**Dataset → Target → Extractor → Grader → Gate → Result**
+**Dataset → Target → Extractor → Grader → Reward → Result**
 
 Common commands:
 
@@ -164,15 +161,42 @@ graders:
 
 Use `letta-evals list-graders` and `letta-evals list-extractors` for built-ins. You can register custom Python graders, extractors, setup hooks, and agent factories with decorators; see [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-and-extractor/) and [`examples/programmatic-agent-creation/`](examples/programmatic-agent-creation/).
 
-### Gates
+### Rewards
 
-A gate turns grader metrics into the suite pass/fail result. Supported gate kinds are:
+A reward turns grader outputs into the canonical per-sample scalar stored on `SampleResult.reward`. The framework owns the contract and persistence; suite authors own any custom composition logic.
 
-- `simple`: threshold one metric
-- `weighted_average`: combine several metrics with weights
-- `logical`: combine conditions with `and` / `or`
+For simple suites, use one grader directly:
 
-See [`examples/multi-grader-gate/`](examples/multi-grader-gate/) for complete gate examples.
+```yaml
+reward:
+  kind: metric
+  metric_key: correctness
+```
+
+For suite-specific composition, point at a Python reward composer:
+
+```yaml
+reward:
+  kind: custom
+  function: rewards.py:compose_reward
+```
+
+```python
+from letta_evals import RewardOutput, reward_composer
+
+
+@reward_composer
+def compose_reward(ctx):
+    quality = ctx.grades["quality"].score
+    valid = ctx.grades["validity_check"].score
+    if valid < 1.0:
+        return RewardOutput(score=0.0, metadata={"reason": "validity_check_failed"})
+    return RewardOutput(score=quality)
+```
+
+`grades` remain the source of truth for raw grader outputs. Reward metadata should only contain derived composer decisions that are not already recoverable from grades, submissions, or the sample.
+
+See [`examples/reward-composition/`](examples/reward-composition/) for complete custom reward examples.
 
 ### Setup scripts and agent factories
 
@@ -191,7 +215,7 @@ The [`examples/`](examples/) directory contains working suites:
 - [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-and-extractor/) — custom Python extractor and grader for structured JSON output
 - [`examples/letta-code-simple-edit/`](examples/letta-code-simple-edit/) — Letta Code fixes buggy Python files, with a subprocess grader
 - [`docs/modal-sandbox.md`](docs/modal-sandbox.md) — per-sample Modal sandbox execution
-- [`examples/multi-grader-gate/`](examples/multi-grader-gate/) — logical and weighted-average gates across multiple graders
+- [`examples/reward-composition/`](examples/reward-composition/) — custom reward composers across multiple graders
 - [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) — compare multiple model handles in one suite
 - [`examples/multiturn-per-turn-grading/`](examples/multiturn-per-turn-grading/) — score each turn of a multi-turn conversation
 - [`examples/per-sample-rubric/`](examples/per-sample-rubric/) — override model-judge rubrics per dataset row
@@ -209,7 +233,7 @@ sandbox:
   timeout_sec: 1800
 ```
 
-The host runner still owns the sample loop, concurrency, JSONL output, and gate evaluation. Each sample is uploaded to a sandbox along with the suite directory; the target, extractors, and graders run in the sandbox; and the final `SampleResult` is returned to the host.
+The host runner still owns the sample loop, concurrency, JSONL output, and reward aggregation. Each sample is uploaded to a sandbox along with the suite directory; the target, extractors, graders, and reward composer run in the sandbox; and the final `SampleResult` is returned to the host.
 
 See [`docs/modal-sandbox.md`](docs/modal-sandbox.md) for setup details, networking notes, and common failure modes.
 

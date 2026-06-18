@@ -1,5 +1,5 @@
-name: ascii-art-weighted-average-gate
-description: Demonstrates a weighted average gate combining rubric quality and ASCII validation
+name: ascii-art-quality-if-ascii
+description: Demonstrates a custom reward composer that zeroes quality when ASCII validation fails
 dataset: dataset.csv
 target:
   kind: letta_code
@@ -22,11 +22,6 @@ graders:
     display_name: "ascii character check"
     function: ascii_printable_only
     extractor: last_assistant
-gate:
-  kind: weighted_average
-  aggregation: avg_score
-  weights:
-    quality: 0.7
-    ascii_only: 0.3
-  op: gte
-  value: 0.0
+reward:
+  kind: custom
+  function: rewards.py:quality_if_ascii

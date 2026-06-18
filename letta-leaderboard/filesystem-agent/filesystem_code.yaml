@@ -34,9 +34,6 @@ graders:
     provider: openai
     extractor: last_assistant
 
-gate:
-  kind: simple
-  metric_key: rubric_check
-  aggregation: avg_score
-  op: gte
-  value: 0.70  # Require 70% accuracy
+reward:
+  kind: metric
+  metric_key: accuracy

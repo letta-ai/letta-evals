@@ -18,13 +18,9 @@ graders:
     kind: tool
     function: custom_python_grader.py:python_output_grader
     extractor: last_assistant
-gate:
-  kind: simple
+reward:
+  kind: metric
   metric_key: bug_fix_check
-  aggregation: avg_score
-  op: gte
-  value: 0.75
-
 # Run every sample inside a fresh Modal sandbox: the letta-code agent edits
 # the buggy file and the grader executes the fixed file, all in-sandbox. The
 # whole suite directory (including the staged sandbox/ files) is uploaded to

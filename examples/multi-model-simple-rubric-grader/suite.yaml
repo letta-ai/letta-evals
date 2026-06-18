@@ -15,9 +15,6 @@ graders:
     temperature: 0.0
     provider: openai
     extractor: last_assistant
-gate:
-  kind: simple
+reward:
+  kind: metric
   metric_key: quality
-  aggregation: avg_score
-  op: gte
-  value: 0.5

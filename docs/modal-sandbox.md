@@ -19,8 +19,8 @@ sandbox after an edit pays the build cost. Override `image` only when you
 need additional system tools the agent invokes.
 
 The orchestrator (`letta-evals run`) keeps running on your host — same
-sample loop, same `max_concurrent`, same JSONL output, same gate
-evaluation. The only thing that changes is what happens *per sample*:
+sample loop, same `max_concurrent`, same JSONL output, same reward
+composition. The only thing that changes is what happens *per sample*:
 instead of executing in-process, the runner creates a Modal sandbox,
 uploads the entire suite directory tree to `/mnt/suite/`, execs
 `letta-evals run --sample ...` inside the sandbox, and round-trips the

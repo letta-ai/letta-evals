@@ -15,9 +15,6 @@ graders:
     extractor: tool_output
     extractor_config:
       tool_name: evals_ci_manage_inventory_tool
-gate:
-  kind: simple
+reward:
+  kind: metric
   metric_key: inventory_check
-  aggregation: avg_score
-  op: gte
-  value: 1.0

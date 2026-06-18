@@ -59,15 +59,15 @@ python3 generate_leaderboard_results.py \
 
 The script will:
 - Read `summary.json` from each results directory
-- Extract per-model `score` (0–1, reported ×100) and `usage.cost`
+- Extract per-model `reward` (0–1, reported ×100) and `usage.cost`
 - Automatically detect the correct metric key from the existing leaderboard
 - Add new models or update existing ones while preserving all data
 - Handle null/missing cost data gracefully
 - Normalize model names with provider prefixes (e.g., `gpt-4` → `openai/gpt-4`)
 
 **File format:**
-- `summary.json`: Top-level fields `{ suite, gates_passed, models: [...], runs_passed? }`
-- Each entry in `models` has `{ model, n_total, n_attempted, score, per_metric, usage, timing, ... }` (multi-run also has `score_std` and `per_metric_std`)
+- `summary.json`: Top-level fields `{ suite, models: [...] }`
+- Each entry in `models` has `{ model, n_total, n_attempted, reward, per_metric, usage, timing, ... }` (multi-run also has `reward_std` and `per_metric_std`)
 
 4. Update leaderboard site
 - Add new models and any analysis / commentary to [updates.md](../leaderboard_site/src/_includes/updates.md).
