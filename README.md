@@ -190,7 +190,7 @@ The [`examples/`](examples/) directory contains working suites:
 
 - [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-and-extractor/) — custom Python extractor and grader for structured JSON output
 - [`examples/letta-code-simple-edit/`](examples/letta-code-simple-edit/) — Letta Code fixes buggy Python files, with a subprocess grader
-- [`examples/modal-sandbox/`](examples/modal-sandbox/) — per-sample isolated execution in fresh Modal sandboxes
+- [`docs/modal-sandbox.md`](docs/modal-sandbox.md) — per-sample Modal sandbox execution
 - [`examples/multi-grader-gate/`](examples/multi-grader-gate/) — logical and weighted-average gates across multiple graders
 - [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) — compare multiple model handles in one suite
 - [`examples/multiturn-per-turn-grading/`](examples/multiturn-per-turn-grading/) — score each turn of a multi-turn conversation
@@ -211,7 +211,7 @@ sandbox:
 
 The host runner still owns the sample loop, concurrency, JSONL output, and gate evaluation. Each sample is uploaded to a sandbox along with the suite directory; the target, extractors, and graders run in the sandbox; and the final `SampleResult` is returned to the host.
 
-See [`examples/modal-sandbox/`](examples/modal-sandbox/) for setup details, networking notes, and common failure modes.
+See [`docs/modal-sandbox.md`](docs/modal-sandbox.md) for setup details, networking notes, and common failure modes.
 
 ## FAQ
 

@@ -120,7 +120,7 @@ graders:
 - `setup_script` - Runs before evaluation to reset the sandbox
 
 For isolated per-sample execution, configure the suite-level
-[`sandbox: { kind: modal, image: ... }`](../modal-sandbox/README.md)
+[`sandbox: { kind: modal, image: ... }`](../../docs/modal-sandbox.md)
 field, which dispatches each sample to a fresh Modal sandbox.
 
 ### `dataset.jsonl`
