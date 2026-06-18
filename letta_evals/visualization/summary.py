@@ -36,7 +36,9 @@ def get_metric_labels(suite: SuiteSpec) -> Dict[str, str]:
     return metric_labels
 
 
-def format_reward_description(suite: SuiteSpec, *, prefer_display_label: bool = False, quote_metric_label: bool = False) -> str:
+def format_reward_description(
+    suite: SuiteSpec, *, prefer_display_label: bool = False, quote_metric_label: bool = False
+) -> str:
     """Format the reward description for summaries and validation output."""
     reward = suite.reward
     kind = getattr(getattr(reward, "kind", None), "value", getattr(reward, "kind", None))

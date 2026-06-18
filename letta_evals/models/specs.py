@@ -56,7 +56,6 @@ class LettaCodeTargetSpec(BaseModel):
     )
 
 
-
 class ModalSandboxSpec(BaseModel):
     """Modal sandbox execution configuration.
 
@@ -111,7 +110,6 @@ class ModalSandboxSpec(BaseModel):
 
 
 SandboxSpec = Annotated[ModalSandboxSpec, Field(discriminator="kind")]
-
 
 
 class BaseGraderSpec(BaseModel):
@@ -180,7 +178,6 @@ GraderSpec = Annotated[
 ]
 
 
-
 class MetricRewardSpec(BaseModel):
     """Use one grader's score directly as the sample reward."""
 
@@ -203,7 +200,6 @@ RewardSpec = Annotated[
     Union[MetricRewardSpec, CustomRewardSpec],
     Field(discriminator="kind"),
 ]
-
 
 
 class SuiteSpec(BaseModel):

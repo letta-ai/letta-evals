@@ -49,7 +49,6 @@ def _make_result(sample_id, score: float) -> SampleResult:
     )
 
 
-
 def _summary_for(model: str, results):
     return summarize_model(
         model=model,

@@ -99,7 +99,6 @@ def aggregate_errors(results: List[SampleResult]) -> Optional[ErrorSummary]:
     )
 
 
-
 def _per_metric_average(results: List[SampleResult], grader_keys: List[str]) -> Dict[str, float]:
     """Mean score per grader across attempted (non-error) samples, 0-1 scale."""
     attempted = [r for r in results if r.error is None]
@@ -114,7 +113,6 @@ def _reward_average(results: List[SampleResult]) -> float:
     """Mean composed reward across successful samples."""
     rewards = [r.reward.score for r in results if r.error is None and r.reward is not None]
     return sum(rewards) / len(rewards) if rewards else 0.0
-
 
 
 def summarize_model(
