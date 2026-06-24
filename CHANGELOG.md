@@ -132,6 +132,29 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.21.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.20.0...letta-evals-v0.21.0) (2026-06-18)
+
+
+### Features
+
+* Replace gates with reward contract ([#290](https://github.com/letta-ai/letta-evals/issues/290)) ([42514de](https://github.com/letta-ai/letta-evals/commit/42514de5e211c89cab6674ae7e198d3d8ecfcdc4))
+
+
+### Bug Fixes
+
+* **sandbox:** Preserve selected suite file ([#293](https://github.com/letta-ai/letta-evals/issues/293)) ([6c530e6](https://github.com/letta-ai/letta-evals/commit/6c530e60d5c54a13cdb2e0c4548c3131a08d6728))
+
+
+### Refactors
+
+* **models:** Remove unused TargetResult run IDs ([#288](https://github.com/letta-ai/letta-evals/issues/288)) ([e19078e](https://github.com/letta-ai/letta-evals/commit/e19078e8d4a5ab3476e87e3306b07eedc12498e3))
+
+
+### Documentation
+
+* Migrate suites to reward contract ([#291](https://github.com/letta-ai/letta-evals/issues/291)) ([bd78c1e](https://github.com/letta-ai/letta-evals/commit/bd78c1e61a8fd6d5f235584e65e16096b364b004))
+* Refresh evals README and examples ([#287](https://github.com/letta-ai/letta-evals/issues/287)) ([1c0bfe8](https://github.com/letta-ai/letta-evals/commit/1c0bfe8037a570a0562dad4cf62ee8217941ea3b))
+
 ## [0.20.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.19.1...letta-evals-v0.20.0) (2026-06-17)
 
 
