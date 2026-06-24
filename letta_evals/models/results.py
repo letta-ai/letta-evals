@@ -22,7 +22,7 @@ from letta_client.types.agents import (
     ToolCallMessage,
     UserMessage,
 )
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_serializer
 
 from letta_evals.models.sample import SampleId
 from letta_evals.types import ErrorCategory
@@ -194,12 +194,22 @@ class RewardOutput(BaseModel):
 # up by ``sample_id``.
 
 
-class SampleResult(BaseModel):
-    """Result for a single sample evaluation."""
+class SampleResult(TargetResult):
+    """Result for a single sample evaluation.
+
+    Extends ``TargetResult`` (the agent-run output) with grading, reward,
+    usage, timing, and error. ``agent_id`` and ``model_handle`` are relaxed to
+    optional here because a sample can fail before the target produces either.
+    The inherited ``trajectory``, ``agent_usage``, ``agent_state``, and
+    ``token_data`` carry over unchanged.
+    """
 
     sample_id: SampleId = Field(description="ID of the sample (look up the full Sample in suite.json)")
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
-    trajectory: List[List[LettaMessageUnion]] = Field(description="Full conversation trajectory from the agent")
+    model_handle: Optional[str] = Field(
+        default=None,
+        description="Model handle used for this sample (also implied by the output file path)",
+    )
     submissions: Dict[str, str] = Field(
         default_factory=dict,
         description="Per-grader extracted submissions (keyed by grader name)",
@@ -215,21 +225,14 @@ class SampleResult(BaseModel):
     usage: Optional[Usage] = Field(default=None, description="Token usage and cost for this sample")
     timing: Timing = Field(description="Wall-clock timing for this sample")
     error: Optional[Error] = Field(default=None, description="Structured error info if this sample failed")
-    # Optional extras — omitted from serialized output when None.
-    agent_usage: Optional[List[dict]] = Field(
-        default=None, description="Raw usage statistics emitted by the agent during the run"
-    )
-    agent_state: Optional[AgentState] = Field(
-        default=None,
-        description=(
-            "Agent state after running the target (includes memory blocks). "
-            "Only populated when at least one grader requires agent_state."
-        ),
-    )
-    token_data: Optional[List[TurnTokenData]] = Field(
-        default=None,
-        description=(
-            "Per-token IDs and logprobs across all turns in the trajectory. "
-            "Only populated when run_sample(return_token_data=True) is called."
-        ),
-    )
+
+    @model_serializer(mode="wrap")
+    def _serialize_identity_first(self, handler):
+        """Surface sample_id and agent_id first in serialized output.
+
+        Inheritance puts TargetResult's fields ahead of these, so reorder on
+        dump to keep <model>.jsonl rows readable (identity leads each line).
+        """
+        data = handler(self)
+        leading = {key: data.pop(key) for key in ("sample_id", "agent_id") if key in data}
+        return {**leading, **data}

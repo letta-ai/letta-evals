@@ -459,6 +459,7 @@ class Runner:
                 result = SampleResult(
                     sample_id=sample_id,
                     agent_id=agent_id,
+                    model_handle=model_handle,
                     trajectory=trajectory,
                     submissions=submissions_dict,
                     grades=grades_dict,
@@ -514,6 +515,7 @@ class Runner:
                 result = SampleResult(
                     sample_id=sample_id,
                     agent_id=agent_id,
+                    model_handle=result_model_handle,
                     trajectory=[],
                     submissions={},
                     grades={},
