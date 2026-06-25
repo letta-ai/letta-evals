@@ -18,9 +18,7 @@ from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
 from letta_evals.metrics import summarize_model, summarize_runs
 from letta_evals.models import (
-    AgentState,
     Error,
-    LettaMessageUnion,
     MetricRewardSpec,
     ModelJudgeGraderSpec,
     ModelRun,
@@ -31,6 +29,7 @@ from letta_evals.models import (
     SampleResult,
     SuiteSpec,
     Summary,
+    TargetResult,
     Timing,
     ToolGraderSpec,
     Usage,
@@ -283,15 +282,8 @@ class Runner:
         model_handle: Optional[str],
         retrieve_agent_state: bool = False,
         return_token_data: bool = False,
-    ) -> tuple[
-        List[List[LettaMessageUnion]],
-        str,
-        str,
-        Optional[list[dict]],
-        Optional[AgentState],
-        Optional[list],
-    ]:
-        """Return (trajectory, agent_id, model_handle, agent_usage, agent_state, token_data)."""
+    ) -> TargetResult:
+        """Return the target run for this sample, served from cache when available."""
         sample_id = sample.id
 
         if self.cached_results:
@@ -310,30 +302,17 @@ class Runner:
                     await self.progress_callback.agent_created(
                         sample_id, agent_id=cached_result.agent_id, model_handle=model_handle, from_cache=True
                     )
-                return (
-                    cached_result.trajectory,
-                    cached_result.agent_id,
-                    model_handle or DEFAULT_MODEL_ID,
-                    getattr(cached_result, "agent_usage", None),
-                    getattr(cached_result, "agent_state", None),
-                    getattr(cached_result, "token_data", None),
-                )
+                # cached_result is a SampleResult (a TargetResult subclass); the
+                # requested handle wins over whatever the cache recorded.
+                return cached_result.model_copy(update={"model_handle": model_handle or DEFAULT_MODEL_ID})
 
         target = self._create_letta_code_target(model_handle)
-        target_result = await target.run(
+        return await target.run(
             sample,
             progress_callback=self.progress_callback,
             project_id=self.project_id,
             retrieve_agent_state=retrieve_agent_state,
             return_token_data=return_token_data,
-        )
-        return (
-            target_result.trajectory,
-            target_result.agent_id,
-            target_result.model_handle,
-            target_result.agent_usage,
-            target_result.agent_state,
-            target_result.token_data,
         )
 
     # ── per-sample driver ──
@@ -373,19 +352,18 @@ class Runner:
 
                 phase = ErrorCategory.TARGET
                 retrieve_agent_state = self._requires_agent_state()
-                (
-                    trajectory,
-                    agent_id,
-                    model_handle,
-                    agent_usage,
-                    agent_state,
-                    token_data,
-                ) = await self._get_or_run_trajectory(
+                target_result = await self._get_or_run_trajectory(
                     sample,
                     model_handle,
                     retrieve_agent_state=retrieve_agent_state,
                     return_token_data=return_token_data,
                 )
+                trajectory = target_result.trajectory
+                agent_id = target_result.agent_id
+                model_handle = target_result.model_handle
+                agent_usage = target_result.agent_usage
+                agent_state = target_result.agent_state
+                token_data = target_result.token_data
 
                 cost = calculate_cost_from_agent_usage(model_handle, agent_usage) if model_handle else None
                 prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
@@ -459,6 +437,7 @@ class Runner:
                 result = SampleResult(
                     sample_id=sample_id,
                     agent_id=agent_id,
+                    model_handle=model_handle,
                     trajectory=trajectory,
                     submissions=submissions_dict,
                     grades=grades_dict,
@@ -514,6 +493,7 @@ class Runner:
                 result = SampleResult(
                     sample_id=sample_id,
                     agent_id=agent_id,
+                    model_handle=result_model_handle,
                     trajectory=[],
                     submissions={},
                     grades={},
