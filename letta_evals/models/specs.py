@@ -51,6 +51,23 @@ class LettaCodeTargetSpec(BaseModel):
         default=None,
         description="Permission mode for letta code (e.g., 'memory' to scope writes to memory roots).",
     )
+    letta_command: str = Field(
+        default="letta",
+        description="Letta Code executable to invoke. Defaults to the first 'letta' on PATH.",
+    )
+    letta_code_version: Optional[str] = Field(
+        default=None,
+        description=(
+            "Expected @letta-ai/letta-code CLI version. When set, letta-evals runs "
+            "'<letta_command> --version' and fails fast if the version does not match."
+        ),
+    )
+    disable_autoupdater: bool = Field(
+        default=False,
+        description=(
+            "Set DISABLE_AUTOUPDATER=1 for Letta Code subprocesses. This is forced when letta_code_version is set."
+        ),
+    )
 
 
 class ModalSandboxSpec(BaseModel):

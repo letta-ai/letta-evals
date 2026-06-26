@@ -7,7 +7,7 @@ import pytest
 
 from letta_evals.models import Sample
 from letta_evals.targets.errors import TargetError
-from letta_evals.targets.letta_code_target import LettaCodeTarget
+from letta_evals.targets.letta_code_target import LettaCodeTarget, _extract_version
 
 
 def _make_target(tmp_path, **overrides) -> LettaCodeTarget:
@@ -108,6 +108,24 @@ def test_build_env_per_sample_overrides_win_over_os_environ(tmp_path, monkeypatc
     env = target._build_subprocess_env(sample, agent_id=None)
 
     assert env["MY_VAR"] == "from-sample"
+
+
+def test_build_env_sets_disable_autoupdater_when_configured(tmp_path):
+    target = _make_target(tmp_path, disable_autoupdater=True)
+    sample = _make_sample()
+
+    env = target._build_subprocess_env(sample, agent_id=None)
+
+    assert env["DISABLE_AUTOUPDATER"] == "1"
+
+
+def test_build_env_sets_disable_autoupdater_when_version_pinned(tmp_path):
+    target = _make_target(tmp_path, letta_code_version="0.27.16")
+    sample = _make_sample(extra_vars={"env": {"DISABLE_AUTOUPDATER": ""}})
+
+    env = target._build_subprocess_env(sample, agent_id=None)
+
+    assert env["DISABLE_AUTOUPDATER"] == "1"
 
 
 def test_build_env_coerces_non_string_values_to_str(tmp_path):
@@ -233,3 +251,35 @@ def test_run_cwd_without_agent_id_uses_base_dir(tmp_path):
 
     # No agent id -> cannot be in memory-cwd mode, fall back to base dir.
     assert target._resolve_run_cwd(sample, agent_id=None) == str(tmp_path)
+
+
+# --- Letta Code version checks --------------------------------------------
+
+
+def test_extract_version_from_letta_code_output():
+    assert _extract_version("0.27.16 (Letta Code)") == "0.27.16"
+    assert _extract_version("@letta-ai/letta-code 0.27.16\n") == "0.27.16"
+    assert _extract_version("custom-build") == "custom-build"
+
+
+@pytest.mark.asyncio
+async def test_verify_letta_code_version_accepts_matching_cli(tmp_path):
+    script = tmp_path / "letta"
+    script.write_text("#!/bin/sh\necho '0.27.16 (Letta Code)'\n")
+    script.chmod(0o755)
+    target = _make_target(tmp_path, letta_command=str(script), letta_code_version="0.27.16")
+
+    actual = await target._verify_letta_code_version(env={}, cwd=str(tmp_path))
+
+    assert actual == "0.27.16"
+
+
+@pytest.mark.asyncio
+async def test_verify_letta_code_version_rejects_mismatched_cli(tmp_path):
+    script = tmp_path / "letta"
+    script.write_text("#!/bin/sh\necho '0.27.18 (Letta Code)'\n")
+    script.chmod(0o755)
+    target = _make_target(tmp_path, letta_command=str(script), letta_code_version="0.27.16")
+
+    with pytest.raises(RuntimeError, match="expected 0.27.16, got 0.27.18"):
+        await target._verify_letta_code_version(env={}, cwd=str(tmp_path))

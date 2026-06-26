@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shlex
 from pathlib import Path
 from typing import Optional
@@ -22,6 +23,15 @@ from letta_evals.visualization.base import ProgressCallback
 logger = logging.getLogger(__name__)
 
 
+_VERSION_RE = re.compile(r"\d+\.\d+\.\d+(?:[-+][A-Za-z0-9_.-]+)?")
+
+
+def _extract_version(output: str) -> str:
+    """Extract the package version from ``letta --version`` output."""
+    match = _VERSION_RE.search(output)
+    return match.group(0) if match else output.strip()
+
+
 class LettaCodeTarget:
     """Letta code target that invokes the letta CLI command."""
 
@@ -36,6 +46,9 @@ class LettaCodeTarget:
         base_dir: Optional[Path] = None,
         flags: Optional[str] = None,
         permission_mode: Optional[str] = None,
+        letta_command: str = "letta",
+        letta_code_version: Optional[str] = None,
+        disable_autoupdater: bool = False,
     ):
         """Initialize the Letta Code target.
 
@@ -53,10 +66,19 @@ class LettaCodeTarget:
                 rules (e.g., "--memfs --context-window 8000").
             permission_mode: Permission mode for letta code (e.g., "memory" to scope
                 writes to memory roots). When "memory", sets MEMORY_DIR env var.
+            letta_command: Letta Code executable to run. Defaults to the first
+                ``letta`` on PATH.
+            letta_code_version: If set, run ``<letta_command> --version`` before
+                samples and fail if the reported version does not match.
+            disable_autoupdater: If true, set ``DISABLE_AUTOUPDATER=1`` for the
+                Letta Code subprocess. This is also forced when letta_code_version
+                is set so the checked version cannot auto-update during execution.
 
         Agent factories may set ``sample.extra_vars["env"]`` (dict) to inject
-        per-sample env vars into the subprocess; user keys win over target-managed
-        ones. See ``_build_subprocess_env``.
+        per-sample env vars into the subprocess. Sample keys override most
+        target-managed keys; the Letta Code auto-updater guard still wins when
+        ``disable_autoupdater`` or ``letta_code_version`` is set. See
+        ``_build_subprocess_env``.
 
         The CLI runs in the process's current working directory. For isolated
         execution, configure ``suite.sandbox`` to dispatch each sample to a
@@ -76,6 +98,13 @@ class LettaCodeTarget:
         # suite.sandbox (Modal), which runs the in-sandbox CLI from /mnt/suite.
         self.base_dir = base_dir or Path.cwd()
         self.flags = shlex.split(flags) if flags else []
+        self.letta_command = letta_command
+        self.letta_code_version = letta_code_version
+        self.disable_autoupdater = disable_autoupdater
+        self._verified_letta_code_version: Optional[str] = None
+
+        if not self.letta_command:
+            raise ValueError("letta_command must not be empty")
 
     def _build_subprocess_env(self, sample: Sample, agent_id: Optional[str]) -> dict[str, str]:
         """Build subprocess env: os.environ -> target-managed -> sample.extra_vars["env"]."""
@@ -111,7 +140,52 @@ class LettaCodeTarget:
             if applied:
                 logger.info(f"Applied per-sample env overrides for sample {sample.id}: keys={sorted(applied)}")
 
+        if self.disable_autoupdater or self.letta_code_version:
+            env["DISABLE_AUTOUPDATER"] = "1"
+
         return env
+
+    async def _verify_letta_code_version(self, env: dict[str, str], cwd: str) -> Optional[str]:
+        """Verify the configured Letta Code CLI version, if requested."""
+        if not self.letta_code_version:
+            return None
+        if self._verified_letta_code_version == self.letta_code_version:
+            return self._verified_letta_code_version
+
+        process = await asyncio.create_subprocess_exec(
+            self.letta_command,
+            "--version",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=cwd,
+            env=env,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+            raise RuntimeError(f"Timed out while checking Letta Code version via {self.letta_command!r}")
+
+        stdout_text = stdout.decode(errors="replace").strip()
+        stderr_text = stderr.decode(errors="replace").strip()
+        output = stdout_text or stderr_text
+
+        if process.returncode != 0:
+            detail = output or f"exit code {process.returncode}"
+            raise RuntimeError(f"Could not check Letta Code version via {self.letta_command!r}: {detail}")
+
+        actual_version = _extract_version(output)
+        if actual_version != self.letta_code_version:
+            raise RuntimeError(
+                "Letta Code version mismatch: "
+                f"expected {self.letta_code_version}, got {actual_version or output} "
+                f"from {self.letta_command!r} --version"
+            )
+
+        self._verified_letta_code_version = actual_version
+        logger.info(f"Verified Letta Code CLI version {actual_version} via {self.letta_command!r}")
+        return actual_version
 
     def _resolve_run_cwd(self, sample: Sample, agent_id: Optional[str]) -> str:
         """Resolve the subprocess working directory.
@@ -151,7 +225,7 @@ class LettaCodeTarget:
 
                 # construct the letta-code CLI command (headless streaming JSON output).
                 cmd = [
-                    "letta",
+                    self.letta_command,
                     "--output-format",
                     "stream-json",
                     "--model",
@@ -215,6 +289,8 @@ class LettaCodeTarget:
                 # Resolve the subprocess cwd (honors a factory-injected MEMORY_DIR
                 # in memory permission mode; see _resolve_run_cwd).
                 run_cwd = self._resolve_run_cwd(sample, factory_agent_id)
+
+                await self._verify_letta_code_version(env, run_cwd)
 
                 # run the letta command with prompt piped via stdin
                 #

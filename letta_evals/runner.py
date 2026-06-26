@@ -179,6 +179,9 @@ class Runner:
             base_dir=self.suite.target.base_dir,
             flags=self.suite.target.flags,
             permission_mode=self.suite.target.permission_mode,
+            letta_command=self.suite.target.letta_command,
+            letta_code_version=self.suite.target.letta_code_version,
+            disable_autoupdater=self.suite.target.disable_autoupdater,
         )
 
     def _init_graders(self) -> None:

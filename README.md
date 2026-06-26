@@ -138,7 +138,21 @@ The supported target is `letta_code`, which runs the Letta Code CLI against a Le
 - `agent_script`: optional `file.py:function_name` agent factory
 - `flags`: additional Letta Code CLI flags (including tool restrictions, e.g. `--allowed-tools Bash Read`)
 - `permission_mode`: optional Letta Code permission mode
+- `letta_command`: Letta Code executable to invoke; defaults to `letta` on `PATH`
+- `letta_code_version`: optional expected `@letta-ai/letta-code` CLI version; fails fast if `letta_command --version` does not match
+- `disable_autoupdater`: set `DISABLE_AUTOUPDATER=1` for Letta Code subprocesses; automatically enabled when `letta_code_version` is set
 - `timeout` and `max_retries`: target execution controls
+
+For reproducible runs, install the desired Letta Code CLI separately and pin it in the target:
+
+```yaml
+target:
+  kind: letta_code
+  model_handles:
+    - openai/gpt-4.1-mini
+  letta_command: /path/to/letta
+  letta_code_version: 0.27.16
+```
 
 ### Graders and extractors
 
