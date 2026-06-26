@@ -1,11 +1,11 @@
-"""Unit tests for LettaCodeTarget token-data fetching."""
+"""Unit tests for letta-code token-data fetching."""
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
 
-from letta_evals.targets.letta_code_target import LettaCodeTarget
+from letta_evals.targets.letta_code_results import fetch_token_data
 
 
 class _FakeRuns:
@@ -48,11 +48,8 @@ def _tool_turn(content="tool output"):
     return {"role": "tool", "content": content}
 
 
-def _make_target(fake_runs: _FakeRuns) -> LettaCodeTarget:
-    return LettaCodeTarget(
-        client=SimpleNamespace(runs=fake_runs),
-        model_handle="tinker/Qwen/Qwen3.6-35B-A3B",
-    )
+def _client(fake_runs: _FakeRuns) -> SimpleNamespace:
+    return SimpleNamespace(runs=fake_runs)
 
 
 @pytest.mark.asyncio
@@ -61,7 +58,7 @@ async def test_fetch_token_data_requests_and_processes_runs_chronologically():
     newer = _run_summary("run-newer", datetime(2026, 1, 1, 12, 1, tzinfo=timezone.utc))
     fake_runs = _FakeRuns(
         # Simulate a server/client returning newest-first despite the requested
-        # order. _fetch_token_data should still sort locally before retrieval.
+        # order. fetch_token_data should still sort locally before retrieval.
         items=[newer, older],
         runs_by_id={
             "run-older": _run_with_turns(_assistant_turn([10, 11], [12]), _tool_turn("first tool")),
@@ -69,7 +66,7 @@ async def test_fetch_token_data_requests_and_processes_runs_chronologically():
         },
     )
 
-    token_data = await _make_target(fake_runs)._fetch_token_data("agent-123")
+    token_data = await fetch_token_data(_client(fake_runs), "agent-123")
 
     assert fake_runs.list_calls == [{"agent_id": "agent-123", "limit": 100, "order": "asc"}]
     assert fake_runs.retrieve_ids == ["run-older", "run-newer"]
@@ -94,7 +91,7 @@ async def test_fetch_token_data_sorts_locally_when_client_lacks_order_kwarg():
         reject_order=True,
     )
 
-    token_data = await _make_target(fake_runs)._fetch_token_data("agent-123")
+    token_data = await fetch_token_data(_client(fake_runs), "agent-123")
 
     assert fake_runs.list_calls == [
         {"agent_id": "agent-123", "limit": 100, "order": "asc"},
