@@ -49,8 +49,31 @@ class LettaCodeTargetSpec(BaseModel):
     )
     permission_mode: Optional[str] = Field(
         default=None,
-        description="Permission mode for letta code (e.g., 'memory' to scope writes to memory roots).",
+        description=("Permission mode passed to letta code (e.g., 'unrestricted', 'standard', or 'acceptEdits')."),
     )
+    memory_workspace: bool = Field(
+        default=False,
+        description=(
+            "Configure MEMORY_DIR/LETTA_MEMORY_DIR and run the Letta Code subprocess from a memory "
+            "workspace. This does not pass '--permission-mode memory' to letta code."
+        ),
+    )
+    memory_dir: Optional[Path] = Field(
+        default=None,
+        description=(
+            "Optional memory workspace root. Relative paths are resolved from the suite file. "
+            "When unset, memory_workspace uses per-sample overrides or the factory-created agent's memory root."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def reject_removed_memory_permission_mode(self):
+        if self.permission_mode == "memory":
+            raise ValueError(
+                "permission_mode: memory was removed from Letta Code. "
+                "Use memory_workspace: true with a current permission_mode such as 'unrestricted'."
+            )
+        return self
 
 
 class ModalSandboxSpec(BaseModel):
@@ -260,6 +283,11 @@ class SuiteSpec(BaseModel):
 
             # resolve target paths
             if "target" in yaml_data:
+                if "memory_dir" in yaml_data["target"] and yaml_data["target"]["memory_dir"]:
+                    memory_dir = Path(yaml_data["target"]["memory_dir"])
+                    if not memory_dir.is_absolute():
+                        yaml_data["target"]["memory_dir"] = str((base_dir / memory_dir).resolve())
+
                 # resolve path-valued flags (--skills, --import) relative to suite file
                 if "flags" in yaml_data["target"] and yaml_data["target"]["flags"]:
                     PATH_FLAGS = {"--skills", "--import"}

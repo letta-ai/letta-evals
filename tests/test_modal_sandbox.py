@@ -9,6 +9,7 @@ The spec-parsing tests do not touch Modal at all.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -126,6 +127,33 @@ class TestSuiteSpecWithSandbox:
         assert suite.sandbox.image == "ghcr.io/letta/letta-evals-runtime:test"
         assert suite.sandbox.secrets == ["letta-api-key"]
         assert suite.sandbox.cpu == 4
+
+    def test_target_memory_workspace_fields_parse_and_resolve(self, tmp_path):
+        yaml_data = _minimal_suite_yaml()
+        yaml_data["target"] = {
+            "kind": "letta_code",
+            "model_handles": ["openai/gpt-4.1-mini"],
+            "permission_mode": "unrestricted",
+            "memory_workspace": True,
+            "memory_dir": "seeded-memory",
+        }
+
+        suite = SuiteSpec.from_yaml(yaml_data, base_dir=tmp_path)
+
+        assert suite.target.permission_mode == "unrestricted"
+        assert suite.target.memory_workspace is True
+        assert suite.target.memory_dir == Path(tmp_path / "seeded-memory").resolve()
+
+    def test_target_rejects_removed_memory_permission_mode(self, tmp_path):
+        yaml_data = _minimal_suite_yaml()
+        yaml_data["target"] = {
+            "kind": "letta_code",
+            "model_handles": ["openai/gpt-4.1-mini"],
+            "permission_mode": "memory",
+        }
+
+        with pytest.raises(ValueError, match="permission_mode: memory was removed"):
+            SuiteSpec.from_yaml(yaml_data, base_dir=tmp_path)
 
 
 class TestExecResult:

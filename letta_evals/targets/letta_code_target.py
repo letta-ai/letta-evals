@@ -36,6 +36,8 @@ class LettaCodeTarget:
         base_dir: Optional[Path] = None,
         flags: Optional[str] = None,
         permission_mode: Optional[str] = None,
+        memory_workspace: bool = False,
+        memory_dir: Optional[Path] = None,
     ):
         """Initialize the Letta Code target.
 
@@ -51,8 +53,16 @@ class LettaCodeTarget:
             base_dir: Base directory for resolving relative paths in agent_script
             flags: Additional CLI flags to pass to letta code, parsed with shell quoting
                 rules (e.g., "--memfs --context-window 8000").
-            permission_mode: Permission mode for letta code (e.g., "memory" to scope
-                writes to memory roots). When "memory", sets MEMORY_DIR env var.
+            permission_mode: Permission mode to pass through to Letta Code.
+                Use a current Letta Code CLI mode such as "unrestricted",
+                "standard", or "acceptEdits".
+            memory_workspace: If true, configure MEMORY_DIR/LETTA_MEMORY_DIR
+                and run the subprocess from that memory workspace when one can
+                be resolved. This controls letta-evals workspace behavior only;
+                use sandboxing if strict filesystem confinement is required.
+            memory_dir: Optional explicit memory workspace root. If unset,
+                memory_workspace uses a per-sample override or the factory-created
+                agent's default ~/.letta/agents/<agent_id>/memory root.
 
         Agent factories may set ``sample.extra_vars["env"]`` (dict) to inject
         per-sample env vars into the subprocess; user keys win over target-managed
@@ -65,6 +75,12 @@ class LettaCodeTarget:
         """
         self.client = client
         self.model_handle = model_handle
+        if permission_mode == "memory":
+            raise ValueError(
+                "permission_mode='memory' was removed from Letta Code. "
+                "Use memory_workspace=True with a current permission_mode such as 'unrestricted'."
+            )
+        self.memory_workspace = memory_workspace
         self.permission_mode = permission_mode
         self.timeout = timeout
         self.max_retries = max_retries
@@ -76,6 +92,30 @@ class LettaCodeTarget:
         # suite.sandbox (Modal), which runs the in-sandbox CLI from /mnt/suite.
         self.base_dir = base_dir or Path.cwd()
         self.flags = shlex.split(flags) if flags else []
+        self.memory_dir = memory_dir
+
+    def _resolve_memory_workspace_dir(self, sample: Sample, agent_id: Optional[str]) -> Optional[Path]:
+        """Resolve the memory workspace root for env/cwd configuration."""
+        if not self.memory_workspace:
+            return None
+
+        sample_env = (sample.extra_vars or {}).get("env") or {}
+        if isinstance(sample_env, dict):
+            injected = sample_env.get("MEMORY_DIR") or sample_env.get("LETTA_MEMORY_DIR")
+            if injected:
+                return Path(str(injected)).expanduser()
+
+        sample_memory_dir = (sample.extra_vars or {}).get("memory_dir")
+        if sample_memory_dir:
+            return Path(str(sample_memory_dir)).expanduser()
+
+        if self.memory_dir:
+            return self.memory_dir.expanduser()
+
+        if agent_id:
+            return Path.home() / ".letta" / "agents" / agent_id / "memory"
+
+        return None
 
     def _build_subprocess_env(self, sample: Sample, agent_id: Optional[str]) -> dict[str, str]:
         """Build subprocess env: os.environ -> target-managed -> sample.extra_vars["env"]."""
@@ -85,10 +125,11 @@ class LettaCodeTarget:
             env["LETTA_BASE_URL"] = self.base_url
             logger.info(f"Setting LETTA_BASE_URL={self.base_url} for letta CLI")
 
-        if self.permission_mode == "memory" and agent_id:
-            memory_dir = Path.home() / ".letta" / "agents" / agent_id / "memory"
+        memory_dir = self._resolve_memory_workspace_dir(sample, agent_id)
+        if memory_dir:
             memory_dir.mkdir(parents=True, exist_ok=True)
             env["MEMORY_DIR"] = str(memory_dir)
+            env["LETTA_MEMORY_DIR"] = str(memory_dir)
 
         sample_env = (sample.extra_vars or {}).get("env")
         if sample_env is not None:
@@ -116,18 +157,15 @@ class LettaCodeTarget:
     def _resolve_run_cwd(self, sample: Sample, agent_id: Optional[str]) -> str:
         """Resolve the subprocess working directory.
 
-        In ``permission_mode == "memory"`` we cd into the memory root so relative
-        file paths resolve correctly. An agent factory may point memory operations
-        at a different repo than the agent's own MemFS (e.g. a seeded "fake" repo)
-        by injecting ``MEMORY_DIR`` via ``sample.extra_vars`` — honor that path so
-        the subprocess starts in the repo it will actually read/write. Otherwise
-        fall back to the agent's own memory root, or the configured base dir.
+        When ``memory_workspace`` is true, run from the resolved memory root so
+        relative file paths resolve there. Agent factories may point memory
+        operations at a seeded repo by injecting ``MEMORY_DIR`` or
+        ``memory_dir`` via ``sample.extra_vars``; otherwise an explicit target
+        ``memory_dir`` or the factory-created agent's own memory root is used.
         """
-        if self.permission_mode == "memory" and agent_id:
-            injected_memory_dir = ((sample.extra_vars or {}).get("env") or {}).get("MEMORY_DIR") or (
-                sample.extra_vars or {}
-            ).get("memory_dir")
-            return str(injected_memory_dir or Path.home() / ".letta" / "agents" / agent_id / "memory")
+        memory_dir = self._resolve_memory_workspace_dir(sample, agent_id)
+        if memory_dir:
+            return str(memory_dir)
         return str(self.base_dir)
 
     async def run(
@@ -191,7 +229,8 @@ class LettaCodeTarget:
                 if self.flags:
                     cmd.extend(self.flags)
 
-                # permission mode (e.g., "memory" to scope writes to MEMORY_DIR)
+                # permission mode passed through to Letta Code. Memory workspace
+                # behavior is handled by letta-evals and is not a CLI permission mode.
                 if self.permission_mode:
                     cmd.extend(["--permission-mode", self.permission_mode])
 
@@ -212,8 +251,8 @@ class LettaCodeTarget:
                 agent_id = factory_agent_id
                 stderr_chunks = []
 
-                # Resolve the subprocess cwd (honors a factory-injected MEMORY_DIR
-                # in memory permission mode; see _resolve_run_cwd).
+                # Resolve the subprocess cwd (honors memory_workspace settings;
+                # see _resolve_run_cwd).
                 run_cwd = self._resolve_run_cwd(sample, factory_agent_id)
 
                 # run the letta command with prompt piped via stdin

@@ -137,8 +137,12 @@ The supported target is `letta_code`, which runs the Letta Code CLI against a Le
 - `model_handles`: one or more model handles to evaluate
 - `agent_script`: optional `file.py:function_name` agent factory
 - `flags`: additional Letta Code CLI flags (including tool restrictions, e.g. `--allowed-tools Bash Read`)
-- `permission_mode`: optional Letta Code permission mode
+- `permission_mode`: optional Letta Code permission mode, such as `unrestricted`, `standard`, or `acceptEdits`
+- `memory_workspace`: configure `MEMORY_DIR` / `LETTA_MEMORY_DIR` and run the Letta Code subprocess from a memory workspace without passing the removed `--permission-mode memory` CLI mode
+- `memory_dir`: optional explicit memory workspace root; relative paths are resolved from the suite file
 - `timeout` and `max_retries`: target execution controls
+
+Do not use `permission_mode: memory`: recent Letta Code releases removed that CLI mode. Use `memory_workspace: true` for memory workspace env/cwd setup, and Modal or another external sandbox if you need strict filesystem confinement.
 
 ### Graders and extractors
 
