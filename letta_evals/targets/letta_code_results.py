@@ -106,8 +106,7 @@ async def fetch_token_data(client: Any, agent_id: str) -> list[TurnTokenData]:
                         # Half-written generation: ids present but logprobs
                         # not fully flushed. Drop it and everything after.
                         logger.info(
-                            f"Truncating token data at half-written turn in run {run_summary.id} "
-                            f"for agent {agent_id}"
+                            f"Truncating token data at half-written turn in run {run_summary.id} for agent {agent_id}"
                         )
                         return token_data
                     # Assistant turn with token IDs from SGLang
