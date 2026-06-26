@@ -172,8 +172,6 @@ class Runner:
         return LettaCodeTarget(
             client=self.client,
             model_handle=model_handle,
-            allowed_tools=self.suite.target.allowed_tools,
-            disallowed_tools=self.suite.target.disallowed_tools,
             timeout=int(self.suite.target.timeout),
             max_retries=self.suite.target.max_retries,
             base_url=self.suite.target.base_url,

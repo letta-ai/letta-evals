@@ -41,13 +41,10 @@ class LettaCodeTargetSpec(BaseModel):
     # internal field for path resolution
     base_dir: Optional[Path] = Field(default=None, exclude=True)
 
-    allowed_tools: Optional[List[str]] = Field(
-        default=None, description="List of allowed tools for letta code (e.g., ['Bash', 'Read'])"
-    )
-    disallowed_tools: Optional[List[str]] = Field(default=None, description="List of disallowed tools for letta code")
     flags: Optional[str] = Field(
         default=None,
-        description="Additional CLI flags to pass to letta code (e.g., '--memfs --context-window 8000'). "
+        description="Additional CLI flags to pass to letta code (e.g., '--memfs --context-window 8000', "
+        "or tool restrictions like '--allowed-tools Bash Read'). "
         "Parsed with shell quoting rules so values with spaces can be quoted.",
     )
     permission_mode: Optional[str] = Field(

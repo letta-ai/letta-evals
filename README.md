@@ -136,8 +136,7 @@ The supported target is `letta_code`, which runs the Letta Code CLI against a Le
 - `base_url`: Letta server URL; defaults to `http://localhost:8283`
 - `model_handles`: one or more model handles to evaluate
 - `agent_script`: optional `file.py:function_name` agent factory
-- `allowed_tools` / `disallowed_tools`: optional Letta Code tool restrictions
-- `flags`: additional Letta Code CLI flags
+- `flags`: additional Letta Code CLI flags (including tool restrictions, e.g. `--allowed-tools Bash Read`)
 - `permission_mode`: optional Letta Code permission mode
 - `timeout` and `max_retries`: target execution controls
 

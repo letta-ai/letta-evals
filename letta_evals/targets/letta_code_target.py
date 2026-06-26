@@ -29,8 +29,6 @@ class LettaCodeTarget:
         self,
         client: AsyncLetta,
         model_handle: str,
-        allowed_tools: Optional[list[str]] = None,
-        disallowed_tools: Optional[list[str]] = None,
         timeout: int = 300,
         max_retries: int = 0,
         base_url: Optional[str] = None,
@@ -44,8 +42,6 @@ class LettaCodeTarget:
         Args:
             client: AsyncLetta client for retrieving messages after CLI execution
             model_handle: Model handle to use with letta code
-            allowed_tools: List of allowed tools (e.g., ["Bash", "Read"])
-            disallowed_tools: List of disallowed tools
             timeout: Command timeout in seconds (default: 300)
             max_retries: Number of retry attempts on failure
             base_url: Base URL for the Letta server (passed to CLI via env var)
@@ -69,8 +65,6 @@ class LettaCodeTarget:
         """
         self.client = client
         self.model_handle = model_handle
-        self.allowed_tools = allowed_tools
-        self.disallowed_tools = disallowed_tools
         self.permission_mode = permission_mode
         self.timeout = timeout
         self.max_retries = max_retries
