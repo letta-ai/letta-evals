@@ -179,6 +179,8 @@ class Runner:
             base_dir=self.suite.target.base_dir,
             flags=self.suite.target.flags,
             permission_mode=self.suite.target.permission_mode,
+            memory_workspace=self.suite.target.memory_workspace,
+            memory_dir=self.suite.target.memory_dir,
         )
 
     def _init_graders(self) -> None:
