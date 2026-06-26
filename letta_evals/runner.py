@@ -456,8 +456,19 @@ class Runner:
                         await self.progress_callback.sample_completed(result, model_handle=model_handle)
                 return result
             except Exception as e:
-                if isinstance(e, TargetError) and e.agent_id:
-                    agent_id = e.agent_id
+                # Always surface whatever trajectory we have, without grading it.
+                # A target raises before the runner assigns trajectory/usage/
+                # token_data, so a target error carries its own best-effort partials
+                # on the exception; a grading/reward error happens after a successful
+                # target, so those values are already locals.
+                if isinstance(e, TargetError):
+                    agent_id = e.agent_id or agent_id
+                    agent_usage = e.agent_usage or agent_usage
+                    partial_trajectory = e.partial_trajectory
+                    partial_token_data = e.token_data
+                else:
+                    partial_trajectory = locals().get("trajectory") or []
+                    partial_token_data = locals().get("token_data")
                 agent_str = f" ({agent_id})" if agent_id else ""
                 log_message = str(e) or type(e).__name__
                 logger.error(f"Error running sample {sample_id}{agent_str} with model {model_handle}: {log_message}")
@@ -494,13 +505,14 @@ class Runner:
                     sample_id=sample_id,
                     agent_id=agent_id,
                     model_handle=result_model_handle,
-                    trajectory=[],
+                    trajectory=partial_trajectory,
                     submissions={},
                     grades={},
                     usage=usage,
                     timing=timing,
                     error=error,
                     agent_usage=agent_usage,
+                    token_data=partial_token_data,
                 )
                 if self.progress_callback:
                     await self.progress_callback.sample_error(result, model_handle=result_model_handle)

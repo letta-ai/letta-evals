@@ -165,6 +165,9 @@ class LettaCodeTarget:
         while attempt <= self.max_retries:
             try:
                 agent_id = None
+                # Initialized up front so the error handler can read whatever
+                # streamed before a failure (e.g. for best-effort usage).
+                events = []
 
                 # construct the letta-code CLI command (headless streaming JSON output).
                 cmd = [
@@ -227,7 +230,6 @@ class LettaCodeTarget:
                 env = self._build_subprocess_env(sample, factory_agent_id)
 
                 agent_id = factory_agent_id
-                events = []
                 stderr_chunks = []
 
                 # Resolve the subprocess cwd (honors a factory-injected MEMORY_DIR
@@ -322,29 +324,10 @@ class LettaCodeTarget:
                     raise RuntimeError("No agent_id found in letta stream output")
 
                 # retrieve the full message history using the agent_id
-                logger.info(f"Retrieving messages for agent {agent_id}")
+                trajectory = await self._fetch_trajectory(agent_id)
 
-                messages = await list_all_agent_messages(self.client, agent_id)
-
-                # wrap messages in a single turn
-                trajectory = [messages] if messages else []
-
-                # Extract usage from the final result event.
-                # stream-json always emits the result event last.
-                usage_stats = []
-                if events and events[-1].get("type") == "result" and "usage" in events[-1]:
-                    usage = events[-1]["usage"]
-                    usage_stats.append(
-                        {
-                            "message_type": "usage_statistics",
-                            "prompt_tokens": usage.get("prompt_tokens", 0),
-                            "completion_tokens": usage.get("completion_tokens", 0),
-                            "total_tokens": usage.get("total_tokens", 0),
-                            "cached_input_tokens": usage.get("cached_input_tokens", 0),
-                            "cache_write_tokens": usage.get("cache_write_tokens", 0),
-                            "reasoning_tokens": usage.get("reasoning_tokens", 0),
-                        }
-                    )
+                # Extract usage from the final stream result event (best-effort).
+                usage_stats = self._extract_usage_stats(events)
 
                 # Fetch token-level data if requested (for RL training)
                 token_data: Optional[list[TurnTokenData]] = None
@@ -360,7 +343,7 @@ class LettaCodeTarget:
                     trajectory=trajectory,
                     agent_id=agent_id,
                     model_handle=self.model_handle,
-                    agent_usage=usage_stats if usage_stats else None,
+                    agent_usage=usage_stats,
                     agent_state=agent_state,
                     token_data=token_data,
                 )
@@ -372,7 +355,28 @@ class LettaCodeTarget:
                 if attempt > self.max_retries:
                     timeout_hint = f"Timed out after {self.timeout}s" if isinstance(e, TimeoutError) else ""
                     msg = str(e) or timeout_hint or type(e).__name__
-                    raise TargetError(msg, agent_id=agent_id or factory_agent_id) from e
+                    err_agent_id = agent_id or factory_agent_id
+                    # Best-effort: surface whatever the agent produced before failing —
+                    # usage from the stream so far (no agent_id needed), plus the partial
+                    # trajectory and token data. agent_id is usually known even on timeout
+                    # (captured from the stream init event).
+                    partial_usage = self._extract_usage_stats(events)
+                    partial_trajectory = []
+                    partial_token_data: Optional[list[TurnTokenData]] = None
+                    if err_agent_id:
+                        try:
+                            partial_trajectory = await self._fetch_trajectory(err_agent_id)
+                            if return_token_data:
+                                partial_token_data = await self._fetch_token_data(err_agent_id)
+                        except Exception as fetch_err:
+                            logger.warning(f"Could not fetch partial trajectory for agent {err_agent_id}: {fetch_err}")
+                    raise TargetError(
+                        msg,
+                        agent_id=err_agent_id,
+                        partial_trajectory=partial_trajectory,
+                        agent_usage=partial_usage,
+                        token_data=partial_token_data,
+                    ) from e
 
                 backoff_time = 2 ** (attempt - 1)
                 logger.warning(
@@ -384,11 +388,49 @@ class LettaCodeTarget:
 
         raise last_error or RuntimeError("Unexpected failure in letta command retry loop")
 
+    async def _fetch_trajectory(self, agent_id: str) -> list:
+        """Fetch the agent's full message history as a single-turn trajectory.
+
+        Single source of truth for the list + single-turn wrapping, called from
+        both the success path and the error path (best-effort) so neither
+        reimplements it.
+        """
+        logger.info(f"Retrieving messages for agent {agent_id}")
+        messages = await list_all_agent_messages(self.client, agent_id)
+        return [messages] if messages else []
+
+    @staticmethod
+    def _extract_usage_stats(events: list) -> Optional[list[dict]]:
+        """Pull agent usage_statistics from the final stream ``result`` event.
+
+        stream-json always emits the result event last. Returns ``None`` when no
+        usage is present — e.g. the stream was cut short by a crash or timeout —
+        so both the success path and the error path report usage the same way.
+        """
+        if events and events[-1].get("type") == "result" and "usage" in events[-1]:
+            usage = events[-1]["usage"]
+            return [
+                {
+                    "message_type": "usage_statistics",
+                    "prompt_tokens": usage.get("prompt_tokens", 0),
+                    "completion_tokens": usage.get("completion_tokens", 0),
+                    "total_tokens": usage.get("total_tokens", 0),
+                    "cached_input_tokens": usage.get("cached_input_tokens", 0),
+                    "cache_write_tokens": usage.get("cache_write_tokens", 0),
+                    "reasoning_tokens": usage.get("reasoning_tokens", 0),
+                }
+            ]
+        return None
+
     async def _fetch_token_data(self, agent_id: str) -> list[TurnTokenData]:
         """Fetch token-level data (IDs + logprobs) for a letta code agent.
 
         Retrieves messages with ``return_token_ids=True`` to get
         ``output_ids`` and ``output_token_logprobs`` per message.
+
+        Stops at the first half-written turn — ``output_ids`` present but a
+        shorter ``output_token_logprobs`` — returning only the clean prefix, so a
+        partially-flushed generation can't corrupt Tinker's sequence-extension.
         """
         token_data: list[TurnTokenData] = []
         try:
@@ -411,13 +453,22 @@ class LettaCodeTarget:
                     output_ids = turn.get("output_ids")
                     role = turn.get("role", "assistant")
                     if output_ids:
+                        logprobs = turn.get("output_token_logprobs")
+                        if logprobs is not None and len(output_ids) != len(logprobs):
+                            # Half-written generation: ids present but logprobs
+                            # not fully flushed. Drop it and everything after.
+                            logger.info(
+                                f"Truncating token data at half-written turn in run {run_summary.id} "
+                                f"for agent {agent_id}"
+                            )
+                            return token_data
                         # Assistant turn with token IDs from SGLang
                         token_data.append(
                             TurnTokenData(
                                 role=role,
                                 input_ids=turn.get("input_ids"),
                                 output_ids=output_ids,
-                                output_token_logprobs=turn.get("output_token_logprobs"),
+                                output_token_logprobs=logprobs,
                             )
                         )
                     elif role in ("tool", "tool_return", "tool_return_message") and turn.get("content"):
