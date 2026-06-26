@@ -4,14 +4,19 @@ import logging
 import os
 import shlex
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 import anyio
 from letta_client import AsyncLetta
 
 from letta_evals.models import Sample, TargetResult, TurnTokenData
 from letta_evals.targets.errors import TargetError
-from letta_evals.utils import list_all_agent_messages, load_object
+from letta_evals.targets.letta_code_results import (
+    extract_usage_stats,
+    fetch_token_data,
+    fetch_trajectory,
+)
+from letta_evals.utils import load_object
 from letta_evals.visualization.base import ProgressCallback
 
 logger = logging.getLogger(__name__)
@@ -24,8 +29,6 @@ class LettaCodeTarget:
         self,
         client: AsyncLetta,
         model_handle: str,
-        allowed_tools: Optional[list[str]] = None,
-        disallowed_tools: Optional[list[str]] = None,
         timeout: int = 300,
         max_retries: int = 0,
         base_url: Optional[str] = None,
@@ -39,8 +42,6 @@ class LettaCodeTarget:
         Args:
             client: AsyncLetta client for retrieving messages after CLI execution
             model_handle: Model handle to use with letta code
-            allowed_tools: List of allowed tools (e.g., ["Bash", "Read"])
-            disallowed_tools: List of disallowed tools
             timeout: Command timeout in seconds (default: 300)
             max_retries: Number of retry attempts on failure
             base_url: Base URL for the Letta server (passed to CLI via env var)
@@ -64,8 +65,6 @@ class LettaCodeTarget:
         """
         self.client = client
         self.model_handle = model_handle
-        self.allowed_tools = allowed_tools
-        self.disallowed_tools = disallowed_tools
         self.permission_mode = permission_mode
         self.timeout = timeout
         self.max_retries = max_retries
@@ -77,25 +76,6 @@ class LettaCodeTarget:
         # suite.sandbox (Modal), which runs the in-sandbox CLI from /mnt/suite.
         self.base_dir = base_dir or Path.cwd()
         self.flags = shlex.split(flags) if flags else []
-
-    @staticmethod
-    def _run_sort_key(run_summary: Any) -> tuple[str, str]:
-        """Return a stable chronological sort key for run summaries.
-
-        Letta server defaults for ``runs.list`` have varied across local
-        development branches. Token data must be processed oldest-to-newest so
-        Tinker sequence-extension can merge consecutive assistant generations.
-        Normalize timestamps to strings so mixed SDK/server timestamp types do
-        not make sorting fail.
-        """
-        created_at = getattr(run_summary, "created_at", None)
-        if hasattr(created_at, "isoformat"):
-            created_key = created_at.isoformat()
-        elif created_at is None:
-            created_key = ""
-        else:
-            created_key = str(created_at)
-        return created_key, str(getattr(run_summary, "id", ""))
 
     def _build_subprocess_env(self, sample: Sample, agent_id: Optional[str]) -> dict[str, str]:
         """Build subprocess env: os.environ -> target-managed -> sample.extra_vars["env"]."""
@@ -324,15 +304,15 @@ class LettaCodeTarget:
                     raise RuntimeError("No agent_id found in letta stream output")
 
                 # retrieve the full message history using the agent_id
-                trajectory = await self._fetch_trajectory(agent_id)
+                trajectory = await fetch_trajectory(self.client, agent_id)
 
                 # Extract usage from the final stream result event (best-effort).
-                usage_stats = self._extract_usage_stats(events)
+                usage_stats = extract_usage_stats(events)
 
                 # Fetch token-level data if requested (for RL training)
                 token_data: Optional[list[TurnTokenData]] = None
                 if return_token_data and agent_id:
-                    token_data = await self._fetch_token_data(agent_id)
+                    token_data = await fetch_token_data(self.client, agent_id)
 
                 # Retrieve agent state if needed (e.g., for memory block extractors)
                 agent_state = None
@@ -360,14 +340,14 @@ class LettaCodeTarget:
                     # usage from the stream so far (no agent_id needed), plus the partial
                     # trajectory and token data. agent_id is usually known even on timeout
                     # (captured from the stream init event).
-                    partial_usage = self._extract_usage_stats(events)
+                    partial_usage = extract_usage_stats(events)
                     partial_trajectory = []
                     partial_token_data: Optional[list[TurnTokenData]] = None
                     if err_agent_id:
                         try:
-                            partial_trajectory = await self._fetch_trajectory(err_agent_id)
+                            partial_trajectory = await fetch_trajectory(self.client, err_agent_id)
                             if return_token_data:
-                                partial_token_data = await self._fetch_token_data(err_agent_id)
+                                partial_token_data = await fetch_token_data(self.client, err_agent_id)
                         except Exception as fetch_err:
                             logger.warning(f"Could not fetch partial trajectory for agent {err_agent_id}: {fetch_err}")
                     raise TargetError(
@@ -387,99 +367,3 @@ class LettaCodeTarget:
                 await anyio.sleep(backoff_time)
 
         raise last_error or RuntimeError("Unexpected failure in letta command retry loop")
-
-    async def _fetch_trajectory(self, agent_id: str) -> list:
-        """Fetch the agent's full message history as a single-turn trajectory.
-
-        Single source of truth for the list + single-turn wrapping, called from
-        both the success path and the error path (best-effort) so neither
-        reimplements it.
-        """
-        logger.info(f"Retrieving messages for agent {agent_id}")
-        messages = await list_all_agent_messages(self.client, agent_id)
-        return [messages] if messages else []
-
-    @staticmethod
-    def _extract_usage_stats(events: list) -> Optional[list[dict]]:
-        """Pull agent usage_statistics from the final stream ``result`` event.
-
-        stream-json always emits the result event last. Returns ``None`` when no
-        usage is present — e.g. the stream was cut short by a crash or timeout —
-        so both the success path and the error path report usage the same way.
-        """
-        if events and events[-1].get("type") == "result" and "usage" in events[-1]:
-            usage = events[-1]["usage"]
-            return [
-                {
-                    "message_type": "usage_statistics",
-                    "prompt_tokens": usage.get("prompt_tokens", 0),
-                    "completion_tokens": usage.get("completion_tokens", 0),
-                    "total_tokens": usage.get("total_tokens", 0),
-                    "cached_input_tokens": usage.get("cached_input_tokens", 0),
-                    "cache_write_tokens": usage.get("cache_write_tokens", 0),
-                    "reasoning_tokens": usage.get("reasoning_tokens", 0),
-                }
-            ]
-        return None
-
-    async def _fetch_token_data(self, agent_id: str) -> list[TurnTokenData]:
-        """Fetch token-level data (IDs + logprobs) for a letta code agent.
-
-        Retrieves messages with ``return_token_ids=True`` to get
-        ``output_ids`` and ``output_token_logprobs`` per message.
-
-        Stops at the first half-written turn — ``output_ids`` present but a
-        shorter ``output_token_logprobs`` — returning only the clean prefix, so a
-        partially-flushed generation can't corrupt Tinker's sequence-extension.
-        """
-        token_data: list[TurnTokenData] = []
-        try:
-            # Fetch ALL runs for this agent — client tools cause each tool-call
-            # round-trip to be a separate run, so token IDs are scattered.
-            try:
-                runs_page = await self.client.runs.list(agent_id=agent_id, limit=100, order="asc")
-            except TypeError:
-                # Older generated clients may not expose the ``order`` kwarg.
-                # Fall back to the legacy call and sort locally below.
-                runs_page = await self.client.runs.list(agent_id=agent_id, limit=100)
-            if not runs_page.items:
-                return token_data
-
-            # Token IDs are stored in run.metadata.result.turns (populated by SGLang native adapter)
-            for run_summary in sorted(runs_page.items, key=self._run_sort_key):
-                run = await self.client.runs.retrieve(run_id=run_summary.id)
-                result = (run.metadata or {}).get("result", {})
-                for turn in result.get("turns") or []:
-                    output_ids = turn.get("output_ids")
-                    role = turn.get("role", "assistant")
-                    if output_ids:
-                        logprobs = turn.get("output_token_logprobs")
-                        if logprobs is not None and len(output_ids) != len(logprobs):
-                            # Half-written generation: ids present but logprobs
-                            # not fully flushed. Drop it and everything after.
-                            logger.info(
-                                f"Truncating token data at half-written turn in run {run_summary.id} "
-                                f"for agent {agent_id}"
-                            )
-                            return token_data
-                        # Assistant turn with token IDs from SGLang
-                        token_data.append(
-                            TurnTokenData(
-                                role=role,
-                                input_ids=turn.get("input_ids"),
-                                output_ids=output_ids,
-                                output_token_logprobs=logprobs,
-                            )
-                        )
-                    elif role in ("tool", "tool_return", "tool_return_message") and turn.get("content"):
-                        # Tool return turn — no output_ids, but content is needed
-                        # for proper multi-turn token sequence reconstruction
-                        token_data.append(
-                            TurnTokenData(
-                                role=role,
-                                content=turn.get("content"),
-                            )
-                        )
-        except Exception as e:
-            logger.warning(f"Could not fetch token data for agent {agent_id}: {e}")
-        return token_data
