@@ -132,6 +132,20 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.22.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.21.0...letta-evals-v0.22.0) (2026-06-26)
+
+
+### Features
+
+* **letta-code:** Add memory workspace target config ([#300](https://github.com/letta-ai/letta-evals/issues/300)) ([4799e37](https://github.com/letta-ai/letta-evals/commit/4799e376b5daf76e60cb56594ab3dc1145e617c0))
+* **letta-code:** Return partial trajectories, usage, and tokens on failure ([#297](https://github.com/letta-ai/letta-evals/issues/297)) ([5600915](https://github.com/letta-ai/letta-evals/commit/560091508e4557bce8510f831c84107777dc6d51))
+
+
+### Refactors
+
+* **letta-code:** Extract result-fetch helpers and drop dead tool fields ([#298](https://github.com/letta-ai/letta-evals/issues/298)) ([224eb98](https://github.com/letta-ai/letta-evals/commit/224eb984ad8293f6e92621a850b636bd5e286f90))
+* Make SampleResult inherit from TargetResult ([#295](https://github.com/letta-ai/letta-evals/issues/295)) ([8e8bc29](https://github.com/letta-ai/letta-evals/commit/8e8bc29144dc33c6688469df19afa7c88146f92c))
+
 ## [0.21.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.20.0...letta-evals-v0.21.0) (2026-06-18)
 
 
