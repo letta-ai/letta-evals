@@ -227,16 +227,6 @@ class Runner:
     def _should_cleanup_agent(self) -> bool:
         return self.suite.cleanup
 
-    async def _attach_requested_token_data(
-        self, result: SampleResult, return_token_data: bool
-    ) -> SampleResult:
-        """Attach host-fetched token data to a completed SampleResult when requested."""
-        if not return_token_data or not result.agent_id:
-            return result
-        return result.model_copy(
-            update={"token_data": await fetch_token_data(self.client, result.agent_id)}
-        )
-
     # ── setup ──
 
     async def _run_setup(self, model_handle: Optional[str] = None) -> None:
@@ -379,7 +369,12 @@ class Runner:
                         self.suite, sample, model_handle, t_sample_start
                     )
                     agent_id = result.agent_id
-                    result = await self._attach_requested_token_data(result, return_token_data)
+                    # The in-sandbox Runner fetches only the artifacts needed
+                    # to grade/build SampleResult. Token arrays intentionally
+                    # stay out of result.json; the host Runner fetches them
+                    # from server-side run metadata after the sandbox returns.
+                    if return_token_data and agent_id:
+                        result = result.model_copy(update={"token_data": await fetch_token_data(self.client, agent_id)})
                     # Fire post-completion callbacks based on the final result —
                     # mid-sample events (grading_started, token streaming) are
                     # not emitted in v1 because the host only sees the final
