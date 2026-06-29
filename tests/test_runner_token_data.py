@@ -3,9 +3,9 @@
 
 Three contracts:
 
-  T0.1: ``Runner.run_sample(return_token_data=True)`` propagates the flag to
-        the target and surfaces the resulting token data on
-        ``SampleResult.token_data``.
+  T0.1: ``Runner.run_sample(return_token_data=True)`` fetches token data from
+        server-side artifacts after the target returns an ``agent_id`` and
+        surfaces it on ``SampleResult.token_data``.
   T0.2: When at least one grader's extractor needs ``agent_state``,
         ``Runner.run_sample`` retrieves it from the target and surfaces it on
         ``SampleResult.agent_state`` so callers do not have to re-fetch it.
@@ -81,27 +81,12 @@ def _make_agent_state() -> AgentState:
     return MagicMock(spec=AgentState, id="agent-fake-1")
 
 
-def _make_target_result(
-    *,
-    agent_state: Optional[AgentState] = None,
-    token_data: Optional[List[TurnTokenData]] = None,
-) -> TargetResult:
-    """Build a TargetResult with an empty trajectory.
-
-    SampleResult/TargetResult only accept ``LettaMessageUnion`` instances
-    in trajectory — building a real one drags in the Letta SDK. The fake
-    grader in this file does not inspect trajectory contents, and
-    ``detect_errors`` only flags empty trajectories when score is 0.0,
-    so we use an empty turn list and ensure the fake grader returns a
-    non-zero score.
-    """
+def _make_target_result() -> TargetResult:
+    """Build the minimal TargetResult returned by LettaCodeTarget."""
     return TargetResult(
-        trajectory=[[]],
         agent_id="agent-fake-1",
         model_handle="fake/model",
         agent_usage=None,
-        agent_state=agent_state,
-        token_data=token_data,
     )
 
 
@@ -213,27 +198,33 @@ def test_t0_3_sample_result_round_trips_through_pydantic():
 
 
 @pytest.mark.asyncio
-async def test_t0_1_return_token_data_flag_propagates_to_target():
-    """run_sample(return_token_data=True) calls target.run with the flag."""
+async def test_t0_1_return_token_data_fetches_after_target_run(monkeypatch):
+    """run_sample(return_token_data=True) fetches token data from agent_id in Runner."""
     grader = _FakeGrader(requires_agent_state=False)
+    token_data = [TurnTokenData(role="assistant_message", output_ids=[100])]
     target = MagicMock()
-    target.run = AsyncMock(return_value=_make_target_result(token_data=None))
+    target.run = AsyncMock(return_value=_make_target_result())
+    fetch_trajectory = AsyncMock(return_value=[[]])
+    fetch_token_data = AsyncMock(return_value=token_data)
+    monkeypatch.setattr("letta_evals.runner.fetch_trajectory", fetch_trajectory)
+    monkeypatch.setattr("letta_evals.runner.fetch_token_data", fetch_token_data)
 
     runner = _make_runner(grader, target)
     sample = Sample(id=0, input="hi", ground_truth="ok")
 
-    await runner.run_sample(sample, model_handle=None, return_token_data=True)
+    result = await runner.run_sample(sample, model_handle=None, return_token_data=True)
 
     target.run.assert_awaited_once()
     kwargs = target.run.await_args.kwargs
-    assert kwargs.get("return_token_data") is True, (
-        "T0.1: Runner.run_sample must propagate return_token_data to the target."
-    )
+    assert "return_token_data" not in kwargs
+    fetch_trajectory.assert_awaited_once_with(runner.client, "agent-fake-1")
+    fetch_token_data.assert_awaited_once_with(runner.client, "agent-fake-1")
+    assert result.token_data == token_data
 
 
 @pytest.mark.asyncio
-async def test_t0_1_token_data_surfaces_on_sample_result():
-    """When the target returns token_data, it appears on SampleResult.token_data."""
+async def test_t0_1_token_data_surfaces_on_sample_result(monkeypatch):
+    """Fetched token data appears on SampleResult.token_data."""
     grader = _FakeGrader(requires_agent_state=False)
     token_data = [
         TurnTokenData(
@@ -244,7 +235,9 @@ async def test_t0_1_token_data_surfaces_on_sample_result():
         ),
     ]
     target = MagicMock()
-    target.run = AsyncMock(return_value=_make_target_result(token_data=token_data))
+    target.run = AsyncMock(return_value=_make_target_result())
+    monkeypatch.setattr("letta_evals.runner.fetch_trajectory", AsyncMock(return_value=[[]]))
+    monkeypatch.setattr("letta_evals.runner.fetch_token_data", AsyncMock(return_value=token_data))
 
     runner = _make_runner(grader, target)
     sample = Sample(id=0, input="hi", ground_truth="ok")
@@ -252,7 +245,7 @@ async def test_t0_1_token_data_surfaces_on_sample_result():
     result = await runner.run_sample(sample, model_handle=None, return_token_data=True)
 
     assert result.token_data == token_data, (
-        "T0.1: SampleResult.token_data must equal the list returned by the target. "
+        "T0.1: SampleResult.token_data must equal the list fetched by Runner. "
         "Pydantic re-validates the list during model construction so identity is "
         "not preserved, but value-equality must hold exactly."
     )
@@ -260,7 +253,7 @@ async def test_t0_1_token_data_surfaces_on_sample_result():
 
 
 @pytest.mark.asyncio
-async def test_t0_1_default_keeps_token_data_none():
+async def test_t0_1_default_keeps_token_data_none(monkeypatch):
     """Default eval-mode call (return_token_data not passed) → field stays None.
 
     This is the back-compat guarantee: existing eval callers don't get a
@@ -268,14 +261,18 @@ async def test_t0_1_default_keeps_token_data_none():
     """
     grader = _FakeGrader(requires_agent_state=False)
     target = MagicMock()
-    target.run = AsyncMock(return_value=_make_target_result(token_data=None))
+    target.run = AsyncMock(return_value=_make_target_result())
+    fetch_token_data = AsyncMock()
+    monkeypatch.setattr("letta_evals.runner.fetch_trajectory", AsyncMock(return_value=[[]]))
+    monkeypatch.setattr("letta_evals.runner.fetch_token_data", fetch_token_data)
 
     runner = _make_runner(grader, target)
     sample = Sample(id=0, input="hi", ground_truth="ok")
 
     result = await runner.run_sample(sample, model_handle=None)
 
-    assert target.run.await_args.kwargs.get("return_token_data") is False
+    assert "return_token_data" not in target.run.await_args.kwargs
+    fetch_token_data.assert_not_awaited()
     assert result.token_data is None
 
 
@@ -285,12 +282,15 @@ async def test_t0_1_default_keeps_token_data_none():
 
 
 @pytest.mark.asyncio
-async def test_t0_2_agent_state_requested_when_grader_needs_it():
-    """Grader with requires_agent_state=True → target.run gets retrieve_agent_state=True."""
+async def test_t0_2_agent_state_requested_when_grader_needs_it(monkeypatch):
+    """Grader with requires_agent_state=True → Runner fetches agent_state."""
     grader = _FakeGrader(requires_agent_state=True)
     agent_state = _make_agent_state()
     target = MagicMock()
-    target.run = AsyncMock(return_value=_make_target_result(agent_state=agent_state))
+    target.run = AsyncMock(return_value=_make_target_result())
+    fetch_agent_state = AsyncMock(return_value=agent_state)
+    monkeypatch.setattr("letta_evals.runner.fetch_trajectory", AsyncMock(return_value=[[]]))
+    monkeypatch.setattr("letta_evals.runner.fetch_agent_state", fetch_agent_state)
 
     runner = _make_runner(grader, target)
     sample = Sample(id=0, input="hi", ground_truth="ok")
@@ -299,7 +299,8 @@ async def test_t0_2_agent_state_requested_when_grader_needs_it():
 
     target.run.assert_awaited_once()
     kwargs = target.run.await_args.kwargs
-    assert kwargs.get("retrieve_agent_state") is True, "T0.2: Runner must request agent_state when any grader needs it."
+    assert "retrieve_agent_state" not in kwargs
+    fetch_agent_state.assert_awaited_once_with(runner.client, "agent-fake-1")
     # And it surfaces on SampleResult so callers don't re-fetch it.
     assert result.agent_state is agent_state
     # Also: the grader actually received the agent_state in its grade() call.
@@ -307,29 +308,32 @@ async def test_t0_2_agent_state_requested_when_grader_needs_it():
 
 
 @pytest.mark.asyncio
-async def test_t0_2_agent_state_skipped_when_no_grader_needs_it():
-    """Grader with requires_agent_state=False → target.run gets retrieve_agent_state=False.
+async def test_t0_2_agent_state_skipped_when_no_grader_needs_it(monkeypatch):
+    """Grader with requires_agent_state=False → Runner skips agent_state fetch.
 
     This is the perf-sensitive default: no grader needs agent_state →
     skip the extra Letta server round-trip the eval would otherwise pay.
     """
     grader = _FakeGrader(requires_agent_state=False)
     target = MagicMock()
-    target.run = AsyncMock(return_value=_make_target_result(agent_state=None))
+    target.run = AsyncMock(return_value=_make_target_result())
+    fetch_agent_state = AsyncMock()
+    monkeypatch.setattr("letta_evals.runner.fetch_trajectory", AsyncMock(return_value=[[]]))
+    monkeypatch.setattr("letta_evals.runner.fetch_agent_state", fetch_agent_state)
 
     runner = _make_runner(grader, target)
     sample = Sample(id=0, input="hi", ground_truth="ok")
 
     result = await runner.run_sample(sample, model_handle=None)
 
-    kwargs = target.run.await_args.kwargs
-    assert kwargs.get("retrieve_agent_state") is False
+    assert "retrieve_agent_state" not in target.run.await_args.kwargs
+    fetch_agent_state.assert_not_awaited()
     assert result.agent_state is None
 
 
 @pytest.mark.asyncio
-async def test_t0_2_agent_state_and_token_data_combine_in_one_call():
-    """Both flags True → one target.run call carrying both.
+async def test_t0_2_agent_state_and_token_data_are_fetched_after_one_target_run(monkeypatch):
+    """Both flags True → one target.run plus Runner-owned artifact fetches.
 
     The whole point of the plumbing: a single ``run_sample`` call returns
     trajectory, agent_state, and token_data together, instead of forcing
@@ -339,7 +343,12 @@ async def test_t0_2_agent_state_and_token_data_combine_in_one_call():
     agent_state = _make_agent_state()
     token_data = [TurnTokenData(role="assistant_message", output_ids=[1, 2])]
     target = MagicMock()
-    target.run = AsyncMock(return_value=_make_target_result(agent_state=agent_state, token_data=token_data))
+    target.run = AsyncMock(return_value=_make_target_result())
+    fetch_agent_state = AsyncMock(return_value=agent_state)
+    fetch_token_data = AsyncMock(return_value=token_data)
+    monkeypatch.setattr("letta_evals.runner.fetch_trajectory", AsyncMock(return_value=[[]]))
+    monkeypatch.setattr("letta_evals.runner.fetch_agent_state", fetch_agent_state)
+    monkeypatch.setattr("letta_evals.runner.fetch_token_data", fetch_token_data)
 
     runner = _make_runner(grader, target)
     sample = Sample(id=0, input="hi", ground_truth="ok")
@@ -348,7 +357,9 @@ async def test_t0_2_agent_state_and_token_data_combine_in_one_call():
 
     assert target.run.await_count == 1, "T0.2 + T0.1: combined RL fetch must be a single target.run call."
     kwargs = target.run.await_args.kwargs
-    assert kwargs.get("retrieve_agent_state") is True
-    assert kwargs.get("return_token_data") is True
+    assert "retrieve_agent_state" not in kwargs
+    assert "return_token_data" not in kwargs
+    fetch_agent_state.assert_awaited_once_with(runner.client, "agent-fake-1")
+    fetch_token_data.assert_awaited_once_with(runner.client, "agent-fake-1")
     assert result.agent_state is agent_state  # AgentState is not re-validated
     assert result.token_data == token_data

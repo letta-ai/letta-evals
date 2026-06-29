@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from letta_evals.targets.letta_code_results import fetch_token_data
+from letta_evals.execution.artifacts import fetch_token_data
 
 
 class _FakeRuns:

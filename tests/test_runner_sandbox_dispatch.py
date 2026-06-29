@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import anyio
 import pytest
@@ -21,6 +21,7 @@ from letta_evals.models import (
     Sample,
     SampleResult,
     Timing,
+    TurnTokenData,
 )
 from letta_evals.runner import Runner, run_suite
 from letta_evals.sandbox.base import ExecResult
@@ -30,6 +31,7 @@ from letta_evals.sandbox.dispatch import run_sample_in_sandbox
 def _canned_result(sample_id) -> SampleResult:
     return SampleResult(
         sample_id=sample_id,
+        agent_id="agent-sandbox-1",
         trajectory=[[]],
         submissions={"acc": "hi"},
         grades={"acc": GradeResult(score=1.0, rationale="canned")},
@@ -133,7 +135,6 @@ class TestRunSampleInSandbox:
             runner.suite,
             sample,
             "openai/gpt-a",
-            False,
             0.0,
         )
 
@@ -161,7 +162,7 @@ class TestRunSampleInSandbox:
         monkeypatch.setattr("letta_evals.sandbox.dispatch.ModalSandbox", lambda spec, session_id: stub)
 
         sample = Sample(id="s1", input="hi", ground_truth="hi")
-        anyio.run(run_sample_in_sandbox, runner.suite, sample, "openai/gpt-a", False, 0.0)
+        anyio.run(run_sample_in_sandbox, runner.suite, sample, "openai/gpt-a", 0.0)
 
         cmd = _sandbox_cli_command(stub)
         assert f"/mnt/suite/{suite_filename}" in cmd
@@ -222,7 +223,7 @@ sandbox:
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)  # absent -> skipped
 
         sample = Sample(id="s1", input="hi", ground_truth="hi")
-        anyio.run(run_sample_in_sandbox, runner.suite, sample, "openai/gpt-a", False, 0.0)
+        anyio.run(run_sample_in_sandbox, runner.suite, sample, "openai/gpt-a", 0.0)
 
         cli_execs = [c for c in stub.execs if "--sample" in c[0]]
         assert cli_execs, stub.execs
@@ -244,7 +245,6 @@ sandbox:
             runner.suite,
             sample,
             "openai/gpt-a",
-            False,
             0.0,
         )
 
@@ -266,7 +266,6 @@ sandbox:
             runner.suite,
             sample,
             "openai/gpt-a",
-            False,
             0.0,
         )
 
@@ -294,7 +293,6 @@ sandbox:
             runner.suite,
             sample,
             "openai/gpt-a",
-            False,
             0.0,
         )
 
@@ -321,7 +319,6 @@ sandbox:
             runner.suite,
             sample,
             "openai/gpt-a",
-            False,
             0.0,
         )
 
@@ -340,7 +337,7 @@ sandbox:
         # called instead.
         called = {}
 
-        async def fake_in_sandbox(suite, sample, model_handle, return_token_data, t_sample_start):
+        async def fake_in_sandbox(suite, sample, model_handle, t_sample_start):
             called["suite"] = suite
             called["sample"] = sample
             called["model_handle"] = model_handle
@@ -355,3 +352,22 @@ sandbox:
         assert called["sample"].id == "s1"
         assert called["model_handle"] == "openai/gpt-a"
         assert result.grades["acc"].score == 1.0
+
+    def test_run_sample_fetches_token_data_on_host_after_sandbox(self, tmp_path, monkeypatch):
+        """Sandbox result JSON stays small; host fetches token data from returned agent_id."""
+        _write_suite_yaml(tmp_path)
+        runner = _make_runner_with_sandbox(tmp_path)
+        token_data = [TurnTokenData(role="assistant", output_ids=[1, 2, 3])]
+
+        async def fake_in_sandbox(suite, sample, model_handle, t_sample_start):
+            return _canned_result(sample.id).model_copy(update={"token_data": None})
+
+        fetch_token_data = AsyncMock(return_value=token_data)
+        monkeypatch.setattr("letta_evals.runner.run_sample_in_sandbox", fake_in_sandbox)
+        monkeypatch.setattr("letta_evals.runner.fetch_token_data", fetch_token_data)
+
+        sample = Sample(id="s1", input="hi", ground_truth="hi")
+        result = anyio.run(runner.run_sample, sample, "openai/gpt-a", True)
+
+        fetch_token_data.assert_awaited_once_with(runner.client, "agent-sandbox-1")
+        assert result.token_data == token_data
