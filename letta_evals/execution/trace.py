@@ -1,7 +1,7 @@
-"""Execution artifact extraction helpers.
+"""Execution trace extraction helpers.
 
 These helpers turn raw execution output (stream events) and server-side
-agent state keyed by ``agent_id`` into the artifacts persisted on
+agent state keyed by ``agent_id`` into the trace fields persisted on
 ``SampleResult``. They intentionally live outside targets so in-process and
 sandboxed runs share the same fetch path.
 """

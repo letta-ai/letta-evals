@@ -72,7 +72,7 @@ class TargetResult(BaseModel):
     """Minimal result from invoking a target.
 
     Targets own execution and return the live ``agent_id`` plus execution
-    metadata. Server-side artifacts such as trajectory, agent state, and token
+    metadata. Server-side trace fields such as trajectory, agent state, and token
     data are fetched by ``Runner`` and persisted on ``SampleResult``.
     """
 
@@ -83,8 +83,8 @@ class TargetResult(BaseModel):
     )
 
 
-class RunArtifacts(TargetResult):
-    """Target execution metadata plus fetched artifacts needed for grading."""
+class TargetTrace(TargetResult):
+    """Target execution metadata plus fetched trace fields needed for grading."""
 
     agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
     model_handle: Optional[str] = Field(
@@ -211,10 +211,10 @@ class RewardOutput(BaseModel):
 # up by ``sample_id``.
 
 
-class SampleResult(RunArtifacts):
+class SampleResult(TargetTrace):
     """Result for a single sample evaluation.
 
-    Extends ``RunArtifacts`` (target execution metadata plus fetched artifacts)
+    Extends ``TargetTrace`` (target execution metadata plus fetched trace fields)
     with grading, reward, usage, timing, and error. ``agent_id`` and
     ``model_handle`` are optional because a sample can fail before the target
     produces either.
@@ -241,7 +241,7 @@ class SampleResult(RunArtifacts):
     def _serialize_identity_first(self, handler):
         """Surface sample_id and agent_id first in serialized output.
 
-        Inheritance puts RunArtifacts' fields ahead of these, so reorder on
+        Inheritance puts TargetTrace's fields ahead of these, so reorder on
         dump to keep <model>.jsonl rows readable (identity leads each line).
         """
         data = handler(self)
