@@ -382,7 +382,7 @@ class Runner:
                         self.suite, sample, model_handle, t_sample_start
                     )
                     agent_id = result.agent_id
-                    if return_token_data and agent_id and result.token_data is None:
+                    if return_token_data and agent_id:
                         result = result.model_copy(update={"token_data": await fetch_token_data(self.client, agent_id)})
                     # Fire post-completion callbacks based on the final result —
                     # mid-sample events (grading_started, token streaming) are

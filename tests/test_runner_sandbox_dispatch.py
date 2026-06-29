@@ -354,13 +354,17 @@ sandbox:
         assert result.grades["acc"].score == 1.0
 
     def test_run_sample_fetches_token_data_on_host_after_sandbox(self, tmp_path, monkeypatch):
-        """Sandbox result JSON stays small; host fetches token data from returned agent_id."""
+        """Host fetches sandbox token data from returned agent_id when requested."""
         _write_suite_yaml(tmp_path)
         runner = _make_runner_with_sandbox(tmp_path)
         token_data = [TurnTokenData(role="assistant", output_ids=[1, 2, 3])]
 
         async def fake_in_sandbox(suite, sample, model_handle, t_sample_start):
-            return _canned_result(sample.id).model_copy(update={"token_data": None})
+            # The intended sandbox contract is token_data=None because the
+            # in-sandbox CLI is not asked to fetch tokens. Use [] here to lock
+            # in the host as authoritative even if a future/older sandbox path
+            # serializes an empty token array.
+            return _canned_result(sample.id).model_copy(update={"token_data": []})
 
         fetch_token_data = AsyncMock(return_value=token_data)
         monkeypatch.setattr("letta_evals.runner.run_sample_in_sandbox", fake_in_sandbox)
