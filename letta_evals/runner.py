@@ -472,13 +472,18 @@ class Runner:
 
                 result = SampleResult(
                     sample_id=sample_id,
-                    **artifacts,
+                    agent_id=agent_id,
+                    model_handle=model_handle,
+                    trajectory=trajectory,
                     submissions=submissions_dict,
                     grades=grades_dict,
                     reward=reward,
                     usage=usage,
                     timing=timing,
                     error=error,
+                    agent_usage=agent_usage,
+                    agent_state=agent_state,
+                    token_data=token_data,
                 )
                 if self.progress_callback:
                     if result.error is not None:
