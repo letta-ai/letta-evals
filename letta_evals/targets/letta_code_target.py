@@ -9,13 +9,9 @@ from typing import Optional
 import anyio
 from letta_client import AsyncLetta
 
-from letta_evals.models import Sample, TargetResult, TurnTokenData
+from letta_evals.execution.artifacts import extract_usage_stats
+from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.errors import TargetError
-from letta_evals.targets.letta_code_results import (
-    extract_usage_stats,
-    fetch_token_data,
-    fetch_trajectory,
-)
 from letta_evals.utils import load_object
 from letta_evals.visualization.base import ProgressCallback
 
@@ -173,10 +169,13 @@ class LettaCodeTarget:
         sample: Sample,
         progress_callback: Optional[ProgressCallback] = None,
         project_id: Optional[str] = None,
-        retrieve_agent_state: bool = False,
-        return_token_data: bool = False,
     ) -> TargetResult:
-        """Run the letta CLI command on a sample."""
+        """Run the letta CLI command on a sample and return execution metadata.
+
+        The target deliberately does not fetch server-side artifacts such as
+        messages, agent state, or token data. ``Runner`` owns those fetches so
+        in-process and sandboxed runs share the same artifact assembly path.
+        """
         attempt = 0
         last_error = None
 
@@ -342,29 +341,13 @@ class LettaCodeTarget:
                 if not agent_id:
                     raise RuntimeError("No agent_id found in letta stream output")
 
-                # retrieve the full message history using the agent_id
-                trajectory = await fetch_trajectory(self.client, agent_id)
-
                 # Extract usage from the final stream result event (best-effort).
                 usage_stats = extract_usage_stats(events)
 
-                # Fetch token-level data if requested (for RL training)
-                token_data: Optional[list[TurnTokenData]] = None
-                if return_token_data and agent_id:
-                    token_data = await fetch_token_data(self.client, agent_id)
-
-                # Retrieve agent state if needed (e.g., for memory block extractors)
-                agent_state = None
-                if retrieve_agent_state:
-                    agent_state = await self.client.agents.retrieve(agent_id=agent_id, include=["agent.blocks"])
-
                 return TargetResult(
-                    trajectory=trajectory,
                     agent_id=agent_id,
                     model_handle=self.model_handle,
                     agent_usage=usage_stats,
-                    agent_state=agent_state,
-                    token_data=token_data,
                 )
 
             except Exception as e:
@@ -375,26 +358,14 @@ class LettaCodeTarget:
                     timeout_hint = f"Timed out after {self.timeout}s" if isinstance(e, TimeoutError) else ""
                     msg = str(e) or timeout_hint or type(e).__name__
                     err_agent_id = agent_id or factory_agent_id
-                    # Best-effort: surface whatever the agent produced before failing —
-                    # usage from the stream so far (no agent_id needed), plus the partial
-                    # trajectory and token data. agent_id is usually known even on timeout
-                    # (captured from the stream init event).
+                    # Best-effort: surface usage from the stream so far. Any
+                    # server-side artifacts (partial trajectory/token data) are
+                    # fetched by Runner from the agent_id when available.
                     partial_usage = extract_usage_stats(events)
-                    partial_trajectory = []
-                    partial_token_data: Optional[list[TurnTokenData]] = None
-                    if err_agent_id:
-                        try:
-                            partial_trajectory = await fetch_trajectory(self.client, err_agent_id)
-                            if return_token_data:
-                                partial_token_data = await fetch_token_data(self.client, err_agent_id)
-                        except Exception as fetch_err:
-                            logger.warning(f"Could not fetch partial trajectory for agent {err_agent_id}: {fetch_err}")
                     raise TargetError(
                         msg,
                         agent_id=err_agent_id,
-                        partial_trajectory=partial_trajectory,
                         agent_usage=partial_usage,
-                        token_data=partial_token_data,
                     ) from e
 
                 backoff_time = 2 ** (attempt - 1)

@@ -1,11 +1,11 @@
-"""Unit tests for letta-code token-data fetching."""
+"""Unit tests for execution artifact token-data fetching."""
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
 
-from letta_evals.targets.letta_code_results import fetch_token_data
+from letta_evals.execution.artifacts import fetch_token_data
 
 
 class _FakeRuns:

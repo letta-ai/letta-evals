@@ -4,10 +4,12 @@ from typing import Any, List, Optional
 class TargetError(Exception):
     """Exception raised by targets that carries agent context.
 
-    Also carries any partial trajectory, usage, and token data recovered from
-    the server (or the agent's own stream) before the failure, so the runner
-    can surface whatever the agent produced on the error path instead of
-    discarding it.
+    Carries the agent id plus usage recovered from the target stream before
+    failure. The runner uses the agent id to fetch any partial server-side
+    artifacts (trajectory/token data) so artifact fetching stays centralized.
+
+    ``partial_trajectory`` and ``token_data`` are retained for compatibility
+    with older/custom targets, but LettaCodeTarget no longer populates them.
     """
 
     def __init__(

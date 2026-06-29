@@ -12,6 +12,7 @@ from letta_client import AsyncLetta
 from rich.console import Console
 
 from letta_evals.datasets.loader import load_dataset
+from letta_evals.execution.artifacts import fetch_agent_state, fetch_token_data, fetch_trajectory
 from letta_evals.execution.grading import detect_errors, grade_sample, validate_rubric_vars
 from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
@@ -23,13 +24,13 @@ from letta_evals.models import (
     ModelJudgeGraderSpec,
     ModelRun,
     ModelSummary,
+    RunArtifacts,
     RunnerResult,
     Sample,
     SampleId,
     SampleResult,
     SuiteSpec,
     Summary,
-    TargetResult,
     Timing,
     ToolGraderSpec,
     Usage,
@@ -276,14 +277,19 @@ class Runner:
                     cache[result.sample_id][model_id] = result
         return cache
 
-    async def _get_or_run_trajectory(
+    async def _get_or_run_artifacts(
         self,
         sample: Sample,
         model_handle: Optional[str],
         retrieve_agent_state: bool = False,
         return_token_data: bool = False,
-    ) -> TargetResult:
-        """Return the target run for this sample, served from cache when available."""
+    ) -> RunArtifacts:
+        """Return target metadata plus fetched artifacts for this sample.
+
+        Targets only execute and return ``agent_id``. Runner owns all
+        server-side artifact fetches so in-process and sandboxed runs share
+        the same trajectory/state/token-data extraction layer.
+        """
         sample_id = sample.id
 
         if self.cached_results:
@@ -304,15 +310,38 @@ class Runner:
                     )
                 # cached_result is a SampleResult (a TargetResult subclass); the
                 # requested handle wins over whatever the cache recorded.
-                return cached_result.model_copy(update={"model_handle": model_handle or DEFAULT_MODEL_ID})
+                result = cached_result.model_copy(update={"model_handle": model_handle or DEFAULT_MODEL_ID})
+                agent_state = result.agent_state
+                if retrieve_agent_state and result.agent_id and agent_state is None:
+                    agent_state = await fetch_agent_state(self.client, result.agent_id)
+                token_data = result.token_data
+                if return_token_data and result.agent_id and token_data is None:
+                    token_data = await fetch_token_data(self.client, result.agent_id)
+                return RunArtifacts(
+                    trajectory=result.trajectory,
+                    agent_id=result.agent_id,
+                    model_handle=result.model_handle,
+                    agent_usage=result.agent_usage,
+                    agent_state=agent_state,
+                    token_data=token_data,
+                )
 
         target = self._create_letta_code_target(model_handle)
-        return await target.run(
+        target_result = await target.run(
             sample,
             progress_callback=self.progress_callback,
             project_id=self.project_id,
-            retrieve_agent_state=retrieve_agent_state,
-            return_token_data=return_token_data,
+        )
+        agent_id = target_result.agent_id
+        agent_state = None
+        token_data = None
+        return RunArtifacts(
+            trajectory=await fetch_trajectory(self.client, agent_id),
+            agent_id=agent_id,
+            model_handle=target_result.model_handle,
+            agent_usage=target_result.agent_usage,
+            agent_state=await fetch_agent_state(self.client, agent_id) if retrieve_agent_state else agent_state,
+            token_data=await fetch_token_data(self.client, agent_id) if return_token_data else token_data,
         )
 
     # ── per-sample driver ──
@@ -336,9 +365,14 @@ class Runner:
                     await self.progress_callback.sample_started(sample_id, model_handle=model_handle)
 
                 if self.suite.sandbox is not None:
-                    result = await run_sample_in_sandbox(
-                        self.suite, sample, model_handle, return_token_data, t_sample_start
-                    )
+                    result = await run_sample_in_sandbox(self.suite, sample, model_handle, t_sample_start)
+                    agent_id = result.agent_id
+                    # The in-sandbox Runner fetches only the artifacts needed
+                    # to grade/build SampleResult. Token arrays intentionally
+                    # stay out of result.json; the host Runner fetches them
+                    # from server-side run metadata after the sandbox returns.
+                    if return_token_data and agent_id:
+                        result = result.model_copy(update={"token_data": await fetch_token_data(self.client, agent_id)})
                     # Fire post-completion callbacks based on the final result —
                     # mid-sample events (grading_started, token streaming) are
                     # not emitted in v1 because the host only sees the final
@@ -352,18 +386,18 @@ class Runner:
 
                 phase = ErrorCategory.TARGET
                 retrieve_agent_state = self._requires_agent_state()
-                target_result = await self._get_or_run_trajectory(
+                artifacts = await self._get_or_run_artifacts(
                     sample,
                     model_handle,
                     retrieve_agent_state=retrieve_agent_state,
                     return_token_data=return_token_data,
                 )
-                trajectory = target_result.trajectory
-                agent_id = target_result.agent_id
-                model_handle = target_result.model_handle
-                agent_usage = target_result.agent_usage
-                agent_state = target_result.agent_state
-                token_data = target_result.token_data
+                trajectory = artifacts.trajectory
+                agent_id = artifacts.agent_id
+                model_handle = artifacts.model_handle
+                agent_usage = artifacts.agent_usage
+                agent_state = artifacts.agent_state
+                token_data = artifacts.token_data
 
                 cost = calculate_cost_from_agent_usage(model_handle, agent_usage) if model_handle else None
                 prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
@@ -457,15 +491,22 @@ class Runner:
                 return result
             except Exception as e:
                 # Always surface whatever trajectory we have, without grading it.
-                # A target raises before the runner assigns trajectory/usage/
-                # token_data, so a target error carries its own best-effort partials
-                # on the exception; a grading/reward error happens after a successful
-                # target, so those values are already locals.
+                # A target can raise before the runner assigns trajectory/token
+                # data, so use its agent_id to fetch best-effort partial
+                # artifacts here. A grading/reward error happens after a
+                # successful target, so those values are already locals.
                 if isinstance(e, TargetError):
                     agent_id = e.agent_id or agent_id
                     agent_usage = e.agent_usage or agent_usage
                     partial_trajectory = e.partial_trajectory
+                    if agent_id:
+                        try:
+                            partial_trajectory = await fetch_trajectory(self.client, agent_id)
+                        except Exception as fetch_err:
+                            logger.warning(f"Could not fetch partial trajectory for agent {agent_id}: {fetch_err}")
                     partial_token_data = e.token_data
+                    if return_token_data and agent_id:
+                        partial_token_data = await fetch_token_data(self.client, agent_id)
                 else:
                     partial_trajectory = locals().get("trajectory") or []
                     partial_token_data = locals().get("token_data")

@@ -94,7 +94,6 @@ async def run_sample_in_sandbox(
     suite: SuiteSpec,
     sample: Sample,
     model_handle: Optional[str],
-    return_token_data: bool,
     t_sample_start: float,
 ) -> SampleResult:
     """Dispatch a single sample to a fresh Modal sandbox.

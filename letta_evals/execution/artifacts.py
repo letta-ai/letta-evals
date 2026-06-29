@@ -1,10 +1,9 @@
-"""Post-run result extraction for the letta-code target.
+"""Execution artifact extraction helpers.
 
-These helpers turn what a letta-code run leaves behind — the CLI's final stream
-event and the agent's server-side messages/runs — into the pieces a
-``TargetResult`` needs. They depend only on the Letta client or a list of stream
-events, not on target configuration, so they live here as free functions rather
-than as methods on ``LettaCodeTarget``.
+These helpers turn raw execution output (stream events) and server-side
+agent state keyed by ``agent_id`` into the artifacts persisted on
+``SampleResult``. They intentionally live outside targets so in-process and
+sandboxed runs share the same fetch path.
 """
 
 import logging
@@ -73,8 +72,8 @@ def _run_sort_key(run_summary: Any) -> tuple[str, str]:
 async def fetch_token_data(client: Any, agent_id: str) -> list[TurnTokenData]:
     """Fetch token-level data (IDs + logprobs) for a letta code agent.
 
-    Retrieves messages with ``return_token_ids=True`` to get
-    ``output_ids`` and ``output_token_logprobs`` per message.
+    Reads token IDs and logprobs from ``run.metadata.result.turns``, which is
+    populated by Letta's SGLang-native adapter for token-aware model runs.
 
     Stops at the first half-written turn — ``output_ids`` present but a
     shorter ``output_token_logprobs`` — returning only the clean prefix, so a
@@ -130,3 +129,8 @@ async def fetch_token_data(client: Any, agent_id: str) -> list[TurnTokenData]:
     except Exception as e:
         logger.warning(f"Could not fetch token data for agent {agent_id}: {e}")
     return token_data
+
+
+async def fetch_agent_state(client: Any, agent_id: str) -> Any:
+    """Fetch the final agent state, including memory blocks, for graders that need it."""
+    return await client.agents.retrieve(agent_id=agent_id, include=["agent.blocks"])
