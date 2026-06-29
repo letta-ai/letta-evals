@@ -1,4 +1,4 @@
-"""Unit tests for letta-code token-data fetching."""
+"""Unit tests for execution artifact token-data fetching."""
 
 from datetime import datetime, timezone
 from types import SimpleNamespace

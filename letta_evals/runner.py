@@ -4,7 +4,7 @@ import os
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TypedDict
 
 import anyio
 import yaml
@@ -19,7 +19,9 @@ from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
 from letta_evals.metrics import summarize_model, summarize_runs
 from letta_evals.models import (
+    AgentState,
     Error,
+    LettaMessageUnion,
     MetricRewardSpec,
     ModelJudgeGraderSpec,
     ModelRun,
@@ -32,6 +34,7 @@ from letta_evals.models import (
     Summary,
     Timing,
     ToolGraderSpec,
+    TurnTokenData,
     Usage,
 )
 from letta_evals.pricing import calculate_cost_from_agent_usage
@@ -52,6 +55,17 @@ logger = logging.getLogger(__name__)
 
 # Sentinel model identifier used when a suite has no model_handles.
 DEFAULT_MODEL_ID = "default"
+
+
+class RunArtifacts(TypedDict):
+    """Target execution metadata plus fetched artifacts needed for grading."""
+
+    trajectory: List[List[LettaMessageUnion]]
+    agent_id: Optional[str]
+    model_handle: Optional[str]
+    agent_usage: Optional[List[dict]]
+    agent_state: Optional[AgentState]
+    token_data: Optional[List[TurnTokenData]]
 
 
 def _model_id_for(model_handle: Optional[str]) -> str:
@@ -282,7 +296,7 @@ class Runner:
         model_handle: Optional[str],
         retrieve_agent_state: bool = False,
         return_token_data: bool = False,
-    ) -> dict:
+    ) -> RunArtifacts:
         """Return target metadata plus fetched artifacts for this sample.
 
         Targets only execute and return ``agent_id``. Runner owns all

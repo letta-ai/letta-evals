@@ -76,7 +76,7 @@ class TargetResult(BaseModel):
     data are fetched by ``Runner`` and persisted on ``SampleResult``.
     """
 
-    agent_id: str = Field(description="ID of the agent that generated this trajectory")
+    agent_id: str = Field(description="ID of the agent created or used by the target run")
     model_handle: str = Field(description="Model handle used for this target")
     agent_usage: Optional[List[dict]] = Field(
         default=None, description="Usage statistics emitted by the agent during the run"

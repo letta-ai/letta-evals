@@ -72,8 +72,8 @@ def _run_sort_key(run_summary: Any) -> tuple[str, str]:
 async def fetch_token_data(client: Any, agent_id: str) -> list[TurnTokenData]:
     """Fetch token-level data (IDs + logprobs) for a letta code agent.
 
-    Retrieves messages with ``return_token_ids=True`` to get
-    ``output_ids`` and ``output_token_logprobs`` per message.
+    Reads token IDs and logprobs from ``run.metadata.result.turns``, which is
+    populated by Letta's SGLang-native adapter for token-aware model runs.
 
     Stops at the first half-written turn — ``output_ids`` present but a
     shorter ``output_token_logprobs`` — returning only the clean prefix, so a
