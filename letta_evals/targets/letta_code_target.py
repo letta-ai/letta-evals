@@ -9,7 +9,7 @@ from typing import Optional
 import anyio
 from letta_client import AsyncLetta
 
-from letta_evals.execution.artifacts import extract_usage_stats
+from letta_evals.execution.trace import extract_usage_stats
 from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.errors import TargetError
 from letta_evals.utils import load_object
@@ -172,9 +172,9 @@ class LettaCodeTarget:
     ) -> TargetResult:
         """Run the letta CLI command on a sample and return execution metadata.
 
-        The target deliberately does not fetch server-side artifacts such as
+        The target deliberately does not fetch server-side trace fields such as
         messages, agent state, or token data. ``Runner`` owns those fetches so
-        in-process and sandboxed runs share the same artifact assembly path.
+        in-process and sandboxed runs share the same trace assembly path.
         """
         attempt = 0
         last_error = None
@@ -359,7 +359,7 @@ class LettaCodeTarget:
                     msg = str(e) or timeout_hint or type(e).__name__
                     err_agent_id = agent_id or factory_agent_id
                     # Best-effort: surface usage from the stream so far. Any
-                    # server-side artifacts (partial trajectory/token data) are
+                    # server-side trace fields (partial trajectory/token data) are
                     # fetched by Runner from the agent_id when available.
                     partial_usage = extract_usage_stats(events)
                     raise TargetError(

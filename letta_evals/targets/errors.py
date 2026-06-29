@@ -6,7 +6,7 @@ class TargetError(Exception):
 
     Carries the agent id plus usage recovered from the target stream before
     failure. The runner uses the agent id to fetch any partial server-side
-    artifacts (trajectory/token data) so artifact fetching stays centralized.
+    trace fields (trajectory/token data) so trace fetching stays centralized.
 
     ``partial_trajectory`` and ``token_data`` are retained for compatibility
     with older/custom targets, but LettaCodeTarget no longer populates them.

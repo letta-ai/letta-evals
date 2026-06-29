@@ -4,7 +4,7 @@
 Three contracts:
 
   T0.1: ``Runner.run_sample(return_token_data=True)`` fetches token data from
-        server-side artifacts after the target returns an ``agent_id`` and
+        server-side trace metadata after the target returns an ``agent_id`` and
         surfaces it on ``SampleResult.token_data``.
   T0.2: When at least one grader's extractor needs ``agent_state``,
         ``Runner.run_sample`` retrieves it from the target and surfaces it on
@@ -115,7 +115,7 @@ def _make_runner(grader: _FakeGrader, target: MagicMock) -> Runner:
     runner.output_path = None
     runner.project_id = None
 
-    # Patch _create_letta_code_target so _get_or_run_trajectory returns our canned target.
+    # Patch _create_letta_code_target so _get_or_run_target_trace returns our canned target.
     runner._create_letta_code_target = lambda model_handle=None: target  # type: ignore[method-assign]
     return runner
 
@@ -333,7 +333,7 @@ async def test_t0_2_agent_state_skipped_when_no_grader_needs_it(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_t0_2_agent_state_and_token_data_are_fetched_after_one_target_run(monkeypatch):
-    """Both flags True → one target.run plus Runner-owned artifact fetches.
+    """Both flags True → one target.run plus Runner-owned trace fetches.
 
     The whole point of the plumbing: a single ``run_sample`` call returns
     trajectory, agent_state, and token_data together, instead of forcing

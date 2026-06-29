@@ -12,8 +12,8 @@ from letta_client import AsyncLetta
 from rich.console import Console
 
 from letta_evals.datasets.loader import load_dataset
-from letta_evals.execution.artifacts import fetch_agent_state, fetch_token_data, fetch_trajectory
 from letta_evals.execution.grading import detect_errors, grade_sample, validate_rubric_vars
+from letta_evals.execution.trace import fetch_agent_state, fetch_token_data, fetch_trajectory
 from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
@@ -24,13 +24,13 @@ from letta_evals.models import (
     ModelJudgeGraderSpec,
     ModelRun,
     ModelSummary,
-    RunArtifacts,
     RunnerResult,
     Sample,
     SampleId,
     SampleResult,
     SuiteSpec,
     Summary,
+    TargetTrace,
     Timing,
     ToolGraderSpec,
     Usage,
@@ -277,17 +277,17 @@ class Runner:
                     cache[result.sample_id][model_id] = result
         return cache
 
-    async def _get_or_run_artifacts(
+    async def _get_or_run_target_trace(
         self,
         sample: Sample,
         model_handle: Optional[str],
         retrieve_agent_state: bool = False,
         return_token_data: bool = False,
-    ) -> RunArtifacts:
-        """Return target metadata plus fetched artifacts for this sample.
+    ) -> TargetTrace:
+        """Return target metadata plus fetched trace fields for this sample.
 
         Targets only execute and return ``agent_id``. Runner owns all
-        server-side artifact fetches so in-process and sandboxed runs share
+        server-side trace fetches so in-process and sandboxed runs share
         the same trajectory/state/token-data extraction layer.
         """
         sample_id = sample.id
@@ -317,7 +317,7 @@ class Runner:
                 token_data = result.token_data
                 if return_token_data and result.agent_id and token_data is None:
                     token_data = await fetch_token_data(self.client, result.agent_id)
-                return RunArtifacts(
+                return TargetTrace(
                     trajectory=result.trajectory,
                     agent_id=result.agent_id,
                     model_handle=result.model_handle,
@@ -335,7 +335,7 @@ class Runner:
         agent_id = target_result.agent_id
         agent_state = None
         token_data = None
-        return RunArtifacts(
+        return TargetTrace(
             trajectory=await fetch_trajectory(self.client, agent_id),
             agent_id=agent_id,
             model_handle=target_result.model_handle,
@@ -367,7 +367,7 @@ class Runner:
                 if self.suite.sandbox is not None:
                     result = await run_sample_in_sandbox(self.suite, sample, model_handle, t_sample_start)
                     agent_id = result.agent_id
-                    # The in-sandbox Runner fetches only the artifacts needed
+                    # The in-sandbox Runner fetches only the trace fields needed
                     # to grade/build SampleResult. Token arrays intentionally
                     # stay out of result.json; the host Runner fetches them
                     # from server-side run metadata after the sandbox returns.
@@ -386,18 +386,18 @@ class Runner:
 
                 phase = ErrorCategory.TARGET
                 retrieve_agent_state = self._requires_agent_state()
-                artifacts = await self._get_or_run_artifacts(
+                target_trace = await self._get_or_run_target_trace(
                     sample,
                     model_handle,
                     retrieve_agent_state=retrieve_agent_state,
                     return_token_data=return_token_data,
                 )
-                trajectory = artifacts.trajectory
-                agent_id = artifacts.agent_id
-                model_handle = artifacts.model_handle
-                agent_usage = artifacts.agent_usage
-                agent_state = artifacts.agent_state
-                token_data = artifacts.token_data
+                trajectory = target_trace.trajectory
+                agent_id = target_trace.agent_id
+                model_handle = target_trace.model_handle
+                agent_usage = target_trace.agent_usage
+                agent_state = target_trace.agent_state
+                token_data = target_trace.token_data
 
                 cost = calculate_cost_from_agent_usage(model_handle, agent_usage) if model_handle else None
                 prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
@@ -493,7 +493,7 @@ class Runner:
                 # Always surface whatever trajectory we have, without grading it.
                 # A target can raise before the runner assigns trajectory/token
                 # data, so use its agent_id to fetch best-effort partial
-                # artifacts here. A grading/reward error happens after a
+                # trace fields here. A grading/reward error happens after a
                 # successful target, so those values are already locals.
                 if isinstance(e, TargetError):
                     agent_id = e.agent_id or agent_id
