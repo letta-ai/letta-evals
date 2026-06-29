@@ -365,9 +365,7 @@ class Runner:
                     await self.progress_callback.sample_started(sample_id, model_handle=model_handle)
 
                 if self.suite.sandbox is not None:
-                    result = await run_sample_in_sandbox(
-                        self.suite, sample, model_handle, t_sample_start
-                    )
+                    result = await run_sample_in_sandbox(self.suite, sample, model_handle, t_sample_start)
                     agent_id = result.agent_id
                     # The in-sandbox Runner fetches only the artifacts needed
                     # to grade/build SampleResult. Token arrays intentionally
