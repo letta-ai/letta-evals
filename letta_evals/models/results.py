@@ -7,7 +7,7 @@ per-sample primitives (Usage, Timing, Error) plus their aggregate companions
 co-located), and the per-sample SampleResult written to <model>.jsonl.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, TypedDict, Union
 
 from letta_client.types import AgentState, ToolReturnMessage
 from letta_client.types.agents import (
@@ -81,6 +81,17 @@ class TargetResult(BaseModel):
     agent_usage: Optional[List[dict]] = Field(
         default=None, description="Usage statistics emitted by the agent during the run"
     )
+
+
+class RunArtifacts(TypedDict):
+    """Target execution metadata plus fetched artifacts needed for grading."""
+
+    trajectory: List[List[LettaMessageUnion]]
+    agent_id: Optional[str]
+    model_handle: Optional[str]
+    agent_usage: Optional[List[dict]]
+    agent_state: Optional[AgentState]
+    token_data: Optional[List[TurnTokenData]]
 
 
 class PerTurnGrade(BaseModel):
