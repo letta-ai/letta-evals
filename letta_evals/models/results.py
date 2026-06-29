@@ -7,7 +7,7 @@ per-sample primitives (Usage, Timing, Error) plus their aggregate companions
 co-located), and the per-sample SampleResult written to <model>.jsonl.
 """
 
-from typing import Any, Dict, List, Optional, TypedDict, Union
+from typing import Any, Dict, List, Optional, Union
 
 from letta_client.types import AgentState, ToolReturnMessage
 from letta_client.types.agents import (
@@ -83,15 +83,29 @@ class TargetResult(BaseModel):
     )
 
 
-class RunArtifacts(TypedDict):
+class RunArtifacts(TargetResult):
     """Target execution metadata plus fetched artifacts needed for grading."""
 
-    trajectory: List[List[LettaMessageUnion]]
-    agent_id: Optional[str]
-    model_handle: Optional[str]
-    agent_usage: Optional[List[dict]]
-    agent_state: Optional[AgentState]
-    token_data: Optional[List[TurnTokenData]]
+    agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
+    model_handle: Optional[str] = Field(
+        default=None,
+        description="Model handle used for this run",
+    )
+    trajectory: List[List[LettaMessageUnion]] = Field(
+        default_factory=list,
+        description="List of conversation turns, each containing Letta messages",
+    )
+    agent_state: Optional[AgentState] = Field(
+        default=None, description="Agent state after running the target (includes memory blocks)"
+    )
+    token_data: Optional[List[TurnTokenData]] = Field(
+        default=None,
+        description=(
+            "Token-level data (IDs + logprobs) for each message across all turns. "
+            "Populated by Runner.run_sample(return_token_data=True) after a live "
+            "target or sandbox run."
+        ),
+    )
 
 
 class PerTurnGrade(BaseModel):
@@ -197,36 +211,16 @@ class RewardOutput(BaseModel):
 # up by ``sample_id``.
 
 
-class SampleResult(TargetResult):
+class SampleResult(RunArtifacts):
     """Result for a single sample evaluation.
 
-    Extends ``TargetResult`` (the target execution metadata) with fetched
-    artifacts, grading, reward, usage, timing, and error. ``agent_id`` and
-    ``model_handle`` are relaxed to optional here because a sample can fail
-    before the target produces either.
+    Extends ``RunArtifacts`` (target execution metadata plus fetched artifacts)
+    with grading, reward, usage, timing, and error. ``agent_id`` and
+    ``model_handle`` are optional because a sample can fail before the target
+    produces either.
     """
 
     sample_id: SampleId = Field(description="ID of the sample (look up the full Sample in suite.json)")
-    agent_id: Optional[str] = Field(default=None, description="ID of the agent that generated this trajectory")
-    model_handle: Optional[str] = Field(
-        default=None,
-        description="Model handle used for this sample (also implied by the output file path)",
-    )
-    trajectory: List[List[LettaMessageUnion]] = Field(
-        default_factory=list,
-        description="List of conversation turns, each containing Letta messages",
-    )
-    agent_state: Optional[AgentState] = Field(
-        default=None, description="Agent state after running the target (includes memory blocks)"
-    )
-    token_data: Optional[List[TurnTokenData]] = Field(
-        default=None,
-        description=(
-            "Token-level data (IDs + logprobs) for each message across all turns. "
-            "Populated by Runner.run_sample(return_token_data=True) after a live "
-            "target or sandbox run."
-        ),
-    )
     submissions: Dict[str, str] = Field(
         default_factory=dict,
         description="Per-grader extracted submissions (keyed by grader name)",
@@ -247,7 +241,7 @@ class SampleResult(TargetResult):
     def _serialize_identity_first(self, handler):
         """Surface sample_id and agent_id first in serialized output.
 
-        Inheritance puts TargetResult's fields ahead of these, so reorder on
+        Inheritance puts RunArtifacts' fields ahead of these, so reorder on
         dump to keep <model>.jsonl rows readable (identity leads each line).
         """
         data = handler(self)

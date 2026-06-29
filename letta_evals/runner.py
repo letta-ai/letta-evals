@@ -317,14 +317,14 @@ class Runner:
                 token_data = result.token_data
                 if return_token_data and result.agent_id and token_data is None:
                     token_data = await fetch_token_data(self.client, result.agent_id)
-                return {
-                    "trajectory": result.trajectory,
-                    "agent_id": result.agent_id,
-                    "model_handle": result.model_handle,
-                    "agent_usage": result.agent_usage,
-                    "agent_state": agent_state,
-                    "token_data": token_data,
-                }
+                return RunArtifacts(
+                    trajectory=result.trajectory,
+                    agent_id=result.agent_id,
+                    model_handle=result.model_handle,
+                    agent_usage=result.agent_usage,
+                    agent_state=agent_state,
+                    token_data=token_data,
+                )
 
         target = self._create_letta_code_target(model_handle)
         target_result = await target.run(
@@ -335,14 +335,14 @@ class Runner:
         agent_id = target_result.agent_id
         agent_state = None
         token_data = None
-        return {
-            "trajectory": await fetch_trajectory(self.client, agent_id),
-            "agent_id": agent_id,
-            "model_handle": target_result.model_handle,
-            "agent_usage": target_result.agent_usage,
-            "agent_state": await fetch_agent_state(self.client, agent_id) if retrieve_agent_state else agent_state,
-            "token_data": await fetch_token_data(self.client, agent_id) if return_token_data else token_data,
-        }
+        return RunArtifacts(
+            trajectory=await fetch_trajectory(self.client, agent_id),
+            agent_id=agent_id,
+            model_handle=target_result.model_handle,
+            agent_usage=target_result.agent_usage,
+            agent_state=await fetch_agent_state(self.client, agent_id) if retrieve_agent_state else agent_state,
+            token_data=await fetch_token_data(self.client, agent_id) if return_token_data else token_data,
+        )
 
     # ── per-sample driver ──
 
@@ -394,12 +394,12 @@ class Runner:
                     retrieve_agent_state=retrieve_agent_state,
                     return_token_data=return_token_data,
                 )
-                trajectory = artifacts["trajectory"]
-                agent_id = artifacts["agent_id"]
-                model_handle = artifacts["model_handle"]
-                agent_usage = artifacts["agent_usage"]
-                agent_state = artifacts["agent_state"]
-                token_data = artifacts["token_data"]
+                trajectory = artifacts.trajectory
+                agent_id = artifacts.agent_id
+                model_handle = artifacts.model_handle
+                agent_usage = artifacts.agent_usage
+                agent_state = artifacts.agent_state
+                token_data = artifacts.token_data
 
                 cost = calculate_cost_from_agent_usage(model_handle, agent_usage) if model_handle else None
                 prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
