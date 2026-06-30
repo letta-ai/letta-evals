@@ -132,6 +132,19 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.23.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.22.0...letta-evals-v0.23.0) (2026-06-30)
+
+
+### Features
+
+* **sandbox:** Pin letta-code version in Modal image ([#306](https://github.com/letta-ai/letta-evals/issues/306)) ([1bc4a36](https://github.com/letta-ai/letta-evals/commit/1bc4a36c8c97544782f39ab45d4f239246e450a4))
+
+
+### Refactors
+
+* **letta-code:** Fetch run artifacts from runner ([#303](https://github.com/letta-ai/letta-evals/issues/303)) ([2bb0124](https://github.com/letta-ai/letta-evals/commit/2bb0124876fbb82955d716a8a68cc7f1102f219f))
+* **letta-code:** Rename target artifacts to trace ([#305](https://github.com/letta-ai/letta-evals/issues/305)) ([642d5df](https://github.com/letta-ai/letta-evals/commit/642d5dffb7afce36a14d5f44193191467f9daa7b))
+
 ## [0.22.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.21.0...letta-evals-v0.22.0) (2026-06-26)
 
 
