@@ -70,7 +70,7 @@ The script will:
 - Each entry in `models` has `{ model, n_total, n_attempted, reward, per_metric, usage, timing, ... }` (multi-run also has `reward_std` and `per_metric_std`)
 
 4. Update leaderboard site
-- Add new models and any analysis / commentary to [updates.md](../leaderboard_site/src/_includes/updates.md).
-- In case of a new provider, add their logo to [leaderboard_site/src/icons](../leaderboard_site/src/icons).
+- Add new models and any analysis / commentary to [updates.md](updates.md).
+- In case of a new provider, add their logo to [leaderboard_site/src/icons](leaderboard_site/src/icons).
 
-Results will be added to the leaderboard YAML file and automatically updated on the website. To preview changes locally, see [README.md](../leaderboard_site/README.md) for instructions on running the leaderboard site.
+Results will be added to the leaderboard YAML file and automatically updated on the website. To preview changes locally, see [README.md](leaderboard_site/README.md) for instructions on running the leaderboard site.

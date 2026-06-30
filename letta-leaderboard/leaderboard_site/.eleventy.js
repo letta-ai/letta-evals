@@ -6,7 +6,7 @@ const MarkdownIt = require('markdown-it');
 module.exports = function(eleventyConfig) {
   // Load all leaderboard YAML files
   eleventyConfig.addGlobalData("leaderboards", function() {
-    const leaderboardDir = '../letta-leaderboard';
+    const leaderboardDir = '..';
     const leaderboards = {};
 
     // Find all leaderboard_*.yaml files
@@ -61,7 +61,7 @@ module.exports = function(eleventyConfig) {
 
   // Load benchmark names from each leaderboard file
   eleventyConfig.addGlobalData("benchmarkNames", function() {
-    const leaderboardDir = '../letta-leaderboard';
+    const leaderboardDir = '..';
     const benchmarkNames = {};
 
     // Find all leaderboard_*.yaml files
@@ -99,7 +99,7 @@ module.exports = function(eleventyConfig) {
 
   // Load metrics metadata from each leaderboard file
   eleventyConfig.addGlobalData("metricsMetadata", function() {
-    const leaderboardDir = '../letta-leaderboard';
+    const leaderboardDir = '..';
     const allMetrics = {};
 
     // Find all leaderboard_*.yaml files
@@ -135,7 +135,7 @@ module.exports = function(eleventyConfig) {
 
   // Load arrange_by configuration from each leaderboard file
   eleventyConfig.addGlobalData("arrangeByConfig", function() {
-    const leaderboardDir = '../letta-leaderboard';
+    const leaderboardDir = '..';
     const arrangeByConfig = {};
 
     // Find all leaderboard_*.yaml files
@@ -172,7 +172,7 @@ module.exports = function(eleventyConfig) {
 
   // Load the latest last_updated date from all leaderboard files
   eleventyConfig.addGlobalData("lastUpdated", function() {
-    const leaderboardDir = '../letta-leaderboard';
+    const leaderboardDir = '..';
     let latestDate = null;
 
     // Find all leaderboard_*.yaml files
@@ -210,7 +210,7 @@ module.exports = function(eleventyConfig) {
 
   // Load updates content from markdown file
   eleventyConfig.addGlobalData("updatesContent", function() {
-    const updatesPath = path.join(__dirname, '..', 'letta-leaderboard', 'updates.md');
+    const updatesPath = path.join(__dirname, '..', 'updates.md');
     if (fs.existsSync(updatesPath)) {
       const md = new MarkdownIt({
         html: true,
@@ -225,13 +225,13 @@ module.exports = function(eleventyConfig) {
 
   // Keep backward compatibility with single leaderboard
   eleventyConfig.addGlobalData("leaderboard", function() {
-    const fallbackPath = '../letta-leaderboard/leaderboard_results.yaml';
+    const fallbackPath = '../leaderboard_results.yaml';
     if (fs.existsSync(fallbackPath)) {
       const fileContents = fs.readFileSync(fallbackPath, 'utf8');
       return yaml.load(fileContents);
     }
     // If leaderboard_results.yaml doesn't exist, return the first benchmark from leaderboards
-    const leaderboardDir = '../letta-leaderboard';
+    const leaderboardDir = '..';
     const benchmarkFiles = [
       'leaderboard_filesystem.yaml',
       'leaderboard_core-memory-read.yaml',
