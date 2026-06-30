@@ -98,6 +98,34 @@ class TestRunSingleSampleHelper:
         revived = SampleResult.model_validate(data)
         assert revived.grades["acc"].rationale == "canned"
 
+    def test_single_sample_output_excludes_agent_state(self, tmp_path):
+        """The sandbox entrypoint consumes agent_state in-process for grading,
+        but must not serialize it across the sandbox→host boundary."""
+        from letta_evals.cli import _run_single_sample
+
+        suite_path = _write_minimal_suite(tmp_path)
+        sample_path = _write_sample(tmp_path)
+        out_path = tmp_path / "out.json"
+
+        result = _canned_result().model_copy(update={"agent_state": {"provider_type": "unknown-preview-provider"}})
+
+        with patch("letta_evals.runner.Runner.run_sample", new_callable=AsyncMock) as run_sample:
+            run_sample.return_value = result
+            anyio.run(
+                _run_single_sample,
+                suite_path,
+                sample_path,
+                out_path,
+                None,
+                None,
+                None,
+                None,
+            )
+
+        data = json.loads(out_path.read_text())
+        assert data["sample_id"] == "s1"
+        assert "agent_state" not in data
+
     def test_drops_sandbox_field_to_prevent_reentry(self, tmp_path):
         """If the suite YAML declares sandbox:, the in-sandbox path must
         strip it before constructing SuiteSpec — otherwise the Runner would

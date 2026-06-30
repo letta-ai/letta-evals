@@ -7,6 +7,7 @@ teardown) without touching Modal at all.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
@@ -152,6 +153,46 @@ class TestRunSampleInSandbox:
         # Result round-tripped.
         assert result.sample_id == "s1"
         assert result.grades["acc"].score == 1.0
+
+    def test_host_drops_agent_state_before_result_validation(self, tmp_path, monkeypatch):
+        """Older/custom sandbox images may still include agent_state in
+        result.json. The host should ignore it before validating SampleResult
+        so provider enum skew in AgentState cannot lose an otherwise successful
+        sample."""
+        _write_suite_yaml(tmp_path)
+        runner = _make_runner_with_sandbox(tmp_path)
+
+        class _SandboxWithUnknownAgentState(_StubSandbox):
+            async def download_file(self, remote: str, local: Path) -> None:
+                self.downloaded.append((remote, local))
+                payload = _canned_result("s1").model_dump(mode="json")
+                payload["agent_state"] = {
+                    "id": "agent-sandbox-1",
+                    "llm_config": {"model_endpoint_type": "unknown-preview-provider"},
+                }
+                local.parent.mkdir(parents=True, exist_ok=True)
+                with open(local, "w") as f:
+                    json.dump(payload, f)
+
+        stub = _SandboxWithUnknownAgentState()
+        monkeypatch.setattr("letta_evals.sandbox.dispatch.ModalSandbox", lambda spec, session_id: stub)
+
+        sample = Sample(id="s1", input="hi", ground_truth="hi")
+        result = anyio.run(
+            run_sample_in_sandbox,
+            runner.suite,
+            sample,
+            "openai/gpt-a",
+            0.0,
+        )
+
+        assert result.error is None
+        assert result.sample_id == "s1"
+        assert result.agent_id == "agent-sandbox-1"
+        assert result.agent_state is None
+        assert result.grades["acc"].score == 1.0
+        assert result.reward is not None
+        assert result.reward.score == 1.0
 
     @pytest.mark.parametrize("suite_filename", ["suite.yaml", "suite-mini.yaml"])
     def test_preserves_exact_suite_file_when_multiple_suite_yamls_exist(self, tmp_path, monkeypatch, suite_filename):

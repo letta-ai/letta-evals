@@ -206,6 +206,9 @@ async def run_sample_in_sandbox(
             try:
                 with open(local_result_path, "r") as f:
                     result_data = json.load(f)
+                # Be tolerant of older/custom sandbox images that still wrote
+                # agent_state; the host does not compute on it post-grading.
+                result_data.pop("agent_state", None)
                 sample_result = SampleResult.model_validate(result_data)
             except Exception as e:
                 return sandbox_error_result(
