@@ -34,3 +34,6 @@ sandbox:
   memory_mb: 4096
   timeout_sec: 1800
   block_network: false
+  # Pin the @letta-ai/letta-code version installed in the sandbox image.
+  # Omit to track the npm `latest` tag.
+  letta_code_version: "0.27.16"

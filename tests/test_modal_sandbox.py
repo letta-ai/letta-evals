@@ -54,6 +54,7 @@ class TestModalSandboxSpec:
         assert spec.forward_env == []
         assert spec.volumes == {}
         assert spec.letta_evals_version is None
+        assert spec.letta_code_version is None
 
     def test_image_override(self):
         spec = ModalSandboxSpec(image="ghcr.io/custom/runtime:1.0")
@@ -87,11 +88,16 @@ class TestModalSandboxSpec:
         # Sanity-check the recipe carries both runtimes.
         assert "letta-evals" in contents
         assert "@letta-ai/letta-code" in contents
+        # The letta-code install must be pinnable via the LETTA_CODE_VERSION
+        # build arg the Modal driver passes from sandbox.letta_code_version.
+        assert "ARG LETTA_CODE_VERSION" in contents
+        assert "@letta-ai/letta-code@${LETTA_CODE_VERSION}" in contents
 
     def test_overrides(self):
         spec = ModalSandboxSpec(
             image="img:1",
             letta_evals_version="0.17.0",
+            letta_code_version="0.27.17",
             secrets=["k1", "k2"],
             forward_env=["MY_CUSTOM_KEY"],
             volumes={"/mnt/cache": "cache-vol"},
@@ -110,6 +116,7 @@ class TestModalSandboxSpec:
         assert spec.block_network is True
         assert spec.app_name == "my-app"
         assert spec.letta_evals_version == "0.17.0"
+        assert spec.letta_code_version == "0.27.17"
 
 
 class TestSuiteSpecWithSandbox:
@@ -161,6 +168,78 @@ class TestExecResult:
         r = ExecResult(stdout="ok", stderr="", return_code=0)
         assert r.stdout == "ok"
         assert r.return_code == 0
+
+
+def _install_fake_modal(monkeypatch):
+    """Inject a fake ``modal`` SDK and return it so tests can assert on calls.
+
+    ``ModalSandbox.start`` imports modal lazily and calls App.lookup,
+    Image.from_dockerfile / from_registry, and Sandbox.create. We stub all of
+    them so start() runs end-to-end without touching Modal, letting us inspect
+    how the image was built.
+    """
+    import sys
+    from unittest.mock import AsyncMock, MagicMock
+
+    import letta_evals.sandbox.modal as modal_driver
+
+    fake_modal = MagicMock(name="modal")
+    fake_modal.App.lookup.aio = AsyncMock(return_value=MagicMock(name="app"))
+    fake_image = MagicMock(name="image")
+    fake_modal.Image.from_dockerfile = MagicMock(return_value=fake_image)
+    fake_modal.Image.from_registry = MagicMock(return_value=fake_image)
+    fake_sandbox = MagicMock(name="sandbox")
+    fake_sandbox.object_id = "sb-xyz"
+    fake_modal.Sandbox.create.aio = AsyncMock(return_value=fake_sandbox)
+
+    monkeypatch.setitem(sys.modules, "modal", fake_modal)
+    monkeypatch.setattr(modal_driver, "_check_modal_auth", lambda: None)
+    return fake_modal
+
+
+class TestModalDriverImageBuild:
+    """The driver turns sandbox.letta_code_version into a Dockerfile build arg."""
+
+    @pytest.mark.asyncio
+    async def test_letta_code_version_becomes_build_arg(self, monkeypatch):
+        from letta_evals.sandbox.modal import ModalSandbox
+
+        fake_modal = _install_fake_modal(monkeypatch)
+        spec = ModalSandboxSpec(letta_code_version="0.27.17", timeout_sec=60, cpu=1, memory_mb=512)
+        sandbox = ModalSandbox(spec=spec, session_id="unit-build-args")
+
+        await sandbox.start()
+
+        fake_modal.Image.from_dockerfile.assert_called_once()
+        _, kwargs = fake_modal.Image.from_dockerfile.call_args
+        assert kwargs["build_args"] == {"LETTA_CODE_VERSION": "0.27.17"}
+        fake_modal.Image.from_registry.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_unset_version_passes_empty_build_args(self, monkeypatch):
+        from letta_evals.sandbox.modal import ModalSandbox
+
+        fake_modal = _install_fake_modal(monkeypatch)
+        spec = ModalSandboxSpec(timeout_sec=60)
+        sandbox = ModalSandbox(spec=spec, session_id="unit-no-version")
+
+        await sandbox.start()
+
+        _, kwargs = fake_modal.Image.from_dockerfile.call_args
+        assert kwargs["build_args"] == {}
+
+    @pytest.mark.asyncio
+    async def test_registry_image_ignores_version(self, monkeypatch):
+        from letta_evals.sandbox.modal import ModalSandbox
+
+        fake_modal = _install_fake_modal(monkeypatch)
+        spec = ModalSandboxSpec(image="ghcr.io/custom/runtime:1.0", letta_code_version="0.27.17", timeout_sec=60)
+        sandbox = ModalSandbox(spec=spec, session_id="unit-registry")
+
+        await sandbox.start()
+
+        fake_modal.Image.from_registry.assert_called_once_with("ghcr.io/custom/runtime:1.0")
+        fake_modal.Image.from_dockerfile.assert_not_called()
 
 
 class TestModalDriverLazyImport:
