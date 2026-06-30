@@ -30,6 +30,12 @@ RUN pip install --no-cache-dir --upgrade "letta-evals>=0.19.0" letta-client
 
 # letta-code is the agent harness invoked by the LettaCodeTarget.
 # Install globally so the `letta` CLI is on $PATH inside the sandbox.
-RUN npm install -g @letta-ai/letta-code
+#
+# LETTA_CODE_VERSION pins the installed npm version; it defaults to `latest`.
+# The Modal driver overrides it from `sandbox.letta_code_version` via
+# Image.from_dockerfile(build_args=...). Modal keys its cached image build on
+# the build args, so each pinned version resolves to its own cached image.
+ARG LETTA_CODE_VERSION=latest
+RUN npm install -g "@letta-ai/letta-code@${LETTA_CODE_VERSION}"
 
 WORKDIR /work

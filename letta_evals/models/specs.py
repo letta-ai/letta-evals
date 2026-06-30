@@ -107,6 +107,16 @@ class ModalSandboxSpec(BaseModel):
             "matches at sandbox start to guard against SampleResult schema drift."
         ),
     )
+    letta_code_version: Optional[str] = Field(
+        default=None,
+        description=(
+            "If set, pins the ``@letta-ai/letta-code`` npm version installed in "
+            "the bundled Dockerfile image, passed through as the "
+            "``LETTA_CODE_VERSION`` build arg (e.g. '0.27.17'). Defaults to the "
+            "Dockerfile's ``latest``. Ignored when ``image`` is set, since a "
+            "pre-built registry image already bakes in its own letta-code."
+        ),
+    )
     secrets: List[str] = Field(default_factory=list, description="Names of pre-uploaded Modal Secrets to attach")
     forward_env: List[str] = Field(
         default_factory=list,

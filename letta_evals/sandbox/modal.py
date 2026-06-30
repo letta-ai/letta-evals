@@ -72,10 +72,21 @@ class ModalSandbox(AbstractSandbox):
             # Default: build the base image from the Dockerfile bundled with
             # the package. Modal caches the build, so repeated sandboxes
             # don't pay the full build cost — only the first sandbox after
-            # the Dockerfile changes does.
+            # the Dockerfile (or its build args) changes does.
             dockerfile_path = Path(__file__).parent / "Dockerfile"
-            image = modal.Image.from_dockerfile(str(dockerfile_path))
+            build_args: dict[str, str] = {}
+            if self.spec.letta_code_version:
+                # Pins @letta-ai/letta-code in the Dockerfile's npm install.
+                build_args["LETTA_CODE_VERSION"] = self.spec.letta_code_version
+            image = modal.Image.from_dockerfile(str(dockerfile_path), build_args=build_args)
         else:
+            if self.spec.letta_code_version:
+                logger.warning(
+                    "sandbox.letta_code_version=%s is ignored because a pre-built "
+                    "image (%s) is set; the registry image bakes in its own letta-code.",
+                    self.spec.letta_code_version,
+                    self.spec.image,
+                )
             image = modal.Image.from_registry(self.spec.image)
 
         secrets = [modal.Secret.from_name(name) for name in self.spec.secrets]

@@ -18,6 +18,25 @@ via Modal's `Image.from_dockerfile` — it carries `letta-evals` (pip) and
 sandbox after an edit pays the build cost. Override `image` only when you
 need additional system tools the agent invokes.
 
+## Pinning the letta-code version
+
+The bundled image installs `@letta-ai/letta-code@latest` by default. To
+evaluate a specific letta-code release — e.g. for reproducible training
+rollouts — pin it with `letta_code_version`:
+
+```yaml
+sandbox:
+  kind: modal
+  letta_code_version: "0.27.17"
+```
+
+The driver passes it to the Dockerfile as the `LETTA_CODE_VERSION` build
+arg (`npm install -g @letta-ai/letta-code@<version>`). Modal keys the
+cached image on build args, so each pinned version gets its own cached
+build. This applies only to the bundled Dockerfile path — when you set a
+pre-built `image`, `letta_code_version` is ignored (the registry image
+already bakes in its own letta-code) and the driver logs a warning.
+
 The orchestrator (`letta-evals run`) keeps running on your host — same
 sample loop, same `max_concurrent`, same JSONL output, same reward
 composition. The only thing that changes is what happens *per sample*:
