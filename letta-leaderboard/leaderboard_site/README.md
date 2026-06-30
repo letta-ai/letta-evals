@@ -27,7 +27,7 @@ This generates static HTML files in the `_site` directory.
 
 ## How It Works
 
-- The site automatically reads all `leaderboard_*.yaml` files from the `../letta-leaderboard` directory
+- The site automatically reads all `leaderboard_*.yaml` files from the parent `letta-leaderboard` directory
 - Each YAML file becomes a separate benchmark tab on the website
 - The site extracts benchmark names, metrics metadata, and results from the YAML structure
 - Icons for providers are loaded from `src/icons/`
