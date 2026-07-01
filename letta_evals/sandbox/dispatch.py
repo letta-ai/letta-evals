@@ -5,14 +5,35 @@ import shlex
 import tempfile
 import time
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Callable, Dict, Optional
 
-from letta_evals.models import Error, Sample, SampleResult, SuiteSpec, Timing
+import pathspec
+
+from letta_evals.models import Error, ModalSandboxSpec, Sample, SampleResult, SuiteSpec, Timing
 from letta_evals.sandbox.modal import ModalSandbox
 from letta_evals.types import ErrorCategory
 
 logger = logging.getLogger(__name__)
+
+# Always dropped from the upload regardless of user config — VCS metadata,
+# caches, virtualenvs, and editor cruft that would only bloat the per-sample
+# tarball. Gitignore-style: a bare name matches at any depth.
+DEFAULT_UPLOAD_EXCLUDES = (
+    ".git",
+    "__pycache__",
+    "*.pyc",
+    "*.pyo",
+    ".venv",
+    "venv",
+    "node_modules",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "*.egg-info",
+    ".DS_Store",
+)
 
 # Built-in host env vars forwarded to Modal sandboxes. Only explicit names are
 # forwarded; suite authors can extend this with `sandbox.forward_env`.
@@ -45,6 +66,93 @@ def suite_yaml_remote_path(suite: SuiteSpec) -> str:
     return f"/mnt/suite/{relative_suite_path.as_posix()}"
 
 
+@dataclass(frozen=True)
+class SandboxMount:
+    """Where the suite's code lands in the sandbox and how the CLI is invoked.
+
+    ``project_root`` mode uploads an ancestor package tree so absolute imports
+    resolve; the default (``project_root`` unset) uploads just the suite
+    directory, preserving self-contained-suite behavior byte-for-byte.
+    """
+
+    local_root: Path  # host directory tarred and uploaded
+    remote_root: str  # where it is extracted in the sandbox
+    cwd: str  # in-sandbox working directory for the CLI
+    pythonpath: Optional[str]  # dir prepended to PYTHONPATH, or None
+    suite_yaml_remote: str  # in-sandbox path to the suite YAML
+
+
+def sandbox_mount(suite: SuiteSpec) -> SandboxMount:
+    """Compute the upload/exec layout for a suite's sandbox run.
+
+    Raises SuiteConfigurationError-style ValueErrors with actionable messages
+    when the layout can't be resolved (e.g. suite not under project_root).
+    """
+    project_root = suite.sandbox.project_root if suite.sandbox else None
+    if project_root is None:
+        return SandboxMount(
+            local_root=suite.base_dir,
+            remote_root="/mnt/suite",
+            cwd="/mnt/suite",
+            pythonpath=None,
+            suite_yaml_remote=suite_yaml_remote_path(suite),
+        )
+
+    if suite.suite_path is None:
+        raise ValueError("sandbox.project_root is set but the suite file path is unknown — cannot place the suite YAML.")
+
+    try:
+        relative_suite_path = suite.suite_path.resolve().relative_to(project_root.resolve())
+    except ValueError as e:
+        raise ValueError(
+            f"Suite file {suite.suite_path} is not inside sandbox.project_root {project_root}; "
+            "project_root must be an ancestor of the suite."
+        ) from e
+
+    return SandboxMount(
+        local_root=project_root,
+        remote_root="/mnt/project",
+        cwd="/mnt/project",
+        pythonpath="/mnt/project",
+        suite_yaml_remote=f"/mnt/project/{relative_suite_path.as_posix()}",
+    )
+
+
+def build_upload_filter(
+    spec: Optional[ModalSandboxSpec], root: Optional[Path] = None
+) -> Callable[[str, bool], bool]:
+    """Return ``keep(relpath, is_dir)`` deciding what enters the upload tarball.
+
+    Built-in junk excludes always apply. When ``spec.respect_gitignore`` is set
+    (the default), the patterns from ``root/.gitignore`` are folded in too — the
+    file is just more gitignore-syntax lines, which is exactly what the exclude
+    spec consumes. ``exclude`` then adds to that; a non-empty ``include`` turns
+    file selection into an allowlist. Directories are always kept (descended)
+    unless they themselves match an exclude, so nested allowlisted files stay
+    reachable.
+    """
+    exclude_patterns = list(DEFAULT_UPLOAD_EXCLUDES)
+    if spec and spec.respect_gitignore and root is not None:
+        gitignore = root / ".gitignore"
+        if gitignore.is_file():
+            exclude_patterns += gitignore.read_text().splitlines()
+    exclude_patterns += list(spec.exclude if spec else [])
+    exclude_spec = pathspec.GitIgnoreSpec.from_lines(exclude_patterns)
+    include_lines = list(spec.include) if spec and spec.include else []
+    include_spec = pathspec.GitIgnoreSpec.from_lines(include_lines) if include_lines else None
+
+    def keep(relpath: str, is_dir: bool) -> bool:
+        if exclude_spec.match_file(relpath):
+            return False
+        if is_dir:
+            return True
+        if include_spec is not None and not include_spec.match_file(relpath):
+            return False
+        return True
+
+    return keep
+
+
 def sandbox_error_result(
     sample_id, t_sample_start: float, category: ErrorCategory, exception_type: str, message: str
 ) -> SampleResult:
@@ -62,12 +170,11 @@ def sandbox_error_result(
     )
 
 
-def build_sandbox_command(suite: SuiteSpec, model_handle: Optional[str]) -> str:
-    suite_yaml_remote = suite_yaml_remote_path(suite)
+def build_sandbox_command(mount: SandboxMount, model_handle: Optional[str]) -> str:
     cmd_parts = [
         "letta-evals",
         "run",
-        suite_yaml_remote,
+        mount.suite_yaml_remote,
         "--sample",
         "/mnt/sample.json",
         "--output-json",
@@ -77,7 +184,11 @@ def build_sandbox_command(suite: SuiteSpec, model_handle: Optional[str]) -> str:
         cmd_parts += ["--model-handle", model_handle]
 
     inner_command = " ".join(shlex.quote(p) for p in cmd_parts)
-    return f"cd /mnt/suite && {inner_command}"
+    prefix = f"cd {shlex.quote(mount.cwd)}"
+    if mount.pythonpath:
+        # Prepend the import root, preserving any PYTHONPATH the image already set.
+        prefix += f" && export PYTHONPATH={shlex.quote(mount.pythonpath)}${{PYTHONPATH:+:$PYTHONPATH}}"
+    return f"{prefix} && {inner_command}"
 
 
 def forwarded_sandbox_env(suite: SuiteSpec) -> Dict[str, str]:
@@ -119,6 +230,13 @@ async def run_sample_in_sandbox(
             "SuiteSpec.base_dir is unset — required for sandbox execution.",
         )
 
+    try:
+        mount = sandbox_mount(suite)
+    except ValueError as e:
+        return sandbox_error_result(
+            sample_id, t_sample_start, ErrorCategory.UNKNOWN, "SuiteConfigurationError", str(e)
+        )
+
     sandbox = ModalSandbox(suite.sandbox, session_id=session_id)
     try:
         try:
@@ -147,7 +265,8 @@ async def run_sample_in_sandbox(
                     sample_id, t_sample_start, ErrorCategory.UNKNOWN, "VersionMismatch", message
                 )
 
-        await sandbox.upload_dir(suite.base_dir, "/mnt/suite")
+        upload_filter = build_upload_filter(suite.sandbox, mount.local_root)
+        await sandbox.upload_dir(mount.local_root, mount.remote_root, path_filter=upload_filter)
 
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp:
             tmp.write(Sample.model_validate(sample.model_dump()).model_dump_json())
@@ -157,7 +276,7 @@ async def run_sample_in_sandbox(
         finally:
             tmp_path.unlink(missing_ok=True)
 
-        command = build_sandbox_command(suite, model_handle)
+        command = build_sandbox_command(mount, model_handle)
         exec_env = forwarded_sandbox_env(suite)
         if exec_env:
             logger.debug("Forwarding env vars to sandbox %s: %s", sandbox.sandbox_id, sorted(exec_env))

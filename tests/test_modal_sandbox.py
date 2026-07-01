@@ -9,12 +9,16 @@ The spec-parsing tests do not touch Modal at all.
 from __future__ import annotations
 
 import os
+import tarfile
 from pathlib import Path
 
+import anyio
 import pytest
 
 from letta_evals.models import ModalSandboxSpec, SuiteSpec
 from letta_evals.sandbox.base import ExecResult
+from letta_evals.sandbox.dispatch import build_upload_filter
+from letta_evals.sandbox.modal import ModalSandbox
 
 
 def _minimal_suite_yaml(**sandbox_overrides):
@@ -55,6 +59,10 @@ class TestModalSandboxSpec:
         assert spec.volumes == {}
         assert spec.letta_evals_version is None
         assert spec.letta_code_version is None
+        assert spec.project_root is None
+        assert spec.include == []
+        assert spec.exclude == []
+        assert spec.respect_gitignore is True
 
     def test_image_override(self):
         spec = ModalSandboxSpec(image="ghcr.io/custom/runtime:1.0")
@@ -135,6 +143,20 @@ class TestSuiteSpecWithSandbox:
         assert suite.sandbox.secrets == ["letta-api-key"]
         assert suite.sandbox.cpu == 4
 
+    def test_project_root_resolves_relative_to_suite_dir(self, tmp_path):
+        suite_dir = tmp_path / "suites" / "mini"
+        suite_dir.mkdir(parents=True)
+        yaml_data = _minimal_suite_yaml(project_root="../..")
+
+        suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_dir)
+
+        assert suite.sandbox.project_root == tmp_path.resolve()
+
+    def test_absolute_project_root_is_preserved(self, tmp_path):
+        yaml_data = _minimal_suite_yaml(project_root=str(tmp_path))
+        suite = SuiteSpec.from_yaml(yaml_data, base_dir=tmp_path / "sub")
+        assert suite.sandbox.project_root == tmp_path.resolve()
+
     def test_target_memory_workspace_fields_parse_and_resolve(self, tmp_path):
         yaml_data = _minimal_suite_yaml()
         yaml_data["target"] = {
@@ -161,6 +183,88 @@ class TestSuiteSpecWithSandbox:
 
         with pytest.raises(ValueError, match="permission_mode: memory was removed"):
             SuiteSpec.from_yaml(yaml_data, base_dir=tmp_path)
+
+
+class TestUploadFilter:
+    def test_default_excludes_drop_junk_but_keep_code_and_data(self):
+        keep = build_upload_filter(ModalSandboxSpec())
+        # Kept: source, config, data.
+        assert keep("pkg/mod.py", False)
+        assert keep("pyproject.toml", False)
+        assert keep("data/samples.jsonl", False)
+        # Dropped: VCS, caches, virtualenvs, compiled/editor junk (at any depth).
+        assert not keep(".git", True)
+        assert not keep("pkg/__pycache__", True)
+        assert not keep("pkg/mod.pyc", False)
+        assert not keep("node_modules", True)
+
+    def test_include_is_an_allowlist_that_still_descends_directories(self):
+        keep = build_upload_filter(ModalSandboxSpec(include=["pkg/**", "pyproject.toml"]))
+        # Directories always descend so nested allowlisted files stay reachable.
+        assert keep("pkg", True)
+        assert keep("other", True)
+        # Files must match an include pattern.
+        assert keep("pkg/mod.py", False)
+        assert keep("pyproject.toml", False)
+        assert not keep("other/notes.txt", False)
+
+    def test_user_exclude_wins_over_include(self):
+        keep = build_upload_filter(ModalSandboxSpec(include=["pkg/**"], exclude=["pkg/secret.py"]))
+        assert keep("pkg/mod.py", False)
+        assert not keep("pkg/secret.py", False)
+
+    def test_respects_gitignore_at_root(self, tmp_path):
+        (tmp_path / ".gitignore").write_text("data/large/\n*.log\n")
+        keep = build_upload_filter(ModalSandboxSpec(), root=tmp_path)
+        assert keep("pkg/mod.py", False)
+        assert not keep("data/large/blob.bin", False)
+        assert not keep("run.log", False)
+
+    def test_gitignore_ignored_when_respect_gitignore_false(self, tmp_path):
+        (tmp_path / ".gitignore").write_text("*.log\n")
+        keep = build_upload_filter(ModalSandboxSpec(respect_gitignore=False), root=tmp_path)
+        assert keep("run.log", False)
+
+
+class TestUploadDirFiltering:
+    def test_tarball_excludes_filtered_members(self, tmp_path):
+        """upload_dir wires the filter into tarfile.add: excluded subtrees never
+        enter the streamed archive."""
+        root = tmp_path / "project"
+        (root / "pkg").mkdir(parents=True)
+        (root / "pkg" / "mod.py").write_text("x = 1\n")
+        (root / "pkg" / "__pycache__").mkdir()
+        (root / "pkg" / "__pycache__" / "mod.pyc").write_text("junk")
+        (root / ".git").mkdir()
+        (root / ".git" / "config").write_text("[core]\n")
+        (root / "data").mkdir()
+        (root / "data" / "samples.jsonl").write_text("{}\n")
+
+        captured: dict = {}
+
+        class _TarCapturingSandbox(ModalSandbox):
+            def __init__(self):
+                self._sandbox = object()  # non-None sentinel; skip real Modal init
+                self.session_id = "cap"
+
+            async def upload_file(self, local: Path, remote: str) -> None:
+                with tarfile.open(local, "r:gz") as tar:
+                    captured["names"] = {n for n in tar.getnames() if n not in (".", "")}
+
+            async def exec(self, command, env=None, timeout_sec=None):
+                return ExecResult(stdout="", stderr="", return_code=0)
+
+        sb = _TarCapturingSandbox()
+        keep = build_upload_filter(ModalSandboxSpec())
+        anyio.run(sb.upload_dir, root, "/mnt/project", keep)
+
+        names = captured["names"]
+        assert "./pkg/mod.py" in names
+        assert "./data/samples.jsonl" in names
+        # Excluded subtrees are pruned wholesale — not even the dir entry ships.
+        assert not any(".git" in n for n in names)
+        assert not any("__pycache__" in n for n in names)
+        assert not any(n.endswith(".pyc") for n in names)
 
 
 class TestExecResult:

@@ -131,6 +131,44 @@ class ModalSandboxSpec(BaseModel):
         default_factory=dict,
         description="Mapping of in-sandbox mount path -> Modal Volume name",
     )
+    project_root: Optional[Path] = Field(
+        default=None,
+        description=(
+            "Optional directory (an ancestor of the suite file) uploaded to the "
+            "sandbox and placed on PYTHONPATH, so a suite that lives inside a "
+            "larger package tree can import shared modules "
+            "(e.g. `from myproject.pkg import ...`) and reference files outside "
+            "the suite folder. Relative paths resolve against the suite file's "
+            "directory. When unset, only the suite directory is uploaded "
+            "(self-contained-suite behavior, unchanged)."
+        ),
+    )
+    include: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Gitignore-style globs; when non-empty, ONLY matching files under the "
+            "uploaded tree are shipped (an allowlist). Use to trim a large "
+            "project_root down to its code closure. Directories are always "
+            "descended so nested matches are reachable."
+        ),
+    )
+    exclude: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Gitignore-style globs excluded from the upload, on top of built-in "
+            "defaults (.git, __pycache__, *.pyc, .venv, node_modules, and similar "
+            "junk) and any .gitignore patterns. Applied after `include`."
+        ),
+    )
+    respect_gitignore: bool = Field(
+        default=True,
+        description=(
+            "When True (default), patterns from the uploaded root's .gitignore are "
+            "excluded from the upload, so anything git ignores is never shipped to "
+            "the sandbox. Reads the root-level .gitignore only; nested .gitignore "
+            "files, the global gitignore, and .git/info/exclude are not consulted."
+        ),
+    )
     cpu: int = Field(default=2, description="vCPU count for the sandbox")
     memory_mb: int = Field(default=2048, description="Memory in MiB for the sandbox")
     timeout_sec: int = Field(default=1800, description="Hard sandbox timeout in seconds")
@@ -329,6 +367,14 @@ class SuiteSpec(BaseModel):
                     gspec["base_dir"] = base_dir
                     resolved_graders[key] = gspec
                 yaml_data["graders"] = resolved_graders
+
+            # resolve sandbox.project_root — the ancestor dir uploaded and made
+            # the import root. Relative paths resolve against the suite file dir.
+            if isinstance(yaml_data.get("sandbox"), dict) and yaml_data["sandbox"].get("project_root"):
+                project_root = Path(yaml_data["sandbox"]["project_root"])
+                if not project_root.is_absolute():
+                    project_root = base_dir / project_root
+                yaml_data["sandbox"]["project_root"] = str(project_root.resolve())
 
             yaml_data["base_dir"] = base_dir
 
