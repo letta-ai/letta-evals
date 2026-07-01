@@ -1,8 +1,6 @@
 import json
 from pathlib import Path
-from typing import Iterator, List, Optional, Union
-
-import pandas as pd
+from typing import Any, Iterator, List, Optional, Union
 
 from letta_evals.models import Sample, SampleId
 
@@ -23,7 +21,9 @@ def _json_sample_id(data: dict, fallback: int) -> SampleId:
     return fallback
 
 
-def _csv_sample_id(df: pd.DataFrame, row, fallback: int) -> SampleId:
+def _csv_sample_id(df: Any, row: Any, fallback: int) -> SampleId:
+    import pandas as pd
+
     for field_name in ("sample_id", "id"):
         if field_name in df.columns and not pd.isna(row.get(field_name)):
             return _normalize_sample_id(row[field_name])
@@ -119,8 +119,10 @@ def _parse_string_or_list(value: str, field_name: str, row_idx: int) -> Union[st
     return value_str
 
 
-def _parse_json_dict_field(df: pd.DataFrame, row, field_name: str, row_idx) -> Optional[dict]:
+def _parse_json_dict_field(df: Any, row: Any, field_name: str, row_idx) -> Optional[dict]:
     """Parse an optional CSV column that expects a JSON object string."""
+    import pandas as pd
+
     if field_name not in df.columns or pd.isna(row.get(field_name)):
         return None
     try:
@@ -148,6 +150,8 @@ def load_csv(
     - rubric_path (optional): per-sample rubric file path. Resolved relative
       to the dataset file's directory. Mutually exclusive with ``rubric``.
     """
+    import pandas as pd
+
     try:
         df = pd.read_csv(file_path)
     except Exception as e:
