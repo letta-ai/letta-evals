@@ -49,21 +49,27 @@ DEFAULT_SANDBOX_FORWARD_ENV = (
 )
 
 
+def _remote_suite_yaml(suite_path: Path, local_root: Path, remote_root: str) -> str:
+    """Map a host suite-file path to its in-sandbox path under ``remote_root``.
+
+    Tolerates a relative or unresolved ``suite_path`` by falling back to
+    resolving both sides. Raises ``ValueError`` if the suite is not under
+    ``local_root``.
+    """
+    try:
+        relative = suite_path.relative_to(local_root)
+    except ValueError:
+        relative = suite_path.resolve().relative_to(local_root.resolve())
+    return f"{remote_root}/{relative.as_posix()}"
+
+
 def suite_yaml_remote_path(suite: SuiteSpec) -> str:
     """Return the in-sandbox path for the suite file the host loaded."""
     if suite.suite_path is None:
         return "/mnt/suite/suite.yaml"
-
-    base = suite.base_dir
-    if base is None:
+    if suite.base_dir is None:
         return f"/mnt/suite/{suite.suite_path.name}"
-
-    try:
-        relative_suite_path = suite.suite_path.relative_to(base)
-    except ValueError:
-        relative_suite_path = suite.suite_path.resolve().relative_to(base.resolve())
-
-    return f"/mnt/suite/{relative_suite_path.as_posix()}"
+    return _remote_suite_yaml(suite.suite_path, suite.base_dir, "/mnt/suite")
 
 
 @dataclass(frozen=True)
@@ -76,8 +82,7 @@ class SandboxMount:
     """
 
     local_root: Path  # host directory tarred and uploaded
-    remote_root: str  # where it is extracted in the sandbox
-    cwd: str  # in-sandbox working directory for the CLI
+    remote_root: str  # where it is extracted in the sandbox; also the CLI's cwd
     pythonpath: Optional[str]  # dir prepended to PYTHONPATH, or None
     suite_yaml_remote: str  # in-sandbox path to the suite YAML
 
@@ -93,7 +98,6 @@ def sandbox_mount(suite: SuiteSpec) -> SandboxMount:
         return SandboxMount(
             local_root=suite.base_dir,
             remote_root="/mnt/suite",
-            cwd="/mnt/suite",
             pythonpath=None,
             suite_yaml_remote=suite_yaml_remote_path(suite),
         )
@@ -102,7 +106,7 @@ def sandbox_mount(suite: SuiteSpec) -> SandboxMount:
         raise ValueError("sandbox.project_root is set but the suite file path is unknown — cannot place the suite YAML.")
 
     try:
-        relative_suite_path = suite.suite_path.resolve().relative_to(project_root.resolve())
+        suite_yaml_remote = _remote_suite_yaml(suite.suite_path, project_root, "/mnt/project")
     except ValueError as e:
         raise ValueError(
             f"Suite file {suite.suite_path} is not inside sandbox.project_root {project_root}; "
@@ -112,21 +116,21 @@ def sandbox_mount(suite: SuiteSpec) -> SandboxMount:
     return SandboxMount(
         local_root=project_root,
         remote_root="/mnt/project",
-        cwd="/mnt/project",
         pythonpath="/mnt/project",
-        suite_yaml_remote=f"/mnt/project/{relative_suite_path.as_posix()}",
+        suite_yaml_remote=suite_yaml_remote,
     )
 
 
 def build_upload_filter(
     spec: Optional[ModalSandboxSpec], root: Optional[Path] = None
-) -> Callable[[str, bool], bool]:
-    """Return ``keep(relpath, is_dir)`` deciding what enters the upload tarball.
+) -> Callable[[str], bool]:
+    """Return ``keep(relpath)`` deciding what enters the upload tarball.
 
     Built-in junk excludes always apply. When ``spec.respect_gitignore`` is set
     (the default), the patterns from ``root/.gitignore`` are folded in too — the
     file is just more gitignore-syntax lines, which is exactly what the exclude
-    spec consumes. A directory that matches an exclude is pruned wholesale;
+    spec consumes. A directory that matches an exclude is pruned wholesale (a
+    property of ``tarfile.add`` skipping recursion when the filter drops it);
     everything else is kept.
     """
     exclude_patterns = list(DEFAULT_UPLOAD_EXCLUDES)
@@ -136,7 +140,7 @@ def build_upload_filter(
             exclude_patterns += gitignore.read_text().splitlines()
     exclude_spec = pathspec.GitIgnoreSpec.from_lines(exclude_patterns)
 
-    def keep(relpath: str, is_dir: bool) -> bool:
+    def keep(relpath: str) -> bool:
         return not exclude_spec.match_file(relpath)
 
     return keep
@@ -173,7 +177,7 @@ def build_sandbox_command(mount: SandboxMount, model_handle: Optional[str]) -> s
         cmd_parts += ["--model-handle", model_handle]
 
     inner_command = " ".join(shlex.quote(p) for p in cmd_parts)
-    prefix = f"cd {shlex.quote(mount.cwd)}"
+    prefix = f"cd {shlex.quote(mount.remote_root)}"
     if mount.pythonpath:
         # Prepend the import root, preserving any PYTHONPATH the image already set.
         prefix += f" && export PYTHONPATH={shlex.quote(mount.pythonpath)}${{PYTHONPATH:+:$PYTHONPATH}}"

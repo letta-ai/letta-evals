@@ -164,10 +164,10 @@ class ModalSandbox(AbstractSandbox):
         Avoids per-file SDK round trips (which add up fast for suites with
         large datasets) by going through a single tar exec call.
 
-        ``path_filter(relpath, is_dir)`` selects what enters the tarball: it
-        receives each member's POSIX path relative to ``local`` and whether it
-        is a directory, and returns True to keep it. Returning False for a
-        directory prunes its whole subtree. None uploads everything.
+        ``path_filter(relpath)`` selects what enters the tarball: it receives
+        each member's POSIX path relative to ``local`` and returns True to keep
+        it. Dropping a directory prunes its whole subtree (``tarfile`` skips
+        recursion into a filtered-out dir). None uploads everything.
         """
         if self._sandbox is None:
             raise RuntimeError("Sandbox not started — call start() first")
@@ -178,7 +178,7 @@ class ModalSandbox(AbstractSandbox):
             if path_filter is None or tarinfo.name in (".", ""):
                 return tarinfo
             relpath = tarinfo.name[2:] if tarinfo.name.startswith("./") else tarinfo.name
-            return tarinfo if path_filter(relpath, tarinfo.isdir()) else None
+            return tarinfo if path_filter(relpath) else None
 
         with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
             tar_path = Path(tmp.name)

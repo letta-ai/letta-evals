@@ -364,4 +364,19 @@ class SuiteSpec(BaseModel):
         if suite_path is not None:
             yaml_data["suite_path"] = suite_path
 
+        # Fail fast at load (so `validate` catches it once) when project_root
+        # isn't an ancestor of the suite — otherwise every sample's sandbox
+        # dispatch would fail identically. Deferred when the suite path is
+        # unknown; sandbox_mount re-checks defensively.
+        sandbox_cfg = yaml_data.get("sandbox")
+        if isinstance(sandbox_cfg, dict) and sandbox_cfg.get("project_root") and suite_path is not None:
+            project_root = Path(sandbox_cfg["project_root"])
+            try:
+                suite_path.resolve().relative_to(project_root.resolve())
+            except ValueError as e:
+                raise ValueError(
+                    f"Suite file {suite_path} is not inside sandbox.project_root {project_root}; "
+                    "project_root must be an ancestor of the suite."
+                ) from e
+
         return cls(**yaml_data)

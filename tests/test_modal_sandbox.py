@@ -155,6 +155,17 @@ class TestSuiteSpecWithSandbox:
         suite = SuiteSpec.from_yaml(yaml_data, base_dir=tmp_path / "sub")
         assert suite.sandbox.project_root == tmp_path.resolve()
 
+    def test_project_root_must_be_ancestor_of_suite(self, tmp_path):
+        """A project_root that doesn't contain the suite fails at load, so
+        `validate` catches it once instead of every sample failing later."""
+        suite_dir = tmp_path / "suite"
+        suite_dir.mkdir()
+        (tmp_path / "other").mkdir()
+        yaml_data = _minimal_suite_yaml(project_root="../other")
+
+        with pytest.raises(ValueError, match="must be an ancestor"):
+            SuiteSpec.from_yaml(yaml_data, base_dir=suite_dir, suite_path=suite_dir / "suite.yaml")
+
     def test_target_memory_workspace_fields_parse_and_resolve(self, tmp_path):
         yaml_data = _minimal_suite_yaml()
         yaml_data["target"] = {
@@ -187,26 +198,26 @@ class TestUploadFilter:
     def test_default_excludes_drop_junk_but_keep_code_and_data(self):
         keep = build_upload_filter(ModalSandboxSpec())
         # Kept: source, config, data.
-        assert keep("pkg/mod.py", False)
-        assert keep("pyproject.toml", False)
-        assert keep("data/samples.jsonl", False)
+        assert keep("pkg/mod.py")
+        assert keep("pyproject.toml")
+        assert keep("data/samples.jsonl")
         # Dropped: VCS, caches, virtualenvs, compiled/editor junk (at any depth).
-        assert not keep(".git", True)
-        assert not keep("pkg/__pycache__", True)
-        assert not keep("pkg/mod.pyc", False)
-        assert not keep("node_modules", True)
+        assert not keep(".git")
+        assert not keep("pkg/__pycache__")
+        assert not keep("pkg/mod.pyc")
+        assert not keep("node_modules")
 
     def test_respects_gitignore_at_root(self, tmp_path):
         (tmp_path / ".gitignore").write_text("data/large/\n*.log\n")
         keep = build_upload_filter(ModalSandboxSpec(), root=tmp_path)
-        assert keep("pkg/mod.py", False)
-        assert not keep("data/large/blob.bin", False)
-        assert not keep("run.log", False)
+        assert keep("pkg/mod.py")
+        assert not keep("data/large/blob.bin")
+        assert not keep("run.log")
 
     def test_gitignore_ignored_when_respect_gitignore_false(self, tmp_path):
         (tmp_path / ".gitignore").write_text("*.log\n")
         keep = build_upload_filter(ModalSandboxSpec(respect_gitignore=False), root=tmp_path)
-        assert keep("run.log", False)
+        assert keep("run.log")
 
 
 class TestUploadDirFiltering:
