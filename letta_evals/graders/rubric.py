@@ -3,10 +3,7 @@ import os
 from pathlib import Path
 from typing import Optional, Tuple
 
-from anthropic import AsyncAnthropic, transform_schema
 from dotenv import load_dotenv
-from google import genai
-from openai import AsyncOpenAI
 from pydantic import BaseModel as PydanticBaseModel
 from pydantic import Field as PydanticField
 
@@ -70,6 +67,8 @@ class RubricGrader(Grader):
             if not api_key:
                 raise ValueError("OPENAI_API_KEY not found in environment variables")
 
+            from openai import AsyncOpenAI
+
             client_kwargs = {
                 "api_key": api_key,
                 "max_retries": max_retries,
@@ -86,6 +85,8 @@ class RubricGrader(Grader):
             if not api_key:
                 raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
 
+            from anthropic import AsyncAnthropic
+
             client_kwargs = {
                 "api_key": api_key,
                 "max_retries": max_retries,
@@ -101,6 +102,9 @@ class RubricGrader(Grader):
             api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
             if not api_key:
                 raise ValueError("GEMINI_API_KEY or GOOGLE_API_KEY not found in environment variables")
+
+            from google import genai
+
             self.client = genai.Client(api_key=api_key)
         else:
             raise ValueError(f"Unsupported provider: {provider}")
@@ -158,6 +162,8 @@ class RubricGrader(Grader):
                 usage = response.usage.model_dump() if response.usage else None
 
             elif self.provider == LLMProvider.ANTHROPIC:
+                from anthropic import transform_schema
+
                 kwargs = dict(
                     model=self.model,
                     max_tokens=4096,
@@ -179,6 +185,8 @@ class RubricGrader(Grader):
                     "cache_read_input_tokens": getattr(response.usage, "cache_read_input_tokens", 0),
                 }
             elif self.provider == LLMProvider.GOOGLE:
+                from google import genai
+
                 google_config_kwargs = dict(
                     response_mime_type="application/json",
                     response_schema=_JudgeResponse,
