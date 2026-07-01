@@ -103,7 +103,9 @@ def sandbox_mount(suite: SuiteSpec) -> SandboxMount:
         )
 
     if suite.suite_path is None:
-        raise ValueError("sandbox.project_root is set but the suite file path is unknown — cannot place the suite YAML.")
+        raise ValueError(
+            "sandbox.project_root is set but the suite file path is unknown — cannot place the suite YAML."
+        )
 
     try:
         suite_yaml_remote = _remote_suite_yaml(suite.suite_path, project_root, "/mnt/project")
@@ -121,9 +123,7 @@ def sandbox_mount(suite: SuiteSpec) -> SandboxMount:
     )
 
 
-def build_upload_filter(
-    spec: Optional[ModalSandboxSpec], root: Optional[Path] = None
-) -> Callable[[str], bool]:
+def build_upload_filter(spec: Optional[ModalSandboxSpec], root: Optional[Path] = None) -> Callable[[str], bool]:
     """Return ``keep(relpath)`` deciding what enters the upload tarball.
 
     Built-in junk excludes always apply. When ``spec.respect_gitignore`` is set
@@ -226,9 +226,7 @@ async def run_sample_in_sandbox(
     try:
         mount = sandbox_mount(suite)
     except ValueError as e:
-        return sandbox_error_result(
-            sample_id, t_sample_start, ErrorCategory.UNKNOWN, "SuiteConfigurationError", str(e)
-        )
+        return sandbox_error_result(sample_id, t_sample_start, ErrorCategory.UNKNOWN, "SuiteConfigurationError", str(e))
 
     sandbox = ModalSandbox(suite.sandbox, session_id=session_id)
     try:
