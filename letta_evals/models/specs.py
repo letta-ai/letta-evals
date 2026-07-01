@@ -131,6 +131,27 @@ class ModalSandboxSpec(BaseModel):
         default_factory=dict,
         description="Mapping of in-sandbox mount path -> Modal Volume name",
     )
+    project_root: Optional[Path] = Field(
+        default=None,
+        description=(
+            "Optional directory (an ancestor of the suite file) uploaded to the "
+            "sandbox and placed on PYTHONPATH, so a suite that lives inside a "
+            "larger package tree can import shared modules "
+            "(e.g. `from myproject.pkg import ...`) and reference files outside "
+            "the suite folder. Relative paths resolve against the suite file's "
+            "directory. When unset, only the suite directory is uploaded "
+            "(self-contained-suite behavior, unchanged)."
+        ),
+    )
+    respect_gitignore: bool = Field(
+        default=True,
+        description=(
+            "When True (default), patterns from the uploaded root's .gitignore are "
+            "excluded from the upload, so anything git ignores is never shipped to "
+            "the sandbox. Reads the root-level .gitignore only; nested .gitignore "
+            "files, the global gitignore, and .git/info/exclude are not consulted."
+        ),
+    )
     cpu: int = Field(default=2, description="vCPU count for the sandbox")
     memory_mb: int = Field(default=2048, description="Memory in MiB for the sandbox")
     timeout_sec: int = Field(default=1800, description="Hard sandbox timeout in seconds")
@@ -330,9 +351,32 @@ class SuiteSpec(BaseModel):
                     resolved_graders[key] = gspec
                 yaml_data["graders"] = resolved_graders
 
+            # resolve sandbox.project_root — the ancestor dir uploaded and made
+            # the import root. Relative paths resolve against the suite file dir.
+            if isinstance(yaml_data.get("sandbox"), dict) and yaml_data["sandbox"].get("project_root"):
+                project_root = Path(yaml_data["sandbox"]["project_root"])
+                if not project_root.is_absolute():
+                    project_root = base_dir / project_root
+                yaml_data["sandbox"]["project_root"] = str(project_root.resolve())
+
             yaml_data["base_dir"] = base_dir
 
         if suite_path is not None:
             yaml_data["suite_path"] = suite_path
+
+        # Fail fast at load (so `validate` catches it once) when project_root
+        # isn't an ancestor of the suite — otherwise every sample's sandbox
+        # dispatch would fail identically. Deferred when the suite path is
+        # unknown; sandbox_mount re-checks defensively.
+        sandbox_cfg = yaml_data.get("sandbox")
+        if isinstance(sandbox_cfg, dict) and sandbox_cfg.get("project_root") and suite_path is not None:
+            project_root = Path(sandbox_cfg["project_root"])
+            try:
+                suite_path.resolve().relative_to(project_root.resolve())
+            except ValueError as e:
+                raise ValueError(
+                    f"Suite file {suite_path} is not inside sandbox.project_root {project_root}; "
+                    "project_root must be an ancestor of the suite."
+                ) from e
 
         return cls(**yaml_data)

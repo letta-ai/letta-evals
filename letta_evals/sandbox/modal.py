@@ -15,7 +15,7 @@ import shlex
 import tarfile
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from letta_evals.models import ModalSandboxSpec
 from letta_evals.sandbox.base import AbstractSandbox, ExecResult, SandboxAuthError, SandboxNotInstalledError
@@ -153,22 +153,38 @@ class ModalSandbox(AbstractSandbox):
         # tarball, /mnt after upload_dir's mkdir for sample.json).
         await self._sandbox.filesystem.copy_from_local.aio(str(local), remote)
 
-    async def upload_dir(self, local: Path, remote: str) -> None:
+    async def upload_dir(
+        self,
+        local: Path,
+        remote: str,
+        path_filter: Optional[Callable[[str], bool]] = None,
+    ) -> None:
         """Tar up ``local`` on the host, stream into the sandbox, extract at ``remote``.
 
         Avoids per-file SDK round trips (which add up fast for suites with
         large datasets) by going through a single tar exec call.
+
+        ``path_filter(relpath)`` selects what enters the tarball: it receives
+        each member's POSIX path relative to ``local`` and returns True to keep
+        it. Dropping a directory prunes its whole subtree (``tarfile`` skips
+        recursion into a filtered-out dir). None uploads everything.
         """
         if self._sandbox is None:
             raise RuntimeError("Sandbox not started — call start() first")
         if not local.is_dir():
             raise ValueError(f"upload_dir: local path is not a directory: {local}")
 
+        def _tar_filter(tarinfo: tarfile.TarInfo) -> Optional[tarfile.TarInfo]:
+            if path_filter is None or tarinfo.name in (".", ""):
+                return tarinfo
+            relpath = tarinfo.name[2:] if tarinfo.name.startswith("./") else tarinfo.name
+            return tarinfo if path_filter(relpath) else None
+
         with tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False) as tmp:
             tar_path = Path(tmp.name)
         try:
             with tarfile.open(tar_path, "w:gz") as tar:
-                tar.add(local, arcname=".")
+                tar.add(local, arcname=".", filter=_tar_filter)
 
             remote_tar = f"/tmp/{self.session_id}-suite.tar.gz"
             await self.upload_file(tar_path, remote_tar)

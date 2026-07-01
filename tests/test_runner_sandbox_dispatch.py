@@ -71,8 +71,9 @@ class _StubSandbox:
     async def upload_file(self, local: Path, remote: str) -> None:
         self.uploaded_files.append((local, remote))
 
-    async def upload_dir(self, local: Path, remote: str) -> None:
+    async def upload_dir(self, local: Path, remote: str, path_filter=None) -> None:
         self.uploaded_dirs.append((local, remote))
+        self.upload_filter = path_filter
 
     async def download_file(self, remote: str, local: Path) -> None:
         self.downloaded.append((remote, local))
@@ -153,6 +154,59 @@ class TestRunSampleInSandbox:
         # Result round-tripped.
         assert result.sample_id == "s1"
         assert result.grades["acc"].score == 1.0
+
+    def test_project_root_uploads_ancestor_and_sets_pythonpath(self, tmp_path, monkeypatch):
+        """With sandbox.project_root set, the ancestor tree is uploaded to
+        /mnt/project, the CLI runs there with it on PYTHONPATH, and the suite
+        YAML is addressed relative to project_root."""
+        suite_dir = tmp_path / "suites" / "mini"
+        suite_dir.mkdir(parents=True)
+        suite_path = suite_dir / "suite.yaml"
+        suite_path.write_text("name: test-suite\n")
+
+        spec = ModalSandboxSpec(image="img:test", timeout_sec=60, project_root=tmp_path)
+        runner = _make_runner_with_sandbox(tmp_path, sandbox_spec=spec)
+        runner.suite.base_dir = suite_dir
+        runner.suite.suite_path = suite_path
+
+        stub = _StubSandbox()
+        monkeypatch.setattr("letta_evals.sandbox.dispatch.ModalSandbox", lambda spec, session_id: stub)
+
+        sample = Sample(id="s1", input="hi", ground_truth="hi")
+        result = anyio.run(run_sample_in_sandbox, runner.suite, sample, "openai/gpt-a", 0.0)
+
+        # The whole project_root (not just the suite dir) is uploaded to /mnt/project.
+        assert (tmp_path, "/mnt/project") in stub.uploaded_dirs
+        cmd = _sandbox_cli_command(stub)
+        assert "cd /mnt/project" in cmd
+        assert "PYTHONPATH=/mnt/project" in cmd
+        # Suite YAML addressed relative to project_root, not /mnt/suite.
+        assert "/mnt/project/suites/mini/suite.yaml" in cmd
+        assert "/mnt/suite" not in cmd
+        assert result.sample_id == "s1"
+
+    def test_project_root_rejects_suite_outside_root(self, tmp_path, monkeypatch):
+        """A project_root that isn't an ancestor of the suite is a config error,
+        surfaced without ever starting a sandbox."""
+        outside_root = tmp_path / "other"
+        outside_root.mkdir()
+        suite_dir = tmp_path / "suite"
+        suite_dir.mkdir()
+
+        spec = ModalSandboxSpec(image="img:test", timeout_sec=60, project_root=outside_root)
+        runner = _make_runner_with_sandbox(tmp_path, sandbox_spec=spec)
+        runner.suite.base_dir = suite_dir
+        runner.suite.suite_path = suite_dir / "suite.yaml"
+
+        stub = _StubSandbox()
+        monkeypatch.setattr("letta_evals.sandbox.dispatch.ModalSandbox", lambda spec, session_id: stub)
+
+        sample = Sample(id="s1", input="hi", ground_truth="hi")
+        result = anyio.run(run_sample_in_sandbox, runner.suite, sample, "openai/gpt-a", 0.0)
+
+        assert not stub.started, "config error must short-circuit before starting a sandbox"
+        assert result.error is not None
+        assert result.error.exception_type == "SuiteConfigurationError"
 
     def test_host_drops_agent_state_before_result_validation(self, tmp_path, monkeypatch):
         """Older/custom sandbox images may still include agent_state in

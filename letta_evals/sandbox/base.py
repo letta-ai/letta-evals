@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 
 @dataclass
@@ -43,7 +43,9 @@ class AbstractSandbox(ABC):
     async def upload_file(self, local: Path, remote: str) -> None: ...
 
     @abstractmethod
-    async def upload_dir(self, local: Path, remote: str) -> None: ...
+    async def upload_dir(
+        self, local: Path, remote: str, path_filter: Optional[Callable[[str], bool]] = None
+    ) -> None: ...
 
     @abstractmethod
     async def download_file(self, remote: str, local: Path) -> None: ...
