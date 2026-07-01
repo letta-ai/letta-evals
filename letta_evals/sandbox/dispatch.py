@@ -126,29 +126,18 @@ def build_upload_filter(
     Built-in junk excludes always apply. When ``spec.respect_gitignore`` is set
     (the default), the patterns from ``root/.gitignore`` are folded in too — the
     file is just more gitignore-syntax lines, which is exactly what the exclude
-    spec consumes. ``exclude`` then adds to that; a non-empty ``include`` turns
-    file selection into an allowlist. Directories are always kept (descended)
-    unless they themselves match an exclude, so nested allowlisted files stay
-    reachable.
+    spec consumes. A directory that matches an exclude is pruned wholesale;
+    everything else is kept.
     """
     exclude_patterns = list(DEFAULT_UPLOAD_EXCLUDES)
     if spec and spec.respect_gitignore and root is not None:
         gitignore = root / ".gitignore"
         if gitignore.is_file():
             exclude_patterns += gitignore.read_text().splitlines()
-    exclude_patterns += list(spec.exclude if spec else [])
     exclude_spec = pathspec.GitIgnoreSpec.from_lines(exclude_patterns)
-    include_lines = list(spec.include) if spec and spec.include else []
-    include_spec = pathspec.GitIgnoreSpec.from_lines(include_lines) if include_lines else None
 
     def keep(relpath: str, is_dir: bool) -> bool:
-        if exclude_spec.match_file(relpath):
-            return False
-        if is_dir:
-            return True
-        if include_spec is not None and not include_spec.match_file(relpath):
-            return False
-        return True
+        return not exclude_spec.match_file(relpath)
 
     return keep
 

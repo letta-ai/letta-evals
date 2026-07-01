@@ -60,8 +60,6 @@ class TestModalSandboxSpec:
         assert spec.letta_evals_version is None
         assert spec.letta_code_version is None
         assert spec.project_root is None
-        assert spec.include == []
-        assert spec.exclude == []
         assert spec.respect_gitignore is True
 
     def test_image_override(self):
@@ -197,21 +195,6 @@ class TestUploadFilter:
         assert not keep("pkg/__pycache__", True)
         assert not keep("pkg/mod.pyc", False)
         assert not keep("node_modules", True)
-
-    def test_include_is_an_allowlist_that_still_descends_directories(self):
-        keep = build_upload_filter(ModalSandboxSpec(include=["pkg/**", "pyproject.toml"]))
-        # Directories always descend so nested allowlisted files stay reachable.
-        assert keep("pkg", True)
-        assert keep("other", True)
-        # Files must match an include pattern.
-        assert keep("pkg/mod.py", False)
-        assert keep("pyproject.toml", False)
-        assert not keep("other/notes.txt", False)
-
-    def test_user_exclude_wins_over_include(self):
-        keep = build_upload_filter(ModalSandboxSpec(include=["pkg/**"], exclude=["pkg/secret.py"]))
-        assert keep("pkg/mod.py", False)
-        assert not keep("pkg/secret.py", False)
 
     def test_respects_gitignore_at_root(self, tmp_path):
         (tmp_path / ".gitignore").write_text("data/large/\n*.log\n")

@@ -143,23 +143,6 @@ class ModalSandboxSpec(BaseModel):
             "(self-contained-suite behavior, unchanged)."
         ),
     )
-    include: List[str] = Field(
-        default_factory=list,
-        description=(
-            "Gitignore-style globs; when non-empty, ONLY matching files under the "
-            "uploaded tree are shipped (an allowlist). Use to trim a large "
-            "project_root down to its code closure. Directories are always "
-            "descended so nested matches are reachable."
-        ),
-    )
-    exclude: List[str] = Field(
-        default_factory=list,
-        description=(
-            "Gitignore-style globs excluded from the upload, on top of built-in "
-            "defaults (.git, __pycache__, *.pyc, .venv, node_modules, and similar "
-            "junk) and any .gitignore patterns. Applied after `include`."
-        ),
-    )
     respect_gitignore: bool = Field(
         default=True,
         description=(
