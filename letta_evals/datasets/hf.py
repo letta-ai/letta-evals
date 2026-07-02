@@ -99,8 +99,7 @@ def parse_hf_ref(value: str) -> HfDatasetRef:
         return HfDatasetRef(repo_id=repo_id, revision=rest[1], path="/".join(rest[2:]))
 
     raise ValueError(
-        f"Unrecognized HuggingFace URL shape {value!r}; expected a repo URL or a "
-        "'.../resolve/<rev>/<file>' file URL."
+        f"Unrecognized HuggingFace URL shape {value!r}; expected a repo URL or a '.../resolve/<rev>/<file>' file URL."
     )
 
 
