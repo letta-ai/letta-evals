@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from typing import Any, Iterator, List, Optional, Union
 
+from letta_evals.datasets.hf import is_hf_ref, resolve_hf_dataset
 from letta_evals.models import Sample, SampleId
 
 
@@ -237,16 +238,20 @@ def load_dataset(
 ) -> Iterator[Sample]:
     """Load samples from a dataset file (JSONL or CSV).
 
-    Automatically detects format based on file extension:
+    ``file_path`` is a local path or a HuggingFace Hub URL. HF URLs are fetched
+    (single manifest file, cached) to a local path first; format is then
+    detected by file extension exactly as for a local file:
     - .jsonl: Load as JSONL
     - .csv: Load as CSV
 
     Args:
-        file_path: Path to dataset file (.jsonl or .csv)
+        file_path: Local path or HuggingFace Hub URL to the dataset (.jsonl/.csv)
         max_samples: Maximum number of samples to load
         sample_tags: Filter samples by tags (not currently supported)
         base_dir: Suite directory, used to resolve relative ``rubric_path``
             values. Defaults to the dataset file's own directory when unset.
+            For HF-backed datasets this stays the suite dir, so rubric files
+            resolve next to the suite rather than in the HF cache.
 
     Returns:
         Iterator of Sample objects
@@ -254,16 +259,18 @@ def load_dataset(
     Raises:
         ValueError: If file format is unsupported or file is invalid
     """
-    file_path = Path(file_path)
+    if is_hf_ref(file_path):
+        local_path = resolve_hf_dataset(str(file_path)).local_path
+    else:
+        local_path = Path(file_path)
+        if not local_path.exists():
+            raise ValueError(f"Dataset file does not exist: {local_path}")
 
-    if not file_path.exists():
-        raise ValueError(f"Dataset file does not exist: {file_path}")
-
-    suffix = file_path.suffix.lower()
+    suffix = local_path.suffix.lower()
 
     if suffix == ".jsonl":
-        return load_jsonl(file_path, max_samples=max_samples, sample_tags=sample_tags, base_dir=base_dir)
+        return load_jsonl(local_path, max_samples=max_samples, sample_tags=sample_tags, base_dir=base_dir)
     elif suffix == ".csv":
-        return load_csv(file_path, max_samples=max_samples, sample_tags=sample_tags, base_dir=base_dir)
+        return load_csv(local_path, max_samples=max_samples, sample_tags=sample_tags, base_dir=base_dir)
     else:
         raise ValueError(f"Unsupported dataset format: {suffix}. Supported formats: .jsonl, .csv")

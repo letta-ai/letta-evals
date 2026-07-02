@@ -129,6 +129,15 @@ Dataset rows may also include fields such as:
 - `agent_args` for programmatic agent factories
 - `rubric` or `rubric_path` for per-sample model-judge rubric overrides
 
+Instead of a local path, `dataset:` may point at a dataset hosted on the [HuggingFace Hub](https://huggingface.co/). The single manifest file is fetched and cached on the host, then loaded exactly like a local file:
+
+```yaml
+# pin a revision (tag / branch / commit SHA) for reproducible runs
+dataset: https://huggingface.co/datasets/letta-ai/swe-chat-tagged/resolve/<revision>/train.jsonl
+```
+
+This needs the optional extra (`pip install 'letta-evals[hf]'`). Private repos work with a standard `HF_TOKEN` / `HUGGING_FACE_HUB_TOKEN` in the environment. Fetching happens host-side, so nothing is downloaded inside the Modal sandbox. An unpinned revision (a bare repo URL, or `.../resolve/main/...`) warns and surfaces the resolved commit so the run stays reproducible from its logs; a bare repo URL is accepted only when the repo holds exactly one `.jsonl`/`.csv` manifest. Relative `rubric_path` values still resolve against the suite directory, not the HF cache.
+
 ### Targets
 
 The supported target is `letta_code`, which runs the Letta Code CLI against a Letta server. Important target fields include:

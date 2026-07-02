@@ -55,6 +55,9 @@ dev = [
 filesystem = [
     "faker>=37.6.0",
 ]
+hf = [
+    "huggingface_hub>=0.20.0",
+]
 skills = [
     "pathspec>=0.12.1",
     "openpyxl>=3.1.5",
