@@ -41,14 +41,8 @@ def _resolve_rubric_fields(
 
     Returns the rubric text (loaded from disk if ``rubric_path`` is set,
     otherwise the inline ``rubric``), or ``None`` if neither is provided.
-    Raises ``ValueError`` if both are set.
-
     Relative ``rubric_path`` values resolve against ``base_dir`` (the suite
-    directory), consistent with every other path field in the suite —
-    ``function``, ``extractor``, ``prompt_path``, ``setup_script``, etc. This
-    is what lets a dataset live somewhere other than the suite dir (e.g. an
-    HF-backed manifest in ``~/.cache/huggingface``) while its rubric files
-    stay resolvable next to the suite.
+    dir). Raises ``ValueError`` if both are set.
     """
     if rubric_inline is not None and rubric_path is not None:
         raise ValueError(f"Row {row_idx}: cannot set both 'rubric' and 'rubric_path'. Use one or the other.")
