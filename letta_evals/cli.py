@@ -160,7 +160,14 @@ def run(
         )
         effective_output = output if output is not None else suite.output
 
-        samples = list(load_dataset(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
+        samples = list(
+            load_dataset(
+                suite.dataset,
+                max_samples=suite.max_samples,
+                sample_tags=suite.sample_tags,
+                base_dir=suite.base_dir,
+            )
+        )
         num_samples = len(samples)
 
         # calculate total evaluations (samples × models)

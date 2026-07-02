@@ -10,6 +10,7 @@ from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from letta_evals.datasets.hf import is_hf_ref
 from letta_evals.types import (
     GraderKind,
     LLMProvider,
@@ -258,7 +259,13 @@ class SuiteSpec(BaseModel):
 
     name: str = Field(description="Name of the evaluation suite")
     description: Optional[str] = Field(default=None, description="Description of what this suite evaluates")
-    dataset: Path = Field(description="Path to JSONL dataset file")
+    dataset: str = Field(
+        description=(
+            "Local path or HuggingFace Hub URL to the JSONL/CSV dataset file. "
+            "HF URLs (https://huggingface.co/datasets/<org>/<repo>/resolve/<rev>/<file>) "
+            "are fetched and cached on the host; local paths resolve against the suite dir."
+        )
+    )
     target: LettaCodeTargetSpec = Field(description="Target configuration")
     graders: Optional[Dict[str, GraderSpec]] = Field(default=None, description="Multiple graders keyed by metric name")
     reward: RewardSpec = Field(description="Per-sample reward composition contract")
@@ -304,9 +311,12 @@ class SuiteSpec(BaseModel):
     ) -> "SuiteSpec":
         """Create from parsed YAML data."""
         if base_dir:
-            # resolve dataset path
-            if "dataset" in yaml_data and not Path(yaml_data["dataset"]).is_absolute():
-                yaml_data["dataset"] = str((base_dir / yaml_data["dataset"]).resolve())
+            # resolve dataset path (HF Hub URLs are left as-is; only local
+            # relative paths are anchored to the suite dir)
+            if "dataset" in yaml_data:
+                dataset_ref = yaml_data["dataset"]
+                if not is_hf_ref(dataset_ref) and not Path(dataset_ref).is_absolute():
+                    yaml_data["dataset"] = str((base_dir / dataset_ref).resolve())
 
             # resolve output path
             if "output" in yaml_data and yaml_data["output"] and not Path(yaml_data["output"]).is_absolute():

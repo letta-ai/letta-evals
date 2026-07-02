@@ -585,7 +585,12 @@ class Runner:
             await self._run_setup()
 
         samples = list(
-            load_dataset(self.suite.dataset, max_samples=self.suite.max_samples, sample_tags=self.suite.sample_tags)
+            load_dataset(
+                self.suite.dataset,
+                max_samples=self.suite.max_samples,
+                sample_tags=self.suite.sample_tags,
+                base_dir=self.suite.base_dir,
+            )
         )
         self._sample_lookup = {s.id: s for s in samples}
 
@@ -724,7 +729,14 @@ async def run_suite(
         cached_results = await StreamingReader.to_runner_result(cached_results_path)
 
         cached_sample_map = {s.id: s for s in cached_results.samples}
-        samples = list(load_dataset(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
+        samples = list(
+            load_dataset(
+                suite.dataset,
+                max_samples=suite.max_samples,
+                sample_tags=suite.sample_tags,
+                base_dir=suite.base_dir,
+            )
+        )
 
         for sample in samples:
             if sample.id in cached_sample_map:
@@ -734,7 +746,14 @@ async def run_suite(
                         f"Sample ID {sample.id} input mismatch: dataset has '{sample.input}' but cache has '{cached_sample.input}'"
                     )
 
-    samples = list(load_dataset(suite.dataset, max_samples=suite.max_samples, sample_tags=suite.sample_tags))
+    samples = list(
+        load_dataset(
+            suite.dataset,
+            max_samples=suite.max_samples,
+            sample_tags=suite.sample_tags,
+            base_dir=suite.base_dir,
+        )
+    )
     if suite.target.model_handles:
         num_models = len(suite.target.model_handles)
     else:
