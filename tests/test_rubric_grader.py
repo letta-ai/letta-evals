@@ -133,6 +133,19 @@ class TestLoaderPerSampleRubric:
         # The loader resolves the file and stores its content in sample.rubric.
         assert samples[0].rubric == "file rubric"
 
+    def test_jsonl_rubric_path_resolves_against_base_dir(self, tmp_path: Path):
+        # Dataset in a subdir; rubric file lives next to the suite (base_dir),
+        # not next to the dataset. Relative rubric_path must resolve against
+        # base_dir — the same anchor every other suite path field uses — so an
+        # off-suite dataset (e.g. an HF cache dir) keeps rubric files findable.
+        (tmp_path / "rubric.txt").write_text("suite-level rubric")
+        datasets_dir = tmp_path / "datasets"
+        datasets_dir.mkdir()
+        data = datasets_dir / "data.jsonl"
+        data.write_text(json.dumps({"input": "Q?", "rubric_path": "rubric.txt"}) + "\n")
+        samples = list(load_jsonl(data, base_dir=tmp_path))
+        assert samples[0].rubric == "suite-level rubric"
+
     def test_jsonl_rubric_path_absolute(self, tmp_path: Path):
         rubric_file = tmp_path / "abs.txt"
         rubric_file.write_text("absolute rubric")

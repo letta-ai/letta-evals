@@ -1,6 +1,5 @@
 """Unit tests for cleanup behavior."""
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from letta_evals.models import (
@@ -16,7 +15,7 @@ def _make_suite(target_spec, cleanup: bool = False) -> SuiteSpec:
     """Create a minimal SuiteSpec for testing."""
     return SuiteSpec(
         name="test-cleanup",
-        dataset=Path("fake.jsonl"),
+        dataset="fake.jsonl",
         target=target_spec,
         graders={"accuracy": ToolGraderSpec(kind=GraderKind.TOOL, function="exact_match")},
         reward=MetricRewardSpec(kind=RewardKind.METRIC, metric_key="accuracy"),
