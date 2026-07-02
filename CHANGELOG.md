@@ -132,6 +132,30 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.24.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.23.0...letta-evals-v0.24.0) (2026-07-02)
+
+
+### Features
+
+* **datasets:** Support HuggingFace Hub-backed datasets in `dataset:` ([#317](https://github.com/letta-ai/letta-evals/issues/317)) ([0680ab6](https://github.com/letta-ai/letta-evals/commit/0680ab6bcb6969baec7b9730b65fb12bebd60905))
+* **sandbox:** Support non-self-contained suites via project_root ([#313](https://github.com/letta-ai/letta-evals/issues/313)) ([610f1d6](https://github.com/letta-ai/letta-evals/commit/610f1d632095175d353c68990377f2acd36bb12c))
+
+
+### Bug Fixes
+
+* **sandbox:** Drop agent state across result boundary ([#312](https://github.com/letta-ai/letta-evals/issues/312)) ([8c9dde1](https://github.com/letta-ai/letta-evals/commit/8c9dde1b9333a81ae01b200f04bfdd57721b980d))
+
+
+### Performance Improvements
+
+* Lazy import heavy eval dependencies ([#315](https://github.com/letta-ai/letta-evals/issues/315)) ([4b5975c](https://github.com/letta-ai/letta-evals/commit/4b5975c62ac391fa8abf0b5ecb1d3fe7a8470518))
+
+
+### Chores
+
+* Regenerate uv.lock ([#318](https://github.com/letta-ai/letta-evals/issues/318)) ([4b10abd](https://github.com/letta-ai/letta-evals/commit/4b10abd8df3c4c672d76c000ef6c453b9e96ce9c))
+* Tidy repo layout and relocate CI config ([#307](https://github.com/letta-ai/letta-evals/issues/307)) ([597fafe](https://github.com/letta-ai/letta-evals/commit/597fafe77d7d38020132aab2cc2d36b1ec6ccf53))
+
 ## [0.23.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.22.0...letta-evals-v0.23.0) (2026-06-30)
 
 
