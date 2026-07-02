@@ -33,7 +33,7 @@ def _csv_sample_id(df: Any, row: Any, fallback: int) -> SampleId:
 def _resolve_rubric_fields(
     rubric_inline: Optional[str],
     rubric_path: Optional[str],
-    dataset_dir: Path,
+    base_dir: Path,
     row_idx: int,
 ) -> Optional[str]:
     """Resolve per-sample rubric fields into a single rubric string.
@@ -41,13 +41,20 @@ def _resolve_rubric_fields(
     Returns the rubric text (loaded from disk if ``rubric_path`` is set,
     otherwise the inline ``rubric``), or ``None`` if neither is provided.
     Raises ``ValueError`` if both are set.
+
+    Relative ``rubric_path`` values resolve against ``base_dir`` (the suite
+    directory), consistent with every other path field in the suite —
+    ``function``, ``extractor``, ``prompt_path``, ``setup_script``, etc. This
+    is what lets a dataset live somewhere other than the suite dir (e.g. an
+    HF-backed manifest in ``~/.cache/huggingface``) while its rubric files
+    stay resolvable next to the suite.
     """
     if rubric_inline is not None and rubric_path is not None:
         raise ValueError(f"Row {row_idx}: cannot set both 'rubric' and 'rubric_path'. Use one or the other.")
     if rubric_path is not None:
         path = Path(rubric_path)
         if not path.is_absolute():
-            path = (dataset_dir / path).resolve()
+            path = (base_dir / path).resolve()
         if not path.exists():
             raise ValueError(f"Row {row_idx}: rubric_path '{rubric_path}' does not exist (resolved to {path}).")
         with open(path, "r") as f:
@@ -56,10 +63,18 @@ def _resolve_rubric_fields(
 
 
 def load_jsonl(
-    file_path: Path, max_samples: Optional[int] = None, sample_tags: Optional[List[str]] = None
+    file_path: Path,
+    max_samples: Optional[int] = None,
+    sample_tags: Optional[List[str]] = None,
+    base_dir: Optional[Path] = None,
 ) -> Iterator[Sample]:
-    """Load samples from a JSONL file."""
-    dataset_dir = file_path.parent
+    """Load samples from a JSONL file.
+
+    ``base_dir`` is the suite directory, used to resolve relative
+    ``rubric_path`` values. Falls back to the dataset file's own directory
+    when unset (e.g. direct calls); for a colocated dataset the two coincide.
+    """
+    rubric_base = base_dir if base_dir is not None else file_path.parent
     with open(file_path, "r") as f:
         line_index = 0
         yielded_count = 0
@@ -78,7 +93,7 @@ def load_jsonl(
             rubric_text = _resolve_rubric_fields(
                 data.get("rubric"),
                 data.get("rubric_path"),
-                dataset_dir,
+                rubric_base,
                 line_index,
             )
             sample = Sample(
@@ -135,7 +150,10 @@ def _parse_json_dict_field(df: Any, row: Any, field_name: str, row_idx) -> Optio
 
 
 def load_csv(
-    file_path: Path, max_samples: Optional[int] = None, sample_tags: Optional[List[str]] = None
+    file_path: Path,
+    max_samples: Optional[int] = None,
+    sample_tags: Optional[List[str]] = None,
+    base_dir: Optional[Path] = None,
 ) -> Iterator[Sample]:
     """Load samples from a CSV file.
 
@@ -148,7 +166,7 @@ def load_csv(
     - rubric (optional): per-sample rubric text (multi-line strings in CSV
       cells are awkward; prefer ``rubric_path`` for non-trivial rubrics)
     - rubric_path (optional): per-sample rubric file path. Resolved relative
-      to the dataset file's directory. Mutually exclusive with ``rubric``.
+      to ``base_dir`` (the suite directory). Mutually exclusive with ``rubric``.
     """
     import pandas as pd
 
@@ -163,7 +181,7 @@ def load_csv(
     if "input" not in df.columns:
         raise ValueError(f"CSV file {file_path} missing required column 'input'. Found columns: {list(df.columns)}")
 
-    dataset_dir = file_path.parent
+    rubric_base = base_dir if base_dir is not None else file_path.parent
     yielded_count = 0
     for idx, row in df.iterrows():
         if max_samples and yielded_count >= max_samples:
@@ -191,7 +209,7 @@ def load_csv(
         if "rubric_path" in df.columns and not pd.isna(row.get("rubric_path")):
             rubric_path_value = str(row["rubric_path"]).strip()
 
-        rubric_text = _resolve_rubric_fields(rubric_inline, rubric_path_value, dataset_dir, int(idx))
+        rubric_text = _resolve_rubric_fields(rubric_inline, rubric_path_value, rubric_base, int(idx))
 
         # create sample
         try:
@@ -212,7 +230,10 @@ def load_csv(
 
 
 def load_dataset(
-    file_path: Union[str, Path], max_samples: Optional[int] = None, sample_tags: Optional[List[str]] = None
+    file_path: Union[str, Path],
+    max_samples: Optional[int] = None,
+    sample_tags: Optional[List[str]] = None,
+    base_dir: Optional[Path] = None,
 ) -> Iterator[Sample]:
     """Load samples from a dataset file (JSONL or CSV).
 
@@ -224,6 +245,8 @@ def load_dataset(
         file_path: Path to dataset file (.jsonl or .csv)
         max_samples: Maximum number of samples to load
         sample_tags: Filter samples by tags (not currently supported)
+        base_dir: Suite directory, used to resolve relative ``rubric_path``
+            values. Defaults to the dataset file's own directory when unset.
 
     Returns:
         Iterator of Sample objects
@@ -239,8 +262,8 @@ def load_dataset(
     suffix = file_path.suffix.lower()
 
     if suffix == ".jsonl":
-        return load_jsonl(file_path, max_samples=max_samples, sample_tags=sample_tags)
+        return load_jsonl(file_path, max_samples=max_samples, sample_tags=sample_tags, base_dir=base_dir)
     elif suffix == ".csv":
-        return load_csv(file_path, max_samples=max_samples, sample_tags=sample_tags)
+        return load_csv(file_path, max_samples=max_samples, sample_tags=sample_tags, base_dir=base_dir)
     else:
         raise ValueError(f"Unsupported dataset format: {suffix}. Supported formats: .jsonl, .csv")
