@@ -38,6 +38,7 @@ dependencies = [
     "pandas>=2.3.2",
     "matplotlib>=3.10.6",
     "pathspec>=0.12.1",
+    "huggingface_hub>=0.20.0",
 ]
 
 [project.urls]
@@ -54,9 +55,6 @@ dev = [
 ]
 filesystem = [
     "faker>=37.6.0",
-]
-hf = [
-    "huggingface_hub>=0.20.0",
 ]
 skills = [
     "pathspec>=0.12.1",

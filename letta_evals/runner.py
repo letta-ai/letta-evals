@@ -11,6 +11,7 @@ import yaml
 from letta_client import AsyncLetta
 from rich.console import Console
 
+from letta_evals.datasets.hf import hf_dataset_provenance
 from letta_evals.datasets.loader import load_dataset
 from letta_evals.execution.grading import detect_errors, grade_sample, validate_rubric_vars
 from letta_evals.execution.trace import fetch_agent_state, fetch_token_data, fetch_trajectory
@@ -715,6 +716,10 @@ async def run_suite(
         yaml_data = yaml.safe_load(f)
 
     suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent, suite_path=suite_path)
+
+    # Record which exact dataset snapshot this run reads (HF repo/revision/commit);
+    # None for local datasets. Persisted into suite.json by the streaming writer.
+    suite.dataset_provenance = hf_dataset_provenance(suite.dataset)
 
     actual_num_runs = num_runs if num_runs is not None else (suite.num_runs or 1)
 

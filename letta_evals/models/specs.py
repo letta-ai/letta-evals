@@ -291,6 +291,12 @@ class SuiteSpec(BaseModel):
         ),
     )
 
+    # Resolved dataset provenance, populated at run time (HF repo / revision /
+    # commit SHA) so a completed run records the exact dataset snapshot it used.
+    # None for local datasets. Serialized into suite.json, unlike the internal
+    # path-resolution fields below.
+    dataset_provenance: Optional[Dict[str, Any]] = Field(default=None)
+
     # internal fields for path resolution / dispatch
     base_dir: Optional[Path] = Field(default=None, exclude=True)
     suite_path: Optional[Path] = Field(default=None, exclude=True)

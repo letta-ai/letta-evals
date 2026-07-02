@@ -1,24 +1,23 @@
 """Unit tests for HuggingFace Hub-backed datasets.
 
 Covers URL detection/parsing, provenance extraction, the fetch wrapper (with a
-stubbed ``huggingface_hub``), and the end-to-end ``load_dataset`` path including
-that ``rubric_path`` resolves against the suite dir, not the HF cache dir.
+stubbed ``huggingface_hub``), the end-to-end ``load_dataset`` path including
+that ``rubric_path`` resolves against the suite dir (not the HF cache dir), and
+that resolved provenance serializes into the suite config (suite.json).
 """
 
 from __future__ import annotations
 
-import importlib.util
 import json
 from pathlib import Path
 
+import huggingface_hub
 import pytest
 
-from letta_evals.datasets import hf
 from letta_evals.datasets.hf import (
     HfDatasetRef,
     _commit_sha_from_cache_path,
-    _import_hf,
-    _is_unpinned,
+    hf_dataset_provenance,
     is_hf_ref,
     parse_hf_ref,
     resolve_hf_dataset,
@@ -27,22 +26,23 @@ from letta_evals.datasets.loader import load_dataset
 from letta_evals.models import SuiteSpec
 
 
-class _FakeHub:
-    """Stand-in for the ``huggingface_hub`` module in tests."""
+def _install_fake_hub(monkeypatch, download_path=None, files=None):
+    """Patch huggingface_hub's fetch fns with in-memory stubs; return call log."""
+    calls = {"download": [], "list": []}
 
-    def __init__(self, download_path, files=None):
-        self.download_path = str(download_path)
-        self.files = list(files) if files is not None else []
-        self.download_calls = []
-
-    def hf_hub_download(self, repo_id, filename, repo_type, revision):
-        self.download_calls.append(
+    def _download(repo_id, filename, repo_type, revision):
+        calls["download"].append(
             {"repo_id": repo_id, "filename": filename, "repo_type": repo_type, "revision": revision}
         )
-        return self.download_path
+        return str(download_path)
 
-    def list_repo_files(self, repo_id, repo_type, revision):
-        return list(self.files)
+    def _list(repo_id, repo_type, revision):
+        calls["list"].append({"repo_id": repo_id, "repo_type": repo_type, "revision": revision})
+        return list(files or [])
+
+    monkeypatch.setattr(huggingface_hub, "hf_hub_download", _download)
+    monkeypatch.setattr(huggingface_hub, "list_repo_files", _list)
+    return calls
 
 
 def _cache_file(tmp_path: Path, sha: str, filename: str, rows) -> Path:
@@ -62,7 +62,7 @@ class TestIsHfRef:
         [
             "https://huggingface.co/datasets/org/repo",
             "https://huggingface.co/datasets/org/repo/resolve/main/d.jsonl",
-            "http://huggingface.co/org/model/resolve/v1/d.jsonl",
+            "http://huggingface.co/datasets/org/repo/blob/v1/d.csv",
             "HTTPS://HuggingFace.co/datasets/org/repo",  # case-insensitive host/scheme
         ],
     )
@@ -76,6 +76,7 @@ class TestIsHfRef:
             "/abs/path/data.jsonl",
             "datasets/local.jsonl",
             "https://example.com/data.jsonl",
+            "https://huggingface.co/org/model/resolve/v1/d.jsonl",  # model repo, not a dataset
             "https://huggingface.co.evil.com/datasets/org/repo",  # look-alike host
             Path("data.jsonl"),
             None,
@@ -91,28 +92,23 @@ class TestIsHfRef:
 class TestParseHfRef:
     def test_resolve_url(self):
         ref = parse_hf_ref("https://huggingface.co/datasets/letta-ai/swe-chat-tagged/resolve/main/train.jsonl")
-        assert ref == HfDatasetRef("letta-ai/swe-chat-tagged", "dataset", "main", "train.jsonl")
+        assert ref == HfDatasetRef("letta-ai/swe-chat-tagged", "main", "train.jsonl")
 
     def test_blob_url(self):
         ref = parse_hf_ref("https://huggingface.co/datasets/org/repo/blob/v1.0/data.csv")
-        assert ref == HfDatasetRef("org/repo", "dataset", "v1.0", "data.csv")
+        assert ref == HfDatasetRef("org/repo", "v1.0", "data.csv")
 
     def test_bare_repo_url(self):
         ref = parse_hf_ref("https://huggingface.co/datasets/letta-ai/swe-chat-tagged")
-        assert ref == HfDatasetRef("letta-ai/swe-chat-tagged", "dataset", None, None)
-
-    def test_model_repo(self):
-        ref = parse_hf_ref("https://huggingface.co/org/model/resolve/abc123/d.jsonl")
-        assert ref == HfDatasetRef("org/model", "model", "abc123", "d.jsonl")
-
-    def test_space_repo(self):
-        ref = parse_hf_ref("https://huggingface.co/spaces/org/space/resolve/main/d.csv")
-        assert ref.repo_type == "space"
-        assert ref.repo_id == "org/space"
+        assert ref == HfDatasetRef("letta-ai/swe-chat-tagged", None, None)
 
     def test_nested_path(self):
         ref = parse_hf_ref("https://huggingface.co/datasets/org/repo/resolve/main/sub/dir/data.jsonl")
         assert ref.path == "sub/dir/data.jsonl"
+
+    def test_non_dataset_url_raises(self):
+        with pytest.raises(ValueError, match="expected"):
+            parse_hf_ref("https://huggingface.co/org/model/resolve/v1/d.jsonl")
 
     def test_resolve_missing_file_raises(self):
         with pytest.raises(ValueError, match="missing a revision and/or file path"):
@@ -126,31 +122,13 @@ class TestParseHfRef:
 # ── provenance helpers ─────────────────────────────────────────────────────
 
 
-class TestProvenanceHelpers:
-    def test_commit_sha_extracted(self):
+class TestCommitShaFromCachePath:
+    def test_extracted(self):
         p = Path("/home/u/.cache/huggingface/datasets--org--repo/snapshots/deadbeef/data.jsonl")
         assert _commit_sha_from_cache_path(p) == "deadbeef"
 
-    def test_commit_sha_none_when_no_snapshots(self):
+    def test_none_when_no_snapshots(self):
         assert _commit_sha_from_cache_path(Path("/tmp/local/data.jsonl")) is None
-
-    @pytest.mark.parametrize("rev,expected", [(None, True), ("main", True), ("master", True)])
-    def test_unpinned(self, rev, expected):
-        assert _is_unpinned(rev) is expected
-
-    @pytest.mark.parametrize("rev", ["abc123def", "v1.0", "release-2024"])
-    def test_pinned(self, rev):
-        assert _is_unpinned(rev) is False
-
-
-# ── _import_hf ─────────────────────────────────────────────────────────────
-
-
-def test_import_hf_missing_raises():
-    if importlib.util.find_spec("huggingface_hub") is not None:
-        pytest.skip("huggingface_hub is installed; cannot exercise the missing-dep path")
-    with pytest.raises(ImportError, match=r"letta-evals\[hf\]"):
-        _import_hf()
 
 
 # ── resolve_hf_dataset ─────────────────────────────────────────────────────
@@ -159,8 +137,7 @@ def test_import_hf_missing_raises():
 class TestResolveHfDataset:
     def test_file_url_returns_path_and_provenance(self, tmp_path, monkeypatch):
         cache = _cache_file(tmp_path, "abc123", "train.jsonl", [{"input": "Q?"}])
-        fake = _FakeHub(cache)
-        monkeypatch.setattr(hf, "_import_hf", lambda: fake)
+        calls = _install_fake_hub(monkeypatch, download_path=cache)
 
         resolved = resolve_hf_dataset("https://huggingface.co/datasets/org/repo/resolve/abc123/train.jsonl")
 
@@ -168,38 +145,42 @@ class TestResolveHfDataset:
         assert resolved.commit_sha == "abc123"
         assert resolved.repo_id == "org/repo"
         assert resolved.path == "train.jsonl"
-        assert fake.download_calls == [
+        assert calls["download"] == [
             {"repo_id": "org/repo", "filename": "train.jsonl", "repo_type": "dataset", "revision": "abc123"}
         ]
 
     def test_unpinned_revision_warns(self, tmp_path, monkeypatch):
         cache = _cache_file(tmp_path, "sha9", "d.jsonl", [{"input": "Q?"}])
-        monkeypatch.setattr(hf, "_import_hf", lambda: _FakeHub(cache))
+        _install_fake_hub(monkeypatch, download_path=cache)
 
         with pytest.warns(UserWarning, match="unpinned"):
             resolve_hf_dataset("https://huggingface.co/datasets/org/repo/resolve/main/d.jsonl")
 
+    def test_pinned_revision_does_not_warn(self, tmp_path, monkeypatch, recwarn):
+        cache = _cache_file(tmp_path, "abc123", "d.jsonl", [{"input": "Q?"}])
+        _install_fake_hub(monkeypatch, download_path=cache)
+
+        resolve_hf_dataset("https://huggingface.co/datasets/org/repo/resolve/abc123/d.jsonl")
+        assert not [w for w in recwarn.list if "unpinned" in str(w.message)]
+
     def test_bare_repo_single_manifest_resolved(self, tmp_path, monkeypatch):
         cache = _cache_file(tmp_path, "sha9", "the_only.jsonl", [{"input": "Q?"}])
-        fake = _FakeHub(cache, files=["README.md", "the_only.jsonl", "config.yaml"])
-        monkeypatch.setattr(hf, "_import_hf", lambda: fake)
+        calls = _install_fake_hub(monkeypatch, download_path=cache, files=["README.md", "the_only.jsonl", "x.yaml"])
 
         with pytest.warns(UserWarning):  # bare repo => unpinned
             resolved = resolve_hf_dataset("https://huggingface.co/datasets/org/repo")
 
         assert resolved.path == "the_only.jsonl"
-        assert fake.download_calls[0]["filename"] == "the_only.jsonl"
+        assert calls["download"][0]["filename"] == "the_only.jsonl"
 
     def test_bare_repo_multiple_manifests_raises(self, tmp_path, monkeypatch):
-        fake = _FakeHub(tmp_path / "x", files=["train.jsonl", "test.jsonl"])
-        monkeypatch.setattr(hf, "_import_hf", lambda: fake)
+        _install_fake_hub(monkeypatch, download_path=tmp_path / "x", files=["train.jsonl", "test.jsonl"])
 
         with pytest.raises(ValueError, match="multiple manifests"):
             resolve_hf_dataset("https://huggingface.co/datasets/org/repo")
 
     def test_bare_repo_no_manifest_raises(self, tmp_path, monkeypatch):
-        fake = _FakeHub(tmp_path / "x", files=["README.md", "weights.bin"])
-        monkeypatch.setattr(hf, "_import_hf", lambda: fake)
+        _install_fake_hub(monkeypatch, download_path=tmp_path / "x", files=["README.md", "weights.bin"])
 
         with pytest.raises(ValueError, match="No .jsonl/.csv manifest"):
             resolve_hf_dataset("https://huggingface.co/datasets/org/repo")
@@ -211,7 +192,7 @@ class TestResolveHfDataset:
 class TestLoadDatasetHf:
     def test_loads_samples_from_hf_url(self, tmp_path, monkeypatch):
         cache = _cache_file(tmp_path, "abc", "d.jsonl", [{"input": "Q1"}, {"input": "Q2"}])
-        monkeypatch.setattr(hf, "_import_hf", lambda: _FakeHub(cache))
+        _install_fake_hub(monkeypatch, download_path=cache)
 
         samples = list(load_dataset("https://huggingface.co/datasets/org/repo/resolve/abc/d.jsonl"))
         assert [s.input for s in samples] == ["Q1", "Q2"]
@@ -224,7 +205,7 @@ class TestLoadDatasetHf:
         suite_dir.mkdir()
         (suite_dir / "rubric.txt").write_text("suite-level rubric")
         cache = _cache_file(tmp_path, "abc", "d.jsonl", [{"input": "Q?", "rubric_path": "rubric.txt"}])
-        monkeypatch.setattr(hf, "_import_hf", lambda: _FakeHub(cache))
+        _install_fake_hub(monkeypatch, download_path=cache)
 
         samples = list(
             load_dataset(
@@ -235,7 +216,7 @@ class TestLoadDatasetHf:
         assert samples[0].rubric == "suite-level rubric"
 
 
-# ── SuiteSpec.from_yaml leaves HF URLs untouched ───────────────────────────
+# ── provenance record + suite.json serialization ───────────────────────────
 
 
 def _suite_yaml(dataset: str) -> dict:
@@ -246,6 +227,32 @@ def _suite_yaml(dataset: str) -> dict:
         "graders": {"g": {"kind": "tool", "function": "exact_match"}},
         "reward": {"kind": "metric", "metric_key": "g"},
     }
+
+
+class TestProvenance:
+    def test_local_dataset_has_no_provenance(self):
+        assert hf_dataset_provenance("data/local.jsonl") is None
+
+    def test_hf_dataset_provenance_record(self, tmp_path, monkeypatch):
+        cache = _cache_file(tmp_path, "abc123", "train.jsonl", [{"input": "Q?"}])
+        _install_fake_hub(monkeypatch, download_path=cache)
+
+        prov = hf_dataset_provenance("https://huggingface.co/datasets/org/repo/resolve/abc123/train.jsonl")
+        assert prov == {
+            "source": "huggingface",
+            "url": "https://huggingface.co/datasets/org/repo/resolve/abc123/train.jsonl",
+            "repo_id": "org/repo",
+            "path": "train.jsonl",
+            "revision": "abc123",
+            "commit_sha": "abc123",
+        }
+
+    def test_provenance_serializes_into_suite_config(self):
+        # Mirrors StreamingWriter.initialize, which dumps the suite into suite.json.
+        suite = SuiteSpec.from_yaml(_suite_yaml("https://huggingface.co/datasets/org/repo/resolve/abc/d.jsonl"))
+        suite.dataset_provenance = {"source": "huggingface", "commit_sha": "abc"}
+        dumped = json.loads(suite.model_dump_json(exclude={"base_dir"}))
+        assert dumped["dataset_provenance"]["commit_sha"] == "abc"
 
 
 class TestFromYamlDataset:

@@ -136,7 +136,7 @@ Instead of a local path, `dataset:` may point at a dataset hosted on the [Huggin
 dataset: https://huggingface.co/datasets/letta-ai/swe-chat-tagged/resolve/<revision>/train.jsonl
 ```
 
-This needs the optional extra (`pip install 'letta-evals[hf]'`). Private repos work with a standard `HF_TOKEN` / `HUGGING_FACE_HUB_TOKEN` in the environment. Fetching happens host-side, so nothing is downloaded inside the Modal sandbox. An unpinned revision (a bare repo URL, or `.../resolve/main/...`) warns and surfaces the resolved commit so the run stays reproducible from its logs; a bare repo URL is accepted only when the repo holds exactly one `.jsonl`/`.csv` manifest. Relative `rubric_path` values still resolve against the suite directory, not the HF cache.
+Private repos work with a standard `HF_TOKEN` / `HUGGING_FACE_HUB_TOKEN` in the environment. Fetching happens host-side, so nothing is downloaded inside the Modal sandbox. An unpinned revision (a bare repo URL, or `.../resolve/main/...`) warns and surfaces the resolved commit so the run stays reproducible from its logs; the resolved commit SHA is also recorded in `suite.json` under `config.dataset_provenance`. A bare repo URL is accepted only when the repo holds exactly one `.jsonl`/`.csv` manifest. Relative `rubric_path` values still resolve against the suite directory, not the HF cache.
 
 ### Targets
 
