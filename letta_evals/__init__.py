@@ -45,7 +45,7 @@ from letta_evals.visualization.factory import ProgressStyle, create_progress_cal
 try:
     __version__: str = _pkg_version("letta-evals")
 except PackageNotFoundError:
-    __version__ = "0.23.0"
+    __version__ = "0.24.0"
 
 __all__ = [
     "AgentState",
