@@ -6,6 +6,7 @@ agent state keyed by ``agent_id`` into the trace fields persisted on
 sandboxed runs share the same fetch path.
 """
 
+import json
 import logging
 from typing import Any, Optional
 
@@ -15,27 +16,32 @@ from letta_evals.utils import list_all_agent_messages
 logger = logging.getLogger(__name__)
 
 
-def extract_usage_stats(events: list) -> Optional[list[dict]]:
-    """Pull agent usage_statistics from the final stream ``result`` event.
+def extract_usage_stats(last_line: str) -> Optional[list[dict]]:
+    """Pull agent usage_statistics from the stream's final line.
 
-    stream-json always emits the result event last. Returns ``None`` when no
-    usage is present — e.g. the stream was cut short by a crash or timeout —
-    so both the success path and the error path report usage the same way.
+    stream-json emits the ``result`` event last. Returns ``None`` when the
+    line is empty, unparseable, or not a result event (e.g. a stream cut
+    short by a crash or timeout).
     """
-    if events and events[-1].get("type") == "result" and "usage" in events[-1]:
-        usage = events[-1]["usage"]
-        return [
-            {
-                "message_type": "usage_statistics",
-                "prompt_tokens": usage.get("prompt_tokens", 0),
-                "completion_tokens": usage.get("completion_tokens", 0),
-                "total_tokens": usage.get("total_tokens", 0),
-                "cached_input_tokens": usage.get("cached_input_tokens", 0),
-                "cache_write_tokens": usage.get("cache_write_tokens", 0),
-                "reasoning_tokens": usage.get("reasoning_tokens", 0),
-            }
-        ]
-    return None
+    try:
+        event = json.loads(last_line) if last_line else None
+    except json.JSONDecodeError as err:
+        logger.warning(f"Unparseable final stream line ({err.msg} at pos {err.pos}): {last_line[:200]}")
+        return None
+    if not isinstance(event, dict) or event.get("type") != "result" or "usage" not in event:
+        return None
+    usage = event["usage"]
+    return [
+        {
+            "message_type": "usage_statistics",
+            "prompt_tokens": usage.get("prompt_tokens", 0),
+            "completion_tokens": usage.get("completion_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0),
+            "cached_input_tokens": usage.get("cached_input_tokens", 0),
+            "cache_write_tokens": usage.get("cache_write_tokens", 0),
+            "reasoning_tokens": usage.get("reasoning_tokens", 0),
+        }
+    ]
 
 
 async def fetch_trajectory(client: Any, agent_id: str) -> list:

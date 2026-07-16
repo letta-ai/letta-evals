@@ -182,9 +182,8 @@ class LettaCodeTarget:
         while attempt <= self.max_retries:
             try:
                 agent_id = None
-                # Initialized up front so the error handler can read whatever
-                # streamed before a failure (e.g. for best-effort usage).
-                events = []
+                # Last non-blank stdout line; parsed after exit for the result event.
+                last_line = ""
 
                 # construct the letta-code CLI command (headless streaming JSON output).
                 cmd = [
@@ -278,32 +277,37 @@ class LettaCodeTarget:
                 process.stdin.close()
                 await process.stdin.wait_closed()
 
-                # Read streaming JSON output line by line, capturing agent_id
-                # from the init event as soon as it arrives. This ensures we
-                # have the agent_id even if the process later times out.
+                # Only the init event (agent_id) and the final result event
+                # (usage, parsed from last_line after exit) are consumed from
+                # the stream — the trajectory is fetched server-side. Drain
+                # everything after init without parsing (#319).
                 async def _read_stdout():
-                    nonlocal agent_id
+                    nonlocal agent_id, last_line
+                    init_seen = False
                     async for raw_line in process.stdout:
-                        line = raw_line.decode().strip()
+                        line = raw_line.decode(errors="replace").strip()
                         if not line:
+                            continue
+                        last_line = line
+                        if init_seen:
                             continue
                         try:
                             event = json.loads(line)
-                            events.append(event)
-                            if event.get("type") == "system" and event.get("subtype") == "init":
-                                if not agent_id:
-                                    agent_id = event.get("agent_id")
-                                    logger.info(f"Captured agent_id {agent_id} from stream init event")
-                                    if progress_callback and agent_id:
-                                        await progress_callback.agent_created(
-                                            sample.id, agent_id=agent_id, model_handle=self.model_handle
-                                        )
-                                if progress_callback and agent_id:
-                                    await progress_callback.message_sending(
-                                        sample.id, 1, len(inputs), agent_id=agent_id, model_handle=self.model_handle
-                                    )
                         except json.JSONDecodeError:
-                            logger.warning(f"Non-JSON stream output: {line[:200]}")
+                            continue
+                        if isinstance(event, dict) and event.get("type") == "system" and event.get("subtype") == "init":
+                            init_seen = True
+                            if not agent_id:
+                                agent_id = event.get("agent_id")
+                                logger.info(f"Captured agent_id {agent_id} from stream init event")
+                                if progress_callback and agent_id:
+                                    await progress_callback.agent_created(
+                                        sample.id, agent_id=agent_id, model_handle=self.model_handle
+                                    )
+                            if progress_callback and agent_id:
+                                await progress_callback.message_sending(
+                                    sample.id, 1, len(inputs), agent_id=agent_id, model_handle=self.model_handle
+                                )
 
                 async def _read_stderr():
                     async for raw_line in process.stderr:
@@ -322,18 +326,10 @@ class LettaCodeTarget:
                 stderr_text = "".join(stderr_chunks)
 
                 if process.returncode != 0:
-                    # Surface the last stdout event so the real error isn't lost
-                    last_stdout_event = ""
-                    for ev in reversed(events):
-                        try:
-                            last_stdout_event = json.dumps(ev)[:500]
-                        except Exception:
-                            last_stdout_event = str(ev)[:500]
-                        break
-
+                    # Surface the last stdout line so the real error isn't lost
                     parts = [f"Letta command failed with return code {process.returncode}"]
-                    if last_stdout_event:
-                        parts.append(f"Last stdout event: {last_stdout_event}")
+                    if last_line:
+                        parts.append(f"Last stdout line: {last_line[:500]}")
                     if stderr_text:
                         parts.append(f"Stderr: {stderr_text[:500]}")
                     raise RuntimeError(". ".join(parts))
@@ -342,7 +338,7 @@ class LettaCodeTarget:
                     raise RuntimeError("No agent_id found in letta stream output")
 
                 # Extract usage from the final stream result event (best-effort).
-                usage_stats = extract_usage_stats(events)
+                usage_stats = extract_usage_stats(last_line)
 
                 return TargetResult(
                     agent_id=agent_id,
@@ -361,7 +357,7 @@ class LettaCodeTarget:
                     # Best-effort: surface usage from the stream so far. Any
                     # server-side trace fields (partial trajectory/token data) are
                     # fetched by Runner from the agent_id when available.
-                    partial_usage = extract_usage_stats(events)
+                    partial_usage = extract_usage_stats(last_line)
                     raise TargetError(
                         msg,
                         agent_id=err_agent_id,
