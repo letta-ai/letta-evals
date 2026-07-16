@@ -1,68 +1,64 @@
-"""Tests for LettaCodeTarget stream-json handling (issue #319).
-
-Covers the `_parse_stream_line` salvage helper and the slimmed-down stdout
-reader: the stream is drained but only parsed for the init event (agent_id)
-and the final result event (usage), so malformed mid-stream tool-return
-lines cannot affect a run.
-"""
+"""Stream-json handling: the parse_stream_line salvage helper and the
+drain-only LettaCodeTarget stdout reader (issue #319)."""
 
 import logging
 import os
 
 import pytest
 
+from letta_evals.execution.trace import parse_stream_line
 from letta_evals.models import Sample
 from letta_evals.targets.errors import TargetError
-from letta_evals.targets.letta_code_target import LettaCodeTarget, _parse_stream_line
+from letta_evals.targets.letta_code_target import LettaCodeTarget
 
-# --- _parse_stream_line ------------------------------------------------------
+# --- parse_stream_line -------------------------------------------------------
 
 
 def test_parse_single_object():
-    assert _parse_stream_line('{"type": "result"}') == [{"type": "result"}]
+    assert parse_stream_line('{"type": "result"}') == [{"type": "result"}]
 
 
 def test_parse_empty_line():
-    assert _parse_stream_line("") == []
+    assert parse_stream_line("") == []
 
 
 def test_parse_concatenated_records_salvages_all(caplog):
     # Torn writer output: two records glued onto one line ("Extra data").
     line = '{"a": 1}{"b": 2}'
     with caplog.at_level(logging.WARNING):
-        events = _parse_stream_line(line)
+        events = parse_stream_line(line)
     assert events == [{"a": 1}, {"b": 2}]
     assert "Extra data" in caplog.text
     assert "salvaged 2 event(s)" in caplog.text
 
 
 def test_parse_concatenated_records_with_whitespace_between():
-    assert _parse_stream_line('{"a": 1} \t {"b": 2}') == [{"a": 1}, {"b": 2}]
+    assert parse_stream_line('{"a": 1} \t {"b": 2}') == [{"a": 1}, {"b": 2}]
 
 
 def test_parse_truncated_line_returns_empty(caplog):
     line = '{"type": "message", "content": "abc'
     with caplog.at_level(logging.WARNING):
-        events = _parse_stream_line(line)
+        events = parse_stream_line(line)
     assert events == []
     assert "Unterminated string" in caplog.text
 
 
 def test_parse_object_followed_by_truncated_record():
     # First record intact, second torn off mid-payload: salvage the first.
-    assert _parse_stream_line('{"a": 1}{"b": "tru') == [{"a": 1}]
+    assert parse_stream_line('{"a": 1}{"b": "tru') == [{"a": 1}]
 
 
 def test_parse_control_character_payload(caplog):
     line = '{"content": "a\x01b"}'
     with caplog.at_level(logging.WARNING):
-        assert _parse_stream_line(line) == []
+        assert parse_stream_line(line) == []
     assert "Invalid control character" in caplog.text
 
 
 def test_parse_non_object_json_ignored():
-    assert _parse_stream_line("42") == []
-    assert _parse_stream_line("[1, 2]") == []
+    assert parse_stream_line("42") == []
+    assert parse_stream_line("[1, 2]") == []
 
 
 # --- run() end-to-end against a fake letta CLI -------------------------------

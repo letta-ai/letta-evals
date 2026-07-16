@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import os
 import shlex
@@ -9,55 +8,13 @@ from typing import Optional
 import anyio
 from letta_client import AsyncLetta
 
-from letta_evals.execution.trace import extract_usage_stats
+from letta_evals.execution.trace import extract_usage_stats, parse_stream_line
 from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.errors import TargetError
 from letta_evals.utils import load_object
 from letta_evals.visualization.base import ProgressCallback
 
 logger = logging.getLogger(__name__)
-
-
-def _parse_stream_line(line: str) -> list[dict]:
-    """Parse one stream-json line into its JSON object events.
-
-    letta-code emits one JSON object per line, but stdout writes can tear
-    under load and concatenate two records onto a single line (issue #319).
-    Rather than dropping such lines, salvage every complete object and log
-    a diagnostic that identifies the failure mode (error message, position,
-    lengths, prefix/suffix). Non-object JSON values are ignored. Returns []
-    when nothing parseable is found.
-    """
-    if not line:
-        return []
-    try:
-        obj = json.loads(line)
-        return [obj] if isinstance(obj, dict) else []
-    except json.JSONDecodeError as err:
-        events: list[dict] = []
-        decoder = json.JSONDecoder()
-        pos = 0
-        while pos < len(line):
-            if line[pos].isspace():
-                pos += 1
-                continue
-            try:
-                obj, pos = decoder.raw_decode(line, pos)
-            except json.JSONDecodeError:
-                break
-            if isinstance(obj, dict):
-                events.append(obj)
-        logger.warning(
-            "Malformed stream-json line: %s at pos %d (%d chars, %d bytes); salvaged %d event(s); prefix=%r suffix=%r",
-            err.msg,
-            err.pos,
-            len(line),
-            len(line.encode("utf-8", errors="replace")),
-            len(events),
-            line[:120],
-            line[-120:],
-        )
-        return events
 
 
 class LettaCodeTarget:
@@ -224,10 +181,7 @@ class LettaCodeTarget:
         while attempt <= self.max_retries:
             try:
                 agent_id = None
-                # Last non-blank stdout line, kept raw and only parsed after
-                # the process exits (stream-json emits the result event last).
-                # Initialized up front so the error handler can read whatever
-                # streamed before a failure (e.g. for best-effort usage).
+                # Last non-blank stdout line; parsed after exit for the result event.
                 last_line = ""
 
                 # construct the letta-code CLI command (headless streaming JSON output).
@@ -322,14 +276,10 @@ class LettaCodeTarget:
                 process.stdin.close()
                 await process.stdin.wait_closed()
 
-                # Drain stdout line by line. The stream is only load-bearing
-                # in two places: the init event (agent_id, captured as soon as
-                # it arrives so we have it even if the process later times
-                # out) and the final result event (usage, parsed from
-                # last_line after exit). Everything in between is drained
-                # without parsing — the authoritative trajectory is fetched
-                # from the server by agent_id, and large tool-return lines are
-                # exactly the ones that arrive malformed (issue #319).
+                # Only the init event (agent_id) and the final result event
+                # (usage, parsed from last_line after exit) are consumed from
+                # the stream — the trajectory is fetched server-side. Drain
+                # everything after init without parsing (#319).
                 async def _read_stdout():
                     nonlocal agent_id, last_line
                     init_seen = False
@@ -340,7 +290,7 @@ class LettaCodeTarget:
                         last_line = line
                         if init_seen:
                             continue
-                        for event in _parse_stream_line(line):
+                        for event in parse_stream_line(line):
                             if event.get("type") == "system" and event.get("subtype") == "init":
                                 init_seen = True
                                 if not agent_id:
@@ -384,7 +334,7 @@ class LettaCodeTarget:
                     raise RuntimeError("No agent_id found in letta stream output")
 
                 # Extract usage from the final stream result event (best-effort).
-                usage_stats = extract_usage_stats(_parse_stream_line(last_line))
+                usage_stats = extract_usage_stats(parse_stream_line(last_line))
 
                 return TargetResult(
                     agent_id=agent_id,
@@ -400,12 +350,10 @@ class LettaCodeTarget:
                     timeout_hint = f"Timed out after {self.timeout}s" if isinstance(e, TimeoutError) else ""
                     msg = str(e) or timeout_hint or type(e).__name__
                     err_agent_id = agent_id or factory_agent_id
-                    # Best-effort: surface usage from the stream so far. A
-                    # cut-short stream won't end on a result event, so this
-                    # yields None just as before. Any server-side trace fields
-                    # (partial trajectory/token data) are fetched by Runner
-                    # from the agent_id when available.
-                    partial_usage = extract_usage_stats(_parse_stream_line(last_line))
+                    # Best-effort: surface usage from the stream so far. Any
+                    # server-side trace fields (partial trajectory/token data) are
+                    # fetched by Runner from the agent_id when available.
+                    partial_usage = extract_usage_stats(parse_stream_line(last_line))
                     raise TargetError(
                         msg,
                         agent_id=err_agent_id,

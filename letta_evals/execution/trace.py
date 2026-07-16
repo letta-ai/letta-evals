@@ -6,6 +6,7 @@ agent state keyed by ``agent_id`` into the trace fields persisted on
 sandboxed runs share the same fetch path.
 """
 
+import json
 import logging
 from typing import Any, Optional
 
@@ -13,6 +14,45 @@ from letta_evals.models import TurnTokenData
 from letta_evals.utils import list_all_agent_messages
 
 logger = logging.getLogger(__name__)
+
+
+def parse_stream_line(line: str) -> list[dict]:
+    """Parse one stream-json line into its JSON object events.
+
+    Expected framing is one object per line, but torn stdout writes can glue
+    records together — salvage every complete object and log a diagnostic.
+    Non-object values are ignored; returns [] if nothing parses.
+    """
+    if not line:
+        return []
+    try:
+        obj = json.loads(line)
+        return [obj] if isinstance(obj, dict) else []
+    except json.JSONDecodeError as err:
+        events: list[dict] = []
+        decoder = json.JSONDecoder()
+        pos = 0
+        while pos < len(line):
+            if line[pos].isspace():
+                pos += 1
+                continue
+            try:
+                obj, pos = decoder.raw_decode(line, pos)
+            except json.JSONDecodeError:
+                break
+            if isinstance(obj, dict):
+                events.append(obj)
+        logger.warning(
+            "Malformed stream-json line: %s at pos %d (%d chars, %d bytes); salvaged %d event(s); prefix=%r suffix=%r",
+            err.msg,
+            err.pos,
+            len(line),
+            len(line.encode("utf-8", errors="replace")),
+            len(events),
+            line[:120],
+            line[-120:],
+        )
+        return events
 
 
 def extract_usage_stats(events: list) -> Optional[list[dict]]:
