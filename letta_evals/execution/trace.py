@@ -16,66 +16,32 @@ from letta_evals.utils import list_all_agent_messages
 logger = logging.getLogger(__name__)
 
 
-def parse_stream_line(line: str) -> list[dict]:
-    """Parse one stream-json line into its JSON object events.
+def extract_usage_stats(last_line: str) -> Optional[list[dict]]:
+    """Pull agent usage_statistics from the stream's final line.
 
-    Expected framing is one object per line, but torn stdout writes can glue
-    records together — salvage every complete object and log a diagnostic.
-    Non-object values are ignored; returns [] if nothing parses.
+    stream-json emits the ``result`` event last. Returns ``None`` when the
+    line is empty, unparseable, or not a result event (e.g. a stream cut
+    short by a crash or timeout).
     """
-    if not line:
-        return []
     try:
-        obj = json.loads(line)
-        return [obj] if isinstance(obj, dict) else []
+        event = json.loads(last_line) if last_line else None
     except json.JSONDecodeError as err:
-        events: list[dict] = []
-        decoder = json.JSONDecoder()
-        pos = 0
-        while pos < len(line):
-            if line[pos].isspace():
-                pos += 1
-                continue
-            try:
-                obj, pos = decoder.raw_decode(line, pos)
-            except json.JSONDecodeError:
-                break
-            if isinstance(obj, dict):
-                events.append(obj)
-        logger.warning(
-            "Malformed stream-json line: %s at pos %d (%d chars, %d bytes); salvaged %d event(s); prefix=%r suffix=%r",
-            err.msg,
-            err.pos,
-            len(line),
-            len(line.encode("utf-8", errors="replace")),
-            len(events),
-            line[:120],
-            line[-120:],
-        )
-        return events
-
-
-def extract_usage_stats(events: list) -> Optional[list[dict]]:
-    """Pull agent usage_statistics from the final stream ``result`` event.
-
-    stream-json always emits the result event last. Returns ``None`` when no
-    usage is present — e.g. the stream was cut short by a crash or timeout —
-    so both the success path and the error path report usage the same way.
-    """
-    if events and events[-1].get("type") == "result" and "usage" in events[-1]:
-        usage = events[-1]["usage"]
-        return [
-            {
-                "message_type": "usage_statistics",
-                "prompt_tokens": usage.get("prompt_tokens", 0),
-                "completion_tokens": usage.get("completion_tokens", 0),
-                "total_tokens": usage.get("total_tokens", 0),
-                "cached_input_tokens": usage.get("cached_input_tokens", 0),
-                "cache_write_tokens": usage.get("cache_write_tokens", 0),
-                "reasoning_tokens": usage.get("reasoning_tokens", 0),
-            }
-        ]
-    return None
+        logger.warning(f"Unparseable final stream line ({err.msg} at pos {err.pos}): {last_line[:200]}")
+        return None
+    if not isinstance(event, dict) or event.get("type") != "result" or "usage" not in event:
+        return None
+    usage = event["usage"]
+    return [
+        {
+            "message_type": "usage_statistics",
+            "prompt_tokens": usage.get("prompt_tokens", 0),
+            "completion_tokens": usage.get("completion_tokens", 0),
+            "total_tokens": usage.get("total_tokens", 0),
+            "cached_input_tokens": usage.get("cached_input_tokens", 0),
+            "cache_write_tokens": usage.get("cache_write_tokens", 0),
+            "reasoning_tokens": usage.get("reasoning_tokens", 0),
+        }
+    ]
 
 
 async def fetch_trajectory(client: Any, agent_id: str) -> list:

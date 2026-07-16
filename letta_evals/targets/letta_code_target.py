@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import shlex
@@ -8,7 +9,7 @@ from typing import Optional
 import anyio
 from letta_client import AsyncLetta
 
-from letta_evals.execution.trace import extract_usage_stats, parse_stream_line
+from letta_evals.execution.trace import extract_usage_stats
 from letta_evals.models import Sample, TargetResult
 from letta_evals.targets.errors import TargetError
 from letta_evals.utils import load_object
@@ -290,20 +291,23 @@ class LettaCodeTarget:
                         last_line = line
                         if init_seen:
                             continue
-                        for event in parse_stream_line(line):
-                            if event.get("type") == "system" and event.get("subtype") == "init":
-                                init_seen = True
-                                if not agent_id:
-                                    agent_id = event.get("agent_id")
-                                    logger.info(f"Captured agent_id {agent_id} from stream init event")
-                                    if progress_callback and agent_id:
-                                        await progress_callback.agent_created(
-                                            sample.id, agent_id=agent_id, model_handle=self.model_handle
-                                        )
+                        try:
+                            event = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        if isinstance(event, dict) and event.get("type") == "system" and event.get("subtype") == "init":
+                            init_seen = True
+                            if not agent_id:
+                                agent_id = event.get("agent_id")
+                                logger.info(f"Captured agent_id {agent_id} from stream init event")
                                 if progress_callback and agent_id:
-                                    await progress_callback.message_sending(
-                                        sample.id, 1, len(inputs), agent_id=agent_id, model_handle=self.model_handle
+                                    await progress_callback.agent_created(
+                                        sample.id, agent_id=agent_id, model_handle=self.model_handle
                                     )
+                            if progress_callback and agent_id:
+                                await progress_callback.message_sending(
+                                    sample.id, 1, len(inputs), agent_id=agent_id, model_handle=self.model_handle
+                                )
 
                 async def _read_stderr():
                     async for raw_line in process.stderr:
@@ -334,7 +338,7 @@ class LettaCodeTarget:
                     raise RuntimeError("No agent_id found in letta stream output")
 
                 # Extract usage from the final stream result event (best-effort).
-                usage_stats = extract_usage_stats(parse_stream_line(last_line))
+                usage_stats = extract_usage_stats(last_line)
 
                 return TargetResult(
                     agent_id=agent_id,
@@ -353,7 +357,7 @@ class LettaCodeTarget:
                     # Best-effort: surface usage from the stream so far. Any
                     # server-side trace fields (partial trajectory/token data) are
                     # fetched by Runner from the agent_id when available.
-                    partial_usage = extract_usage_stats(parse_stream_line(last_line))
+                    partial_usage = extract_usage_stats(last_line)
                     raise TargetError(
                         msg,
                         agent_id=err_agent_id,

@@ -1,71 +1,58 @@
-"""Stream-json handling: the parse_stream_line salvage helper and the
-drain-only LettaCodeTarget stdout reader (issue #319)."""
+"""Stream-json handling: the drain-only LettaCodeTarget stdout reader and
+final-line usage extraction (issue #319)."""
 
 import logging
 import os
 
 import pytest
 
-from letta_evals.execution.trace import parse_stream_line
+from letta_evals.execution.trace import extract_usage_stats
 from letta_evals.models import Sample
 from letta_evals.targets.errors import TargetError
 from letta_evals.targets.letta_code_target import LettaCodeTarget
 
-# --- parse_stream_line -------------------------------------------------------
+# --- extract_usage_stats -----------------------------------------------------
+
+RESULT_LINE = '{"type": "result", "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}}'
 
 
-def test_parse_single_object():
-    assert parse_stream_line('{"type": "result"}') == [{"type": "result"}]
+def test_extract_usage_from_result_line():
+    stats = extract_usage_stats(RESULT_LINE)
+    assert stats == [
+        {
+            "message_type": "usage_statistics",
+            "prompt_tokens": 10,
+            "completion_tokens": 5,
+            "total_tokens": 15,
+            "cached_input_tokens": 0,
+            "cache_write_tokens": 0,
+            "reasoning_tokens": 0,
+        }
+    ]
 
 
-def test_parse_empty_line():
-    assert parse_stream_line("") == []
+def test_extract_usage_empty_line_is_none():
+    assert extract_usage_stats("") is None
 
 
-def test_parse_concatenated_records_salvages_all(caplog):
-    # Torn writer output: two records glued onto one line ("Extra data").
-    line = '{"a": 1}{"b": 2}'
+def test_extract_usage_non_result_event_is_none():
+    assert extract_usage_stats('{"type": "message", "content": "hi"}') is None
+    assert extract_usage_stats("42") is None
+
+
+def test_extract_usage_malformed_line_warns_and_is_none(caplog):
+    # e.g. a result event glued onto a torn tool-return line
     with caplog.at_level(logging.WARNING):
-        events = parse_stream_line(line)
-    assert events == [{"a": 1}, {"b": 2}]
+        assert extract_usage_stats('{"type": "message"}' + RESULT_LINE) is None
+    assert "Unparseable final stream line" in caplog.text
     assert "Extra data" in caplog.text
-    assert "salvaged 2 event(s)" in caplog.text
-
-
-def test_parse_concatenated_records_with_whitespace_between():
-    assert parse_stream_line('{"a": 1} \t {"b": 2}') == [{"a": 1}, {"b": 2}]
-
-
-def test_parse_truncated_line_returns_empty(caplog):
-    line = '{"type": "message", "content": "abc'
-    with caplog.at_level(logging.WARNING):
-        events = parse_stream_line(line)
-    assert events == []
-    assert "Unterminated string" in caplog.text
-
-
-def test_parse_object_followed_by_truncated_record():
-    # First record intact, second torn off mid-payload: salvage the first.
-    assert parse_stream_line('{"a": 1}{"b": "tru') == [{"a": 1}]
-
-
-def test_parse_control_character_payload(caplog):
-    line = '{"content": "a\x01b"}'
-    with caplog.at_level(logging.WARNING):
-        assert parse_stream_line(line) == []
-    assert "Invalid control character" in caplog.text
-
-
-def test_parse_non_object_json_ignored():
-    assert parse_stream_line("42") == []
-    assert parse_stream_line("[1, 2]") == []
 
 
 # --- run() end-to-end against a fake letta CLI -------------------------------
 
-INIT_LINE = b'{"type": "system", "subtype": "init", "agent_id": "agent-stream-test"}'
-RESULT_LINE = b'{"type": "result", "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}}'
-TOOL_RETURN_LINE = b'{"type": "message", "message_type": "tool_return_message", "content": "' + b"x" * 30000 + b'"}'
+INIT_LINE_B = b'{"type": "system", "subtype": "init", "agent_id": "agent-stream-test"}'
+RESULT_LINE_B = RESULT_LINE.encode()
+TOOL_RETURN_LINE_B = b'{"type": "message", "message_type": "tool_return_message", "content": "' + b"x" * 30000 + b'"}'
 
 
 def _install_fake_letta(tmp_path, monkeypatch, stdout_payload: bytes, returncode: int = 0) -> None:
@@ -93,49 +80,36 @@ def _make_target(tmp_path) -> LettaCodeTarget:
 
 
 @pytest.mark.asyncio
-async def test_run_ignores_malformed_mid_stream_lines(tmp_path, monkeypatch, caplog):
+async def test_run_ignores_malformed_mid_stream_lines(tmp_path, monkeypatch):
     # A torn tool_return line (two records on one line) between init and
-    # result is drained without parsing: no warning, no effect on the run.
-    payload = b"\n".join([INIT_LINE, TOOL_RETURN_LINE + TOOL_RETURN_LINE, RESULT_LINE, b""])
+    # result is drained without parsing: no effect on the run.
+    payload = b"\n".join([INIT_LINE_B, TOOL_RETURN_LINE_B + TOOL_RETURN_LINE_B, RESULT_LINE_B, b""])
     _install_fake_letta(tmp_path, monkeypatch, payload)
 
-    with caplog.at_level(logging.WARNING):
-        result = await _make_target(tmp_path).run(Sample(id=0, input="hello"))
+    result = await _make_target(tmp_path).run(Sample(id=0, input="hello"))
 
     assert result.agent_id == "agent-stream-test"
-    assert result.agent_usage == [
-        {
-            "message_type": "usage_statistics",
-            "prompt_tokens": 10,
-            "completion_tokens": 5,
-            "total_tokens": 15,
-            "cached_input_tokens": 0,
-            "cache_write_tokens": 0,
-            "reasoning_tokens": 0,
-        }
-    ]
-    assert "Malformed stream-json line" not in caplog.text
+    assert result.agent_usage[0]["total_tokens"] == 15
 
 
 @pytest.mark.asyncio
-async def test_run_salvages_result_event_glued_to_tool_return(tmp_path, monkeypatch, caplog):
-    # If the writer glues the final result event onto the preceding
-    # tool_return line, raw_decode salvage still recovers the usage stats.
-    payload = b"\n".join([INIT_LINE, TOOL_RETURN_LINE + RESULT_LINE, b""])
+async def test_run_glued_result_line_warns_and_yields_no_usage(tmp_path, monkeypatch, caplog):
+    # If the writer glues the result event onto the preceding tool_return
+    # line, usage is lost (accepted tradeoff) but the run still succeeds.
+    payload = b"\n".join([INIT_LINE_B, TOOL_RETURN_LINE_B + RESULT_LINE_B, b""])
     _install_fake_letta(tmp_path, monkeypatch, payload)
 
     with caplog.at_level(logging.WARNING):
         result = await _make_target(tmp_path).run(Sample(id=0, input="hello"))
 
     assert result.agent_id == "agent-stream-test"
-    assert result.agent_usage is not None
-    assert result.agent_usage[0]["total_tokens"] == 15
-    assert "salvaged 2 event(s)" in caplog.text
+    assert result.agent_usage is None
+    assert "Unparseable final stream line" in caplog.text
 
 
 @pytest.mark.asyncio
 async def test_run_survives_invalid_utf8_in_stream(tmp_path, monkeypatch):
-    payload = b"\n".join([INIT_LINE, b'{"type": "message", "content": "\xff\xfe garbage"}', RESULT_LINE, b""])
+    payload = b"\n".join([INIT_LINE_B, b'{"type": "message", "content": "\xff\xfe garbage"}', RESULT_LINE_B, b""])
     _install_fake_letta(tmp_path, monkeypatch, payload)
 
     result = await _make_target(tmp_path).run(Sample(id=0, input="hello"))
@@ -147,7 +121,7 @@ async def test_run_survives_invalid_utf8_in_stream(tmp_path, monkeypatch):
 @pytest.mark.asyncio
 async def test_run_missing_result_event_yields_no_usage(tmp_path, monkeypatch):
     # A stream cut short of the result event reports usage as None.
-    payload = b"\n".join([INIT_LINE, TOOL_RETURN_LINE, b""])
+    payload = b"\n".join([INIT_LINE_B, TOOL_RETURN_LINE_B, b""])
     _install_fake_letta(tmp_path, monkeypatch, payload)
 
     result = await _make_target(tmp_path).run(Sample(id=0, input="hello"))
@@ -158,7 +132,7 @@ async def test_run_missing_result_event_yields_no_usage(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_run_nonzero_exit_surfaces_last_stdout_line(tmp_path, monkeypatch):
-    payload = b"\n".join([INIT_LINE, b'{"type": "error", "message": "boom"}', b""])
+    payload = b"\n".join([INIT_LINE_B, b'{"type": "error", "message": "boom"}', b""])
     _install_fake_letta(tmp_path, monkeypatch, payload, returncode=1)
 
     with pytest.raises(TargetError) as exc_info:
@@ -170,7 +144,7 @@ async def test_run_nonzero_exit_surfaces_last_stdout_line(tmp_path, monkeypatch)
 
 @pytest.mark.asyncio
 async def test_run_without_init_event_fails_with_no_agent_id(tmp_path, monkeypatch):
-    payload = b"\n".join([TOOL_RETURN_LINE, RESULT_LINE, b""])
+    payload = b"\n".join([TOOL_RETURN_LINE_B, RESULT_LINE_B, b""])
     _install_fake_letta(tmp_path, monkeypatch, payload)
 
     with pytest.raises(TargetError, match="No agent_id found"):
