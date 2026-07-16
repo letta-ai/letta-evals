@@ -12,6 +12,7 @@ from letta_evals import __version__
 from letta_evals.datasets.loader import load_dataset
 from letta_evals.models import SuiteSpec
 from letta_evals.runner import run_suite
+from letta_evals.streaming import _safe_segment
 from letta_evals.visualization.factory import ProgressStyle
 
 app = typer.Typer(help="Letta Evals - Evaluation framework for Letta AI agents")
@@ -246,13 +247,15 @@ def run(
         if effective_output and not quiet:
             console.print(f"[green]Suite config saved to {effective_output}/suite.json[/green]")
             console.print(f"[green]Summary saved to {effective_output}/summary.json[/green]")
+            # Print the sanitized on-disk names, not the raw model handles
+            # (streaming writes openai/gpt-4 results to openai-gpt-4.jsonl).
             if is_multi_run:
-                model_dirs = ", ".join(ms.model for ms in result.summary.models)
+                model_dirs = ", ".join(_safe_segment(ms.model) for ms in result.summary.models)
                 console.print(
                     f"[green]Per-run results saved under {effective_output}/<model>/run_*.jsonl (models: {model_dirs})[/green]"
                 )
             else:
-                files = ", ".join(f"{ms.model}.jsonl" for ms in result.summary.models)
+                files = ", ".join(f"{_safe_segment(ms.model)}.jsonl" for ms in result.summary.models)
                 console.print(f"[green]Per-model results streamed to {effective_output}/{{{files}}}[/green]")
 
         if not quiet:
