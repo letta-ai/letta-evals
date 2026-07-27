@@ -702,8 +702,15 @@ async def run_suite(
     letta_base_url: Optional[str] = None,
     letta_project_id: Optional[str] = None,
     num_runs: Optional[int] = None,
+    model_handle: Optional[str] = None,
 ) -> RunnerResult:
-    """Load and run a suite from YAML file."""
+    """Load and run a suite from YAML file.
+
+    When ``model_handle`` is provided, the suite's ``target.model_handles``
+    list is narrowed to just that single handle *before* ``SuiteSpec``
+    construction, so the runner, sandbox dispatch, and streaming writer all
+    see a single-model scope.
+    """
     if custom_progress_callback is not None:
         style_val = progress_style if isinstance(progress_style, ProgressStyle) else ProgressStyle(progress_style)
         if style_val != ProgressStyle.NONE:
@@ -714,6 +721,12 @@ async def run_suite(
 
     with open(suite_path, "r") as f:
         yaml_data = yaml.safe_load(f)
+
+    # Apply --model-handle override before SuiteSpec construction so the
+    # entire run (runner, sandbox dispatch, streaming writer) sees a
+    # single-model scope.  Mirrors the mutation in _run_single_sample.
+    if model_handle is not None:
+        yaml_data.setdefault("target", {})["model_handles"] = [model_handle]
 
     suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent, suite_path=suite_path)
 

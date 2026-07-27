@@ -257,7 +257,11 @@ Yes. Many suites only need YAML plus JSONL/CSV data and built-in graders such as
 
 **Can I test multiple models?**
 
-Yes. Set `target.model_handles` to a list. Letta Evals runs every sample for every model and writes per-model results.
+Yes. Set `target.model_handles` to a list. Letta Evals runs every sample for every model and writes per-model results. To run the complete suite against one model without editing its YAML, pass `--model-handle`, for example:
+
+```bash
+letta-evals run suite.yaml --model-handle baseten/dream-1@letta-research
+```
 
 **Can I run evaluations repeatedly?**
 
