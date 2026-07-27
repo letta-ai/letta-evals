@@ -65,6 +65,7 @@ return arr[len(arr)]  # should be arr[-1] or arr[len(arr)-1]
 def calculate_average(numbers):
     return sum(numbers) / len(numbers)  # crashes on empty list
 
+
 calculate_average([])  # needs guard clause
 ```
 **Expected output after fix:** `Average: 30.0` (only the second test case)
@@ -146,7 +147,8 @@ async def python_output_grader(sample: Sample, submission: str) -> GradeResult:
 
     # run the python file asynchronously
     process = await asyncio.create_subprocess_exec(
-        "python3", str(full_path),
+        "python3",
+        str(full_path),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )

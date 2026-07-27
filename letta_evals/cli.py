@@ -96,8 +96,9 @@ def run(
         None,
         "--model-handle",
         help=(
-            "Only valid with --sample: scope the single-sample run to this model handle "
-            "(e.g. 'openai/gpt-4.1'). Overrides the suite's model_handles list."
+            "Scope the run to this single model handle (e.g. 'openai/gpt-4.1'). "
+            "Overrides the suite's model_handles list for both full-suite and "
+            "--sample runs."
         ),
     ),
 ):
@@ -152,6 +153,13 @@ def run(
     try:
         with open(suite_path, "r") as f:
             yaml_data = yaml.safe_load(f)
+
+        # Apply --model-handle override before SuiteSpec construction so the
+        # entire suite (display counts, runner, sandbox dispatch) sees a
+        # single-model scope.  Mirrors the mutation in _run_single_sample.
+        if model_handle is not None:
+            yaml_data.setdefault("target", {})["model_handles"] = [model_handle]
+
         suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent, suite_path=suite_path)
 
         effective_max_concurrent = (
@@ -234,6 +242,7 @@ def run(
             letta_base_url=base_url,
             letta_project_id=project_id,
             num_runs=num_runs,
+            model_handle=model_handle,
         )
 
     try:
