@@ -37,6 +37,21 @@ build. This applies only to the bundled Dockerfile path — when you set a
 pre-built `image`, `letta_code_version` is ignored (the registry image
 already bakes in its own letta-code) and the driver logs a warning.
 
+Pin `letta-evals` the same way when the host and sandbox must use an exact
+runner version:
+
+```yaml
+sandbox:
+  kind: modal
+  letta_evals_version: "0.24.0"
+```
+
+With the bundled image, the driver passes this value to the Dockerfile as the
+`LETTA_EVALS_VERSION` build arg, so it both selects the installed version and
+invalidates stale cached image layers. The runner also verifies the version
+after startup. With a pre-built `image`, the setting only performs the runtime
+version check.
+
 The orchestrator (`letta-evals run`) keeps running on your host — same
 sample loop, same `max_concurrent`, same JSONL output, same reward
 composition. The only thing that changes is what happens *per sample*:

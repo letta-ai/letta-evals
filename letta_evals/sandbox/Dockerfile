@@ -25,8 +25,15 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # letta-evals provides the in-sandbox `letta-evals run --sample ...` entrypoint.
-# letta-client is its Letta SDK dependency.
-RUN pip install --no-cache-dir --upgrade "letta-evals>=0.19.0" letta-client
+# Pinning LETTA_EVALS_VERSION makes the requested runtime part of Modal's image
+# cache key. When unset, install the latest published release.
+ARG LETTA_EVALS_VERSION=latest
+RUN if [ "$LETTA_EVALS_VERSION" = "latest" ]; then \
+        LETTA_EVALS_PACKAGE="letta-evals"; \
+    else \
+        LETTA_EVALS_PACKAGE="letta-evals==$LETTA_EVALS_VERSION"; \
+    fi \
+    && pip install --no-cache-dir --upgrade "$LETTA_EVALS_PACKAGE"
 
 # letta-code is the agent harness invoked by the LettaCodeTarget.
 # Install globally so the `letta` CLI is on $PATH inside the sandbox.

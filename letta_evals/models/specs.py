@@ -104,8 +104,9 @@ class ModalSandboxSpec(BaseModel):
     letta_evals_version: Optional[str] = Field(
         default=None,
         description=(
-            "If set, the runner asserts the image's ``letta-evals --version`` "
-            "matches at sandbox start to guard against SampleResult schema drift."
+            "If set with the bundled image, pins the installed letta-evals package and "
+            "asserts its version at sandbox start. With a pre-built image, only the "
+            "runtime assertion applies."
         ),
     )
     letta_code_version: Optional[str] = Field(

@@ -94,6 +94,10 @@ class TestModalSandboxSpec:
         # Sanity-check the recipe carries both runtimes.
         assert "letta-evals" in contents
         assert "@letta-ai/letta-code" in contents
+        # The letta-evals install must be pinnable so the requested version
+        # invalidates stale Modal image layers.
+        assert "ARG LETTA_EVALS_VERSION" in contents
+        assert 'LETTA_EVALS_PACKAGE="letta-evals==$LETTA_EVALS_VERSION"' in contents
         # The letta-code install must be pinnable via the LETTA_CODE_VERSION
         # build arg the Modal driver passes from sandbox.letta_code_version.
         assert "ARG LETTA_CODE_VERSION" in contents
@@ -296,21 +300,30 @@ def _install_fake_modal(monkeypatch):
 
 
 class TestModalDriverImageBuild:
-    """The driver turns sandbox.letta_code_version into a Dockerfile build arg."""
+    """The driver pins runtime versions in the bundled Dockerfile image."""
 
     @pytest.mark.asyncio
     async def test_letta_code_version_becomes_build_arg(self, monkeypatch):
         from letta_evals.sandbox.modal import ModalSandbox
 
         fake_modal = _install_fake_modal(monkeypatch)
-        spec = ModalSandboxSpec(letta_code_version="0.27.17", timeout_sec=60, cpu=1, memory_mb=512)
+        spec = ModalSandboxSpec(
+            letta_evals_version="0.24.0",
+            letta_code_version="0.27.17",
+            timeout_sec=60,
+            cpu=1,
+            memory_mb=512,
+        )
         sandbox = ModalSandbox(spec=spec, session_id="unit-build-args")
 
         await sandbox.start()
 
         fake_modal.Image.from_dockerfile.assert_called_once()
         _, kwargs = fake_modal.Image.from_dockerfile.call_args
-        assert kwargs["build_args"] == {"LETTA_CODE_VERSION": "0.27.17"}
+        assert kwargs["build_args"] == {
+            "LETTA_EVALS_VERSION": "0.24.0",
+            "LETTA_CODE_VERSION": "0.27.17",
+        }
         fake_modal.Image.from_registry.assert_not_called()
 
     @pytest.mark.asyncio
