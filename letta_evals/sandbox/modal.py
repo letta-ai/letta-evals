@@ -75,6 +75,9 @@ class ModalSandbox(AbstractSandbox):
             # the Dockerfile (or its build args) changes does.
             dockerfile_path = Path(__file__).parent / "Dockerfile"
             build_args: dict[str, str] = {}
+            if self.spec.letta_evals_version:
+                # Pins the in-sandbox runner and invalidates stale cached layers.
+                build_args["LETTA_EVALS_VERSION"] = self.spec.letta_evals_version
             if self.spec.letta_code_version:
                 # Pins @letta-ai/letta-code in the Dockerfile's npm install.
                 build_args["LETTA_CODE_VERSION"] = self.spec.letta_code_version
