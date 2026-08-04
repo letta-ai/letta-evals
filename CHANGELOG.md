@@ -132,6 +132,20 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.25.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.24.0...letta-evals-v0.25.0) (2026-08-04)
+
+
+### Features
+
+* **cli:** Override models for full suite runs ([#323](https://github.com/letta-ai/letta-evals/issues/323)) ([e47f167](https://github.com/letta-ai/letta-evals/commit/e47f167cf5558393e2bfb29a9b48e576ba5e7adc))
+
+
+### Bug Fixes
+
+* **cli:** Print sanitized results filenames in completion messages ([#321](https://github.com/letta-ai/letta-evals/issues/321)) ([99fc467](https://github.com/letta-ai/letta-evals/commit/99fc4672c07bf04d80aa68d1d8354ab077a3bc2a))
+* **sandbox:** Pin Modal eval runtime ([#324](https://github.com/letta-ai/letta-evals/issues/324)) ([0087667](https://github.com/letta-ai/letta-evals/commit/0087667fc21830c8446d9319b757463c503c702f))
+* **targets:** Drain letta-code stream without parsing redundant events ([#320](https://github.com/letta-ai/letta-evals/issues/320)) ([4c938a8](https://github.com/letta-ai/letta-evals/commit/4c938a8233f517fdbe093bfb0b4408c2fcdb77b6))
+
 ## [0.24.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.23.0...letta-evals-v0.24.0) (2026-07-02)
 
 
