@@ -33,7 +33,7 @@ RUN if [ "$LETTA_EVALS_VERSION" = "latest" ]; then \
     else \
         LETTA_EVALS_PACKAGE="letta-evals==$LETTA_EVALS_VERSION"; \
     fi \
-    && pip install --no-cache-dir --upgrade "$LETTA_EVALS_PACKAGE" letta-client
+    && pip install --no-cache-dir --upgrade "$LETTA_EVALS_PACKAGE"
 
 # letta-code is the agent harness invoked by the LettaCodeTarget.
 # Install globally so the `letta` CLI is on $PATH inside the sandbox.
