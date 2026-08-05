@@ -108,6 +108,7 @@ class Runner:
 
         api_key = letta_api_key or self.suite.target.api_key or env_api_key
         base_url = letta_base_url or self.suite.target.base_url or env_base_url
+        self.letta_base_url = base_url
         self.project_id = letta_project_id or self.suite.target.project_id or env_project_id
 
         client_kwargs: dict[str, object] = {"timeout": self.suite.target.timeout}
@@ -176,7 +177,7 @@ class Runner:
             model_handle=model_handle,
             timeout=int(self.suite.target.timeout),
             max_retries=self.suite.target.max_retries,
-            base_url=self.suite.target.base_url,
+            base_url=self.letta_base_url,
             agent_script=self.suite.target.agent_script,
             base_dir=self.suite.target.base_dir,
             flags=self.suite.target.flags,

@@ -97,6 +97,9 @@ class TestModalSandboxSpec:
         # The letta-evals install must be pinnable so the requested version
         # invalidates stale Modal image layers.
         assert "ARG LETTA_EVALS_VERSION" in contents
+        assert '"typing_extensions>=4.15.0"' in contents
+        assert "from typing_extensions import Sentinel" in contents
+        assert "letta-evals @" in contents
         assert 'LETTA_EVALS_PACKAGE="letta-evals==$LETTA_EVALS_VERSION"' in contents
         # The letta-code install must be pinnable via the LETTA_CODE_VERSION
         # build arg the Modal driver passes from sandbox.letta_code_version.
@@ -272,6 +275,16 @@ class TestExecResult:
         assert r.return_code == 0
 
 
+def test_direct_letta_evals_package_specs_skip_version_check():
+    from letta_evals.sandbox.dispatch import is_direct_letta_evals_package_spec
+
+    assert is_direct_letta_evals_package_spec(
+        "letta-evals @ git+https://github.com/letta-ai/letta-evals.git@branch"
+    )
+    assert is_direct_letta_evals_package_spec("git+https://github.com/letta-ai/letta-evals.git@branch")
+    assert not is_direct_letta_evals_package_spec("0.25.0")
+
+
 def _install_fake_modal(monkeypatch):
     """Inject a fake ``modal`` SDK and return it so tests can assert on calls.
 
@@ -288,6 +301,7 @@ def _install_fake_modal(monkeypatch):
     fake_modal = MagicMock(name="modal")
     fake_modal.App.lookup.aio = AsyncMock(return_value=MagicMock(name="app"))
     fake_image = MagicMock(name="image")
+    fake_image.pip_install.return_value = fake_image
     fake_modal.Image.from_dockerfile = MagicMock(return_value=fake_image)
     fake_modal.Image.from_registry = MagicMock(return_value=fake_image)
     fake_sandbox = MagicMock(name="sandbox")
@@ -324,6 +338,7 @@ class TestModalDriverImageBuild:
             "LETTA_EVALS_VERSION": "0.24.0",
             "LETTA_CODE_VERSION": "0.27.17",
         }
+        fake_modal.Image.from_dockerfile.return_value.pip_install.assert_called_once_with("typing_extensions>=4.15.0")
         fake_modal.Image.from_registry.assert_not_called()
 
     @pytest.mark.asyncio
@@ -338,6 +353,7 @@ class TestModalDriverImageBuild:
 
         _, kwargs = fake_modal.Image.from_dockerfile.call_args
         assert kwargs["build_args"] == {}
+        fake_modal.Image.from_dockerfile.return_value.pip_install.assert_called_once_with("typing_extensions>=4.15.0")
 
     @pytest.mark.asyncio
     async def test_registry_image_ignores_version(self, monkeypatch):

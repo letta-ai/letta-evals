@@ -81,7 +81,9 @@ class ModalSandbox(AbstractSandbox):
             if self.spec.letta_code_version:
                 # Pins @letta-ai/letta-code in the Dockerfile's npm install.
                 build_args["LETTA_CODE_VERSION"] = self.spec.letta_code_version
-            image = modal.Image.from_dockerfile(str(dockerfile_path), build_args=build_args)
+            image = modal.Image.from_dockerfile(str(dockerfile_path), build_args=build_args).pip_install(
+                "typing_extensions>=4.15.0"
+            )
         else:
             if self.spec.letta_code_version:
                 logger.warning(

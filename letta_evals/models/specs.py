@@ -24,7 +24,7 @@ class LettaCodeTargetSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["letta_code"] = "letta_code"
-    base_url: str = Field(default="http://localhost:8283", description="Letta server URL")
+    base_url: Optional[str] = Field(default=None, description="Letta server URL")
     api_key: Optional[str] = Field(default=None, description="API key for authentication")
     timeout: float = Field(default=300.0, description="Request timeout in seconds")
     project_id: Optional[str] = Field(default=None, description="Letta project ID")
