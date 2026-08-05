@@ -49,6 +49,11 @@ DEFAULT_SANDBOX_FORWARD_ENV = (
 )
 
 
+def is_direct_letta_evals_package_spec(spec: str) -> bool:
+    """Return true when ``spec`` is a pip direct reference, not a version."""
+    return spec.startswith("git+") or "://" in spec or spec.startswith("letta-evals @")
+
+
 def _remote_suite_yaml(suite_path: Path, local_root: Path, remote_root: str) -> str:
     """Map a host suite-file path to its in-sandbox path under ``remote_root``.
 
@@ -244,7 +249,9 @@ async def run_sample_in_sandbox(
 
         logger.info("Sandbox %s started for sample %s", sandbox.sandbox_id, sample_id)
 
-        if suite.sandbox.letta_evals_version:
+        if suite.sandbox.letta_evals_version and not is_direct_letta_evals_package_spec(
+            suite.sandbox.letta_evals_version
+        ):
             version_check = await sandbox.exec("letta-evals --version")
             expected = suite.sandbox.letta_evals_version
             if version_check.return_code != 0 or expected not in (version_check.stdout + version_check.stderr):

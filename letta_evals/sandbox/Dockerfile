@@ -26,14 +26,21 @@ RUN apt-get update \
 
 # letta-evals provides the in-sandbox `letta-evals run --sample ...` entrypoint.
 # Pinning LETTA_EVALS_VERSION makes the requested runtime part of Modal's image
-# cache key. When unset, install the latest published release.
+# cache key. A plain version installs `letta-evals==<version>`; a direct package
+# spec such as `letta-evals @ git+https://...` installs that exact ref for smoke
+# tests before a PyPI release exists. When unset, install the latest published
+# release.
 ARG LETTA_EVALS_VERSION=latest
-RUN if [ "$LETTA_EVALS_VERSION" = "latest" ]; then \
+RUN python -m pip install --no-cache-dir --upgrade pip "typing_extensions>=4.15.0" \
+    && if [ "$LETTA_EVALS_VERSION" = "latest" ]; then \
         LETTA_EVALS_PACKAGE="letta-evals"; \
+    elif echo "$LETTA_EVALS_VERSION" | grep -Eq '(^letta-evals[[:space:]]*@|^git\+|://)'; then \
+        LETTA_EVALS_PACKAGE="$LETTA_EVALS_VERSION"; \
     else \
         LETTA_EVALS_PACKAGE="letta-evals==$LETTA_EVALS_VERSION"; \
     fi \
-    && pip install --no-cache-dir --upgrade "$LETTA_EVALS_PACKAGE"
+    && pip install --no-cache-dir --upgrade "$LETTA_EVALS_PACKAGE" \
+    && python -c "from typing_extensions import Sentinel"
 
 # letta-code is the agent harness invoked by the LettaCodeTarget.
 # Install globally so the `letta` CLI is on $PATH inside the sandbox.
