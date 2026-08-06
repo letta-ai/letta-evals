@@ -26,9 +26,10 @@ sandbox:
 **Breaking:** `image` is optional, but when it is omitted both exact
 application pins are now required; mutable tags, ranges, and non-commit Git
 refs are rejected. The driver builds the system base from the bundled
-Dockerfile, then installs each application in an explicit Modal layer whose definition includes its
-pin. Override `image` with a pre-built registry reference only when the agent
-needs additional system tools or a separately managed runtime.
+Dockerfile, then installs each application in an explicit Modal layer whose
+definition includes its pin. Override `image` with a pre-built registry
+reference only when the agent needs additional system tools or a separately
+managed runtime.
 
 When `sandbox` is set, the runner uploads the entire suite directory tree
 to `/mnt/suite/` inside the sandbox, execs `letta-evals run --sample ...`,

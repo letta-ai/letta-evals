@@ -78,56 +78,17 @@ class LettaCodeTargetSpec(BaseModel):
         return self
 
 
-_EXACT_PYTHON_VERSION_RE = re.compile(
-    r"^(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*))*"
-    r"(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?"
-    r"(?:\+[a-z0-9]+(?:\.[a-z0-9]+)*)?$"
-)
-_EXACT_NPM_VERSION_RE = re.compile(
-    r"^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
-    r"(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
-)
-_FULL_GIT_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
+_EXACT_RELEASE_RE = re.compile(r"^\d+\.\d+\.\d+[a-zA-Z0-9.+-]*$")
+_FULL_GIT_PIN_RE = re.compile(r"^(?:letta-evals\s*@\s*)?git\+https://[^@\s]+@[0-9a-fA-F]{40}(?:#\S+)?$")
 
 
-def _direct_git_ref(spec: str) -> Optional[str]:
-    """Return the ref from a pip Git direct reference, if present."""
-    if "git+" not in spec:
-        return None
-    url = spec.split("git+", 1)[1].split("#", 1)[0]
-    if "@" not in url:
-        return ""
-    return url.rsplit("@", 1)[1]
+def _is_immutable_version_pin(pin: str) -> bool:
+    """Accept an exact release identifier; package managers validate the suffix."""
+    return pin == pin.strip() and _EXACT_RELEASE_RE.fullmatch(pin) is not None
 
 
-def _validate_letta_evals_pin(pin: str) -> None:
-    if not pin:
-        raise ValueError("letta_evals_version may not be empty.")
-    if pin != pin.strip():
-        raise ValueError("letta_evals_version may not contain leading or trailing whitespace.")
-    if pin.lower() == "latest":
-        raise ValueError("letta_evals_version may not use the mutable 'latest' tag.")
-
-    git_ref = _direct_git_ref(pin)
-    if git_ref is not None and not _FULL_GIT_SHA_RE.fullmatch(git_ref):
-        raise ValueError(
-            "letta_evals_version Git references must use a full 40-character commit SHA, not a mutable branch or tag."
-        )
-    if git_ref is None and "://" in pin:
-        raise ValueError("letta_evals_version direct references must be Git URLs pinned to a full commit SHA.")
-    if git_ref is None and not _EXACT_PYTHON_VERSION_RE.fullmatch(pin):
-        raise ValueError("letta_evals_version must be a canonical exact version or immutable Git reference.")
-
-
-def _validate_letta_code_pin(pin: str) -> None:
-    if not pin:
-        raise ValueError("letta_code_version may not be empty.")
-    if pin != pin.strip():
-        raise ValueError("letta_code_version may not contain leading or trailing whitespace.")
-    if pin.lower() == "latest":
-        raise ValueError("letta_code_version may not use the mutable 'latest' tag.")
-    if not _EXACT_NPM_VERSION_RE.fullmatch(pin):
-        raise ValueError("letta_code_version must be an exact npm semantic version such as '0.30.5'.")
+def _is_immutable_evals_pin(pin: str) -> bool:
+    return _is_immutable_version_pin(pin) or _FULL_GIT_PIN_RE.fullmatch(pin) is not None
 
 
 class ModalSandboxSpec(BaseModel):
@@ -157,8 +118,8 @@ class ModalSandboxSpec(BaseModel):
         default=None,
         description=(
             "Exact letta-evals package version or Git reference pinned to a full commit SHA. "
-            "Required with the bundled image and verified at sandbox start. With a "
-            "pre-built image, this only verifies the baked-in runtime."
+            "Required with the bundled image. Released versions are verified at sandbox "
+            "start; with a pre-built image, this only verifies the baked-in runtime."
         ),
     )
     letta_code_version: Optional[str] = Field(
@@ -213,24 +174,17 @@ class ModalSandboxSpec(BaseModel):
 
     @model_validator(mode="after")
     def require_bundled_image_version_pins(self):
-        if self.image is None:
-            pins = {
-                "letta_evals_version": self.letta_evals_version,
-                "letta_code_version": self.letta_code_version,
-            }
-            missing = [name for name, value in pins.items() if value is None or not value.strip()]
-            if missing:
-                raise ValueError(
-                    "The bundled Modal image requires exact version pins for "
-                    f"{', '.join(missing)}; set both version fields or provide sandbox.image."
-                )
-
-        if self.letta_evals_version is not None:
-            _validate_letta_evals_pin(self.letta_evals_version)
-
-        if self.image is None:
-            assert self.letta_code_version is not None
-            _validate_letta_code_pin(self.letta_code_version)
+        if self.image is not None:
+            return self
+        evals_pin, code_pin = self.letta_evals_version, self.letta_code_version
+        if not evals_pin or not code_pin:
+            raise ValueError("The bundled Modal image requires both application version pins.")
+        if not _is_immutable_evals_pin(evals_pin):
+            raise ValueError(
+                "letta_evals_version must be an exact release or a credential-free HTTPS Git URL pinned to a full SHA."
+            )
+        if not _is_immutable_version_pin(code_pin):
+            raise ValueError("letta_code_version must be an exact npm version such as '0.30.5'.")
         return self
 
 

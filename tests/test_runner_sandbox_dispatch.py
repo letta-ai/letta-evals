@@ -1,7 +1,7 @@
 """Tests for the sandbox dispatch path.
 
 These tests mock out ``ModalSandbox`` so we exercise the orchestration code
-(suite-dir upload, command construction, result round-trip,
+(version check, suite-dir upload, command construction, result round-trip,
 teardown) without touching Modal at all.
 """
 
@@ -44,13 +44,14 @@ def _canned_result(sample_id) -> SampleResult:
 class _StubSandbox:
     """Stand-in for ModalSandbox that records calls."""
 
-    def __init__(self, exec_return_code: int = 0):
+    def __init__(self, version_output: str = "letta-evals 0.17.0", exec_return_code: int = 0):
         self.started = False
         self.stopped = False
         self.uploaded_files: list[tuple[Path, str]] = []
         self.uploaded_dirs: list[tuple[Path, str]] = []
         self.execs: list[tuple[str, Optional[dict], Optional[int]]] = []
         self.downloaded: list[tuple[str, Path]] = []
+        self._version_output = version_output
         self._exec_return_code = exec_return_code
         self.sandbox_id = "sb-test-1"
         self._result_to_write: Optional[SampleResult] = None
@@ -63,6 +64,8 @@ class _StubSandbox:
 
     async def exec(self, command, env=None, timeout_sec=None) -> ExecResult:
         self.execs.append((command, env, timeout_sec))
+        if "--version" in command:
+            return ExecResult(stdout=self._version_output, stderr="", return_code=0)
         return ExecResult(stdout="", stderr="", return_code=self._exec_return_code)
 
     async def upload_file(self, local: Path, remote: str) -> None:
@@ -365,6 +368,34 @@ sandbox:
         assert result.error is not None
         assert result.error.exception_type == "SandboxTimeout"
         assert result.error.category.value == "target"
+
+    def test_version_mismatch_short_circuits(self, tmp_path, monkeypatch):
+        _write_suite_yaml(tmp_path)
+        runner = _make_runner_with_sandbox(
+            tmp_path,
+            sandbox_spec=ModalSandboxSpec(
+                image="img:test",
+                letta_evals_version="0.99.0",
+                timeout_sec=60,
+            ),
+        )
+        stub = _StubSandbox(version_output="letta-evals 0.17.0")
+        monkeypatch.setattr("letta_evals.sandbox.dispatch.ModalSandbox", lambda spec, session_id: stub)
+
+        sample = Sample(id="s1", input="hi", ground_truth="hi")
+        result = anyio.run(
+            run_sample_in_sandbox,
+            runner.suite,
+            sample,
+            "openai/gpt-a",
+            0.0,
+        )
+
+        assert result.error is not None
+        assert result.error.exception_type == "VersionMismatch"
+        # No CLI exec should have happened after the failed version check.
+        cli_commands = [c[0] for c in stub.execs if "--sample" in c[0]]
+        assert not cli_commands
 
     def test_start_failure_returns_target_error(self, tmp_path, monkeypatch):
         _write_suite_yaml(tmp_path)

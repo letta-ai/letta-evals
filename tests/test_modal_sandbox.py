@@ -60,19 +60,9 @@ class TestModalSandboxSpec:
         assert spec.project_root is None
         assert spec.respect_gitignore is True
 
-    @pytest.mark.parametrize(
-        ("kwargs", "missing"),
-        [
-            ({}, "letta_evals_version, letta_code_version"),
-            ({"letta_evals_version": "0.25.0"}, "letta_code_version"),
-            ({"letta_code_version": "0.30.5"}, "letta_evals_version"),
-            ({"letta_evals_version": "", "letta_code_version": "0.30.5"}, "letta_evals_version"),
-            ({"letta_evals_version": "0.25.0", "letta_code_version": ""}, "letta_code_version"),
-        ],
-    )
-    def test_bundled_image_requires_both_pins(self, kwargs, missing):
-        with pytest.raises(ValueError, match=missing):
-            ModalSandboxSpec(**kwargs)
+    def test_bundled_image_requires_both_pins(self):
+        with pytest.raises(ValueError, match="requires both"):
+            ModalSandboxSpec(letta_evals_version="0.25.0")
 
     @pytest.mark.parametrize(
         "kwargs",
@@ -81,11 +71,11 @@ class TestModalSandboxSpec:
             {"letta_evals_version": "0.25.0", "letta_code_version": "latest"},
             {"letta_evals_version": "0.25.0", "letta_code_version": "^0.30.5"},
             {
-                "letta_evals_version": "https://example.com/letta-evals-current.whl",
+                "letta_evals_version": "letta-evals @ git+https://github.com/letta-ai/letta-evals.git@main",
                 "letta_code_version": "0.30.5",
             },
             {
-                "letta_evals_version": "letta-evals @ git+https://github.com/letta-ai/letta-evals.git@main",
+                "letta_evals_version": f"git+https://user:secret@example.com/repo.git@{'a' * 40}",
                 "letta_code_version": "0.30.5",
             },
         ],
@@ -94,38 +84,13 @@ class TestModalSandboxSpec:
         with pytest.raises(ValueError):
             ModalSandboxSpec(**kwargs)
 
-    def test_custom_image_rejects_unverifiable_eval_pin(self):
-        with pytest.raises(ValueError, match="full 40-character commit SHA"):
-            ModalSandboxSpec(
-                image="img:test",
-                letta_evals_version="git+https://github.com/letta-ai/letta-evals.git@main",
-            )
-
-    def test_rejects_noncanonical_python_version(self):
-        with pytest.raises(ValueError, match="canonical exact version"):
-            ModalSandboxSpec(
-                letta_evals_version="1.0-rc1",
-                letta_code_version="0.30.5",
-            )
-
-    def test_yaml_without_image_accepts_exact_pins(self):
+    def test_bundled_image_accepts_exact_pins(self):
         commit = "a" * 40
-        yaml_data = {
-            "name": "u",
-            "dataset": "s.jsonl",
-            "target": {"kind": "letta_code", "model_handles": ["openai/gpt-4.1-mini"]},
-            "graders": {"g": {"kind": "tool", "function": "exact_match"}},
-            "reward": {"kind": "metric", "metric_key": "g"},
-            "sandbox": {
-                "kind": "modal",
-                "letta_evals_version": (f"letta-evals @ git+https://github.com/letta-ai/letta-evals.git@{commit}"),
-                "letta_code_version": "0.30.5",
-            },
-        }
-        suite = SuiteSpec.from_yaml(yaml_data)
-        assert suite.sandbox is not None
-        assert suite.sandbox.image is None
-        assert suite.sandbox.letta_code_version == "0.30.5"
+        spec = ModalSandboxSpec(
+            letta_evals_version=f"letta-evals @ git+https://github.com/letta-ai/letta-evals.git@{commit}",
+            letta_code_version="0.30.5",
+        )
+        assert spec.image is None
 
     def test_bundled_dockerfile_exists(self):
         """The Dockerfile must ship with the package so Image.from_dockerfile
@@ -142,7 +107,6 @@ class TestModalSandboxSpec:
         assert "ARG LETTA_CODE_VERSION" not in contents
         assert "npm install -g" not in contents
         assert '"typing_extensions>=4.15.0"' in contents
-        assert "from typing_extensions import Sentinel" in contents
         assert "setup_22.x" in contents
         assert "major === 22 && minor < 19" in contents
 
@@ -324,18 +288,6 @@ def test_letta_evals_package_spec_normalization():
     assert _letta_evals_package_spec(direct) == direct
 
 
-def test_direct_url_log_summary_redacts_credentials_and_query():
-    from letta_evals.sandbox.modal import _direct_url_log_summary
-
-    summary = _direct_url_log_summary(
-        {
-            "url": "https://user:secret@example.com/org/repo.git?token=secret",
-            "vcs_info": {"commit_id": "a" * 40, "vcs": "git"},
-        }
-    )
-    assert summary == {"url": "https://example.com/org/repo.git", "commit_id": "a" * 40}
-
-
 def _install_fake_modal(monkeypatch):
     """Inject a fake ``modal`` SDK and return it so tests can assert on calls."""
     import sys
@@ -352,14 +304,10 @@ def _install_fake_modal(monkeypatch):
     fake_modal.Image.from_registry = MagicMock(return_value=fake_image)
     fake_sandbox = MagicMock(name="sandbox")
     fake_sandbox.object_id = "sb-xyz"
-    fake_sandbox.terminate.aio = AsyncMock()
     fake_modal.Sandbox.create.aio = AsyncMock(return_value=fake_sandbox)
-    runtime_verifier = AsyncMock()
 
     monkeypatch.setitem(sys.modules, "modal", fake_modal)
     monkeypatch.setattr(modal_driver, "_check_modal_auth", lambda: None)
-    monkeypatch.setattr(modal_driver.ModalSandbox, "_verify_runtime", runtime_verifier)
-    fake_modal._runtime_verifier = runtime_verifier
     return fake_modal
 
 
@@ -386,43 +334,12 @@ class TestModalDriverImageBuild:
         _, kwargs = fake_modal.Image.from_dockerfile.call_args
         assert kwargs == {}
         layer_calls = fake_modal.Image.from_dockerfile.return_value.run_commands.call_args_list
-        assert "letta-evals==0.24.0" in layer_calls[0].args[0]
-        assert "from typing_extensions import Sentinel" in layer_calls[0].args[1]
-        assert "@letta-ai/letta-code@0.30.5" in layer_calls[1].args[0]
-        assert layer_calls[1].args[1:] == ("node --version", "letta --version")
+        assert "@letta-ai/letta-code@0.30.5" in layer_calls[0].args[0]
+        assert layer_calls[0].args[1:] == ("letta --version",)
+        assert "letta-evals==0.24.0" in layer_calls[1].args[0]
+        assert "from typing_extensions import Sentinel" in layer_calls[1].args[1]
         assert sandbox.image_id == "im-xyz"
         fake_modal.Image.from_registry.assert_not_called()
-        fake_modal._runtime_verifier.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_changing_pins_changes_literal_layer_definitions(self, monkeypatch):
-        from letta_evals.sandbox.modal import ModalSandbox
-
-        fake_modal = _install_fake_modal(monkeypatch)
-        image = fake_modal.Image.from_dockerfile.return_value
-
-        pins = [
-            ("0.24.0", "0.30.5"),
-            ("0.25.0", "0.30.5"),  # only letta-evals changes
-            ("0.24.0", "0.30.7"),  # only letta-code changes
-        ]
-        for evals_version, code_version in pins:
-            spec = ModalSandboxSpec(
-                letta_evals_version=evals_version,
-                letta_code_version=code_version,
-                timeout_sec=60,
-            )
-            await ModalSandbox(spec=spec, session_id=f"unit-{evals_version}-{code_version}").start()
-
-        commands = [call.args[0] for call in image.run_commands.call_args_list]
-        assert commands == [
-            "python -m pip install --no-cache-dir --upgrade letta-evals==0.24.0",
-            "npm install -g --omit=dev @letta-ai/letta-code@0.30.5",
-            "python -m pip install --no-cache-dir --upgrade letta-evals==0.25.0",
-            "npm install -g --omit=dev @letta-ai/letta-code@0.30.5",
-            "python -m pip install --no-cache-dir --upgrade letta-evals==0.24.0",
-            "npm install -g --omit=dev @letta-ai/letta-code@0.30.7",
-        ]
 
     @pytest.mark.asyncio
     async def test_direct_git_pin_is_shell_quoted_in_layer(self, monkeypatch):
@@ -439,7 +356,7 @@ class TestModalDriverImageBuild:
 
         await ModalSandbox(spec=spec, session_id="unit-direct-ref").start()
 
-        evals_command = fake_modal.Image.from_dockerfile.return_value.run_commands.call_args_list[0].args[0]
+        evals_command = fake_modal.Image.from_dockerfile.return_value.run_commands.call_args_list[1].args[0]
         assert evals_command.endswith(f"'{direct}'")
 
     @pytest.mark.asyncio
@@ -455,162 +372,6 @@ class TestModalDriverImageBuild:
         fake_modal.Image.from_registry.assert_called_once_with("ghcr.io/custom/runtime:1.0")
         fake_modal.Image.from_dockerfile.assert_not_called()
         fake_modal.Image.from_registry.return_value.run_commands.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_runtime_verification_failure_terminates_created_sandbox(self, monkeypatch):
-        from letta_evals.sandbox.modal import ModalSandbox, VersionMismatch
-
-        fake_modal = _install_fake_modal(monkeypatch)
-        fake_modal._runtime_verifier.side_effect = VersionMismatch("stale runtime")
-        spec = ModalSandboxSpec(letta_evals_version="0.25.0", letta_code_version="0.30.5")
-        sandbox = ModalSandbox(spec=spec, session_id="unit-verification-failure")
-
-        with pytest.raises(VersionMismatch, match="stale runtime"):
-            await sandbox.start()
-
-        created = fake_modal.Sandbox.create.aio.return_value
-        created.terminate.aio.assert_awaited_once()
-        assert sandbox.sandbox_id is None
-
-
-class TestModalRuntimeVerification:
-    @staticmethod
-    def _probe_result(
-        *,
-        evals_version="0.25.0",
-        code_version="0.30.5",
-        node_version="v22.19.0",
-        commit=None,
-    ):
-        import json
-
-        direct_url = None
-        if commit:
-            direct_url = {
-                "url": "https://github.com/letta-ai/letta-evals.git",
-                "vcs_info": {"commit_id": commit, "vcs": "git"},
-            }
-        return ExecResult(
-            stdout=json.dumps(
-                {
-                    "letta_evals_version": evals_version,
-                    "letta_evals_direct_url": direct_url,
-                    "letta_code_version": code_version,
-                    "letta_version_output": code_version,
-                    "node_version": node_version,
-                }
-            ),
-            stderr="",
-            return_code=0,
-        )
-
-    @pytest.mark.asyncio
-    async def test_accepts_exact_versions(self, monkeypatch):
-        from unittest.mock import AsyncMock
-
-        sandbox = ModalSandbox(
-            ModalSandboxSpec(letta_evals_version="0.25.0", letta_code_version="0.30.5"),
-            session_id="verify-exact",
-        )
-        sandbox._sandbox = object()
-        monkeypatch.setattr(sandbox, "exec", AsyncMock(return_value=self._probe_result()))
-
-        await sandbox._verify_runtime()
-
-    @pytest.mark.asyncio
-    async def test_custom_image_allows_older_node_and_non_global_code_install(self, monkeypatch):
-        from unittest.mock import AsyncMock
-
-        sandbox = ModalSandbox(
-            ModalSandboxSpec(image="img:test", letta_evals_version="0.25.0"),
-            session_id="verify-custom",
-        )
-        sandbox._sandbox = object()
-        probe = self._probe_result(code_version=None, node_version="v20.18.0")
-        monkeypatch.setattr(sandbox, "exec", AsyncMock(return_value=probe))
-
-        await sandbox._verify_runtime()
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "probe_result",
-        [
-            ExecResult(stdout="", stderr="probe failed", return_code=1),
-            ExecResult(stdout="not-json", stderr="", return_code=0),
-        ],
-    )
-    async def test_rejects_failed_or_invalid_runtime_probe(self, monkeypatch, probe_result):
-        from unittest.mock import AsyncMock
-
-        from letta_evals.sandbox.modal import RuntimeProbeError
-
-        sandbox = ModalSandbox(
-            ModalSandboxSpec(letta_evals_version="0.25.0", letta_code_version="0.30.5"),
-            session_id="verify-probe-failure",
-        )
-        sandbox._sandbox = object()
-        monkeypatch.setattr(sandbox, "exec", AsyncMock(return_value=probe_result))
-
-        with pytest.raises(RuntimeProbeError):
-            await sandbox._verify_runtime()
-
-    @pytest.mark.asyncio
-    async def test_accepts_exact_git_commit(self, monkeypatch):
-        from unittest.mock import AsyncMock
-
-        commit = "a" * 40
-        direct = f"letta-evals @ git+https://github.com/letta-ai/letta-evals.git@{commit}"
-        sandbox = ModalSandbox(
-            ModalSandboxSpec(letta_evals_version=direct, letta_code_version="0.30.5"),
-            session_id="verify-commit",
-        )
-        sandbox._sandbox = object()
-        monkeypatch.setattr(sandbox, "exec", AsyncMock(return_value=self._probe_result(commit=commit)))
-
-        await sandbox._verify_runtime()
-
-    @pytest.mark.asyncio
-    async def test_rejects_git_commit_mismatch(self, monkeypatch):
-        from unittest.mock import AsyncMock
-
-        from letta_evals.sandbox.modal import VersionMismatch
-
-        expected_commit = "a" * 40
-        actual_commit = "b" * 40
-        direct = f"letta-evals @ git+https://github.com/letta-ai/letta-evals.git@{expected_commit}"
-        sandbox = ModalSandbox(
-            ModalSandboxSpec(letta_evals_version=direct, letta_code_version="0.30.5"),
-            session_id="verify-commit-mismatch",
-        )
-        sandbox._sandbox = object()
-        monkeypatch.setattr(sandbox, "exec", AsyncMock(return_value=self._probe_result(commit=actual_commit)))
-
-        with pytest.raises(VersionMismatch):
-            await sandbox._verify_runtime()
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "probe_result",
-        [
-            _probe_result(evals_version="0.24.0"),
-            _probe_result(code_version="0.30.7"),
-            _probe_result(node_version="v22.18.0"),
-        ],
-    )
-    async def test_rejects_runtime_mismatches(self, monkeypatch, probe_result):
-        from unittest.mock import AsyncMock
-
-        from letta_evals.sandbox.modal import VersionMismatch
-
-        sandbox = ModalSandbox(
-            ModalSandboxSpec(letta_evals_version="0.25.0", letta_code_version="0.30.5"),
-            session_id="verify-mismatch",
-        )
-        sandbox._sandbox = object()
-        monkeypatch.setattr(sandbox, "exec", AsyncMock(return_value=probe_result))
-
-        with pytest.raises(VersionMismatch):
-            await sandbox._verify_runtime()
 
 
 class TestModalDriverLazyImport:
@@ -653,7 +414,7 @@ class TestModalDriverLive:
     async def test_echo_round_trip(self):
         from letta_evals.sandbox.modal import ModalSandbox
 
-        # No image override: build the stable base plus exact runtime layers.
+        # No image override: build the shared base plus exact runtime layers.
         spec = ModalSandboxSpec(
             letta_evals_version="0.25.0",
             letta_code_version="0.30.5",

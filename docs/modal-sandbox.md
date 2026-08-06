@@ -17,7 +17,7 @@ sandbox:
 `letta_evals/sandbox/Dockerfile`, then installs the requested `letta-evals`
 and `@letta-ai/letta-code` releases in explicit Modal layers. Each exact pin
 is part of its layer's command, so changing a pin rebuilds that layer and its
-downstream layers without rebuilding the stable OS/toolchain base.
+downstream layers without rebuilding the shared OS/toolchain base.
 
 Both pins are required with the bundled base. Mutable values such as `latest`,
 npm version ranges, and Git branch or tag references are rejected. For an
@@ -31,11 +31,9 @@ sandbox:
   letta_code_version: "0.30.5"
 ```
 
-For the bundled runtime, the runner verifies the installed Python version or
-Git commit, the installed npm package version, and Node `>=22.19.0`
-immediately after sandbox startup. It also logs the hydrated Modal image ID
-and detected runtime versions. Custom images log the same probe data, while
-their baked-in Node and Letta Code versions remain image-managed.
+The base checks Node `>=22.19.0` during the image build, and the application
+layers smoke-test the Letta Code CLI and `typing_extensions.Sentinel`. The
+runner retains its lightweight startup check for released `letta-evals` pins.
 
 Override `image` only when you need additional system tools or a pre-built
 runtime. A custom image may omit both pins because it bakes in its own
@@ -169,7 +167,7 @@ creation (`No agent_id found in letta stream output`).
 | `Modal SDK not found` | Reinstall letta-evals (`pip install letta-evals`); the Modal SDK ships with it. |
 | `Modal authentication not found` | Run `modal token new`. |
 | `SandboxExecError` with `letta-evals: not found` | The image doesn't install letta-evals on `PATH`. |
-| `VersionMismatch` | An installed application version, Git commit, or Node version does not match the sandbox contract. Correct the pins or rebuild a custom image. |
+| `VersionMismatch` | The image's `letta-evals --version` doesn't match the released version pinned in the YAML. Correct the pin or rebuild a custom image. |
 | `ResultDeserializationError` | The in-sandbox CLI exited 0 but didn't write `/mnt/result.json`. Check sandbox stderr in the host run log. |
 
 ## Migrating from `target.sandbox` / `target.working_dir`
