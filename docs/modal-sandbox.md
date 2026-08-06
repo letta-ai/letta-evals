@@ -1,56 +1,46 @@
 # Modal sandboxes
 
-Run every sample inside a fresh Modal sandbox by adding a single field to
-your suite YAML:
+Run every sample inside a fresh Modal sandbox by adding a suite-level block
+with exact application runtime pins:
 
 ```yaml
 sandbox:
   kind: modal
+  letta_evals_version: "0.25.0"
+  letta_code_version: "0.30.5"
   secrets: [letta-api-key, openai-key]
   cpu: 2
   memory_mb: 4096
 ```
 
-`image` is optional. When unset, the driver builds the base image on
-demand from the Dockerfile bundled at `letta_evals/sandbox/Dockerfile`
-via Modal's `Image.from_dockerfile` — it carries `letta-evals` (pip) and
-`@letta-ai/letta-code` (npm), and the build is cached so only the first
-sandbox after an edit pays the build cost. Override `image` only when you
-need additional system tools the agent invokes.
+`image` is optional. When unset, the driver builds the system base in
+`letta_evals/sandbox/Dockerfile`, then installs the requested `letta-evals`
+and `@letta-ai/letta-code` releases in explicit Modal layers. Each exact pin
+is part of its layer's command, so changing a pin rebuilds that layer and its
+downstream layers without rebuilding the stable OS/toolchain base.
 
-## Pinning the letta-code version
-
-The bundled image installs `@letta-ai/letta-code@latest` by default. To
-evaluate a specific letta-code release — e.g. for reproducible training
-rollouts — pin it with `letta_code_version`:
+Both pins are required with the bundled base. Mutable values such as `latest`,
+npm version ranges, and Git branch or tag references are rejected. For an
+unreleased `letta-evals` revision, use a direct reference with the full commit
+SHA:
 
 ```yaml
 sandbox:
   kind: modal
-  letta_code_version: "0.27.17"
+  letta_evals_version: "letta-evals @ git+https://github.com/letta-ai/letta-evals.git@0123456789abcdef0123456789abcdef01234567"
+  letta_code_version: "0.30.5"
 ```
 
-The driver passes it to the Dockerfile as the `LETTA_CODE_VERSION` build
-arg (`npm install -g @letta-ai/letta-code@<version>`). Modal keys the
-cached image on build args, so each pinned version gets its own cached
-build. This applies only to the bundled Dockerfile path — when you set a
-pre-built `image`, `letta_code_version` is ignored (the registry image
-already bakes in its own letta-code) and the driver logs a warning.
+For the bundled runtime, the runner verifies the installed Python version or
+Git commit, the installed npm package version, and Node `>=22.19.0`
+immediately after sandbox startup. It also logs the hydrated Modal image ID
+and detected runtime versions. Custom images log the same probe data, while
+their baked-in Node and Letta Code versions remain image-managed.
 
-Pin `letta-evals` the same way when the host and sandbox must use an exact
-runner version:
-
-```yaml
-sandbox:
-  kind: modal
-  letta_evals_version: "0.24.0"
-```
-
-With the bundled image, the driver passes this value to the Dockerfile as the
-`LETTA_EVALS_VERSION` build arg, so it both selects the installed version and
-invalidates stale cached image layers. The runner also verifies the version
-after startup. With a pre-built `image`, the setting only performs the runtime
-version check.
+Override `image` only when you need additional system tools or a pre-built
+runtime. A custom image may omit both pins because it bakes in its own
+applications. If `letta_evals_version` is set with a custom image, it remains
+a runtime assertion; `letta_code_version` is ignored and logs a warning.
 
 The orchestrator (`letta-evals run`) keeps running on your host — same
 sample loop, same `max_concurrent`, same JSONL output, same reward
@@ -93,23 +83,23 @@ final `SampleResult` JSON back.
      `secrets: [<name>]`. Only allowlisted names are forwarded — never
      your whole environment.
 
-   The bundled base image already carries `letta-evals` and
-   `@letta-ai/letta-code`, so most suites won't need a custom image.
+   The default image layers install the two pinned application runtimes,
+   so most suites won't need a custom image.
 
 ### Building a custom image (optional)
 
 If your agent invokes system tools the base image doesn't ship with
-(compilers, language toolchains, project-specific binaries), build a
-derived image and reference it via `sandbox.image`. The bundled base
-recipe at `letta_evals/sandbox/Dockerfile` is a good starting point —
-copy it and add what you need:
+(compilers, language toolchains, project-specific binaries), build a custom
+runtime and reference it via `sandbox.image`. The bundled Dockerfile is now
+system-only, so a registry image must also install compatible `letta-evals`
+and `@letta-ai/letta-code` application runtimes:
 
 ```dockerfile
+# Copy the Python, Node >=22.19, git, and compiler setup from the bundled base.
 FROM python:3.12-slim
-# ... letta-evals + @letta-ai/letta-code (see letta_evals/sandbox/Dockerfile) ...
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential rustc \
-    && rm -rf /var/lib/apt/lists/*
+# ... system setup plus project-specific tools ...
+RUN python -m pip install --no-cache-dir "letta-evals==0.25.0"
+RUN npm install -g --omit=dev "@letta-ai/letta-code@0.30.5"
 ```
 
 Then push to any registry Modal can reach and set
@@ -155,6 +145,8 @@ target:
   base_url: https://your-letta-server.example.com
 sandbox:
   kind: modal
+  letta_evals_version: "0.25.0"
+  letta_code_version: "0.30.5"
   block_network: false
 ```
 
@@ -177,7 +169,7 @@ creation (`No agent_id found in letta stream output`).
 | `Modal SDK not found` | Reinstall letta-evals (`pip install letta-evals`); the Modal SDK ships with it. |
 | `Modal authentication not found` | Run `modal token new`. |
 | `SandboxExecError` with `letta-evals: not found` | The image doesn't install letta-evals on `PATH`. |
-| `VersionMismatch` | The image's `letta-evals --version` doesn't match the `letta_evals_version` pinned in the YAML. Rebuild the image or unpin. |
+| `VersionMismatch` | An installed application version, Git commit, or Node version does not match the sandbox contract. Correct the pins or rebuild a custom image. |
 | `ResultDeserializationError` | The in-sandbox CLI exited 0 but didn't write `/mnt/result.json`. Check sandbox stderr in the host run log. |
 
 ## Migrating from `target.sandbox` / `target.working_dir`
@@ -197,6 +189,8 @@ target:
   kind: letta_code
 sandbox:
   kind: modal
+  letta_evals_version: "0.25.0"
+  letta_code_version: "0.30.5"
 ```
 
 The image's `WORKDIR` (set in the Dockerfile) replaces the role of

@@ -4,6 +4,7 @@ Pydantic models for the suite YAML: target (agent), graders (tool / model
 judge), reward composition, and the top-level :class:`SuiteSpec`.
 """
 
+import re
 import shlex
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Literal, Optional, Union
@@ -77,17 +78,68 @@ class LettaCodeTargetSpec(BaseModel):
         return self
 
 
+_EXACT_PYTHON_VERSION_RE = re.compile(
+    r"^(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*))*"
+    r"(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?"
+    r"(?:\+[a-z0-9]+(?:\.[a-z0-9]+)*)?$"
+)
+_EXACT_NPM_VERSION_RE = re.compile(
+    r"^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
+    r"(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
+)
+_FULL_GIT_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
+
+
+def _direct_git_ref(spec: str) -> Optional[str]:
+    """Return the ref from a pip Git direct reference, if present."""
+    if "git+" not in spec:
+        return None
+    url = spec.split("git+", 1)[1].split("#", 1)[0]
+    if "@" not in url:
+        return ""
+    return url.rsplit("@", 1)[1]
+
+
+def _validate_letta_evals_pin(pin: str) -> None:
+    if not pin:
+        raise ValueError("letta_evals_version may not be empty.")
+    if pin != pin.strip():
+        raise ValueError("letta_evals_version may not contain leading or trailing whitespace.")
+    if pin.lower() == "latest":
+        raise ValueError("letta_evals_version may not use the mutable 'latest' tag.")
+
+    git_ref = _direct_git_ref(pin)
+    if git_ref is not None and not _FULL_GIT_SHA_RE.fullmatch(git_ref):
+        raise ValueError(
+            "letta_evals_version Git references must use a full 40-character commit SHA, not a mutable branch or tag."
+        )
+    if git_ref is None and "://" in pin:
+        raise ValueError("letta_evals_version direct references must be Git URLs pinned to a full commit SHA.")
+    if git_ref is None and not _EXACT_PYTHON_VERSION_RE.fullmatch(pin):
+        raise ValueError("letta_evals_version must be a canonical exact version or immutable Git reference.")
+
+
+def _validate_letta_code_pin(pin: str) -> None:
+    if not pin:
+        raise ValueError("letta_code_version may not be empty.")
+    if pin != pin.strip():
+        raise ValueError("letta_code_version may not contain leading or trailing whitespace.")
+    if pin.lower() == "latest":
+        raise ValueError("letta_code_version may not use the mutable 'latest' tag.")
+    if not _EXACT_NPM_VERSION_RE.fullmatch(pin):
+        raise ValueError("letta_code_version must be an exact npm semantic version such as '0.30.5'.")
+
+
 class ModalSandboxSpec(BaseModel):
     """Modal sandbox execution configuration.
 
     When attached to a :class:`SuiteSpec` via the ``sandbox`` field, every
     sample executes inside a fresh Modal sandbox driven by the host runner.
 
-    When ``image`` is unset (the default), the driver builds the sandbox
-    image from the Dockerfile bundled at ``letta_evals/sandbox/Dockerfile``
-    via Modal's ``Image.from_dockerfile``. The bundled recipe carries the
-    ``letta-evals`` Python package and the ``@letta-ai/letta-code`` npm
-    CLI, so no registry publishing is required for the common case.
+    When ``image`` is unset, the driver builds a system base from the bundled
+    Dockerfile, then installs the required pinned ``letta-evals`` and
+    ``@letta-ai/letta-code`` versions in explicit Modal image layers. A custom
+    pre-built ``image`` may instead bake in its own application runtimes.
     """
 
     kind: Literal["modal"] = "modal"
@@ -104,19 +156,17 @@ class ModalSandboxSpec(BaseModel):
     letta_evals_version: Optional[str] = Field(
         default=None,
         description=(
-            "If set with the bundled image, pins the installed letta-evals package and "
-            "asserts its version at sandbox start. With a pre-built image, only the "
-            "runtime assertion applies."
+            "Exact letta-evals package version or Git reference pinned to a full commit SHA. "
+            "Required with the bundled image and verified at sandbox start. With a "
+            "pre-built image, this only verifies the baked-in runtime."
         ),
     )
     letta_code_version: Optional[str] = Field(
         default=None,
         description=(
-            "If set, pins the ``@letta-ai/letta-code`` npm version installed in "
-            "the bundled Dockerfile image, passed through as the "
-            "``LETTA_CODE_VERSION`` build arg (e.g. '0.27.17'). Defaults to the "
-            "Dockerfile's ``latest``. Ignored when ``image`` is set, since a "
-            "pre-built registry image already bakes in its own letta-code."
+            "Exact @letta-ai/letta-code npm version installed in the bundled image "
+            "(e.g. '0.30.5'). Required with the bundled image. Ignored when image "
+            "is set, since a pre-built registry image bakes in its own letta-code."
         ),
     )
     secrets: List[str] = Field(default_factory=list, description="Names of pre-uploaded Modal Secrets to attach")
@@ -160,6 +210,28 @@ class ModalSandboxSpec(BaseModel):
     idle_timeout_sec: Optional[int] = Field(default=None, description="Idle timeout (seconds) before auto-termination")
     block_network: bool = Field(default=False, description="If True, the sandbox is created without network access")
     app_name: str = Field(default="letta-evals", description="Modal App name to attach sandboxes to")
+
+    @model_validator(mode="after")
+    def require_bundled_image_version_pins(self):
+        if self.image is None:
+            pins = {
+                "letta_evals_version": self.letta_evals_version,
+                "letta_code_version": self.letta_code_version,
+            }
+            missing = [name for name, value in pins.items() if value is None or not value.strip()]
+            if missing:
+                raise ValueError(
+                    "The bundled Modal image requires exact version pins for "
+                    f"{', '.join(missing)}; set both version fields or provide sandbox.image."
+                )
+
+        if self.letta_evals_version is not None:
+            _validate_letta_evals_pin(self.letta_evals_version)
+
+        if self.image is None:
+            assert self.letta_code_version is not None
+            _validate_letta_code_pin(self.letta_code_version)
+        return self
 
 
 SandboxSpec = Annotated[ModalSandboxSpec, Field(discriminator="kind")]

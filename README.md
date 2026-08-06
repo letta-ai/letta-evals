@@ -240,12 +240,14 @@ Add a suite-level `sandbox` block to run every sample inside a fresh Modal sandb
 ```yaml
 sandbox:
   kind: modal
+  letta_evals_version: "0.25.0"
+  letta_code_version: "0.30.5"
   cpu: 2
   memory_mb: 4096
   timeout_sec: 1800
 ```
 
-The host runner still owns the sample loop, concurrency, JSONL output, and reward aggregation. Each sample is uploaded to a sandbox along with the suite directory; the target, extractors, graders, and reward composer run in the sandbox; and the final `SampleResult` is returned to the host.
+The bundled runtime requires exact `letta_evals_version` and `letta_code_version` pins; mutable tags and version ranges are rejected. The host runner still owns the sample loop, concurrency, JSONL output, and reward aggregation. Each sample is uploaded to a sandbox along with the suite directory; the target, extractors, graders, and reward composer run in the sandbox; and the final `SampleResult` is returned to the host.
 
 See [`docs/modal-sandbox.md`](docs/modal-sandbox.md) for setup details, networking notes, and common failure modes.
 
