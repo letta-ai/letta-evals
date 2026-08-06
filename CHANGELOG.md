@@ -136,6 +136,13 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.25.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.25.0...letta-evals-v0.25.1) (2026-08-05)
+
+
+### Bug Fixes
+
+* **sandbox:** upgrade typing extensions in Modal image ([#325](https://github.com/letta-ai/letta-evals/issues/325)) ([80a097d](https://github.com/letta-ai/letta-evals/commit/80a097d8519590c0f7827be1940ace0b8d1ebabb))
+
 ## [0.25.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.24.0...letta-evals-v0.25.0) (2026-08-04)
 
 
