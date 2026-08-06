@@ -49,11 +49,6 @@ DEFAULT_SANDBOX_FORWARD_ENV = (
 )
 
 
-def is_direct_letta_evals_package_spec(spec: str) -> bool:
-    """Return true when ``spec`` is a pip direct reference, not a version."""
-    return spec.startswith("git+") or "://" in spec or spec.startswith("letta-evals @")
-
-
 def _remote_suite_yaml(suite_path: Path, local_root: Path, remote_root: str) -> str:
     """Map a host suite-file path to its in-sandbox path under ``remote_root``.
 
@@ -249,12 +244,15 @@ async def run_sample_in_sandbox(
 
         logger.info("Sandbox %s started for sample %s", sandbox.sandbox_id, sample_id)
 
-        if suite.sandbox.letta_evals_version and not is_direct_letta_evals_package_spec(
-            suite.sandbox.letta_evals_version
-        ):
-            version_check = await sandbox.exec("letta-evals --version")
+        # Keep the existing lightweight check for released letta-evals pins.
+        # Git pins are already immutable inputs to the image layer and do not
+        # necessarily expose their commit through distribution metadata.
+        if suite.sandbox.letta_evals_version and "git+" not in suite.sandbox.letta_evals_version:
+            version_check = await sandbox.exec(
+                "python -c \"from importlib.metadata import version; print(version('letta-evals'))\""
+            )
             expected = suite.sandbox.letta_evals_version
-            if version_check.return_code != 0 or expected not in (version_check.stdout + version_check.stderr):
+            if version_check.return_code != 0 or version_check.stdout.strip() != expected:
                 message = (
                     f"Sandbox image's letta-evals version does not match "
                     f"pinned '{expected}': {version_check.stdout.strip() or version_check.stderr.strip()}"

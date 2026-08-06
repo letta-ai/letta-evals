@@ -23,6 +23,11 @@ from letta_evals.sandbox.base import AbstractSandbox, ExecResult, SandboxAuthErr
 logger = logging.getLogger(__name__)
 
 
+def _letta_evals_package_spec(pin: str) -> str:
+    """Normalize a version or direct reference into a pip package spec."""
+    return pin if "git+" in pin else f"letta-evals=={pin}"
+
+
 def _import_modal():
     """Lazy import of the Modal SDK. Raises a friendly error if not installed."""
     try:
@@ -55,7 +60,7 @@ class ModalSandbox(AbstractSandbox):
         self.spec = spec
         self.session_id = session_id
         self._sandbox = None
-        self._app = None
+        self._image_id = None
 
     @property
     def sandbox_id(self) -> Optional[str]:
@@ -63,26 +68,37 @@ class ModalSandbox(AbstractSandbox):
             return None
         return getattr(self._sandbox, "object_id", None)
 
+    @property
+    def image_id(self) -> Optional[str]:
+        return self._image_id
+
     async def start(self) -> None:
         modal = _import_modal()
         _check_modal_auth()
 
         app = await modal.App.lookup.aio(name=self.spec.app_name, create_if_missing=True)
         if self.spec.image is None:
-            # Default: build the base image from the Dockerfile bundled with
-            # the package. Modal caches the build, so repeated sandboxes
-            # don't pay the full build cost — only the first sandbox after
-            # the Dockerfile (or its build args) changes does.
+            # The Dockerfile is a shared OS/toolchain base. Application pins
+            # live in literal Modal layer commands so each exact pin becomes
+            # part of the layer definition and cannot reuse another version's
+            # cached installation.
             dockerfile_path = Path(__file__).parent / "Dockerfile"
-            build_args: dict[str, str] = {}
-            if self.spec.letta_evals_version:
-                # Pins the in-sandbox runner and invalidates stale cached layers.
-                build_args["LETTA_EVALS_VERSION"] = self.spec.letta_evals_version
-            if self.spec.letta_code_version:
-                # Pins @letta-ai/letta-code in the Dockerfile's npm install.
-                build_args["LETTA_CODE_VERSION"] = self.spec.letta_code_version
-            image = modal.Image.from_dockerfile(str(dockerfile_path), build_args=build_args).pip_install(
-                "typing_extensions>=4.15.0"
+            evals_pin = self.spec.letta_evals_version
+            code_pin = self.spec.letta_code_version
+            assert evals_pin is not None and code_pin is not None  # enforced by ModalSandboxSpec
+
+            # Letta Code is the larger and less frequently changed layer. Put
+            # it first so changing an evals release or Git SHA only rebuilds
+            # the cheaper Python layer.
+            code_package = f"@letta-ai/letta-code@{code_pin}"
+            image = modal.Image.from_dockerfile(str(dockerfile_path)).run_commands(
+                f"npm install -g --omit=dev {shlex.quote(code_package)}",
+                "letta --version",
+            )
+            evals_package = _letta_evals_package_spec(evals_pin)
+            image = image.run_commands(
+                f"python -m pip install --no-cache-dir --upgrade {shlex.quote(evals_package)}",
+                'python -c "from typing_extensions import Sentinel"',
             )
         else:
             if self.spec.letta_code_version:
@@ -113,13 +129,13 @@ class ModalSandbox(AbstractSandbox):
         if self.spec.idle_timeout_sec is not None:
             create_kwargs["idle_timeout"] = self.spec.idle_timeout_sec
 
-        self._app = app
         self._sandbox = await modal.Sandbox.create.aio(**create_kwargs)
+        self._image_id = getattr(image, "object_id", None)
         logger.info(
             "Started Modal sandbox %s (session=%s, image=%s)",
             self.sandbox_id,
             self.session_id,
-            self.spec.image,
+            self.image_id,
         )
 
     async def exec(

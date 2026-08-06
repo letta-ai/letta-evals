@@ -44,7 +44,7 @@ def _canned_result(sample_id) -> SampleResult:
 class _StubSandbox:
     """Stand-in for ModalSandbox that records calls."""
 
-    def __init__(self, version_output: str = "letta-evals 0.17.0", exec_return_code: int = 0):
+    def __init__(self, version_output: str = "0.17.0", exec_return_code: int = 0):
         self.started = False
         self.stopped = False
         self.uploaded_files: list[tuple[Path, str]] = []
@@ -64,7 +64,7 @@ class _StubSandbox:
 
     async def exec(self, command, env=None, timeout_sec=None) -> ExecResult:
         self.execs.append((command, env, timeout_sec))
-        if "--version" in command:
+        if "importlib.metadata" in command:
             return ExecResult(stdout=self._version_output, stderr="", return_code=0)
         return ExecResult(stdout="", stderr="", return_code=self._exec_return_code)
 
@@ -375,11 +375,12 @@ sandbox:
             tmp_path,
             sandbox_spec=ModalSandboxSpec(
                 image="img:test",
-                letta_evals_version="0.99.0",
+                letta_evals_version="0.25.0",
                 timeout_sec=60,
             ),
         )
-        stub = _StubSandbox(version_output="letta-evals 0.17.0")
+        # Exact comparison must not let 0.25.0 match the suffix of 10.25.0.
+        stub = _StubSandbox(version_output="10.25.0")
         monkeypatch.setattr("letta_evals.sandbox.dispatch.ModalSandbox", lambda spec, session_id: stub)
 
         sample = Sample(id="s1", input="hi", ground_truth="hi")

@@ -2,8 +2,8 @@
 
 The live driver test is skipped unless Modal credentials are configured
 (MODAL_TOKEN_ID / MODAL_TOKEN_SECRET or ~/.modal.toml). It builds the
-bundled Dockerfile (the default image) — no per-test image config required.
-The spec-parsing tests do not touch Modal at all.
+bundled system base and exact application layers. The spec-parsing tests do
+not touch Modal at all.
 """
 
 from __future__ import annotations
@@ -43,12 +43,12 @@ def _minimal_suite_yaml(**sandbox_overrides):
 
 
 class TestModalSandboxSpec:
-    def test_defaults(self):
-        """Image defaults to None (build from bundled Dockerfile); other
-        defaults let a minimal `sandbox: { kind: modal }` block work."""
-        spec = ModalSandboxSpec()
+    def test_registry_image_keeps_runtime_pins_optional(self):
+        spec = ModalSandboxSpec(image="ghcr.io/custom/runtime:1.0")
         assert spec.kind == "modal"
-        assert spec.image is None
+        assert spec.image == "ghcr.io/custom/runtime:1.0"
+        assert spec.letta_evals_version is None
+        assert spec.letta_code_version is None
         assert spec.cpu == 2
         assert spec.memory_mb == 2048
         assert spec.timeout_sec == 1800
@@ -57,29 +57,42 @@ class TestModalSandboxSpec:
         assert spec.secrets == []
         assert spec.forward_env == []
         assert spec.volumes == {}
-        assert spec.letta_evals_version is None
-        assert spec.letta_code_version is None
         assert spec.project_root is None
         assert spec.respect_gitignore is True
 
-    def test_image_override(self):
-        spec = ModalSandboxSpec(image="ghcr.io/custom/runtime:1.0")
-        assert spec.image == "ghcr.io/custom/runtime:1.0"
+    def test_bundled_image_requires_both_pins(self):
+        with pytest.raises(ValueError, match="requires both"):
+            ModalSandboxSpec(letta_evals_version="0.25.0")
 
-    def test_yaml_without_image_leaves_image_unset(self):
-        """A suite YAML can declare `sandbox: { kind: modal }` with no image
-        — the driver builds from the bundled Dockerfile."""
-        yaml_data = {
-            "name": "u",
-            "dataset": "s.jsonl",
-            "target": {"kind": "letta_code", "model_handles": ["openai/gpt-4.1-mini"]},
-            "graders": {"g": {"kind": "tool", "function": "exact_match"}},
-            "reward": {"kind": "metric", "metric_key": "g"},
-            "sandbox": {"kind": "modal"},
-        }
-        suite = SuiteSpec.from_yaml(yaml_data)
-        assert suite.sandbox is not None
-        assert suite.sandbox.image is None
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"letta_evals_version": "latest", "letta_code_version": "0.30.5"},
+            {"letta_evals_version": "0.25.0", "letta_code_version": "latest"},
+            {"letta_evals_version": "0.25.0", "letta_code_version": "^0.30.5"},
+            {"letta_evals_version": "1.2.3-rc1", "letta_code_version": "0.30.5"},
+            {"letta_evals_version": "0.25.0", "letta_code_version": "1.2.3-beta.1"},
+            {
+                "letta_evals_version": "letta-evals @ git+https://github.com/letta-ai/letta-evals.git@main",
+                "letta_code_version": "0.30.5",
+            },
+            {
+                "letta_evals_version": f"git+https://user:secret@example.com/repo.git@{'a' * 40}",
+                "letta_code_version": "0.30.5",
+            },
+        ],
+    )
+    def test_bundled_image_rejects_mutable_or_ranged_pins(self, kwargs):
+        with pytest.raises(ValueError):
+            ModalSandboxSpec(**kwargs)
+
+    def test_bundled_image_accepts_exact_pins(self):
+        commit = "a" * 40
+        spec = ModalSandboxSpec(
+            letta_evals_version=f"letta-evals @ git+https://github.com/letta-ai/letta-evals.git@{commit}",
+            letta_code_version="0.30.5",
+        )
+        assert spec.image is None
 
     def test_bundled_dockerfile_exists(self):
         """The Dockerfile must ship with the package so Image.from_dockerfile
@@ -91,20 +104,13 @@ class TestModalSandboxSpec:
         dockerfile = Path(sandbox_pkg.__file__).parent / "Dockerfile"
         assert dockerfile.is_file(), f"Bundled Dockerfile missing: {dockerfile}"
         contents = dockerfile.read_text()
-        # Sanity-check the recipe carries both runtimes.
-        assert "letta-evals" in contents
-        assert "@letta-ai/letta-code" in contents
-        # The letta-evals install must be pinnable so the requested version
-        # invalidates stale Modal image layers.
-        assert "ARG LETTA_EVALS_VERSION" in contents
+        # The bundled Dockerfile is intentionally application-independent.
+        assert "ARG LETTA_EVALS_VERSION" not in contents
+        assert "ARG LETTA_CODE_VERSION" not in contents
+        assert "npm install -g" not in contents
         assert '"typing_extensions>=4.15.0"' in contents
-        assert "from typing_extensions import Sentinel" in contents
-        assert "letta-evals @" in contents
-        assert 'LETTA_EVALS_PACKAGE="letta-evals==$LETTA_EVALS_VERSION"' in contents
-        # The letta-code install must be pinnable via the LETTA_CODE_VERSION
-        # build arg the Modal driver passes from sandbox.letta_code_version.
-        assert "ARG LETTA_CODE_VERSION" in contents
-        assert "@letta-ai/letta-code@${LETTA_CODE_VERSION}" in contents
+        assert "setup_22.x" in contents
+        assert "major === 22 && minor < 19" in contents
 
     def test_overrides(self):
         spec = ModalSandboxSpec(
@@ -203,7 +209,7 @@ class TestSuiteSpecWithSandbox:
 
 class TestUploadFilter:
     def test_default_excludes_drop_junk_but_keep_code_and_data(self):
-        keep = build_upload_filter(ModalSandboxSpec())
+        keep = build_upload_filter(ModalSandboxSpec(image="img:test"))
         # Kept: source, config, data.
         assert keep("pkg/mod.py")
         assert keep("pyproject.toml")
@@ -216,14 +222,14 @@ class TestUploadFilter:
 
     def test_respects_gitignore_at_root(self, tmp_path):
         (tmp_path / ".gitignore").write_text("data/large/\n*.log\n")
-        keep = build_upload_filter(ModalSandboxSpec(), root=tmp_path)
+        keep = build_upload_filter(ModalSandboxSpec(image="img:test"), root=tmp_path)
         assert keep("pkg/mod.py")
         assert not keep("data/large/blob.bin")
         assert not keep("run.log")
 
     def test_gitignore_ignored_when_respect_gitignore_false(self, tmp_path):
         (tmp_path / ".gitignore").write_text("*.log\n")
-        keep = build_upload_filter(ModalSandboxSpec(respect_gitignore=False), root=tmp_path)
+        keep = build_upload_filter(ModalSandboxSpec(image="img:test", respect_gitignore=False), root=tmp_path)
         assert keep("run.log")
 
 
@@ -256,7 +262,7 @@ class TestUploadDirFiltering:
                 return ExecResult(stdout="", stderr="", return_code=0)
 
         sb = _TarCapturingSandbox()
-        keep = build_upload_filter(ModalSandboxSpec())
+        keep = build_upload_filter(ModalSandboxSpec(image="img:test"))
         anyio.run(sb.upload_dir, root, "/mnt/project", keep)
 
         names = captured["names"]
@@ -275,24 +281,17 @@ class TestExecResult:
         assert r.return_code == 0
 
 
-def test_direct_letta_evals_package_specs_skip_version_check():
-    from letta_evals.sandbox.dispatch import is_direct_letta_evals_package_spec
+def test_letta_evals_package_spec_normalization():
+    from letta_evals.sandbox.modal import _letta_evals_package_spec
 
-    assert is_direct_letta_evals_package_spec(
-        "letta-evals @ git+https://github.com/letta-ai/letta-evals.git@branch"
-    )
-    assert is_direct_letta_evals_package_spec("git+https://github.com/letta-ai/letta-evals.git@branch")
-    assert not is_direct_letta_evals_package_spec("0.25.0")
+    commit = "a" * 40
+    direct = f"letta-evals @ git+https://github.com/letta-ai/letta-evals.git@{commit}"
+    assert _letta_evals_package_spec("0.25.0") == "letta-evals==0.25.0"
+    assert _letta_evals_package_spec(direct) == direct
 
 
 def _install_fake_modal(monkeypatch):
-    """Inject a fake ``modal`` SDK and return it so tests can assert on calls.
-
-    ``ModalSandbox.start`` imports modal lazily and calls App.lookup,
-    Image.from_dockerfile / from_registry, and Sandbox.create. We stub all of
-    them so start() runs end-to-end without touching Modal, letting us inspect
-    how the image was built.
-    """
+    """Inject a fake ``modal`` SDK and return it so tests can assert on calls."""
     import sys
     from unittest.mock import AsyncMock, MagicMock
 
@@ -301,7 +300,8 @@ def _install_fake_modal(monkeypatch):
     fake_modal = MagicMock(name="modal")
     fake_modal.App.lookup.aio = AsyncMock(return_value=MagicMock(name="app"))
     fake_image = MagicMock(name="image")
-    fake_image.pip_install.return_value = fake_image
+    fake_image.object_id = "im-xyz"
+    fake_image.run_commands.return_value = fake_image
     fake_modal.Image.from_dockerfile = MagicMock(return_value=fake_image)
     fake_modal.Image.from_registry = MagicMock(return_value=fake_image)
     fake_sandbox = MagicMock(name="sandbox")
@@ -314,59 +314,66 @@ def _install_fake_modal(monkeypatch):
 
 
 class TestModalDriverImageBuild:
-    """The driver pins runtime versions in the bundled Dockerfile image."""
+    """The driver puts exact runtime pins in literal Modal layer definitions."""
 
     @pytest.mark.asyncio
-    async def test_letta_code_version_becomes_build_arg(self, monkeypatch):
+    async def test_exact_versions_become_explicit_image_layers(self, monkeypatch):
         from letta_evals.sandbox.modal import ModalSandbox
 
         fake_modal = _install_fake_modal(monkeypatch)
         spec = ModalSandboxSpec(
             letta_evals_version="0.24.0",
-            letta_code_version="0.27.17",
+            letta_code_version="0.30.5",
             timeout_sec=60,
             cpu=1,
             memory_mb=512,
         )
-        sandbox = ModalSandbox(spec=spec, session_id="unit-build-args")
+        sandbox = ModalSandbox(spec=spec, session_id="unit-versioned-layers")
 
         await sandbox.start()
 
         fake_modal.Image.from_dockerfile.assert_called_once()
         _, kwargs = fake_modal.Image.from_dockerfile.call_args
-        assert kwargs["build_args"] == {
-            "LETTA_EVALS_VERSION": "0.24.0",
-            "LETTA_CODE_VERSION": "0.27.17",
-        }
-        fake_modal.Image.from_dockerfile.return_value.pip_install.assert_called_once_with("typing_extensions>=4.15.0")
+        assert kwargs == {}
+        layer_calls = fake_modal.Image.from_dockerfile.return_value.run_commands.call_args_list
+        assert "@letta-ai/letta-code@0.30.5" in layer_calls[0].args[0]
+        assert layer_calls[0].args[1:] == ("letta --version",)
+        assert "letta-evals==0.24.0" in layer_calls[1].args[0]
+        assert "from typing_extensions import Sentinel" in layer_calls[1].args[1]
+        assert sandbox.image_id == "im-xyz"
         fake_modal.Image.from_registry.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_unset_version_passes_empty_build_args(self, monkeypatch):
+    async def test_direct_git_pin_is_shell_quoted_in_layer(self, monkeypatch):
         from letta_evals.sandbox.modal import ModalSandbox
 
         fake_modal = _install_fake_modal(monkeypatch)
-        spec = ModalSandboxSpec(timeout_sec=60)
-        sandbox = ModalSandbox(spec=spec, session_id="unit-no-version")
+        commit = "a" * 40
+        direct = f"letta-evals @ git+https://github.com/letta-ai/letta-evals.git@{commit}"
+        spec = ModalSandboxSpec(
+            letta_evals_version=direct,
+            letta_code_version="0.30.5",
+            timeout_sec=60,
+        )
 
-        await sandbox.start()
+        await ModalSandbox(spec=spec, session_id="unit-direct-ref").start()
 
-        _, kwargs = fake_modal.Image.from_dockerfile.call_args
-        assert kwargs["build_args"] == {}
-        fake_modal.Image.from_dockerfile.return_value.pip_install.assert_called_once_with("typing_extensions>=4.15.0")
+        evals_command = fake_modal.Image.from_dockerfile.return_value.run_commands.call_args_list[1].args[0]
+        assert evals_command.endswith(f"'{direct}'")
 
     @pytest.mark.asyncio
-    async def test_registry_image_ignores_version(self, monkeypatch):
+    async def test_registry_image_skips_versioned_layers(self, monkeypatch):
         from letta_evals.sandbox.modal import ModalSandbox
 
         fake_modal = _install_fake_modal(monkeypatch)
-        spec = ModalSandboxSpec(image="ghcr.io/custom/runtime:1.0", letta_code_version="0.27.17", timeout_sec=60)
+        spec = ModalSandboxSpec(image="ghcr.io/custom/runtime:1.0", letta_code_version="0.30.5", timeout_sec=60)
         sandbox = ModalSandbox(spec=spec, session_id="unit-registry")
 
         await sandbox.start()
 
         fake_modal.Image.from_registry.assert_called_once_with("ghcr.io/custom/runtime:1.0")
         fake_modal.Image.from_dockerfile.assert_not_called()
+        fake_modal.Image.from_registry.return_value.run_commands.assert_not_called()
 
 
 class TestModalDriverLazyImport:
@@ -406,16 +413,34 @@ class TestModalDriverLive:
     """
 
     @pytest.mark.asyncio
-    async def test_echo_round_trip(self):
+    async def test_pinned_images_have_requested_versions(self):
         from letta_evals.sandbox.modal import ModalSandbox
 
-        # No image override: defaults to building the bundled Dockerfile.
-        spec = ModalSandboxSpec(timeout_sec=120, cpu=1, memory_mb=512)
-        sandbox = ModalSandbox(spec=spec, session_id="unit-echo")
-        await sandbox.start()
-        try:
-            res = await sandbox.exec("echo hello")
-            assert res.return_code == 0
-            assert "hello" in res.stdout
-        finally:
-            await sandbox.stop()
+        image_ids = []
+        for code_version in ("0.30.5", "0.30.7"):
+            spec = ModalSandboxSpec(
+                letta_evals_version="0.25.0",
+                letta_code_version=code_version,
+                timeout_sec=180,
+                cpu=1,
+                memory_mb=512,
+            )
+            sandbox = ModalSandbox(spec=spec, session_id=f"unit-pin-{code_version}")
+            await sandbox.start()
+            try:
+                assert sandbox.image_id is not None
+                image_ids.append(sandbox.image_id)
+                version_result = await sandbox.exec("npm list -g @letta-ai/letta-code --depth=0")
+                assert version_result.return_code == 0
+                assert f"@letta-ai/letta-code@{code_version}" in version_result.stdout
+                if code_version == "0.30.5":
+                    echo_result = await sandbox.exec("echo hello")
+                    assert echo_result.return_code == 0
+                    assert "hello" in echo_result.stdout
+                    help_result = await sandbox.exec("letta --help")
+                    assert help_result.return_code == 0
+                    assert "--stateless" in help_result.stdout
+            finally:
+                await sandbox.stop()
+
+        assert image_ids[0] != image_ids[1]

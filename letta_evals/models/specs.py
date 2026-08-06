@@ -4,6 +4,7 @@ Pydantic models for the suite YAML: target (agent), graders (tool / model
 judge), reward composition, and the top-level :class:`SuiteSpec`.
 """
 
+import re
 import shlex
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Literal, Optional, Union
@@ -77,17 +78,28 @@ class LettaCodeTargetSpec(BaseModel):
         return self
 
 
+_EXACT_VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
+_FULL_GIT_PIN_RE = re.compile(r"^(?:letta-evals\s*@\s*)?git\+https://[^@\s]+@[0-9a-fA-F]{40}(?:#\S+)?$")
+
+
+def _is_immutable_version_pin(pin: str) -> bool:
+    return _EXACT_VERSION_RE.fullmatch(pin) is not None
+
+
+def _is_immutable_evals_pin(pin: str) -> bool:
+    return _is_immutable_version_pin(pin) or _FULL_GIT_PIN_RE.fullmatch(pin) is not None
+
+
 class ModalSandboxSpec(BaseModel):
     """Modal sandbox execution configuration.
 
     When attached to a :class:`SuiteSpec` via the ``sandbox`` field, every
     sample executes inside a fresh Modal sandbox driven by the host runner.
 
-    When ``image`` is unset (the default), the driver builds the sandbox
-    image from the Dockerfile bundled at ``letta_evals/sandbox/Dockerfile``
-    via Modal's ``Image.from_dockerfile``. The bundled recipe carries the
-    ``letta-evals`` Python package and the ``@letta-ai/letta-code`` npm
-    CLI, so no registry publishing is required for the common case.
+    When ``image`` is unset, the driver builds a system base from the bundled
+    Dockerfile, then installs the required pinned ``letta-evals`` and
+    ``@letta-ai/letta-code`` versions in explicit Modal image layers. A custom
+    pre-built ``image`` may instead bake in its own application runtimes.
     """
 
     kind: Literal["modal"] = "modal"
@@ -104,19 +116,17 @@ class ModalSandboxSpec(BaseModel):
     letta_evals_version: Optional[str] = Field(
         default=None,
         description=(
-            "If set with the bundled image, pins the installed letta-evals package and "
-            "asserts its version at sandbox start. With a pre-built image, only the "
-            "runtime assertion applies."
+            "Exact letta-evals package version or Git reference pinned to a full commit SHA. "
+            "Required with the bundled image. Released versions are verified at sandbox "
+            "start; with a pre-built image, this only verifies the baked-in runtime."
         ),
     )
     letta_code_version: Optional[str] = Field(
         default=None,
         description=(
-            "If set, pins the ``@letta-ai/letta-code`` npm version installed in "
-            "the bundled Dockerfile image, passed through as the "
-            "``LETTA_CODE_VERSION`` build arg (e.g. '0.27.17'). Defaults to the "
-            "Dockerfile's ``latest``. Ignored when ``image`` is set, since a "
-            "pre-built registry image already bakes in its own letta-code."
+            "Exact @letta-ai/letta-code npm version installed in the bundled image "
+            "(e.g. '0.30.5'). Required with the bundled image. Ignored when image "
+            "is set, since a pre-built registry image bakes in its own letta-code."
         ),
     )
     secrets: List[str] = Field(default_factory=list, description="Names of pre-uploaded Modal Secrets to attach")
@@ -160,6 +170,21 @@ class ModalSandboxSpec(BaseModel):
     idle_timeout_sec: Optional[int] = Field(default=None, description="Idle timeout (seconds) before auto-termination")
     block_network: bool = Field(default=False, description="If True, the sandbox is created without network access")
     app_name: str = Field(default="letta-evals", description="Modal App name to attach sandboxes to")
+
+    @model_validator(mode="after")
+    def require_bundled_image_version_pins(self):
+        if self.image is not None:
+            return self
+        evals_pin, code_pin = self.letta_evals_version, self.letta_code_version
+        if not evals_pin or not code_pin:
+            raise ValueError("The bundled Modal image requires both application version pins.")
+        if not _is_immutable_evals_pin(evals_pin):
+            raise ValueError(
+                "letta_evals_version must be an exact release or a credential-free HTTPS Git URL pinned to a full SHA."
+            )
+        if not _is_immutable_version_pin(code_pin):
+            raise ValueError("letta_code_version must be an exact npm version such as '0.30.5'.")
+        return self
 
 
 SandboxSpec = Annotated[ModalSandboxSpec, Field(discriminator="kind")]

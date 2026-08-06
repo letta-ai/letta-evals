@@ -16,16 +16,20 @@ adding a top-level `sandbox` field to the suite YAML:
 ```yaml
 sandbox:
   kind: modal
+  letta_evals_version: "0.25.0"
+  letta_code_version: "0.30.5"
   secrets: [letta-api-key, openai-key]
   cpu: 2
   memory_mb: 4096
 ```
 
-`image` is optional — when omitted, the driver builds the base image on
-demand from the bundled `letta_evals/sandbox/Dockerfile` (cached after the
-first build), which already carries `letta-evals` (pip) and
-`@letta-ai/letta-code` (npm). Override `image` with a pre-built registry
-reference only when the agent needs additional system tools.
+**Breaking:** `image` is optional, but when it is omitted both exact
+application pins are now required; mutable tags, ranges, and non-commit Git
+refs are rejected. The driver builds the system base from the bundled
+Dockerfile, then installs each application in an explicit Modal layer whose
+definition includes its pin. Override `image` with a pre-built registry
+reference only when the agent needs additional system tools or a separately
+managed runtime.
 
 When `sandbox` is set, the runner uploads the entire suite directory tree
 to `/mnt/suite/` inside the sandbox, execs `letta-evals run --sample ...`,
