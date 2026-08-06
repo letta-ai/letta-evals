@@ -23,13 +23,9 @@ from letta_evals.sandbox.base import AbstractSandbox, ExecResult, SandboxAuthErr
 logger = logging.getLogger(__name__)
 
 
-def _is_direct_letta_evals_package_spec(spec: str) -> bool:
-    return spec.startswith("git+") or "://" in spec or spec.startswith("letta-evals @")
-
-
 def _letta_evals_package_spec(pin: str) -> str:
     """Normalize a version or direct reference into a pip package spec."""
-    return pin if _is_direct_letta_evals_package_spec(pin) else f"letta-evals=={pin}"
+    return pin if "git+" in pin else f"letta-evals=={pin}"
 
 
 def _import_modal():
@@ -64,7 +60,6 @@ class ModalSandbox(AbstractSandbox):
         self.spec = spec
         self.session_id = session_id
         self._sandbox = None
-        self._app = None
         self._image_id = None
 
     @property
@@ -134,7 +129,6 @@ class ModalSandbox(AbstractSandbox):
         if self.spec.idle_timeout_sec is not None:
             create_kwargs["idle_timeout"] = self.spec.idle_timeout_sec
 
-        self._app = app
         self._sandbox = await modal.Sandbox.create.aio(**create_kwargs)
         self._image_id = getattr(image, "object_id", None)
         logger.info(

@@ -70,6 +70,8 @@ class TestModalSandboxSpec:
             {"letta_evals_version": "latest", "letta_code_version": "0.30.5"},
             {"letta_evals_version": "0.25.0", "letta_code_version": "latest"},
             {"letta_evals_version": "0.25.0", "letta_code_version": "^0.30.5"},
+            {"letta_evals_version": "1.2.3-rc1", "letta_code_version": "0.30.5"},
+            {"letta_evals_version": "0.25.0", "letta_code_version": "1.2.3-beta.1"},
             {
                 "letta_evals_version": "letta-evals @ git+https://github.com/letta-ai/letta-evals.git@main",
                 "letta_code_version": "0.30.5",
@@ -411,32 +413,7 @@ class TestModalDriverLive:
     """
 
     @pytest.mark.asyncio
-    async def test_echo_round_trip(self):
-        from letta_evals.sandbox.modal import ModalSandbox
-
-        # No image override: build the shared base plus exact runtime layers.
-        spec = ModalSandboxSpec(
-            letta_evals_version="0.25.0",
-            letta_code_version="0.30.5",
-            timeout_sec=120,
-            cpu=1,
-            memory_mb=512,
-        )
-        sandbox = ModalSandbox(spec=spec, session_id="unit-echo")
-        await sandbox.start()
-        try:
-            assert sandbox.image_id and sandbox.image_id.startswith("im-")
-            res = await sandbox.exec("echo hello")
-            assert res.return_code == 0
-            assert "hello" in res.stdout
-            help_result = await sandbox.exec("letta --help")
-            assert help_result.return_code == 0
-            assert "--stateless" in help_result.stdout
-        finally:
-            await sandbox.stop()
-
-    @pytest.mark.asyncio
-    async def test_changing_code_pin_changes_image(self):
+    async def test_pinned_images_have_requested_versions(self):
         from letta_evals.sandbox.modal import ModalSandbox
 
         image_ids = []
@@ -453,6 +430,16 @@ class TestModalDriverLive:
             try:
                 assert sandbox.image_id is not None
                 image_ids.append(sandbox.image_id)
+                version_result = await sandbox.exec("npm list -g @letta-ai/letta-code --depth=0")
+                assert version_result.return_code == 0
+                assert f"@letta-ai/letta-code@{code_version}" in version_result.stdout
+                if code_version == "0.30.5":
+                    echo_result = await sandbox.exec("echo hello")
+                    assert echo_result.return_code == 0
+                    assert "hello" in echo_result.stdout
+                    help_result = await sandbox.exec("letta --help")
+                    assert help_result.return_code == 0
+                    assert "--stateless" in help_result.stdout
             finally:
                 await sandbox.stop()
 

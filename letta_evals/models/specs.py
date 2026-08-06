@@ -78,13 +78,12 @@ class LettaCodeTargetSpec(BaseModel):
         return self
 
 
-_EXACT_RELEASE_RE = re.compile(r"^\d+\.\d+\.\d+[a-zA-Z0-9.+-]*$")
+_EXACT_VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 _FULL_GIT_PIN_RE = re.compile(r"^(?:letta-evals\s*@\s*)?git\+https://[^@\s]+@[0-9a-fA-F]{40}(?:#\S+)?$")
 
 
 def _is_immutable_version_pin(pin: str) -> bool:
-    """Accept an exact release identifier; package managers validate the suffix."""
-    return pin == pin.strip() and _EXACT_RELEASE_RE.fullmatch(pin) is not None
+    return _EXACT_VERSION_RE.fullmatch(pin) is not None
 
 
 def _is_immutable_evals_pin(pin: str) -> bool:

@@ -167,7 +167,7 @@ creation (`No agent_id found in letta stream output`).
 | `Modal SDK not found` | Reinstall letta-evals (`pip install letta-evals`); the Modal SDK ships with it. |
 | `Modal authentication not found` | Run `modal token new`. |
 | `SandboxExecError` with `letta-evals: not found` | The image doesn't install letta-evals on `PATH`. |
-| `VersionMismatch` | The image's `letta-evals --version` doesn't match the released version pinned in the YAML. Correct the pin or rebuild a custom image. |
+| `VersionMismatch` | The installed `letta-evals` distribution doesn't exactly match the released version pinned in the YAML. Correct the pin or rebuild a custom image. |
 | `ResultDeserializationError` | The in-sandbox CLI exited 0 but didn't write `/mnt/result.json`. Check sandbox stderr in the host run log. |
 
 ## Migrating from `target.sandbox` / `target.working_dir`
