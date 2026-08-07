@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 import anyio
 import pytest
 
+from letta_evals.execution.trace import TokenDataFetchError
 from letta_evals.models import (
     GradeResult,
     ModalSandboxSpec,
@@ -471,3 +472,29 @@ sandbox:
 
         fetch_token_data.assert_awaited_once_with(runner.client, "agent-sandbox-1")
         assert result.token_data == token_data
+
+    def test_run_sample_surfaces_atomic_token_fetch_failure(self, tmp_path, monkeypatch):
+        """A failed host fetch marks the sample failed instead of returning partial token data."""
+        _write_suite_yaml(tmp_path)
+        runner = _make_runner_with_sandbox(tmp_path)
+
+        async def fake_in_sandbox(suite, sample, model_handle, t_sample_start):
+            return _canned_result(sample.id)
+
+        fetch_error = TokenDataFetchError(
+            "agent-sandbox-1",
+            completed_runs=3,
+            total_runs=8,
+            failed_run_id="run-4",
+            reason="connection reset",
+        )
+        monkeypatch.setattr("letta_evals.runner.run_sample_in_sandbox", fake_in_sandbox)
+        monkeypatch.setattr("letta_evals.runner.fetch_token_data", AsyncMock(side_effect=fetch_error))
+
+        sample = Sample(id="s1", input="hi", ground_truth="hi")
+        result = anyio.run(runner.run_sample, sample, "openai/gpt-a", True)
+
+        assert result.error is not None
+        assert result.error.exception_type == "TokenDataFetchError"
+        assert "completed_runs=3/8" in result.error.message
+        assert result.token_data is None

@@ -6,14 +6,46 @@ agent state keyed by ``agent_id`` into the trace fields persisted on
 sandboxed runs share the same fetch path.
 """
 
+import asyncio
 import json
 import logging
+import random
 from typing import Any, Optional
+
+from letta_client import APIConnectionError, APITimeoutError
 
 from letta_evals.models import TurnTokenData
 from letta_evals.utils import list_all_agent_messages
 
 logger = logging.getLogger(__name__)
+
+_TOKEN_FETCH_MAX_ATTEMPTS = 3
+_TOKEN_FETCH_RETRY_BASE_SECONDS = 0.5
+_RETRYABLE_TOKEN_FETCH_ERRORS = (APIConnectionError, APITimeoutError)
+
+
+class TokenDataFetchError(RuntimeError):
+    """Raised when a complete, internally consistent token trace cannot be fetched."""
+
+    def __init__(
+        self,
+        agent_id: str,
+        *,
+        completed_runs: int,
+        total_runs: int | None,
+        failed_run_id: str | None,
+        reason: str,
+    ) -> None:
+        total = "unknown" if total_runs is None else str(total_runs)
+        failed_run = f", failed_run_id={failed_run_id}" if failed_run_id else ""
+        super().__init__(
+            f"Atomic token-data fetch failed for agent {agent_id}: {reason} "
+            f"(completed_runs={completed_runs}/{total}{failed_run})"
+        )
+        self.agent_id = agent_id
+        self.completed_runs = completed_runs
+        self.total_runs = total_runs
+        self.failed_run_id = failed_run_id
 
 
 def extract_usage_stats(last_line: str) -> Optional[list[dict]]:
@@ -75,66 +107,135 @@ def _run_sort_key(run_summary: Any) -> tuple[str, str]:
     return created_key, str(getattr(run_summary, "id", ""))
 
 
-async def fetch_token_data(client: Any, agent_id: str) -> list[TurnTokenData]:
-    """Fetch token-level data (IDs + logprobs) for a letta code agent.
-
-    Reads token IDs and logprobs from ``run.metadata.result.turns``, which is
-    populated by Letta's SGLang-native adapter for token-aware model runs.
-
-    Stops at the first half-written turn — ``output_ids`` present but a
-    shorter ``output_token_logprobs`` — returning only the clean prefix, so a
-    partially-flushed generation can't corrupt Tinker's sequence-extension.
-    """
-    token_data: list[TurnTokenData] = []
+async def _list_agent_runs(client: Any, agent_id: str) -> list[Any]:
+    """List every run for an agent, including pages beyond the API limit."""
     try:
-        # Fetch ALL runs for this agent — client tools cause each tool-call
-        # round-trip to be a separate run, so token IDs are scattered.
-        try:
-            runs_page = await client.runs.list(agent_id=agent_id, limit=100, order="asc")
-        except TypeError:
-            # Older generated clients may not expose the ``order`` kwarg.
-            # Fall back to the legacy call and sort locally below.
-            runs_page = await client.runs.list(agent_id=agent_id, limit=100)
-        if not runs_page.items:
-            return token_data
+        runs_page = await client.runs.list(agent_id=agent_id, limit=100, order="asc")
+    except TypeError:
+        # Older generated clients may not expose the ``order`` kwarg.
+        runs_page = await client.runs.list(agent_id=agent_id, limit=100)
 
-        # Token IDs are stored in run.metadata.result.turns (populated by SGLang native adapter)
-        for run_summary in sorted(runs_page.items, key=_run_sort_key):
+    runs: list[Any] = []
+    seen_run_ids: set[str] = set()
+    while True:
+        new_runs = [run for run in runs_page.items if str(run.id) not in seen_run_ids]
+        if runs_page.items and not new_runs:
+            # Defensive stop if an older server ignores the pagination cursor.
+            break
+        runs.extend(new_runs)
+        seen_run_ids.update(str(run.id) for run in new_runs)
+
+        has_next_page = getattr(runs_page, "has_next_page", None)
+        get_next_page = getattr(runs_page, "get_next_page", None)
+        if not callable(has_next_page) or not callable(get_next_page) or not runs_page.has_next_page():
+            break
+        runs_page = await runs_page.get_next_page()
+
+    return runs
+
+
+async def _fetch_token_data_once(client: Any, agent_id: str) -> list[TurnTokenData]:
+    """Fetch one complete token-data snapshot or raise without returning a prefix."""
+    try:
+        # Client tools cause each tool-call round-trip to be a separate run, so
+        # token IDs are scattered across the agent's runs.
+        run_summaries = sorted(await _list_agent_runs(client, agent_id), key=_run_sort_key)
+    except _RETRYABLE_TOKEN_FETCH_ERRORS as exc:
+        raise TokenDataFetchError(
+            agent_id,
+            completed_runs=0,
+            total_runs=None,
+            failed_run_id=None,
+            reason=f"{type(exc).__name__}: {exc}",
+        ) from exc
+
+    token_data: list[TurnTokenData] = []
+
+    for completed_runs, run_summary in enumerate(run_summaries):
+        try:
             run = await client.runs.retrieve(run_id=run_summary.id)
-            result = (run.metadata or {}).get("result", {})
-            for turn in result.get("turns") or []:
-                output_ids = turn.get("output_ids")
-                role = turn.get("role", "assistant")
-                if output_ids:
-                    logprobs = turn.get("output_token_logprobs")
-                    if logprobs is not None and len(output_ids) != len(logprobs):
-                        # Half-written generation: ids present but logprobs
-                        # not fully flushed. Drop it and everything after.
-                        logger.info(
-                            f"Truncating token data at half-written turn in run {run_summary.id} for agent {agent_id}"
-                        )
-                        return token_data
-                    # Assistant turn with token IDs from SGLang
-                    token_data.append(
-                        TurnTokenData(
-                            role=role,
-                            input_ids=turn.get("input_ids"),
-                            output_ids=output_ids,
-                            output_token_logprobs=logprobs,
-                        )
+        except _RETRYABLE_TOKEN_FETCH_ERRORS as exc:
+            raise TokenDataFetchError(
+                agent_id,
+                completed_runs=completed_runs,
+                total_runs=len(run_summaries),
+                failed_run_id=str(run_summary.id),
+                reason=f"{type(exc).__name__}: {exc}",
+            ) from exc
+
+        result = (run.metadata or {}).get("result", {})
+        for turn in result.get("turns") or []:
+            output_ids = turn.get("output_ids")
+            role = turn.get("role", "assistant")
+            if output_ids:
+                logprobs = turn.get("output_token_logprobs")
+                if logprobs is not None and len(output_ids) != len(logprobs):
+                    raise TokenDataFetchError(
+                        agent_id,
+                        completed_runs=completed_runs,
+                        total_runs=len(run_summaries),
+                        failed_run_id=str(run_summary.id),
+                        reason=(f"half-written turn has {len(output_ids)} output IDs but {len(logprobs)} logprobs"),
                     )
-                elif role in ("tool", "tool_return", "tool_return_message") and turn.get("content"):
-                    # Tool return turn — no output_ids, but content is needed
-                    # for proper multi-turn token sequence reconstruction
-                    token_data.append(
-                        TurnTokenData(
-                            role=role,
-                            content=turn.get("content"),
-                        )
+                token_data.append(
+                    TurnTokenData(
+                        role=role,
+                        input_ids=turn.get("input_ids"),
+                        output_ids=output_ids,
+                        output_token_logprobs=logprobs,
                     )
-    except Exception as e:
-        logger.warning(f"Could not fetch token data for agent {agent_id}: {e}")
+                )
+            elif role in ("tool", "tool_return", "tool_return_message") and turn.get("content"):
+                token_data.append(
+                    TurnTokenData(
+                        role=role,
+                        content=turn.get("content"),
+                    )
+                )
+
     return token_data
+
+
+async def fetch_token_data(
+    client: Any,
+    agent_id: str,
+    *,
+    max_attempts: int = _TOKEN_FETCH_MAX_ATTEMPTS,
+    retry_base_seconds: float = _TOKEN_FETCH_RETRY_BASE_SECONDS,
+) -> list[TurnTokenData]:
+    """Fetch token IDs and logprobs atomically, retrying the complete snapshot.
+
+    Each attempt starts with a fresh accumulator. A transport failure or
+    half-written turn discards that attempt's prefix. After ``max_attempts``
+    failures, ``TokenDataFetchError`` propagates so callers can retry the full
+    rollout rather than training or evaluating on incomplete token data.
+    """
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be at least 1")
+
+    last_error: TokenDataFetchError | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return await _fetch_token_data_once(client, agent_id)
+        except TokenDataFetchError as exc:
+            last_error = exc
+            if attempt == max_attempts:
+                break
+            delay = retry_base_seconds * (2 ** (attempt - 1))
+            if delay > 0:
+                delay += random.uniform(0.0, retry_base_seconds)
+            logger.warning(
+                "Token-data fetch attempt %d/%d failed for agent %s; discarding partial data and retrying in %.2fs: %r",
+                attempt,
+                max_attempts,
+                agent_id,
+                delay,
+                exc.__cause__ or exc,
+            )
+            await asyncio.sleep(delay)
+
+    assert last_error is not None
+    raise last_error
 
 
 async def fetch_agent_state(client: Any, agent_id: str) -> Any:
