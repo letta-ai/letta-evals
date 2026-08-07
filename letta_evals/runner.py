@@ -14,7 +14,7 @@ from rich.console import Console
 from letta_evals.datasets.hf import hf_dataset_provenance
 from letta_evals.datasets.loader import load_dataset
 from letta_evals.execution.grading import detect_errors, grade_sample, validate_rubric_vars
-from letta_evals.execution.trace import fetch_agent_state, fetch_token_data, fetch_trajectory
+from letta_evals.execution.trace import TokenDataFetchError, fetch_agent_state, fetch_token_data, fetch_trajectory
 from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
@@ -508,7 +508,15 @@ class Runner:
                             logger.warning(f"Could not fetch partial trajectory for agent {agent_id}: {fetch_err}")
                     partial_token_data = e.token_data
                     if return_token_data and agent_id:
-                        partial_token_data = await fetch_token_data(self.client, agent_id)
+                        try:
+                            partial_token_data = await fetch_token_data(self.client, agent_id)
+                        except TokenDataFetchError as fetch_err:
+                            logger.warning(
+                                "Could not fetch complete token data for failed agent %s: %r",
+                                agent_id,
+                                fetch_err.__cause__ or fetch_err,
+                            )
+                            partial_token_data = None
                 else:
                     partial_trajectory = locals().get("trajectory") or []
                     partial_token_data = locals().get("token_data")
