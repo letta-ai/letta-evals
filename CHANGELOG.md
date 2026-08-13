@@ -140,6 +140,14 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.25.2](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.25.1...letta-evals-v0.25.2) (2026-08-13)
+
+
+### Bug Fixes
+
+* **execution:** Fetch token traces atomically ([#329](https://github.com/letta-ai/letta-evals/issues/329)) ([a207c56](https://github.com/letta-ai/letta-evals/commit/a207c5604d4b68e4b23247465ded52aa3e2991f4))
+* **sandbox:** Migrate Modal sandboxes to v2 filesystem backend ([#331](https://github.com/letta-ai/letta-evals/issues/331)) ([a0006fe](https://github.com/letta-ai/letta-evals/commit/a0006fe52b2d0536ea2dacf5db0f4c650b1468c8))
+
 ## [0.25.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.25.0...letta-evals-v0.25.1) (2026-08-05)
 
 
