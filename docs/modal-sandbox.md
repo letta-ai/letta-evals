@@ -31,6 +31,10 @@ sandbox:
   letta_code_version: "0.30.5"
 ```
 
+The driver requires Modal SDK 1.5.4 or newer and enables Modal's v2 Sandbox
+backend before creating each sandbox. If `MODAL_SANDBOX_V2` is already set in
+the host environment, the driver preserves that explicit value.
+
 The base checks Node `>=22.19.0` during the image build, and the application
 layers smoke-test the Letta Code CLI and `typing_extensions.Sentinel`. The
 runner retains its lightweight startup check for released `letta-evals` pins.

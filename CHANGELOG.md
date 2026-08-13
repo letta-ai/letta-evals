@@ -49,6 +49,10 @@ The Modal SDK ships as a base dependency, so `pip install letta-evals` is all
 you need to drive sandboxes. See `docs/modal-sandbox.md` for details
 suite.
 
+The minimum Modal SDK version is now 1.5.4. The sandbox driver enables Modal's
+v2 Sandbox backend by default and uses its path-oriented `sandbox.filesystem`
+APIs for host-to-sandbox file transfers.
+
 ### ⚠ BREAKING CHANGES — `target.sandbox` and `target.working_dir` removed
 
 The `sandbox: bool` and `working_dir: Path` fields on `LettaCodeTargetSpec`
