@@ -53,6 +53,11 @@ def _check_modal_auth() -> None:
     )
 
 
+def _enable_modal_sandbox_v2() -> None:
+    """Use Modal's v2 Sandbox backend unless the caller configured it explicitly."""
+    os.environ.setdefault("MODAL_SANDBOX_V2", "1")
+
+
 class ModalSandbox(AbstractSandbox):
     """Single-container Modal sandbox driving one sample's worth of work."""
 
@@ -73,6 +78,9 @@ class ModalSandbox(AbstractSandbox):
         return self._image_id
 
     async def start(self) -> None:
+        # Modal 1.5.4 makes v2 opt-in through this setting. Keep an explicit
+        # caller value intact so deployments retain a rollback path.
+        _enable_modal_sandbox_v2()
         modal = _import_modal()
         _check_modal_auth()
 

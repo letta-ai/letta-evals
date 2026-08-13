@@ -306,11 +306,70 @@ def _install_fake_modal(monkeypatch):
     fake_modal.Image.from_registry = MagicMock(return_value=fake_image)
     fake_sandbox = MagicMock(name="sandbox")
     fake_sandbox.object_id = "sb-xyz"
+    fake_sandbox.filesystem.copy_from_local.aio = AsyncMock()
+    fake_sandbox.filesystem.copy_to_local.aio = AsyncMock()
     fake_modal.Sandbox.create.aio = AsyncMock(return_value=fake_sandbox)
 
     monkeypatch.setitem(sys.modules, "modal", fake_modal)
     monkeypatch.setattr(modal_driver, "_check_modal_auth", lambda: None)
     return fake_modal
+
+
+class TestModalDriverV2:
+    @pytest.mark.parametrize(
+        ("configured", "expected"),
+        [(None, "1"), ("0", "0")],
+        ids=["enabled-by-default", "explicit-value-preserved"],
+    )
+    @pytest.mark.asyncio
+    async def test_start_configures_v2(self, monkeypatch, configured, expected):
+        if configured is None:
+            monkeypatch.delenv("MODAL_SANDBOX_V2", raising=False)
+        else:
+            monkeypatch.setenv("MODAL_SANDBOX_V2", configured)
+        _install_fake_modal(monkeypatch)
+        sandbox = ModalSandbox(
+            spec=ModalSandboxSpec(image="ghcr.io/custom/runtime:1.0"),
+            session_id="unit-v2",
+        )
+
+        await sandbox.start()
+
+        assert os.environ["MODAL_SANDBOX_V2"] == expected
+
+
+class TestModalDriverFilesystem:
+    @pytest.mark.asyncio
+    async def test_upload_file_uses_v2_filesystem_api(self, monkeypatch, tmp_path):
+        fake_modal = _install_fake_modal(monkeypatch)
+        sandbox = ModalSandbox(
+            spec=ModalSandboxSpec(image="ghcr.io/custom/runtime:1.0"),
+            session_id="unit-upload",
+        )
+        local = tmp_path / "input.json"
+        local.write_text("{}\n")
+        await sandbox.start()
+
+        await sandbox.upload_file(local, "/mnt/input.json")
+
+        filesystem = fake_modal.Sandbox.create.aio.return_value.filesystem
+        filesystem.copy_from_local.aio.assert_awaited_once_with(str(local), "/mnt/input.json")
+
+    @pytest.mark.asyncio
+    async def test_download_file_uses_v2_filesystem_api(self, monkeypatch, tmp_path):
+        fake_modal = _install_fake_modal(monkeypatch)
+        sandbox = ModalSandbox(
+            spec=ModalSandboxSpec(image="ghcr.io/custom/runtime:1.0"),
+            session_id="unit-download",
+        )
+        local = tmp_path / "nested" / "result.json"
+        await sandbox.start()
+
+        await sandbox.download_file("/mnt/result.json", local)
+
+        assert local.parent.is_dir()
+        filesystem = fake_modal.Sandbox.create.aio.return_value.filesystem
+        filesystem.copy_to_local.aio.assert_awaited_once_with("/mnt/result.json", str(local))
 
 
 class TestModalDriverImageBuild:
