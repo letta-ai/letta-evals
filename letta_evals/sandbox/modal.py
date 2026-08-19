@@ -22,6 +22,11 @@ from letta_evals.sandbox.base import AbstractSandbox, ExecResult, SandboxAuthErr
 
 logger = logging.getLogger(__name__)
 
+_MODAL_AUTH_ERROR_MESSAGE = (
+    "Modal authentication failed. Run `modal token new` for local use or verify "
+    "that the Modal Function identity has access."
+)
+
 
 def _letta_evals_package_spec(pin: str) -> str:
     """Normalize a version or direct reference into a pip package spec."""
@@ -37,20 +42,6 @@ def _import_modal():
             "Modal SDK not found. It ships with letta-evals; reinstall with `pip install letta-evals`."
         ) from e
     return modal
-
-
-def _check_modal_auth() -> None:
-    """Pre-flight check for Modal credentials before any network call."""
-    token_id = os.getenv("MODAL_TOKEN_ID")
-    token_secret = os.getenv("MODAL_TOKEN_SECRET")
-    if token_id and token_secret:
-        return
-    if (Path.home() / ".modal.toml").exists():
-        return
-    raise SandboxAuthError(
-        "Modal authentication not found. Run `modal token new` or set "
-        "MODAL_TOKEN_ID and MODAL_TOKEN_SECRET environment variables."
-    )
 
 
 def _enable_modal_sandbox_v2() -> None:
@@ -82,9 +73,11 @@ class ModalSandbox(AbstractSandbox):
         # caller value intact so deployments retain a rollback path.
         _enable_modal_sandbox_v2()
         modal = _import_modal()
-        _check_modal_auth()
 
-        app = await modal.App.lookup.aio(name=self.spec.app_name, create_if_missing=True)
+        try:
+            app = await modal.App.lookup.aio(name=self.spec.app_name, create_if_missing=True)
+        except modal.exception.AuthError as e:
+            raise SandboxAuthError(_MODAL_AUTH_ERROR_MESSAGE) from e
         if self.spec.image is None:
             # The Dockerfile is a shared OS/toolchain base. Application pins
             # live in literal Modal layer commands so each exact pin becomes
@@ -137,7 +130,10 @@ class ModalSandbox(AbstractSandbox):
         if self.spec.idle_timeout_sec is not None:
             create_kwargs["idle_timeout"] = self.spec.idle_timeout_sec
 
-        self._sandbox = await modal.Sandbox.create.aio(**create_kwargs)
+        try:
+            self._sandbox = await modal.Sandbox.create.aio(**create_kwargs)
+        except modal.exception.AuthError as e:
+            raise SandboxAuthError(_MODAL_AUTH_ERROR_MESSAGE) from e
         self._image_id = getattr(image, "object_id", None)
         logger.info(
             "Started Modal sandbox %s (session=%s, image=%s)",

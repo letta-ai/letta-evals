@@ -1001,7 +1001,7 @@ wheels = [
 
 [[package]]
 name = "letta-evals"
-version = "0.25.1"
+version = "0.25.2"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
