@@ -16,7 +16,7 @@ import anyio
 import pytest
 
 from letta_evals.models import ModalSandboxSpec, SuiteSpec
-from letta_evals.sandbox.base import ExecResult
+from letta_evals.sandbox.base import ExecResult, SandboxAuthError
 from letta_evals.sandbox.dispatch import build_upload_filter
 from letta_evals.sandbox.modal import ModalSandbox
 
@@ -330,9 +330,7 @@ class TestModalDriverAuth:
         fake_modal.Sandbox.create.aio.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_start_translates_modal_auth_error(self, monkeypatch):
-        from letta_evals.sandbox.base import SandboxAuthError
-
+    async def test_start_translates_app_lookup_auth_error(self, monkeypatch):
         class FakeModalAuthError(Exception):
             pass
 
@@ -350,6 +348,26 @@ class TestModalDriverAuth:
 
         assert exc_info.value.__cause__ is sdk_error
         fake_modal.Sandbox.create.aio.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_start_translates_sandbox_create_auth_error(self, monkeypatch):
+        class FakeModalAuthError(Exception):
+            pass
+
+        fake_modal = _install_fake_modal(monkeypatch)
+        fake_modal.exception.AuthError = FakeModalAuthError
+        sdk_error = FakeModalAuthError("invalid ambient credentials")
+        fake_modal.Sandbox.create.aio.side_effect = sdk_error
+        sandbox = ModalSandbox(
+            spec=ModalSandboxSpec(image="ghcr.io/custom/runtime:1.0"),
+            session_id="unit-create-auth-error",
+        )
+
+        with pytest.raises(SandboxAuthError, match="Modal authentication failed") as exc_info:
+            await sandbox.start()
+
+        assert exc_info.value.__cause__ is sdk_error
+        fake_modal.App.lookup.aio.assert_awaited_once()
 
 
 class TestModalDriverV2:

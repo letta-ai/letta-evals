@@ -22,6 +22,11 @@ from letta_evals.sandbox.base import AbstractSandbox, ExecResult, SandboxAuthErr
 
 logger = logging.getLogger(__name__)
 
+_MODAL_AUTH_ERROR_MESSAGE = (
+    "Modal authentication failed. Run `modal token new` for local use or verify "
+    "that the Modal Function identity has access."
+)
+
 
 def _letta_evals_package_spec(pin: str) -> str:
     """Normalize a version or direct reference into a pip package spec."""
@@ -72,10 +77,7 @@ class ModalSandbox(AbstractSandbox):
         try:
             app = await modal.App.lookup.aio(name=self.spec.app_name, create_if_missing=True)
         except modal.exception.AuthError as e:
-            raise SandboxAuthError(
-                "Modal authentication failed. Run `modal token new` for local use or verify "
-                "that the Modal Function identity has access."
-            ) from e
+            raise SandboxAuthError(_MODAL_AUTH_ERROR_MESSAGE) from e
         if self.spec.image is None:
             # The Dockerfile is a shared OS/toolchain base. Application pins
             # live in literal Modal layer commands so each exact pin becomes
@@ -128,7 +130,10 @@ class ModalSandbox(AbstractSandbox):
         if self.spec.idle_timeout_sec is not None:
             create_kwargs["idle_timeout"] = self.spec.idle_timeout_sec
 
-        self._sandbox = await modal.Sandbox.create.aio(**create_kwargs)
+        try:
+            self._sandbox = await modal.Sandbox.create.aio(**create_kwargs)
+        except modal.exception.AuthError as e:
+            raise SandboxAuthError(_MODAL_AUTH_ERROR_MESSAGE) from e
         self._image_id = getattr(image, "object_id", None)
         logger.info(
             "Started Modal sandbox %s (session=%s, image=%s)",
