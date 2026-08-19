@@ -39,20 +39,6 @@ def _import_modal():
     return modal
 
 
-def _check_modal_auth() -> None:
-    """Pre-flight check for Modal credentials before any network call."""
-    token_id = os.getenv("MODAL_TOKEN_ID")
-    token_secret = os.getenv("MODAL_TOKEN_SECRET")
-    if token_id and token_secret:
-        return
-    if (Path.home() / ".modal.toml").exists():
-        return
-    raise SandboxAuthError(
-        "Modal authentication not found. Run `modal token new` or set "
-        "MODAL_TOKEN_ID and MODAL_TOKEN_SECRET environment variables."
-    )
-
-
 def _enable_modal_sandbox_v2() -> None:
     """Use Modal's v2 Sandbox backend unless the caller configured it explicitly."""
     os.environ.setdefault("MODAL_SANDBOX_V2", "1")
@@ -82,9 +68,14 @@ class ModalSandbox(AbstractSandbox):
         # caller value intact so deployments retain a rollback path.
         _enable_modal_sandbox_v2()
         modal = _import_modal()
-        _check_modal_auth()
 
-        app = await modal.App.lookup.aio(name=self.spec.app_name, create_if_missing=True)
+        try:
+            app = await modal.App.lookup.aio(name=self.spec.app_name, create_if_missing=True)
+        except modal.exception.AuthError as e:
+            raise SandboxAuthError(
+                "Modal authentication failed. Run `modal token new` for local use or verify "
+                "that the Modal Function identity has access."
+            ) from e
         if self.spec.image is None:
             # The Dockerfile is a shared OS/toolchain base. Application pins
             # live in literal Modal layer commands so each exact pin becomes

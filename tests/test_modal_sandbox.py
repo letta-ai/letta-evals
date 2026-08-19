@@ -295,8 +295,6 @@ def _install_fake_modal(monkeypatch):
     import sys
     from unittest.mock import AsyncMock, MagicMock
 
-    import letta_evals.sandbox.modal as modal_driver
-
     fake_modal = MagicMock(name="modal")
     fake_modal.App.lookup.aio = AsyncMock(return_value=MagicMock(name="app"))
     fake_image = MagicMock(name="image")
@@ -311,8 +309,47 @@ def _install_fake_modal(monkeypatch):
     fake_modal.Sandbox.create.aio = AsyncMock(return_value=fake_sandbox)
 
     monkeypatch.setitem(sys.modules, "modal", fake_modal)
-    monkeypatch.setattr(modal_driver, "_check_modal_auth", lambda: None)
     return fake_modal
+
+
+class TestModalDriverAuth:
+    @pytest.mark.asyncio
+    async def test_start_delegates_auth_to_modal_sdk(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("MODAL_TOKEN_ID", raising=False)
+        monkeypatch.delenv("MODAL_TOKEN_SECRET", raising=False)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        fake_modal = _install_fake_modal(monkeypatch)
+        sandbox = ModalSandbox(
+            spec=ModalSandboxSpec(image="ghcr.io/custom/runtime:1.0"),
+            session_id="unit-sdk-auth",
+        )
+
+        await sandbox.start()
+
+        fake_modal.App.lookup.aio.assert_awaited_once_with(name="letta-evals", create_if_missing=True)
+        fake_modal.Sandbox.create.aio.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_start_translates_modal_auth_error(self, monkeypatch):
+        from letta_evals.sandbox.base import SandboxAuthError
+
+        class FakeModalAuthError(Exception):
+            pass
+
+        fake_modal = _install_fake_modal(monkeypatch)
+        fake_modal.exception.AuthError = FakeModalAuthError
+        sdk_error = FakeModalAuthError("invalid credentials")
+        fake_modal.App.lookup.aio.side_effect = sdk_error
+        sandbox = ModalSandbox(
+            spec=ModalSandboxSpec(image="ghcr.io/custom/runtime:1.0"),
+            session_id="unit-auth-error",
+        )
+
+        with pytest.raises(SandboxAuthError, match="Modal authentication failed") as exc_info:
+            await sandbox.start()
+
+        assert exc_info.value.__cause__ is sdk_error
+        fake_modal.Sandbox.create.aio.assert_not_awaited()
 
 
 class TestModalDriverV2:
