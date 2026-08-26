@@ -27,6 +27,31 @@ jobs:
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
 
+      # release-please bumps the version in pyproject.toml but doesn't know
+      # about uv.lock, which records the project's own version. Refresh the
+      # lockfile on the release PR branch right here: the release PR itself
+      # never triggers workflows (its branch is pushed with GITHUB_TOKEN), so
+      # a pull_request-triggered sync would never fire.
+      - uses: actions/checkout@v4
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+        with:
+          ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+
+      - uses: astral-sh/setup-uv@v5
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+
+      - name: Sync uv.lock on the release PR
+        if: ${{ steps.release.outputs.prs_created == 'true' }}
+        run: |
+          uv lock
+          if ! git diff --quiet uv.lock; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add uv.lock
+            git commit -m "chore: Sync uv.lock with release version"
+            git push
+          fi
+
   publish-pypi:
     name: Publish to PyPI
     needs: release-please
