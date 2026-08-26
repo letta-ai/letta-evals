@@ -114,6 +114,8 @@ def _make_runner(grader: _FakeGrader, target: MagicMock) -> Runner:
     runner.stream_writer = None
     runner.output_path = None
     runner.project_id = None
+    runner._pricing_overrides = None
+    runner._model_identities = {}
 
     # Patch _create_letta_code_target so _get_or_run_target_trace returns our canned target.
     runner._create_letta_code_target = lambda model_handle=None: target  # type: ignore[method-assign]

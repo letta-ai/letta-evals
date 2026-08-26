@@ -19,6 +19,37 @@ from letta_evals.types import (
 )
 
 
+class ModelPricingSpec(BaseModel):
+    """Explicit dollars-per-million-token rates for a model with no catalog entry.
+
+    Used as a ``target.pricing`` value; the other value form is a plain string
+    naming the exact litellm catalog key to bill the handle as.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    input_per_mtok: float = Field(ge=0, description="Input rate in dollars per million tokens")
+    output_per_mtok: float = Field(ge=0, description="Output rate in dollars per million tokens")
+    cache_read_per_mtok: Optional[float] = Field(
+        default=None, ge=0, description="Cache-read rate in dollars per million tokens"
+    )
+    cache_write_per_mtok: Optional[float] = Field(
+        default=None, ge=0, description="Cache-write rate in dollars per million tokens"
+    )
+
+    def to_entry(self) -> Dict[str, float]:
+        """These rates as a litellm-shaped catalog entry, consumed by ``letta_evals.pricing``."""
+        entry = {
+            "input_cost_per_token": self.input_per_mtok / 1_000_000,
+            "output_cost_per_token": self.output_per_mtok / 1_000_000,
+        }
+        if self.cache_read_per_mtok is not None:
+            entry["cache_read_input_token_cost"] = self.cache_read_per_mtok / 1_000_000
+        if self.cache_write_per_mtok is not None:
+            entry["cache_creation_input_token_cost"] = self.cache_write_per_mtok / 1_000_000
+        return entry
+
+
 class LettaCodeTargetSpec(BaseModel):
     """Letta code target configuration."""
 
@@ -34,6 +65,17 @@ class LettaCodeTargetSpec(BaseModel):
     # model handles to test (cloud-compatible model identifiers)
     model_handles: Optional[List[str]] = Field(
         default=None, description="List of model handles (e.g., 'openai/gpt-4.1') for cloud deployments"
+    )
+
+    pricing: Optional[Dict[str, Union[str, ModelPricingSpec]]] = Field(
+        default=None,
+        description=(
+            "Pricing for model handles the run reports as unpriced. Keys are "
+            "model handles, exactly as listed in model_handles; each value is "
+            "either an exact litellm catalog key to bill the handle as, or "
+            "explicit per-Mtok rates. Serialized with the suite, so it applies "
+            "identically to local and sandboxed runs."
+        ),
     )
 
     agent_script: Optional[str] = Field(

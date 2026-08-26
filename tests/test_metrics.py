@@ -6,6 +6,7 @@ from letta_evals.metrics import (
     aggregate_errors,
     aggregate_timing,
     aggregate_usage,
+    count_cost_missing,
     summarize_model,
     summarize_run,
     summarize_runs,
@@ -118,6 +119,27 @@ class TestAggregateUsage:
         assert u.prompt_tokens == 0
         assert u.completion_tokens == 0
         assert u.cost is None
+
+
+class TestCountCostMissing:
+    def test_counts_samples_with_tokens_but_unknown_cost(self):
+        results = [
+            _make_result(usage=Usage(prompt_tokens=100, completion_tokens=50, cost=0.01)),
+            _make_result(usage=Usage(prompt_tokens=100, completion_tokens=50, cost=None)),  # unpriced
+            _make_result(usage=None),  # no usage at all -> not counted
+        ]
+        assert count_cost_missing(results) == 1
+
+    def test_summaries_flag_partial_cost(self):
+        results = [
+            _make_result(sample_id=0, usage=Usage(prompt_tokens=100, completion_tokens=50, cost=0.01)),
+            _make_result(sample_id=1, usage=Usage(prompt_tokens=100, completion_tokens=50, cost=None)),
+        ]
+        ms = summarize_model(model="m", results=results, grader_keys=[_DEFAULT_GRADER])
+        assert ms.cost_missing == 1
+        assert ms.usage.cost == pytest.approx(0.01)  # partial sum, flagged by cost_missing
+        rs = summarize_run(run=1, results=results, grader_keys=[_DEFAULT_GRADER])
+        assert rs.cost_missing == 1
 
 
 class TestAggregateErrors:
