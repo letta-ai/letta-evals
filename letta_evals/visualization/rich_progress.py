@@ -455,11 +455,19 @@ class EvalProgress(ProgressCallback):
 
                 for ms in summary.models:
                     u = ms.usage
+                    if u.cost is not None:
+                        cost_cell = f"${u.cost:.4f}"
+                        if ms.cost_missing > 0:
+                            cost_cell = f"≥{cost_cell} [dim]({ms.cost_missing} unpriced)[/dim]"
+                    elif ms.cost_missing > 0:
+                        cost_cell = f"[dim]unknown ({ms.cost_missing} unpriced)[/dim]"
+                    else:
+                        cost_cell = "-"
                     usage_table.add_row(
                         ms.model,
                         f"{u.prompt_tokens:,}",
                         f"{u.completion_tokens:,}",
-                        f"${u.cost:.4f}" if u.cost is not None else "-",
+                        cost_cell,
                         f"{u.cached_input_tokens:,}" if u.cached_input_tokens > 0 else "-",
                         f"{u.cache_write_tokens:,}" if u.cache_write_tokens > 0 else "-",
                         f"{u.reasoning_tokens:,}" if u.reasoning_tokens > 0 else "-",

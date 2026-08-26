@@ -151,7 +151,7 @@ class Usage(BaseModel):
     cached_input_tokens: int = Field(default=0, description="Cached input tokens served from cache")
     cache_write_tokens: int = Field(default=0, description="Cache write tokens (Anthropic only)")
     reasoning_tokens: int = Field(default=0, description="Reasoning/thinking tokens generated")
-    cost: Optional[float] = Field(default=None, description="Cost in dollars")
+    cost: Optional[float] = Field(default=None, description="Cost in dollars; None when pricing is unknown")
 
 
 class Timing(BaseModel):

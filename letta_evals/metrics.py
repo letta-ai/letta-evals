@@ -55,6 +55,18 @@ def aggregate_usage(results: List[SampleResult]) -> Usage:
     )
 
 
+def count_cost_missing(results: List[SampleResult]) -> int:
+    """Count samples with recorded token usage but no resolvable cost.
+
+    When > 0, the summed ``cost`` from ``aggregate_usage`` is a partial total.
+    """
+    return sum(
+        1
+        for r in results
+        if r.usage is not None and (r.usage.prompt_tokens > 0 or r.usage.completion_tokens > 0) and r.usage.cost is None
+    )
+
+
 def aggregate_timing(results: List[SampleResult]) -> Optional[TimingStats]:
     """Aggregate per-sample timing into mean/p50/p95 stats. Returns None if empty."""
     timings: List[Timing] = [r.timing for r in results if r.timing is not None]
@@ -144,6 +156,7 @@ def summarize_model(
         per_metric=per_metric,
         usage=usage,
         timing=timing,
+        cost_missing=count_cost_missing(results),
         errors=errors,
     )
 
@@ -169,6 +182,7 @@ def summarize_run(
         usage=usage,
         timing=timing,
         n_errors=n_errors,
+        cost_missing=count_cost_missing(results),
     )
 
 
@@ -235,6 +249,7 @@ def summarize_runs(
         per_metric=per_metric_mean,
         usage=usage,
         timing=timing,
+        cost_missing=count_cost_missing(all_results),
         errors=errors,
         reward_std=reward_std,
         per_metric_std=per_metric_std,

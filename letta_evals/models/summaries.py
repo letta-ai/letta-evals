@@ -24,6 +24,10 @@ class PerRunSummary(BaseModel):
     usage: Usage = Field(description="Aggregate usage for this run")
     timing: TimingStats = Field(description="Aggregate timing for this run")
     n_errors: int = Field(default=0, description="Number of errored samples in this run")
+    cost_missing: int = Field(
+        default=0,
+        description="Samples with token usage but unresolved pricing; when > 0, usage.cost is a partial sum",
+    )
 
 
 class ModelSummary(BaseModel):
@@ -43,6 +47,10 @@ class ModelSummary(BaseModel):
     )
     usage: Usage = Field(description="Aggregate usage (summed across runs)")
     timing: TimingStats = Field(description="Aggregate timing (averaged across runs)")
+    cost_missing: int = Field(
+        default=0,
+        description="Samples with token usage but unresolved pricing; when > 0, usage.cost is a partial sum",
+    )
     errors: Optional[ErrorSummary] = Field(default=None, description="Error breakdown (only when errors > 0)")
     runs: Optional[List[PerRunSummary]] = Field(
         default=None,

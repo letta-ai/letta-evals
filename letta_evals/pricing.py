@@ -1,13 +1,24 @@
-"""Model pricing loaded from BerriAI/litellm pricing JSON.
+"""Cost computation at litellm catalog rates.
 
-The pricing table is fetched from upstream once per process. Disk cache
-(`~/.cache/letta_evals/model_prices.json`) lives for 30 minutes; when the cache
-is fresh we skip the network. On cache miss we refetch and rewrite. If a fetch
-fails *and* a stale cache exists, we use the stale cache and log a warning;
-otherwise the underlying network error propagates.
+Rates for a model handle come from, in order:
 
-Use ``MODEL_PRICE_OVERRIDES`` for models the upstream JSON hasn't published yet
-(internal/preview names). Overrides win over the JSON.
+1. A suite-declared ``target.pricing`` entry: an exact litellm catalog key,
+   or explicit rates. Explicit config never falls through to guessing — a
+   catalog key that isn't in the catalog is unknown cost.
+2. The model behind the handle as the server reports it in the agent's
+   ``llm_config`` (model name, endpoint type, provider name). The server has
+   already resolved runtime selectors — effort suffixes, provider routes —
+   to the underlying model, so new handles price themselves.
+
+There is no handle-string guessing: without either source, cost is ``None``
+("unknown"), never ``0.0``. ``calculate_cost_from_agent_usage`` never raises;
+catalog load failures also degrade to unknown cost.
+
+The catalog is litellm's pricing JSON, fetched once per process and disk-cached
+for 30 minutes (a stale cache is used when the refetch fails). Entries are kept
+as litellm's raw dicts: ``input_cost_per_token``, ``output_cost_per_token``,
+``cache_read_input_token_cost``, ``cache_creation_input_token_cost``, and their
+``*_above_200k_tokens`` tier variants.
 """
 
 from __future__ import annotations
@@ -15,140 +26,58 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import time
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import httpx
 
 logger = logging.getLogger(__name__)
 
 LITELLM_PRICING_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
-CACHE_DIR = Path(os.environ.get("LETTA_EVALS_CACHE_DIR", str(Path.home() / ".cache" / "letta_evals")))
-CACHE_FILE = CACHE_DIR / "model_prices.json"
+CACHE_FILE = (
+    Path(os.environ.get("LETTA_EVALS_CACHE_DIR", str(Path.home() / ".cache" / "letta_evals"))) / "model_prices.json"
+)
 CACHE_TTL_SECONDS = 30 * 60  # 30 minutes
 NETWORK_TIMEOUT_SECONDS = 5
 
-# Pattern to match reasoning effort suffixes (-low, -medium, -high, -xhigh, -max)
-_EFFORT_PATTERN = re.compile(r"-(low|medium|high|xhigh|max)$")
-# Pattern to match date suffixes: -YYYY-MM-DD or -YYYYMMDD
-_DATE_PATTERN = re.compile(r"-\d{4}-\d{2}-\d{2}$|-\d{8}$")
+# A target.pricing entry: an exact litellm catalog key, or a litellm-shaped
+# rates dict (ModelPricingSpec.to_entry() produces the latter).
+PricingOverrides = Dict[str, Union[str, Dict[str, float]]]
 
-# In-process cache: parsed pricing table. Loaded lazily.
-_PRICING: Optional[Dict[str, "ModelPricing"]] = None
+# Parsed catalog, loaded lazily, plus a lowercase index (catalog casing is
+# inconsistent with what providers report, e.g. litellm's `minimax/MiniMax-M3`
+# vs a server-reported `minimax/minimax-m3`; exact matches win).
+_TABLE: Optional[Dict[str, dict]] = None
+_TABLE_LOWER: Optional[Dict[str, dict]] = None
 
+# Keys already warned about in this process, so unresolved pricing logs once
+# per handle rather than once per sample.
+_WARNED: set = set()
 
-@dataclass(frozen=True)
-class ModelPricing:
-    """Per-token costs for a model. ``None`` for cache fields means 'not provided'."""
-
-    input_per_token: float
-    output_per_token: float
-    cache_read_per_token: Optional[float] = None
-    cache_creation_per_token: Optional[float] = None
-    # Tiered pricing (e.g. Anthropic Sonnet/Opus 4.5 and Gemini 3 Pro charge ~2x above 200k context)
-    threshold_tokens: Optional[int] = None
-    input_above_threshold_per_token: Optional[float] = None
-    output_above_threshold_per_token: Optional[float] = None
-    cache_read_above_threshold_per_token: Optional[float] = None
-    cache_creation_above_threshold_per_token: Optional[float] = None
-
-
-# Manual overrides for models that haven't shipped to litellm yet, or where we
-# want to pin a different rate. Keys are checked verbatim before any normalization,
-# so use the same canonical form your runner emits (e.g. "openai/gpt-5.2-experimental").
-# Empty by default - litellm covers everything we use today.
-MODEL_PRICE_OVERRIDES: Dict[str, ModelPricing] = {}
-
-
-# Provider-prefix translation: maps our prefix -> ordered list of litellm prefixes to try.
-# Each candidate is tried both with and without date-stripping. An empty prefix means
-# "bare key" (no provider segment).
-_PROVIDER_CANDIDATES: Dict[str, List[str]] = {
-    "anthropic": [""],
-    "openai": [""],
+# litellm prefixes to try for an endpoint type, after the provider-name prefix.
+# Needed where litellm's namespace differs from Letta's (bare keys for openai/
+# anthropic, gemini/ for google) and for BYOK providers whose custom
+# provider_name matches nothing in the catalog.
+_ENDPOINT_TYPE_PREFIXES: Dict[str, List[str]] = {
+    "openai": ["", "openai/"],
+    "anthropic": ["", "anthropic/"],
     "google_ai": ["", "gemini/", "vertex_ai/"],
+    "google_vertex": ["vertex_ai/", "gemini/", ""],
+    "azure": ["azure/"],
+    "groq": ["groq/"],
+    "mistral": ["mistral/"],
+    "together": ["together_ai/"],
+    "bedrock": ["bedrock/", ""],
     "deepseek": ["deepseek/", ""],
-    "mistralai": ["mistral/"],
-    "moonshotai": ["moonshot/"],
-    "z-ai": ["zai/"],
-    "minimax": ["minimax/"],
-}
-
-# When no provider prefix is given, try these in order based on bare-name patterns.
-_BARE_NAME_PROVIDERS: Dict[str, List[str]] = {
-    "claude": ["", "anthropic/"],
-    "gpt": [""],
-    "gemini": ["", "gemini/", "vertex_ai/"],
-    "deepseek": ["deepseek/", ""],
-    "mistral": ["mistral/", ""],
-    "kimi": ["moonshot/"],
-    "glm": ["zai/", ""],
-    "minimax": ["minimax/", ""],
+    "xai": ["xai/"],
 }
 
 
-def _build_pricing_from_json(raw: dict) -> Dict[str, ModelPricing]:
-    """Convert the raw litellm JSON into a dict of model -> ModelPricing."""
-    out: Dict[str, ModelPricing] = {}
-    for key, entry in raw.items():
-        if key == "sample_spec" or not isinstance(entry, dict):
-            continue
-        input_cost = entry.get("input_cost_per_token")
-        output_cost = entry.get("output_cost_per_token")
-        if input_cost is None or output_cost is None:
-            # Embeddings, audio, etc. - skip anything without both required fields.
-            continue
-
-        threshold = None
-        input_above = entry.get("input_cost_per_token_above_200k_tokens")
-        output_above = entry.get("output_cost_per_token_above_200k_tokens")
-        cache_read_above = entry.get("cache_read_input_token_cost_above_200k_tokens")
-        cache_create_above = entry.get("cache_creation_input_token_cost_above_200k_tokens")
-        if any(v is not None for v in (input_above, output_above, cache_read_above, cache_create_above)):
-            threshold = 200_000
-
-        out[key] = ModelPricing(
-            input_per_token=float(input_cost),
-            output_per_token=float(output_cost),
-            cache_read_per_token=_as_float_or_none(entry.get("cache_read_input_token_cost")),
-            cache_creation_per_token=_as_float_or_none(entry.get("cache_creation_input_token_cost")),
-            threshold_tokens=threshold,
-            input_above_threshold_per_token=_as_float_or_none(input_above),
-            output_above_threshold_per_token=_as_float_or_none(output_above),
-            cache_read_above_threshold_per_token=_as_float_or_none(cache_read_above),
-            cache_creation_above_threshold_per_token=_as_float_or_none(cache_create_above),
-        )
-    return out
-
-
-def _as_float_or_none(v) -> Optional[float]:
-    return float(v) if v is not None else None
-
-
-def _read_disk_cache() -> Optional[dict]:
-    if not CACHE_FILE.exists():
-        return None
-    try:
-        with CACHE_FILE.open() as f:
-            return json.load(f)
-    except (OSError, json.JSONDecodeError) as e:
-        logger.warning(f"Failed to read pricing cache at {CACHE_FILE}: {e}")
-        return None
-
-
-def _write_disk_cache(raw: dict) -> None:
-    try:
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        # Atomic write: write to temp then rename
-        tmp = CACHE_FILE.with_suffix(".json.tmp")
-        with tmp.open("w") as f:
-            json.dump(raw, f)
-        tmp.replace(CACHE_FILE)
-    except OSError as e:
-        logger.warning(f"Failed to write pricing cache to {CACHE_FILE}: {e}")
+def _warn_once(key: str, message: str) -> None:
+    if key not in _WARNED:
+        _WARNED.add(key)
+        logger.warning(message)
 
 
 def _fetch_upstream() -> dict:
@@ -158,113 +87,118 @@ def _fetch_upstream() -> dict:
     return resp.json()
 
 
-def _cache_is_fresh() -> bool:
-    if not CACHE_FILE.exists():
-        return False
+def _read_cache(max_age: Optional[float]) -> Optional[dict]:
+    """Read the disk cache; None if absent, unreadable, or older than max_age."""
     try:
-        age = time.time() - CACHE_FILE.stat().st_mtime
-        return age < CACHE_TTL_SECONDS
-    except OSError:
-        return False
+        if max_age is not None and time.time() - CACHE_FILE.stat().st_mtime >= max_age:
+            return None
+        return json.loads(CACHE_FILE.read_text())
+    except (OSError, ValueError):
+        return None
 
 
-def load_pricing_table() -> Dict[str, ModelPricing]:
-    """Load the pricing table, populating the in-process cache on first call."""
-    global _PRICING
-    if _PRICING is not None:
-        return _PRICING
+def _write_cache(raw: dict) -> None:
+    try:
+        CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = CACHE_FILE.with_suffix(".json.tmp")  # atomic: write temp, rename
+        tmp.write_text(json.dumps(raw))
+        tmp.replace(CACHE_FILE)
+    except OSError as e:
+        logger.warning(f"Failed to write pricing cache to {CACHE_FILE}: {e}")
 
-    raw: Optional[dict] = None
 
-    if _cache_is_fresh():
-        raw = _read_disk_cache()
-        if raw is not None:
-            logger.debug(f"Using fresh pricing cache from {CACHE_FILE}")
+def load_pricing_table() -> Dict[str, dict]:
+    """The litellm catalog as raw per-model dicts, loaded once per process.
 
+    Keeps only entries with both input and output rates (drops embeddings,
+    audio, and litellm's sample_spec). Raises only when the fetch fails and no
+    disk cache exists at all.
+    """
+    global _TABLE, _TABLE_LOWER
+    if _TABLE is not None:
+        return _TABLE
+
+    raw = _read_cache(max_age=CACHE_TTL_SECONDS)
     if raw is None:
         try:
             raw = _fetch_upstream()
-            _write_disk_cache(raw)
-            logger.debug(f"Fetched fresh pricing from {LITELLM_PRICING_URL}")
-        except Exception as e:
-            stale = _read_disk_cache()
-            if stale is not None:
-                logger.warning(
-                    f"Failed to fetch pricing from upstream ({e}); falling back to stale cache at {CACHE_FILE}"
-                )
-                raw = stale
-            else:
+            _write_cache(raw)
+        except Exception as err:
+            raw = _read_cache(max_age=None)
+            if raw is None:
                 raise
+            logger.warning(f"Failed to fetch pricing from upstream ({err}); using stale cache at {CACHE_FILE}")
 
-    _PRICING = _build_pricing_from_json(raw)
-    return _PRICING
-
-
-def _candidate_keys(model_handle: str) -> List[str]:
-    """Generate the ordered list of litellm keys to probe for a Letta model handle."""
-    candidates: List[str] = [model_handle]
-
-    if "/" in model_handle:
-        provider, model_part = model_handle.split("/", 1)
-        prefixes = _PROVIDER_CANDIDATES.get(provider, [""])
-        for prefix in prefixes:
-            candidates.append(f"{prefix}{model_part}")
-            stripped = _DATE_PATTERN.sub("", model_part)
-            if stripped != model_part:
-                candidates.append(f"{prefix}{stripped}")
-        # Also try the bare model_part
-        candidates.append(model_part)
-    else:
-        # No provider prefix - try each known pattern based on the leading token
-        for marker, prefixes in _BARE_NAME_PROVIDERS.items():
-            if model_handle.startswith(marker):
-                for prefix in prefixes:
-                    candidates.append(f"{prefix}{model_handle}")
-                    stripped = _DATE_PATTERN.sub("", model_handle)
-                    if stripped != model_handle:
-                        candidates.append(f"{prefix}{stripped}")
-                break
-
-    # De-duplicate while preserving order
-    seen: set = set()
-    deduped: List[str] = []
-    for c in candidates:
-        if c not in seen:
-            seen.add(c)
-            deduped.append(c)
-    return deduped
+    _TABLE = {
+        key: entry
+        for key, entry in raw.items()
+        if isinstance(entry, dict)
+        and entry.get("input_cost_per_token") is not None
+        and entry.get("output_cost_per_token") is not None
+    }
+    _TABLE_LOWER = {}
+    for key, entry in _TABLE.items():
+        _TABLE_LOWER.setdefault(key.lower(), entry)
+    return _TABLE
 
 
-def resolve_model(model_handle: str) -> Optional[ModelPricing]:
-    """Resolve a Letta-style model handle to a ModelPricing entry, or None if unknown.
+def _lookup(key: str) -> Optional[dict]:
+    """Look up one catalog key: exact match first, then case-insensitive."""
+    table = load_pricing_table()
+    return table.get(key) or (_TABLE_LOWER or {}).get(key.lower())
 
-    Resolution order:
-        1. ``MODEL_PRICE_OVERRIDES`` exact match.
-        2. Strip effort suffix (-low, -medium, -high, -xhigh, -max) and recurse.
-        3. Try provider-prefix candidates against the litellm JSON.
+
+def _find_by_identity(
+    model_name: Optional[str], provider_type: Optional[str], provider_name: Optional[str]
+) -> Optional[dict]:
+    """Probe the catalog for a server-reported model name under the
+    provider-name prefix, the endpoint-type prefixes, and bare.
+
+    The name is probed exactly as reported — no suffix stripping: names that
+    look decorated (o3-mini-high, qwen3-max, dated snapshots) are distinct
+    catalog identities, and a near-miss priced as a different model is worse
+    than an unknown cost.
     """
-    if not model_handle:
+    name = (model_name or "").strip()
+    if not name:
         return None
 
-    if model_handle in MODEL_PRICE_OVERRIDES:
-        return MODEL_PRICE_OVERRIDES[model_handle]
+    prefixes: List[str] = []
+    if provider_name:
+        prefixes.append(provider_name.strip().lower() + "/")
+    prefixes += _ENDPOINT_TYPE_PREFIXES.get(provider_type or "", [])
+    if "" not in prefixes:
+        prefixes.append("")
 
-    # Strip effort suffix and try again (recursively, once)
-    stripped = _EFFORT_PATTERN.sub("", model_handle)
-    if stripped != model_handle:
-        return resolve_model(stripped)
-
-    table = load_pricing_table()
-    for candidate in _candidate_keys(model_handle):
-        if candidate in table:
-            return table[candidate]
-
+    for prefix in prefixes:
+        entry = _lookup(prefix + name)
+        if entry is not None:
+            return entry
     return None
 
 
-# ---------------------------------------------------------------------------
-# Cost computation
-# ---------------------------------------------------------------------------
+def _resolve_entry(
+    model_handle: str,
+    model_name: Optional[str],
+    provider_type: Optional[str],
+    provider_name: Optional[str],
+    overrides: Optional[PricingOverrides],
+) -> Optional[dict]:
+    """Suite override first, then the server-reported identity."""
+    override = (overrides or {}).get(model_handle)
+    if isinstance(override, dict):
+        return override
+    if isinstance(override, str):
+        entry = _lookup(override)
+        if entry is None:
+            _warn_once(
+                f"override:{model_handle}",
+                f"target.pricing maps '{model_handle}' to '{override}', which is not in the "
+                f"pricing catalog; cost recorded as unknown",
+            )
+        # Explicit config never falls through to guessing.
+        return entry
+    return _find_by_identity(model_name, provider_type, provider_name)
 
 
 def _read_nested(record: dict, parent_key: str, candidate_keys: List[str]) -> int:
@@ -279,67 +213,52 @@ def _read_nested(record: dict, parent_key: str, candidate_keys: List[str]) -> in
     return 0
 
 
-def _bill_record(
-    pricing: ModelPricing,
-    non_cached: int,
-    cached: int,
-    cache_write: int,
-    completion: int,
-) -> float:
-    """Compute the dollar cost of a single LLM call given a ModelPricing entry."""
-    total_input = non_cached + cached + cache_write
-    use_tier = pricing.threshold_tokens is not None and total_input > pricing.threshold_tokens
-
-    if use_tier and pricing.input_above_threshold_per_token is not None:
-        in_rate = pricing.input_above_threshold_per_token
-    else:
-        in_rate = pricing.input_per_token
-
-    if use_tier and pricing.output_above_threshold_per_token is not None:
-        out_rate = pricing.output_above_threshold_per_token
-    else:
-        out_rate = pricing.output_per_token
-
-    if use_tier and pricing.cache_read_above_threshold_per_token is not None:
-        cache_read_rate = pricing.cache_read_above_threshold_per_token
-    elif pricing.cache_read_per_token is not None:
-        cache_read_rate = pricing.cache_read_per_token
-    else:
-        # No cache pricing available: bill cached input at full input rate.
-        cache_read_rate = in_rate
-
-    if use_tier and pricing.cache_creation_above_threshold_per_token is not None:
-        cache_create_rate = pricing.cache_creation_above_threshold_per_token
-    elif pricing.cache_creation_per_token is not None:
-        cache_create_rate = pricing.cache_creation_per_token
-    else:
-        # OpenAI-style models don't have cache writes; rate is 0.
-        cache_create_rate = 0.0
-
-    return non_cached * in_rate + cached * cache_read_rate + cache_write * cache_create_rate + completion * out_rate
+def _rate(entry: dict, key: str, tier: bool, default: float = 0.0) -> float:
+    """Per-token rate for one bucket, honoring the >200k tier variant when present."""
+    if tier and entry.get(key + "_above_200k_tokens") is not None:
+        return entry[key + "_above_200k_tokens"]
+    v = entry.get(key)
+    return v if v is not None else default
 
 
-def calculate_cost_from_agent_usage(model_handle: str, agent_usage: Optional[List[dict]]) -> float:
-    """Calculate total cost from agent_usage data.
+def calculate_cost_from_agent_usage(
+    model_handle: str,
+    agent_usage: Optional[List[dict]],
+    *,
+    model_name: Optional[str] = None,
+    provider_type: Optional[str] = None,
+    provider_name: Optional[str] = None,
+    overrides: Optional[PricingOverrides] = None,
+) -> Optional[float]:
+    """Total dollar cost of an agent run, billing cache reads, cache writes,
+    and tiered (>200k context) pricing per LLM call.
 
-    Bills cache reads, cache writes, and tiered (>200k context) pricing per LLM
-    call, using rates from the litellm pricing JSON.
+    ``model_name`` / ``provider_type`` / ``provider_name`` are the
+    server-reported identity of the model behind the handle, from the agent's
+    ``llm_config``.
 
-    Args:
-        model_handle: Name of the model
-        agent_usage: List of usage statistics from the agent run
-
-    Returns:
-        Total cost in dollars for the entire agent run, or 0.0 if model pricing
-        is unavailable (logs a debug message).
+    Returns 0.0 for an empty usage list, and None when rates cannot be
+    resolved (cost unknown, warned once per handle). Never raises — a failure
+    to load the pricing catalog also degrades to None.
     """
     if not agent_usage:
         return 0.0
 
-    pricing = resolve_model(model_handle)
-    if pricing is None:
-        logger.debug(f"No pricing information available for model: {model_handle}")
-        return 0.0
+    try:
+        entry = _resolve_entry(model_handle, model_name, provider_type, provider_name, overrides)
+    except Exception as e:
+        _warn_once(
+            f"catalog-error:{model_handle}",
+            f"Could not load pricing catalog while pricing model '{model_handle}' ({e}); cost recorded as unknown",
+        )
+        return None
+    if entry is None:
+        _warn_once(
+            model_handle,
+            f"No pricing found for model '{model_handle}'; cost recorded as unknown. "
+            f"Map it to a catalog entry or explicit rates via target.pricing in the suite YAML.",
+        )
+        return None
 
     total_cost = 0.0
     for record in agent_usage:
@@ -366,6 +285,15 @@ def calculate_cost_from_agent_usage(model_handle: str, agent_usage: Optional[Lis
         # Subtracting both cached buckets gives non-cached input in either case.
         non_cached = max(prompt_tokens - cached_input - cache_write, 0)
 
-        total_cost += _bill_record(pricing, non_cached, cached_input, cache_write, completion_tokens)
+        tier = non_cached + cached_input + cache_write > 200_000
+        in_rate = _rate(entry, "input_cost_per_token", tier)
+        total_cost += (
+            non_cached * in_rate
+            # No cache-read pricing published: bill cached input at the full input rate.
+            + cached_input * _rate(entry, "cache_read_input_token_cost", tier, default=in_rate)
+            # OpenAI-style models have no cache writes; rate 0 when unpublished.
+            + cache_write * _rate(entry, "cache_creation_input_token_cost", tier)
+            + completion_tokens * _rate(entry, "output_cost_per_token", tier)
+        )
 
     return total_cost

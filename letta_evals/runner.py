@@ -36,7 +36,7 @@ from letta_evals.models import (
     ToolGraderSpec,
     Usage,
 )
-from letta_evals.pricing import calculate_cost_from_agent_usage
+from letta_evals.pricing import PricingOverrides, calculate_cost_from_agent_usage
 from letta_evals.rewards import LoadedRewardComposer, RewardContext, load_reward_composer
 from letta_evals.sandbox.dispatch import run_sample_in_sandbox
 from letta_evals.streaming import StreamingReader, StreamingWriter
@@ -70,7 +70,11 @@ def _build_usage(
     cache_write_tokens: Optional[int],
     reasoning_tokens: Optional[int],
 ) -> Optional[Usage]:
-    """Build a Usage object only when there's something meaningful to record."""
+    """Build a Usage object only when there's something meaningful to record.
+
+    ``cost=None`` means "unknown" (pricing unresolved) and is preserved as-is
+    so aggregation can distinguish unpriced samples from free ones.
+    """
     nonzero = any(v is not None and v > 0 for v in (prompt_tokens, completion_tokens, cost))
     if not nonzero:
         return None
@@ -80,7 +84,7 @@ def _build_usage(
         cached_input_tokens=cached_input_tokens or 0,
         cache_write_tokens=cache_write_tokens or 0,
         reasoning_tokens=reasoning_tokens or 0,
-        cost=cost if cost and cost > 0 else None,
+        cost=cost,
     )
 
 
@@ -137,6 +141,14 @@ class Runner:
         self.semaphore = anyio.Semaphore(max_concurrent)
         self.progress_callback = progress_callback
         self.model_handles = self._load_model_handles()
+        # Pricing: suite-declared overrides plus a per-handle cache of the
+        # server-reported (model, endpoint type, provider name) behind each handle.
+        self._pricing_overrides: Optional[PricingOverrides] = (
+            {h: (v if isinstance(v, str) else v.to_entry()) for h, v in self.suite.target.pricing.items()}
+            if self.suite.target.pricing
+            else None
+        )
+        self._model_identities: Dict[str, tuple] = {}
         self.cached_results = cached_results
         self._cached_trajectories: Dict[SampleId, Dict[str, SampleResult]] = (
             self._build_trajectory_cache() if cached_results else {}
@@ -346,6 +358,45 @@ class Runner:
             token_data=await fetch_token_data(self.client, agent_id) if return_token_data else token_data,
         )
 
+    # ── pricing ──
+
+    async def _compute_sample_cost(
+        self,
+        model_handle: Optional[str],
+        agent_id: Optional[str],
+        agent_usage: Optional[List[dict]],
+    ) -> Optional[float]:
+        """Dollar cost for one sample, or None when pricing is unknown. Never raises.
+
+        The model identity behind the handle comes from the agent's
+        ``llm_config`` (the server has already resolved effort suffixes and
+        provider routes there), fetched once per handle.
+        """
+        if not model_handle or not agent_usage:
+            return None
+        identity = self._model_identities.get(model_handle)
+        if identity is None and agent_id:
+            try:
+                cfg = (await self.client.agents.retrieve(agent_id=agent_id)).llm_config
+                endpoint_type = getattr(cfg, "api_model_endpoint_type", None)
+                identity = (
+                    cfg.model,
+                    str(endpoint_type) if endpoint_type else None,
+                    getattr(cfg, "provider_name", None),
+                )
+                self._model_identities[model_handle] = identity
+            except Exception as e:
+                logger.debug(f"Could not fetch llm_config for agent {agent_id}: {e}")
+        model_name, provider_type, provider_name = identity or (None, None, None)
+        return calculate_cost_from_agent_usage(
+            model_handle,
+            agent_usage,
+            model_name=model_name,
+            provider_type=provider_type,
+            provider_name=provider_name,
+            overrides=self._pricing_overrides,
+        )
+
     # ── per-sample driver ──
 
     async def run_sample(
@@ -401,7 +452,7 @@ class Runner:
                 agent_state = target_trace.agent_state
                 token_data = target_trace.token_data
 
-                cost = calculate_cost_from_agent_usage(model_handle, agent_usage) if model_handle else None
+                cost = await self._compute_sample_cost(model_handle, agent_id, agent_usage)
                 prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
                     extract_token_counts(agent_usage)
                 )
@@ -532,11 +583,7 @@ class Runner:
                     message=error_message,
                 )
                 result_model_handle = locals().get("model_handle") or model_handle
-                cost = (
-                    calculate_cost_from_agent_usage(result_model_handle, agent_usage)
-                    if result_model_handle and agent_usage
-                    else None
-                )
+                cost = await self._compute_sample_cost(result_model_handle, agent_id, agent_usage)
                 prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
                     extract_token_counts(agent_usage)
                 )
