@@ -140,6 +140,17 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.26.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.25.3...letta-evals-v0.26.0) (2026-08-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **pricing:** Resolve target-model pricing from server model metadata ([#336](https://github.com/letta-ai/letta-evals/issues/336))
+
+### Features
+
+* **pricing:** Resolve target-model pricing from server model metadata ([#336](https://github.com/letta-ai/letta-evals/issues/336)) ([294a3f9](https://github.com/letta-ai/letta-evals/commit/294a3f902330e74e81512a4d10ac769de99e588e))
+
 ## [0.25.3](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.25.2...letta-evals-v0.25.3) (2026-08-19)
 
 
