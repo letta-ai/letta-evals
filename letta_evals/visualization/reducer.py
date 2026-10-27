@@ -85,30 +85,6 @@ class ProgressStateReducer:
             return self.state.samples.get((sample_id, None))
         return None
 
-    def record_turn_grade(
-        self,
-        sample_id: SampleId,
-        *,
-        turn_num: int,
-        total_turns: int,
-        turn_score: float,
-        grader_key: Optional[str] = None,
-        agent_id: Optional[str] = None,
-        model_handle: Optional[str] = None,
-    ) -> SampleProgress:
-        sample = self.ensure_sample(sample_id, agent_id=agent_id, model_handle=model_handle)
-        if sample.turn_scores is None:
-            sample.turn_scores = {}
-
-        key = grader_key or "_default"
-        if key not in sample.turn_scores:
-            sample.turn_scores[key] = [None] * total_turns
-
-        if turn_num < len(sample.turn_scores[key]):
-            sample.turn_scores[key][turn_num] = turn_score
-
-        return sample
-
     def apply_event(self, event: ProgressEvent) -> ReducerResult:
         if event.kind == "update_sample_state":
             return self.apply_sample_state_update(**event.payload)

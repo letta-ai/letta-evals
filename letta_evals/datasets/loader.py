@@ -154,7 +154,7 @@ def load_csv(
 
     Expected columns:
     - input (required): str or list of strings (as JSON array string)
-    - ground_truth (optional): str or list of strings (as JSON array string for per-turn evaluation)
+    - ground_truth (optional): str
     - agent_args (optional): dict as JSON string
     - rubric_vars (optional): dict as JSON string
     - extra_vars (optional): dict as JSON string

@@ -12,7 +12,6 @@ from rich.progress import Progress
 from rich.table import Table
 from rich.text import Text
 
-from letta_evals.utils import build_turn_symbols, calculate_turn_average
 from letta_evals.visualization.reducer import ProgressRuntimeState
 from letta_evals.visualization.state import (
     SampleProgress,
@@ -114,7 +113,6 @@ class RichProgressRenderer:
             SampleState.LOADING_AGENT: ("⊙", "yellow"),
             SampleState.SENDING_MESSAGES: ("⚡", "cyan"),
             SampleState.GRADING: ("🔍", "magenta"),
-            SampleState.GRADING_TURNS: ("🔍", "magenta"),
             SampleState.COMPLETED: ("✓", "green"),
             SampleState.ERROR: ("⚠", "red"),
         }
@@ -128,12 +126,6 @@ class RichProgressRenderer:
             text = Text()
             text.append(icon)
             text.append(f" sending [{sample.messages_sent}/{sample.total_messages}]")
-            return text
-
-        if sample.state == SampleState.GRADING_TURNS and sample.total_turns > 0:
-            text = Text()
-            text.append(icon)
-            text.append(f" grading [{sample.turns_graded}/{sample.total_turns}]")
             return text
 
         if sample.state == SampleState.COMPLETED:
@@ -341,27 +333,7 @@ class RichProgressRenderer:
                 time_text = "-"
 
             cells: List[str] = [f"{sample.score:.2f}" if sample.score is not None else "-"]
-            if sample.state == SampleState.GRADING_TURNS and sample.turn_scores:
-                if self.metric_labels:
-                    for metric_key in metric_keys:
-                        grader_scores = sample.turn_scores.get(metric_key)
-                        if grader_scores:
-                            score_cell = f"{calculate_turn_average(grader_scores):.2f}"
-                            rationale = build_turn_symbols(grader_scores)
-                        else:
-                            score_cell = "-"
-                            rationale = ""
-                        cells.extend([score_cell, rationale])
-                else:
-                    first_grader = next(iter(sample.turn_scores.values()), None)
-                    if first_grader:
-                        score_cell = f"{calculate_turn_average(first_grader):.2f}"
-                        rationale = build_turn_symbols(first_grader)
-                    else:
-                        score_cell = "-"
-                        rationale = ""
-                    cells.extend([score_cell, rationale])
-            elif self.metric_labels:
+            if self.metric_labels:
                 for metric_key in metric_keys:
                     score_value = None
                     rationale = ""
@@ -385,12 +357,6 @@ class RichProgressRenderer:
                 filled = int(progress * bar_width)
                 bar = "▰" * filled + "▱" * (bar_width - filled)
                 details = f"{bar}  msg {sample.messages_sent}/{sample.total_messages}"
-            elif sample.state == SampleState.GRADING_TURNS and sample.total_turns > 0:
-                progress = sample.turns_graded / sample.total_turns
-                bar_width = max(10, min(30, max(10, self.console.width // 6)))
-                filled = int(progress * bar_width)
-                bar = "▰" * filled + "▱" * (bar_width - filled)
-                details = f"{bar}  turn {sample.turns_graded}/{sample.total_turns}"
             elif sample.state == SampleState.LOADING_AGENT:
                 details = Text("Loading from cache..." if sample.from_cache else "Loading agent...", style="white")
             elif sample.state == SampleState.GRADING:

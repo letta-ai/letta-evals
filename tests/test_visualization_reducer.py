@@ -82,21 +82,3 @@ def test_get_from_cache_checks_model_specific_and_placeholder_entries() -> None:
     assert reducer.get_from_cache(3, None) is True
     assert reducer.get_from_cache(3, "gpt-5") is True
     assert reducer.get_from_cache(999, "gpt-5") is False
-
-
-def test_record_turn_grade_initializes_and_updates_turn_scores() -> None:
-    reducer = ProgressStateReducer(ProgressRuntimeState())
-
-    sample = reducer.record_turn_grade(
-        4,
-        turn_num=1,
-        total_turns=3,
-        turn_score=0.8,
-        grader_key="safety",
-        agent_id="agent-4",
-        model_handle="gpt-5",
-    )
-
-    assert sample.agent_id == "agent-4"
-    assert sample.model_handle == "gpt-5"
-    assert sample.turn_scores == {"safety": [None, 0.8, None]}

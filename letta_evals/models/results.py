@@ -1,7 +1,7 @@
 """Per-sample result and primitive models.
 
 Includes the message union type alias used throughout the codebase, the
-target/grader output models (TargetResult, GradeResult, PerTurnGrade), the
+target/grader output models (TargetResult, GradeResult), the
 per-sample primitives (Usage, Timing, Error) plus their aggregate companions
 (TimingStats, ErrorSummary — kept here so the per-sample/aggregate pairs stay
 co-located), and the per-sample SampleResult written to <model>.jsonl.
@@ -108,28 +108,12 @@ class TargetTrace(TargetResult):
     )
 
 
-class PerTurnGrade(BaseModel):
-    """Grade result for a single turn in per-turn evaluation.
-
-    ``ground_truth`` is not stored here — look up ``sample.ground_truth[turn]``
-    using the per-sample ``sample_id``.
-    """
-
-    turn: int = Field(description="Turn index (0-based)")
-    score: float = Field(description="Score for this turn (0.0 to 1.0)")
-    rationale: Optional[str] = Field(default=None, description="Explanation for this turn's grade")
-    submission: str = Field(description="Extracted submission for this turn")
-
-
 class GradeResult(BaseModel):
     """Grading result for one (sample, grader) pair."""
 
     score: float = Field(description="Numeric score between 0.0 and 1.0")
     rationale: Optional[str] = Field(default=None, description="Explanation of the grading decision")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional grading metadata")
-    per_turn_grades: Optional[List[PerTurnGrade]] = Field(
-        default=None, description="Per-turn grades for multi-turn evaluation (only populated for per-turn evaluations)"
-    )
 
     @field_validator("score")
     def validate_score(cls, v: float) -> float:

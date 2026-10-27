@@ -121,7 +121,7 @@ Datasets can be JSONL or CSV. Each row should provide the user input and, for mo
 {"input": "Draw a cat in ASCII", "ground_truth": "cat"}
 ```
 
-For multi-turn evals, set `input` to a list of user messages. If `ground_truth` is also a list of the same length, supported graders can score each turn independently and average the per-turn scores.
+For multi-turn evals, set `input` to a list of user messages; `ground_truth` stays a single string for the whole conversation.
 
 Dataset rows may also include fields such as:
 
@@ -229,7 +229,6 @@ The [`examples/`](examples/) directory contains working suites:
 - [`docs/modal-sandbox.md`](docs/modal-sandbox.md) — per-sample Modal sandbox execution
 - [`examples/reward-composition/`](examples/reward-composition/) — custom reward composers across multiple graders
 - [`examples/multi-model-simple-rubric-grader/`](examples/multi-model-simple-rubric-grader/) — compare multiple model handles in one suite
-- [`examples/multiturn-per-turn-grading/`](examples/multiturn-per-turn-grading/) — score each turn of a multi-turn conversation
 - [`examples/per-sample-rubric/`](examples/per-sample-rubric/) — override model-judge rubrics per dataset row
 - [`examples/programmatic-agent-creation/`](examples/programmatic-agent-creation/) — create customized agents from Python before each sample
 
