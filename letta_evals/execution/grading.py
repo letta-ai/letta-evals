@@ -6,11 +6,10 @@ execution, progress sequencing, result assembly, and orchestration.
 
 import string
 import time
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from letta_evals.graders.base import Grader
 from letta_evals.models import (
-    AgentState,
     Error,
     GradeResult,
     LettaMessageUnion,
@@ -24,7 +23,7 @@ from letta_evals.types import ErrorCategory
 async def grade_sample(
     sample: Sample,
     trajectory: List[List[LettaMessageUnion]],
-    agent_state: Optional[AgentState],
+    context: Optional[Dict[str, Any]],
     graders: Dict[str, Grader],
 ) -> tuple[Dict[str, GradeResult], Dict[str, str], Dict[str, float]]:
     """Grade a sample across all graders. Returns (grades, submissions, per_grader_time)."""
@@ -34,7 +33,7 @@ async def grade_sample(
 
     for key, grader in graders.items():
         t_grader_start = time.perf_counter()
-        grade, submission = await grader.grade(sample, trajectory, agent_state=agent_state)
+        grade, submission = await grader.grade(sample, trajectory, context=context)
         per_grader_time[key] = time.perf_counter() - t_grader_start
         grades_dict[key] = grade
         submissions_dict[key] = submission

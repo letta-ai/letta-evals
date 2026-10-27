@@ -236,8 +236,3 @@ async def fetch_token_data(
 
     assert last_error is not None
     raise last_error
-
-
-async def fetch_agent_state(client: Any, agent_id: str) -> Any:
-    """Fetch the final agent state, including memory blocks, for graders that need it."""
-    return await client.agents.retrieve(agent_id=agent_id, include=["agent.blocks"])

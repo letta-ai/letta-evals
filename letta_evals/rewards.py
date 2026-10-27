@@ -6,8 +6,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
-from letta_client.types import AgentState
-
 from letta_evals.models import (
     CustomRewardSpec,
     GradeResult,
@@ -36,7 +34,7 @@ class RewardContext:
     trajectory: list[list[LettaMessageUnion]]
     agent_id: Optional[str]
     model_handle: Optional[str]
-    agent_state: Optional[AgentState]
+    context: Mapping[str, Any]
     usage: Optional[Usage]
     timing: Timing
 

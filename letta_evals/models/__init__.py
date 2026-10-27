@@ -16,8 +16,6 @@ grouped into focused submodules:
   in-memory :class:`RunnerResult`/:class:`ModelRun` containers
 """
 
-from letta_client.types import AgentState
-
 from letta_evals.models.results import (
     Error,
     ErrorSummary,
@@ -56,7 +54,6 @@ from letta_evals.models.summaries import (
 )
 
 __all__ = [
-    "AgentState",
     "Sample",
     "SampleId",
     "LettaCodeTargetSpec",

@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import pytest
 from letta_client.types.agents import AssistantMessage
 
+from letta_evals.decorators import extractor
 from letta_evals.graders.tool import ToolGrader
 from letta_evals.models import Sample
 
@@ -184,3 +185,37 @@ class TestToolGraderConstructor:
     def test_invalid_module_path_raises(self):
         with pytest.raises((ValueError, ImportError, ModuleNotFoundError)):
             ToolGrader(function="fake_module:fake_func")
+
+
+# ── Extractors that take rollout context ──
+
+
+@extractor(name="_test_context_echo")
+def _context_echo(trajectory, config, context) -> str:
+    return f"{config['prefix']}{context.get('memory_dir', 'none')}"
+
+
+class TestContextExtractor:
+    @pytest.fixture
+    def grader(self):
+        return ToolGrader(function="exact_match", extractor="_test_context_echo", extractor_config={"prefix": "ws:"})
+
+    @pytest.mark.asyncio
+    async def test_extractor_receives_config_and_context(self, grader):
+        result, submission = await grader.grade(
+            _make_sample("ws:/tmp/x"), _make_trajectory(["hi"]), context={"memory_dir": "/tmp/x"}
+        )
+        assert submission == "ws:/tmp/x"
+        assert result.score == 1.0
+
+    @pytest.mark.asyncio
+    async def test_missing_context_is_empty_dict(self, grader):
+        _, submission = await grader.grade(_make_sample(), _make_trajectory(["hi"]))
+        assert submission == "ws:none"
+
+    def test_agent_state_param_is_rejected(self):
+        with pytest.raises(TypeError, match="'trajectory', 'config', and 'context'"):
+
+            @extractor
+            def _legacy(trajectory, config, agent_state) -> str:
+                return ""

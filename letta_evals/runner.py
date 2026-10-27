@@ -14,7 +14,7 @@ from rich.console import Console
 from letta_evals.datasets.hf import hf_dataset_provenance
 from letta_evals.datasets.loader import load_dataset
 from letta_evals.execution.grading import detect_errors, grade_sample, validate_rubric_vars
-from letta_evals.execution.trace import TokenDataFetchError, fetch_agent_state, fetch_token_data, fetch_trajectory
+from letta_evals.execution.trace import TokenDataFetchError, fetch_token_data, fetch_trajectory
 from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.graders.tool import ToolGrader
@@ -233,11 +233,6 @@ class Runner:
             if self.graders is None or self.suite.reward.metric_key not in self.graders:
                 raise ValueError(f"reward metric_key '{self.suite.reward.metric_key}' not found in graders")
 
-    def _requires_agent_state(self) -> bool:
-        if self.graders:
-            return any(grader.requires_agent_state for grader in self.graders.values())
-        return False
-
     def _should_cleanup_agent(self) -> bool:
         return self.suite.cleanup
 
@@ -295,14 +290,13 @@ class Runner:
         self,
         sample: Sample,
         model_handle: Optional[str],
-        retrieve_agent_state: bool = False,
         return_token_data: bool = False,
     ) -> TargetTrace:
         """Return target metadata plus fetched trace fields for this sample.
 
         Targets only execute and return ``agent_id``. Runner owns all
         server-side trace fetches so in-process and sandboxed runs share
-        the same trajectory/state/token-data extraction layer.
+        the same trajectory/token-data extraction layer.
         """
         sample_id = sample.id
 
@@ -325,9 +319,6 @@ class Runner:
                 # cached_result is a SampleResult (a TargetResult subclass); the
                 # requested handle wins over whatever the cache recorded.
                 result = cached_result.model_copy(update={"model_handle": model_handle or DEFAULT_MODEL_ID})
-                agent_state = result.agent_state
-                if retrieve_agent_state and result.agent_id and agent_state is None:
-                    agent_state = await fetch_agent_state(self.client, result.agent_id)
                 token_data = result.token_data
                 if return_token_data and result.agent_id and token_data is None:
                     token_data = await fetch_token_data(self.client, result.agent_id)
@@ -336,7 +327,7 @@ class Runner:
                     agent_id=result.agent_id,
                     model_handle=result.model_handle,
                     agent_usage=result.agent_usage,
-                    agent_state=agent_state,
+                    context=result.context,
                     token_data=token_data,
                 )
 
@@ -347,15 +338,13 @@ class Runner:
             project_id=self.project_id,
         )
         agent_id = target_result.agent_id
-        agent_state = None
-        token_data = None
         return TargetTrace(
             trajectory=await fetch_trajectory(self.client, agent_id),
             agent_id=agent_id,
             model_handle=target_result.model_handle,
             agent_usage=target_result.agent_usage,
-            agent_state=await fetch_agent_state(self.client, agent_id) if retrieve_agent_state else agent_state,
-            token_data=await fetch_token_data(self.client, agent_id) if return_token_data else token_data,
+            context=target_result.context,
+            token_data=await fetch_token_data(self.client, agent_id) if return_token_data else None,
         )
 
     # ── pricing ──
@@ -438,18 +427,16 @@ class Runner:
                     return result
 
                 phase = ErrorCategory.TARGET
-                retrieve_agent_state = self._requires_agent_state()
                 target_trace = await self._get_or_run_target_trace(
                     sample,
                     model_handle,
-                    retrieve_agent_state=retrieve_agent_state,
                     return_token_data=return_token_data,
                 )
                 trajectory = target_trace.trajectory
                 agent_id = target_trace.agent_id
                 model_handle = target_trace.model_handle
                 agent_usage = target_trace.agent_usage
-                agent_state = target_trace.agent_state
+                context = target_trace.context
                 token_data = target_trace.token_data
 
                 cost = await self._compute_sample_cost(model_handle, agent_id, agent_usage)
@@ -465,7 +452,7 @@ class Runner:
 
                 phase = ErrorCategory.GRADING
                 grades_dict, submissions_dict, per_grader_time = await grade_sample(
-                    sample, trajectory, agent_state, self.graders
+                    sample, trajectory, context, self.graders
                 )
 
                 error = detect_errors(grades_dict, trajectory, submissions_dict)
@@ -498,7 +485,7 @@ class Runner:
                                 trajectory=trajectory,
                                 agent_id=agent_id,
                                 model_handle=model_handle,
-                                agent_state=agent_state,
+                                context=context or {},
                                 usage=usage,
                                 timing=timing,
                             )
@@ -526,7 +513,7 @@ class Runner:
                     timing=timing,
                     error=error,
                     agent_usage=agent_usage,
-                    agent_state=agent_state,
+                    context=context,
                     token_data=token_data,
                 )
                 if self.progress_callback:

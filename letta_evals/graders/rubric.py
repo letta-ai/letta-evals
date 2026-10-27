@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from dotenv import load_dotenv
 from pydantic import BaseModel as PydanticBaseModel
@@ -9,7 +9,7 @@ from pydantic import Field as PydanticField
 
 from letta_evals.graders.base import Grader
 from letta_evals.graders.prompt_utils import build_judge_prompt
-from letta_evals.models import AgentState, GradeResult, Sample
+from letta_evals.models import GradeResult, Sample
 from letta_evals.types import LLMProvider
 
 load_dotenv()
@@ -110,10 +110,10 @@ class RubricGrader(Grader):
             raise ValueError(f"Unsupported provider: {provider}")
 
     async def grade(
-        self, sample: Sample, trajectory, agent_state: Optional[AgentState] = None
+        self, sample: Sample, trajectory, context: Optional[Dict[str, Any]] = None
     ) -> Tuple[GradeResult, str]:
         """Grade using LLM judge with rubric."""
-        submission, extraction_time, early = self.extract(trajectory, agent_state)
+        submission, extraction_time, early = self.extract(trajectory, context)
         if early:
             return early
 

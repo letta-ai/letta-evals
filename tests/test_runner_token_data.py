@@ -1,16 +1,16 @@
 """Tests for ``Runner.run_sample(return_token_data=True)`` and the
-``SampleResult.{token_data, agent_state}`` plumbing.
+``SampleResult.{token_data, context}`` plumbing.
 
 Three contracts:
 
   T0.1: ``Runner.run_sample(return_token_data=True)`` fetches token data from
         server-side trace metadata after the target returns an ``agent_id`` and
         surfaces it on ``SampleResult.token_data``.
-  T0.2: When at least one grader's extractor needs ``agent_state``,
-        ``Runner.run_sample`` retrieves it from the target and surfaces it on
-        ``SampleResult.agent_state`` so callers do not have to re-fetch it.
-  T0.3: ``SampleResult`` validates with the new optional ``token_data`` and
-        ``agent_state`` fields — both as ``None`` (default) and as fully
+  T0.2: The target's per-rollout ``context`` reaches graders and reward
+        composers and is persisted on ``SampleResult.context``, including when
+        the trace comes from cached results.
+  T0.3: ``SampleResult`` validates with the optional ``token_data`` and
+        ``context`` fields — both as ``None`` (default) and as fully
         populated objects.
 
 These tests bypass ``Runner.__init__`` (which builds an AsyncLetta client and
@@ -21,7 +21,7 @@ loads model handles) and inject only the attributes
 
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import AsyncMock, MagicMock
 
 import anyio
@@ -29,9 +29,9 @@ import pytest
 
 from letta_evals.graders.base import Grader
 from letta_evals.models import (
-    AgentState,
     GradeResult,
     LettaMessageUnion,
+    RewardOutput,
     Sample,
     SampleResult,
     TargetResult,
@@ -46,47 +46,31 @@ from letta_evals.runner import Runner
 
 
 class _FakeGrader(Grader):
-    """Minimal Grader that records calls and returns a fixed score.
+    """Minimal Grader that records calls and returns a fixed score."""
 
-    ``requires_agent_state`` is a property on ``Grader``; we override it via
-    instance dict so the parent's property short-circuits in our favour.
-    """
-
-    def __init__(self, *, requires_agent_state: bool = False, score: float = 1.0):
-        self._requires_agent_state = requires_agent_state
+    def __init__(self, *, score: float = 1.0):
         self._score = score
-        self.last_agent_state: Optional[AgentState] = None
+        self.last_context: Optional[Dict[str, Any]] = None
         self.call_count = 0
-
-    @property
-    def requires_agent_state(self) -> bool:  # type: ignore[override]
-        return self._requires_agent_state
 
     async def grade(
         self,
         sample: Sample,
         trajectory: List[List[LettaMessageUnion]],
-        agent_state: Optional[AgentState] = None,
+        context: Optional[Dict[str, Any]] = None,
     ) -> Tuple[GradeResult, str]:
         self.call_count += 1
-        self.last_agent_state = agent_state
+        self.last_context = context
         return GradeResult(score=self._score, rationale="fake"), "submission"
 
 
-def _make_agent_state() -> AgentState:
-    """Build a minimal AgentState — only the id is exercised by these tests."""
-    # AgentState is re-exported from letta_evals.models. Use the constructor
-    # path that requires the fewest mandatory fields by mocking it: the test
-    # only checks identity, never field values.
-    return MagicMock(spec=AgentState, id="agent-fake-1")
-
-
-def _make_target_result() -> TargetResult:
+def _make_target_result(context: Optional[Dict[str, Any]] = None) -> TargetResult:
     """Build the minimal TargetResult returned by LettaCodeTarget."""
     return TargetResult(
         agent_id="agent-fake-1",
         model_handle="fake/model",
         agent_usage=None,
+        context=context,
     )
 
 
@@ -137,7 +121,7 @@ def test_t0_3_sample_result_validates_with_new_fields_none():
         timing=Timing(total=0.0, target=0.0),
     )
     assert result.token_data is None
-    assert result.agent_state is None
+    assert result.context is None
 
 
 def test_t0_3_sample_result_validates_with_token_data_populated():
@@ -168,9 +152,7 @@ def test_t0_3_sample_result_round_trips_through_pydantic():
     """T0.3c: the new fields survive model_dump → model_validate.
 
     Anyone caching SampleResults (e.g. for re-grading) needs both fields
-    to round-trip cleanly. agent_state is intentionally omitted here because
-    it's a complex Letta SDK type whose serialization is its own concern;
-    token_data is the new addition this PR introduces.
+    to round-trip cleanly.
     """
     original = SampleResult(
         sample_id=0,
@@ -186,9 +168,11 @@ def test_t0_3_sample_result_round_trips_through_pydantic():
                 output_ids=[9, 10],
             )
         ],
+        context={"memory_dir": "/ws", "seed": 3},
     )
     dumped = original.model_dump()
     revived = SampleResult.model_validate(dumped)
+    assert revived.context == {"memory_dir": "/ws", "seed": 3}
     assert revived.token_data is not None
     assert revived.token_data[0].input_ids == [7, 8]
     assert revived.token_data[0].output_ids == [9, 10]
@@ -202,7 +186,7 @@ def test_t0_3_sample_result_round_trips_through_pydantic():
 @pytest.mark.asyncio
 async def test_t0_1_return_token_data_fetches_after_target_run(monkeypatch):
     """run_sample(return_token_data=True) fetches token data from agent_id in Runner."""
-    grader = _FakeGrader(requires_agent_state=False)
+    grader = _FakeGrader()
     token_data = [TurnTokenData(role="assistant_message", output_ids=[100])]
     target = MagicMock()
     target.run = AsyncMock(return_value=_make_target_result())
@@ -227,7 +211,7 @@ async def test_t0_1_return_token_data_fetches_after_target_run(monkeypatch):
 @pytest.mark.asyncio
 async def test_t0_1_token_data_surfaces_on_sample_result(monkeypatch):
     """Fetched token data appears on SampleResult.token_data."""
-    grader = _FakeGrader(requires_agent_state=False)
+    grader = _FakeGrader()
     token_data = [
         TurnTokenData(
             role="assistant_message",
@@ -261,7 +245,7 @@ async def test_t0_1_default_keeps_token_data_none(monkeypatch):
     This is the back-compat guarantee: existing eval callers don't get a
     surprise field populated, and they don't pay the token-fetch cost.
     """
-    grader = _FakeGrader(requires_agent_state=False)
+    grader = _FakeGrader()
     target = MagicMock()
     target.run = AsyncMock(return_value=_make_target_result())
     fetch_token_data = AsyncMock()
@@ -279,89 +263,86 @@ async def test_t0_1_default_keeps_token_data_none(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# T0.2 — agent_state plumbing (gated by graders)
+# T0.2 — rollout context plumbing
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_t0_2_agent_state_requested_when_grader_needs_it(monkeypatch):
-    """Grader with requires_agent_state=True → Runner fetches agent_state."""
-    grader = _FakeGrader(requires_agent_state=True)
-    agent_state = _make_agent_state()
+async def test_t0_2_target_context_reaches_graders_reward_and_result(monkeypatch):
+    """Context from the target flows to graders, the reward composer, and SampleResult."""
+    grader = _FakeGrader()
+    context = {"memory_dir": "/ws/agent-fake-1"}
     target = MagicMock()
-    target.run = AsyncMock(return_value=_make_target_result())
-    fetch_agent_state = AsyncMock(return_value=agent_state)
+    target.run = AsyncMock(return_value=_make_target_result(context=context))
     monkeypatch.setattr("letta_evals.runner.fetch_trajectory", AsyncMock(return_value=[[]]))
-    monkeypatch.setattr("letta_evals.runner.fetch_agent_state", fetch_agent_state)
 
     runner = _make_runner(grader, target)
+    reward_contexts = []
+
+    async def reward_composer(ctx):
+        reward_contexts.append(ctx.context)
+        return RewardOutput(score=1.0)
+
+    runner.reward_composer = reward_composer
     sample = Sample(id=0, input="hi", ground_truth="ok")
 
     result = await runner.run_sample(sample, model_handle=None)
 
-    target.run.assert_awaited_once()
-    kwargs = target.run.await_args.kwargs
-    assert "retrieve_agent_state" not in kwargs
-    fetch_agent_state.assert_awaited_once_with(runner.client, "agent-fake-1")
-    # And it surfaces on SampleResult so callers don't re-fetch it.
-    assert result.agent_state is agent_state
-    # Also: the grader actually received the agent_state in its grade() call.
-    assert grader.last_agent_state is agent_state
+    assert grader.last_context == context
+    assert reward_contexts == [context]
+    assert result.context == context
+    assert result.error is None
 
 
 @pytest.mark.asyncio
-async def test_t0_2_agent_state_skipped_when_no_grader_needs_it(monkeypatch):
-    """Grader with requires_agent_state=False → Runner skips agent_state fetch.
-
-    This is the perf-sensitive default: no grader needs agent_state →
-    skip the extra Letta server round-trip the eval would otherwise pay.
-    """
-    grader = _FakeGrader(requires_agent_state=False)
+async def test_t0_2_missing_context_gives_reward_composer_empty_dict(monkeypatch):
+    """No factory/workspace → result.context stays None; composers still get a dict."""
+    grader = _FakeGrader()
     target = MagicMock()
     target.run = AsyncMock(return_value=_make_target_result())
-    fetch_agent_state = AsyncMock()
     monkeypatch.setattr("letta_evals.runner.fetch_trajectory", AsyncMock(return_value=[[]]))
-    monkeypatch.setattr("letta_evals.runner.fetch_agent_state", fetch_agent_state)
 
     runner = _make_runner(grader, target)
-    sample = Sample(id=0, input="hi", ground_truth="ok")
+    reward_contexts = []
 
-    result = await runner.run_sample(sample, model_handle=None)
+    async def reward_composer(ctx):
+        reward_contexts.append(ctx.context)
+        return RewardOutput(score=1.0)
 
-    assert "retrieve_agent_state" not in target.run.await_args.kwargs
-    fetch_agent_state.assert_not_awaited()
-    assert result.agent_state is None
+    runner.reward_composer = reward_composer
+    result = await runner.run_sample(Sample(id=0, input="hi", ground_truth="ok"), model_handle=None)
+
+    assert grader.last_context is None
+    assert reward_contexts == [{}]
+    assert result.context is None
 
 
 @pytest.mark.asyncio
-async def test_t0_2_agent_state_and_token_data_are_fetched_after_one_target_run(monkeypatch):
-    """Both flags True → one target.run plus Runner-owned trace fetches.
-
-    The whole point of the plumbing: a single ``run_sample`` call returns
-    trajectory, agent_state, and token_data together, instead of forcing
-    callers to re-fetch state via separate client.agents.* calls.
-    """
-    grader = _FakeGrader(requires_agent_state=True)
-    agent_state = _make_agent_state()
-    token_data = [TurnTokenData(role="assistant_message", output_ids=[1, 2])]
+async def test_t0_2_cached_result_context_is_regraded_without_target(monkeypatch):
+    """Re-grading from cache reuses the persisted context; the factory/target does not rerun."""
+    grader = _FakeGrader()
     target = MagicMock()
-    target.run = AsyncMock(return_value=_make_target_result())
-    fetch_agent_state = AsyncMock(return_value=agent_state)
-    fetch_token_data = AsyncMock(return_value=token_data)
-    monkeypatch.setattr("letta_evals.runner.fetch_trajectory", AsyncMock(return_value=[[]]))
-    monkeypatch.setattr("letta_evals.runner.fetch_agent_state", fetch_agent_state)
-    monkeypatch.setattr("letta_evals.runner.fetch_token_data", fetch_token_data)
+    target.run = AsyncMock()
+    fetch_trajectory = AsyncMock()
+    monkeypatch.setattr("letta_evals.runner.fetch_trajectory", fetch_trajectory)
 
     runner = _make_runner(grader, target)
-    sample = Sample(id=0, input="hi", ground_truth="ok")
+    cached = SampleResult(
+        sample_id=0,
+        agent_id="agent-cached",
+        model_handle="fake/model",
+        trajectory=[[]],
+        submissions={"acc": "x"},
+        grades={"acc": GradeResult(score=0.0)},
+        timing=Timing(total=0.0, target=0.0),
+        context={"memory_dir": "/ws/agent-cached"},
+    )
+    runner.cached_results = MagicMock()
+    runner._cached_trajectories = {0: {"fake/model": cached}}
 
-    result = await runner.run_sample(sample, model_handle=None, return_token_data=True)
+    result = await runner.run_sample(Sample(id=0, input="hi", ground_truth="ok"), model_handle=None)
 
-    assert target.run.await_count == 1, "T0.2 + T0.1: combined RL fetch must be a single target.run call."
-    kwargs = target.run.await_args.kwargs
-    assert "retrieve_agent_state" not in kwargs
-    assert "return_token_data" not in kwargs
-    fetch_agent_state.assert_awaited_once_with(runner.client, "agent-fake-1")
-    fetch_token_data.assert_awaited_once_with(runner.client, "agent-fake-1")
-    assert result.agent_state is agent_state  # AgentState is not re-validated
-    assert result.token_data == token_data
+    target.run.assert_not_awaited()
+    fetch_trajectory.assert_not_awaited()
+    assert grader.last_context == {"memory_dir": "/ws/agent-cached"}
+    assert result.context == {"memory_dir": "/ws/agent-cached"}

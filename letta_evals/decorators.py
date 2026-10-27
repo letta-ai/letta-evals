@@ -81,7 +81,9 @@ def extractor(func: Callable = None, *, name: str = None):
 
     Validates that the function has signature:
       - (trajectory: List[List[LettaMessageUnion]], config: dict) -> str, OR
-      - (trajectory: List[List[LettaMessageUnion]], config: dict, agent_state: Optional[AgentState]) -> str
+      - (trajectory: List[List[LettaMessageUnion]], config: dict, context: dict) -> str
+    ``config`` is the grader's static ``extractor_config``; ``context`` is the
+    per-rollout dict produced by the agent factory and target.
     Auto-registers the function to the extractor registry.
 
     Usage:
@@ -90,7 +92,7 @@ def extractor(func: Callable = None, *, name: str = None):
             ...
 
         @extractor
-        def memory_extractor(trajectory: List[List[LettaMessageUnion]], config: dict, agent_state: Optional[AgentState]) -> str:
+        def workspace_extractor(trajectory: List[List[LettaMessageUnion]], config: dict, context: dict) -> str:
             ...
 
         @extractor(name="custom_name")
@@ -104,7 +106,7 @@ def extractor(func: Callable = None, *, name: str = None):
 
         if len(params) not in (2, 3):
             raise TypeError(
-                f"Extractor {f.__name__} must have 2 or 3 parameters (trajectory, config) or (trajectory, config, agent_state), got {len(params)}"
+                f"Extractor {f.__name__} must have 2 or 3 parameters (trajectory, config) or (trajectory, config, context), got {len(params)}"
             )
 
         param_names = [p.name for p in params]
@@ -114,9 +116,9 @@ def extractor(func: Callable = None, *, name: str = None):
                     f"Extractor {f.__name__} must have parameters named 'trajectory' and 'config', got {param_names}"
                 )
         elif len(params) == 3:
-            if param_names != ["trajectory", "config", "agent_state"]:
+            if param_names != ["trajectory", "config", "context"]:
                 raise TypeError(
-                    f"Extractor {f.__name__} must have parameters named 'trajectory', 'config', and 'agent_state', got {param_names}"
+                    f"Extractor {f.__name__} must have parameters named 'trajectory', 'config', and 'context', got {param_names}"
                 )
 
         if sig.return_annotation != inspect.Signature.empty:
@@ -183,13 +185,21 @@ def agent_factory(func: Callable) -> Callable:
     """
     Decorator for agent factory functions.
 
-    Validates that the function has signature: async (client: AsyncLetta, sample: Sample) -> str
+    Validates that the function has signature: async (client: AsyncLetta, sample: Sample).
+    The factory returns either the ``agent_id`` or ``(agent_id, context)``,
+    where ``context`` is a JSON-serializable dict of per-rollout values. The
+    target reads ``env`` / ``memory_dir`` from it, and extractors receive it.
 
     Usage:
         @agent_factory
         async def create_inventory_agent(client: AsyncLetta, sample: Sample) -> str:
             # create agent using client and sample data
             return agent_id
+
+        @agent_factory
+        async def create_seeded_agent(client: AsyncLetta, sample: Sample) -> tuple[str, dict]:
+            # seed a workspace for the agent and hand its path forward
+            return agent_id, {"memory_dir": workspace}
     """
     sig = inspect.signature(func)
     params = list(sig.parameters.values())
@@ -207,10 +217,6 @@ def agent_factory(func: Callable) -> Callable:
 
     if not inspect.iscoroutinefunction(func):
         raise TypeError(f"Agent factory {func.__name__} must be an async function")
-
-    if sig.return_annotation != inspect.Signature.empty:
-        if sig.return_annotation is not str:
-            raise TypeError(f"Agent factory {func.__name__} must return str (agent_id), got {sig.return_annotation}")
 
     @wraps(func)
     async def wrapper(*args, **kwargs):

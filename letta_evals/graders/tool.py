@@ -1,10 +1,10 @@
 import inspect
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from letta_evals.decorators import GRADER_REGISTRY
 from letta_evals.graders.base import Grader
-from letta_evals.models import AgentState, GradeResult, LettaMessageUnion, Sample
+from letta_evals.models import GradeResult, LettaMessageUnion, Sample
 from letta_evals.utils import load_object
 
 
@@ -38,10 +38,10 @@ class ToolGrader(Grader):
             raise ValueError(f"Grader function '{function}' not found in registry")
 
     async def grade(
-        self, sample: Sample, trajectory: List[List[LettaMessageUnion]], agent_state: Optional[AgentState] = None
+        self, sample: Sample, trajectory: List[List[LettaMessageUnion]], context: Optional[Dict[str, Any]] = None
     ) -> Tuple[GradeResult, str]:
         """Grade using the tool function."""
-        submission, extraction_time, early = self.extract(trajectory, agent_state)
+        submission, extraction_time, early = self.extract(trajectory, context)
         if early:
             return early
 
