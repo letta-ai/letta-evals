@@ -465,14 +465,7 @@ class Runner:
 
                 phase = ErrorCategory.GRADING
                 grades_dict, submissions_dict, per_grader_time = await grade_sample(
-                    sample,
-                    trajectory,
-                    agent_state,
-                    self.graders,
-                    sample_id,
-                    agent_id,
-                    model_handle,
-                    self.progress_callback,
+                    sample, trajectory, agent_state, self.graders
                 )
 
                 error = detect_errors(grades_dict, trajectory, submissions_dict)

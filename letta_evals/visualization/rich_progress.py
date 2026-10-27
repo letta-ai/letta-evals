@@ -312,37 +312,6 @@ class EvalProgress(ProgressCallback):
             sample_id, SampleState.GRADING, agent_id=agent_id, model_handle=model_handle, from_cache=existing_from_cache
         )
 
-    async def turn_graded(
-        self,
-        sample_id: SampleId,
-        turn_num: int,
-        total_turns: int,
-        turn_score: float,
-        grader_key: Optional[str] = None,
-        agent_id: Optional[str] = None,
-        model_handle: Optional[str] = None,
-    ):
-        """Update progress for per-turn grading"""
-        sample = self._reducer.record_turn_grade(
-            sample_id,
-            turn_num=turn_num,
-            total_turns=total_turns,
-            turn_score=turn_score,
-            grader_key=grader_key,
-            agent_id=agent_id,
-            model_handle=model_handle,
-        )
-
-        await self.update_sample_state(
-            sample_id,
-            SampleState.GRADING_TURNS,
-            agent_id=agent_id,
-            model_handle=model_handle,
-            from_cache=sample.from_cache,
-            turns_graded=turn_num + 1,  # turn_num is 0-indexed
-            total_turns=total_turns,
-        )
-
     async def sample_completed(self, result: SampleResult, model_handle: Optional[str] = None):
         """Mark sample as completed"""
         fields = sample_progress_fields(result)

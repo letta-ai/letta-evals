@@ -1,3 +1,0 @@
-{"input": ["Answer with only the capital: France", "Answer with only the capital: Germany", "Answer with only the capital: Italy"], "ground_truth": ["Paris", "Berlin", "Rome"]}
-{"input": ["Answer with only the result: 2 + 2", "Answer with only the result: 3 * 4", "Answer with only the result: 10 - 7"], "ground_truth": ["4", "12", "3"]}
-{"input": ["Answer with only the color: clear daytime sky", "Answer with only the color: healthy grass", "Answer with only the color: ripe banana"], "ground_truth": ["blue", "green", "yellow"]}

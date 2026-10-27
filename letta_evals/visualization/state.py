@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from letta_evals.models.sample import SampleId
 
@@ -15,7 +15,6 @@ class SampleState(Enum):
     LOADING_AGENT = "loading"
     SENDING_MESSAGES = "sending"
     GRADING = "grading"
-    GRADING_TURNS = "grading_turns"
     COMPLETED = "completed"
     ERROR = "error"
 
@@ -25,7 +24,6 @@ ACTIVE_SAMPLE_STATES = frozenset(
         SampleState.LOADING_AGENT,
         SampleState.SENDING_MESSAGES,
         SampleState.GRADING,
-        SampleState.GRADING_TURNS,
     }
 )
 COMPLETED_SAMPLE_STATES = frozenset(
@@ -56,9 +54,6 @@ class SampleProgress:
     from_cache: bool = False
     metric_scores: Optional[Dict[str, float]] = None
     metric_rationales: Optional[Dict[str, str]] = None
-    turns_graded: int = 0
-    total_turns: int = 0
-    turn_scores: Optional[Dict[str, List[Optional[float]]]] = None
 
 
 @dataclass

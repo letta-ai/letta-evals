@@ -7,7 +7,7 @@ inputs, optional ground truth, and optional grader/extractor variables.
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 SampleId = Union[int, str]
 
@@ -17,9 +17,9 @@ class Sample(BaseModel):
 
     id: SampleId = Field(description="Sample ID from the dataset, or row index if the dataset does not provide one")
     input: Union[str, List[str]] = Field(description="Input message(s) to send to the agent")
-    ground_truth: Optional[Union[str, List[str]]] = Field(
+    ground_truth: Optional[str] = Field(
         default=None,
-        description="Expected ground_truth response for grading. Can be a list for per-turn evaluation in multi-turn conversations.",
+        description="Expected ground_truth response for grading.",
     )
     agent_args: Optional[Dict[str, Any]] = Field(default=None, description="Custom arguments for agent creation")
     rubric_vars: Optional[Dict[str, Any]] = Field(
@@ -45,22 +45,16 @@ class Sample(BaseModel):
         ),
     )
 
-    @model_validator(mode="after")
-    def validate_ground_truth_format(self):
-        """Validate ground_truth format matches input format."""
-        # Reject str input with list ground_truth (doesn't make sense)
-        if isinstance(self.ground_truth, list) and not isinstance(self.input, list):
-            raise ValueError("ground_truth cannot be a list when input is a string")
-
-        # Ensure lengths match when both are lists
-        if isinstance(self.input, list) and isinstance(self.ground_truth, list):
-            if len(self.input) != len(self.ground_truth):
-                raise ValueError(
-                    f"input has {len(self.input)} items but ground_truth has {len(self.ground_truth)} items. "
-                    f"For per-turn evaluation, each input must have a corresponding ground_truth."
-                )
-
-        return self
+    @field_validator("ground_truth", mode="before")
+    @classmethod
+    def reject_list_ground_truth(cls, v: Any) -> Any:
+        """Fail loudly on datasets written for the removed per-turn grading mode."""
+        if isinstance(v, list):
+            raise ValueError(
+                "ground_truth must be a single string. Per-turn grading (a list ground_truth, "
+                "one entry per input turn) is no longer supported."
+            )
+        return v
 
     @model_validator(mode="after")
     def validate_rubric_fields(self):

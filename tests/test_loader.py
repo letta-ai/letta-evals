@@ -227,15 +227,15 @@ class TestLoadCsv:
             list(load_csv(path))
 
     def test_list_input(self):
-        path = self._write_csv('input,ground_truth\n"[""q1"",""q2""]","[""a1"",""a2""]"\n')
+        path = self._write_csv('input,ground_truth\n"[""q1"",""q2""]",a2\n')
         samples = list(load_csv(path))
         assert samples[0].input == ["q1", "q2"]
-        assert samples[0].ground_truth == ["a1", "a2"]
+        assert samples[0].ground_truth == "a2"
 
-    def test_list_length_mismatch(self):
-        """Input and ground_truth lists with different lengths should raise."""
-        path = self._write_csv('input,ground_truth\n"[""q1"",""q2""]","[""a1""]"\n')
-        with pytest.raises(ValueError, match="Failed to create Sample"):
+    def test_list_ground_truth_rejected(self):
+        """Per-turn grading was removed, so a list ground_truth must fail loudly."""
+        path = self._write_csv('input,ground_truth\n"[""q1"",""q2""]","[""a1"",""a2""]"\n')
+        with pytest.raises(ValueError, match="ground_truth must be a single string"):
             list(load_csv(path))
 
 
