@@ -346,3 +346,23 @@ async def test_t0_2_cached_result_context_is_regraded_without_target(monkeypatch
     fetch_trajectory.assert_not_awaited()
     assert grader.last_context == {"memory_dir": "/ws/agent-cached"}
     assert result.context == {"memory_dir": "/ws/agent-cached"}
+
+
+@pytest.mark.asyncio
+async def test_t0_2_grading_error_still_persists_context(monkeypatch):
+    """A grading failure keeps context on the result so a cached re-grade after the fix has it."""
+
+    class _RaisingGrader(_FakeGrader):
+        async def grade(self, sample, trajectory, context=None):
+            raise RuntimeError("extractor bug")
+
+    target = MagicMock()
+    target.run = AsyncMock(return_value=_make_target_result(context={"memory_dir": "/ws"}))
+    monkeypatch.setattr("letta_evals.runner.fetch_trajectory", AsyncMock(return_value=[[]]))
+
+    runner = _make_runner(_RaisingGrader(), target)
+    result = await runner.run_sample(Sample(id=0, input="hi", ground_truth="ok"), model_handle=None)
+
+    assert result.error is not None
+    assert result.error.message == "extractor bug"
+    assert result.context == {"memory_dir": "/ws"}

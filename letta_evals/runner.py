@@ -400,6 +400,7 @@ class Runner:
         async with self.semaphore:
             agent_id = None
             agent_usage = None
+            context = None
             phase = ErrorCategory.UNKNOWN
             t_sample_start = time.perf_counter()
             try:  # noqa: SIM105 — outer try/finally for agent cleanup
@@ -590,6 +591,7 @@ class Runner:
                     timing=timing,
                     error=error,
                     agent_usage=agent_usage,
+                    context=context,
                     token_data=partial_token_data,
                 )
                 if self.progress_callback:
