@@ -1,23 +1,12 @@
 import time
 from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from letta_evals.extractors import get_extractor
 from letta_evals.models import GradeResult, LettaMessageUnion, Sample
 
 
 class Grader(ABC):
     """Base interface for graders."""
-
-    def _init_extractor(
-        self,
-        extractor: str,
-        extractor_config: Optional[dict] = None,
-        base_dir: Optional[Path] = None,
-    ) -> None:
-        """Initialize the extractor. Call from subclass __init__."""
-        self.extractor = get_extractor(extractor, extractor_config, base_dir=base_dir)
 
     def extract(
         self,

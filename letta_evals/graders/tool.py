@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from letta_evals.decorators import GRADER_REGISTRY
+from letta_evals.extractors import get_extractor
 from letta_evals.graders.base import Grader
 from letta_evals.models import GradeResult, LettaMessageUnion, Sample
 from letta_evals.utils import load_object
@@ -21,7 +22,7 @@ class ToolGrader(Grader):
         self.function_name = function
         self.extractor_name = extractor
         self.base_dir = base_dir
-        self._init_extractor(extractor, extractor_config, base_dir=base_dir)
+        self.extractor = get_extractor(extractor, extractor_config, base_dir=base_dir)
 
         if function in GRADER_REGISTRY:
             self.func = GRADER_REGISTRY[function]

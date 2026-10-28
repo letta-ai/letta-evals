@@ -119,7 +119,14 @@ class LettaCodeTarget:
     def _resolve_memory_workspace_dir(
         self, sample: Sample, agent_id: Optional[str], context: Optional[dict] = None
     ) -> Optional[Path]:
-        """Resolve the memory workspace root for env/cwd configuration."""
+        """Resolve the memory workspace root, or None when there is none.
+
+        The subprocess gets it as ``MEMORY_DIR`` and runs from it, so relative
+        file paths resolve there. Precedence: ``env["MEMORY_DIR"]`` /
+        ``env["LETTA_MEMORY_DIR"]``, then ``memory_dir`` (both from context
+        layered over ``sample.extra_vars``), then the target's ``memory_dir``,
+        then the factory-created agent's own memory root.
+        """
         if not self.memory_workspace:
             return None
 
@@ -143,7 +150,11 @@ class LettaCodeTarget:
         return None
 
     def _build_subprocess_env(
-        self, sample: Sample, agent_id: Optional[str], context: Optional[dict] = None
+        self,
+        sample: Sample,
+        agent_id: Optional[str],
+        context: Optional[dict] = None,
+        memory_dir: Optional[Path] = None,
     ) -> dict[str, str]:
         """Build subprocess env: os.environ -> target-managed -> extra_vars/context ``env``."""
         env = os.environ.copy()
@@ -152,9 +163,7 @@ class LettaCodeTarget:
             env["LETTA_BASE_URL"] = self.base_url
             logger.info(f"Setting LETTA_BASE_URL={self.base_url} for letta CLI")
 
-        memory_dir = self._resolve_memory_workspace_dir(sample, agent_id, context)
         if memory_dir:
-            memory_dir.mkdir(parents=True, exist_ok=True)
             env["MEMORY_DIR"] = str(memory_dir)
             env["LETTA_MEMORY_DIR"] = str(memory_dir)
 
@@ -179,21 +188,6 @@ class LettaCodeTarget:
                 logger.info(f"Applied per-sample env overrides for sample {sample.id}: keys={sorted(applied)}")
 
         return env
-
-    def _resolve_run_cwd(self, sample: Sample, agent_id: Optional[str], context: Optional[dict] = None) -> str:
-        """Resolve the subprocess working directory.
-
-        When ``memory_workspace`` is true, run from the resolved memory root so
-        relative file paths resolve there. Agent factories may point memory
-        operations at a seeded repo by returning ``memory_dir`` or
-        ``env["MEMORY_DIR"]`` in their context (or via ``sample.extra_vars``);
-        otherwise an explicit target ``memory_dir`` or the factory-created
-        agent's own memory root is used.
-        """
-        memory_dir = self._resolve_memory_workspace_dir(sample, agent_id, context)
-        if memory_dir:
-            return str(memory_dir)
-        return str(self.base_dir)
 
     async def run(
         self,
@@ -273,23 +267,20 @@ class LettaCodeTarget:
                     f"Running letta command for sample {sample.id} (prompt via stdin, {len(prompt_bytes)} bytes)"
                 )
 
-                # Hand the resolved workspace forward so extractors don't have to
-                # re-derive the resolution order in _resolve_memory_workspace_dir.
+                # The workspace sets MEMORY_DIR and the subprocess cwd, and is handed
+                # forward so extractors don't re-derive _resolve_memory_workspace_dir.
                 memory_dir = self._resolve_memory_workspace_dir(sample, factory_agent_id, context)
                 if memory_dir:
+                    memory_dir.mkdir(parents=True, exist_ok=True)
                     context = {**context, "memory_dir": str(memory_dir)}
 
                 # Prepare environment variables for the subprocess.
                 # Layers target-managed env (LETTA_BASE_URL, MEMORY_DIR) and per-rollout
                 # overrides from extra_vars/context "env" (see class docstring).
-                env = self._build_subprocess_env(sample, factory_agent_id, context)
+                env = self._build_subprocess_env(sample, factory_agent_id, context, memory_dir)
 
                 agent_id = factory_agent_id
                 stderr_chunks = []
-
-                # Resolve the subprocess cwd (honors memory_workspace settings;
-                # see _resolve_run_cwd).
-                run_cwd = self._resolve_run_cwd(sample, factory_agent_id, context)
 
                 # run the letta command with prompt piped via stdin
                 #
@@ -305,7 +296,7 @@ class LettaCodeTarget:
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    cwd=run_cwd,
+                    cwd=str(memory_dir or self.base_dir),
                     env=env,
                     limit=16 * 1024 * 1024,
                 )
