@@ -1,8 +1,6 @@
 import inspect
 from typing import Callable, Dict
 
-from letta_evals.models import GradeResult
-
 GRADER_REGISTRY: Dict[str, Callable] = {}
 EXTRACTOR_REGISTRY: Dict[str, Callable] = {}
 
@@ -11,7 +9,7 @@ def grader(func: Callable = None, *, name: str = None):
     """
     Decorator for grader functions.
 
-    Validates that the function has signature: (Sample, str) -> GradeResult
+    Validates that the parameters are (sample, submission); the function returns GradeResult.
     Supports both sync and async functions.
     Auto-registers the function to the grader registry.
 
@@ -45,10 +43,6 @@ def grader(func: Callable = None, *, name: str = None):
                 f"Grader {f.__name__} must have parameters named 'sample' and 'submission', got {param_names}"
             )
 
-        if sig.return_annotation != inspect.Signature.empty:
-            if sig.return_annotation != GradeResult:
-                raise TypeError(f"Grader {f.__name__} must return GradeResult, got {sig.return_annotation}")
-
         f._is_grader = True
         GRADER_REGISTRY[name or f.__name__] = f
         return f
@@ -63,7 +57,7 @@ def extractor(func: Callable = None, *, name: str = None):
     """
     Decorator for extractor functions.
 
-    Validates that the function has signature:
+    Validates that the parameters match one of:
       - (trajectory: List[List[LettaMessageUnion]], config: dict) -> str, OR
       - (trajectory: List[List[LettaMessageUnion]], config: dict, context: dict) -> str
     ``config`` is the grader's static ``extractor_config``; ``context`` is the
@@ -104,10 +98,6 @@ def extractor(func: Callable = None, *, name: str = None):
                 raise TypeError(
                     f"Extractor {f.__name__} must have parameters named 'trajectory', 'config', and 'context', got {param_names}"
                 )
-
-        if sig.return_annotation != inspect.Signature.empty:
-            if sig.return_annotation is not str:
-                raise TypeError(f"Extractor {f.__name__} must return str, got {sig.return_annotation}")
 
         f._is_extractor = True
         f._extractor_param_count = len(params)
@@ -227,10 +217,6 @@ def suite_setup(func: Callable) -> Callable:
             raise TypeError(
                 f"Suite setup {func.__name__} must have parameters named 'client' and 'model_handle', got {param_names}"
             )
-
-    if sig.return_annotation != inspect.Signature.empty:
-        if sig.return_annotation is not None:
-            raise TypeError(f"Suite setup {func.__name__} must return None, got {sig.return_annotation}")
 
     func._is_suite_setup = True
     func._suite_setup_param_count = len(params)
