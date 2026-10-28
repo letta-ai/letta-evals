@@ -59,8 +59,6 @@ class RubricGrader(Grader):
         self.model = model
         self.temperature = temperature
         self.provider = provider
-        self.extractor_name = extractor
-        self.base_dir = base_dir
         self.extractor = get_extractor(extractor, extractor_config, base_dir=base_dir)
 
         if provider == LLMProvider.OPENAI:

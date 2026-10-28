@@ -1,5 +1,4 @@
 import inspect
-from functools import wraps
 from typing import Callable, Dict
 
 from letta_evals.models import GradeResult
@@ -50,24 +49,9 @@ def grader(func: Callable = None, *, name: str = None):
             if sig.return_annotation != GradeResult:
                 raise TypeError(f"Grader {f.__name__} must return GradeResult, got {sig.return_annotation}")
 
-        registry_name = name or f.__name__
-        GRADER_REGISTRY[registry_name] = f
-
-        if inspect.iscoroutinefunction(f):
-
-            @wraps(f)
-            async def wrapper(*args, **kwargs):
-                return await f(*args, **kwargs)
-        else:
-
-            @wraps(f)
-            def wrapper(*args, **kwargs):
-                return f(*args, **kwargs)
-
-        # Set on wrapper — functools.wraps doesn't copy custom attributes
-        wrapper._is_grader = True
-
-        return wrapper
+        f._is_grader = True
+        GRADER_REGISTRY[name or f.__name__] = f
+        return f
 
     if func is None:
         return decorator
@@ -125,22 +109,10 @@ def extractor(func: Callable = None, *, name: str = None):
             if sig.return_annotation is not str:
                 raise TypeError(f"Extractor {f.__name__} must return str, got {sig.return_annotation}")
 
-        # Set on f (read by registry lookup) and wrapper (read by load_object
-        # for module:func_name imports) — functools.wraps doesn't copy custom attrs
         f._is_extractor = True
         f._extractor_param_count = len(params)
-
-        registry_name = name or f.__name__
-        EXTRACTOR_REGISTRY[registry_name] = f
-
-        @wraps(f)
-        def wrapper(*args, **kwargs):
-            return f(*args, **kwargs)
-
-        wrapper._is_extractor = True
-        wrapper._extractor_param_count = len(params)
-
-        return wrapper
+        EXTRACTOR_REGISTRY[name or f.__name__] = f
+        return f
 
     if func is None:
         return decorator
@@ -166,19 +138,8 @@ def reward_composer(func: Callable) -> Callable:
     if param_names != ["ctx"]:
         raise TypeError(f"Reward composer {func.__name__} must have parameter named 'ctx', got {param_names}")
 
-    if inspect.iscoroutinefunction(func):
-
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            return await func(*args, **kwargs)
-    else:
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
-
-    wrapper._is_reward_composer = True
-    return wrapper
+    func._is_reward_composer = True
+    return func
 
 
 def agent_factory(func: Callable) -> Callable:
@@ -218,14 +179,8 @@ def agent_factory(func: Callable) -> Callable:
     if not inspect.iscoroutinefunction(func):
         raise TypeError(f"Agent factory {func.__name__} must be an async function")
 
-    @wraps(func)
-    async def wrapper(*args, **kwargs):
-        return await func(*args, **kwargs)
-
-    # Set on wrapper — functools.wraps doesn't copy custom attributes
-    wrapper._is_agent_factory = True
-
-    return wrapper
+    func._is_agent_factory = True
+    return func
 
 
 def suite_setup(func: Callable) -> Callable:
@@ -274,22 +229,9 @@ def suite_setup(func: Callable) -> Callable:
             )
 
     if sig.return_annotation != inspect.Signature.empty:
-        if sig.return_annotation is not None and sig.return_annotation is not None:
+        if sig.return_annotation is not None:
             raise TypeError(f"Suite setup {func.__name__} must return None, got {sig.return_annotation}")
 
-    if inspect.iscoroutinefunction(func):
-
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            return await func(*args, **kwargs)
-    else:
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
-
-    # Set on wrapper — functools.wraps doesn't copy custom attributes
-    wrapper._is_suite_setup = True
-    wrapper._suite_setup_param_count = len(params)
-
-    return wrapper
+    func._is_suite_setup = True
+    func._suite_setup_param_count = len(params)
+    return func

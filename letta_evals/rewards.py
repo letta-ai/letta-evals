@@ -20,7 +20,6 @@ from letta_evals.models import (
 from letta_evals.utils import load_object
 
 RewardReturn = RewardOutput | float | int | dict[str, Any]
-RewardComposer = Callable[["RewardContext"], RewardReturn | Awaitable[RewardReturn]]
 LoadedRewardComposer = Callable[["RewardContext"], Awaitable[RewardOutput]]
 
 

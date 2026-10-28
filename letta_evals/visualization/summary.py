@@ -36,23 +36,6 @@ def get_metric_labels(suite: SuiteSpec) -> Dict[str, str]:
     return metric_labels
 
 
-def format_reward_description(
-    suite: SuiteSpec, *, prefer_display_label: bool = False, quote_metric_label: bool = False
-) -> str:
-    """Format the reward description for summaries and validation output."""
-    reward = suite.reward
-    kind = getattr(getattr(reward, "kind", None), "value", getattr(reward, "kind", None))
-    if kind == "metric":
-        metric_key = getattr(reward, "metric_key", "")
-        metric_label = get_metric_labels(suite).get(metric_key, metric_key) if prefer_display_label else metric_key
-        if quote_metric_label and metric_label:
-            metric_label = f"'{metric_label}'"
-        return f"metric {metric_label}".strip()
-    if kind == "custom":
-        return f"custom {getattr(reward, 'function', '')}".strip()
-    return f"unknown reward kind: {kind}"
-
-
 def print_truncated_samples_notice(console: Console, total_samples: int, displayed_samples: int) -> None:
     if total_samples > displayed_samples:
         console.print(f"[dim]Showing first {displayed_samples} of {total_samples} samples[/dim]")
