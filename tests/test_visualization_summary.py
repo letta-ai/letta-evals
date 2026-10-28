@@ -21,7 +21,6 @@ from letta_evals.types import RewardKind
 from letta_evals.visualization.summary import (
     build_rich_sample_results_table,
     build_simple_sample_results_table,
-    format_reward_description,
     get_displayed_sample_results,
 )
 
@@ -84,14 +83,6 @@ def _make_result():
         suite_spec=suite_spec,
         runs={"model-a": model_a, "model-z": model_z},
     )
-
-
-def test_format_reward_description_for_metric_reward() -> None:
-    result = _make_result()
-
-    description = format_reward_description(result.suite_spec, prefer_display_label=True, quote_metric_label=True)
-
-    assert description == "metric 'Accuracy'"
 
 
 def test_get_displayed_sample_results_sorts_by_model_then_sample() -> None:

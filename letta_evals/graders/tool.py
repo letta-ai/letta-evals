@@ -19,9 +19,6 @@ class ToolGrader(Grader):
         extractor_config: Optional[dict] = None,
         base_dir: Optional[Path] = None,
     ):
-        self.function_name = function
-        self.extractor_name = extractor
-        self.base_dir = base_dir
         self.extractor = get_extractor(extractor, extractor_config, base_dir=base_dir)
 
         if function in GRADER_REGISTRY:

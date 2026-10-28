@@ -153,7 +153,6 @@ class Runner:
         self._cached_trajectories: Dict[SampleId, Dict[str, SampleResult]] = (
             self._build_trajectory_cache() if cached_results else {}
         )
-        self._sample_lookup: Dict[SampleId, Sample] = {}
         # ``stream_writer`` is shared across runs in multi-run mode; if not
         # provided, the runner builds its own. ``current_run`` is the 1-based
         # index of this run inside that shared writer.
@@ -254,20 +253,10 @@ class Runner:
                 log_msg += f" for model: {model_handle}"
             logger.info(log_msg)
 
-            if inspect.iscoroutinefunction(setup_func):
-                if param_count == 2:
-                    await setup_func(self.client, model_handle)
-                elif param_count == 1:
-                    await setup_func(self.client)
-                else:
-                    await setup_func()
-            else:
-                if param_count == 2:
-                    setup_func(self.client, model_handle)
-                elif param_count == 1:
-                    setup_func(self.client)
-                else:
-                    setup_func()
+            # param_count selects (), (client,) or (client, model_handle).
+            out = setup_func(*(self.client, model_handle)[:param_count])
+            if inspect.isawaitable(out):
+                await out
 
             logger.info("Setup completed successfully")
 
@@ -401,6 +390,8 @@ class Runner:
             agent_id = None
             agent_usage = None
             context = None
+            trajectory = []
+            token_data = None
             phase = ErrorCategory.UNKNOWN
             t_sample_start = time.perf_counter()
             try:  # noqa: SIM105 — outer try/finally for agent cleanup
@@ -528,30 +519,24 @@ class Runner:
                 # A target can raise before the runner assigns trajectory/token
                 # data, so use its agent_id to fetch best-effort partial
                 # trace fields here. A grading/reward error happens after a
-                # successful target, so those values are already locals.
+                # successful target, so those values are already assigned.
                 if isinstance(e, TargetError):
                     agent_id = e.agent_id or agent_id
                     agent_usage = e.agent_usage or agent_usage
-                    partial_trajectory = e.partial_trajectory
                     if agent_id:
                         try:
-                            partial_trajectory = await fetch_trajectory(self.client, agent_id)
+                            trajectory = await fetch_trajectory(self.client, agent_id)
                         except Exception as fetch_err:
                             logger.warning(f"Could not fetch partial trajectory for agent {agent_id}: {fetch_err}")
-                    partial_token_data = e.token_data
                     if return_token_data and agent_id:
                         try:
-                            partial_token_data = await fetch_token_data(self.client, agent_id)
+                            token_data = await fetch_token_data(self.client, agent_id)
                         except TokenDataFetchError as fetch_err:
                             logger.warning(
                                 "Could not fetch complete token data for failed agent %s: %r",
                                 agent_id,
                                 fetch_err.__cause__ or fetch_err,
                             )
-                            partial_token_data = None
-                else:
-                    partial_trajectory = locals().get("trajectory") or []
-                    partial_token_data = locals().get("token_data")
                 agent_str = f" ({agent_id})" if agent_id else ""
                 log_message = str(e) or type(e).__name__
                 logger.error(f"Error running sample {sample_id}{agent_str} with model {model_handle}: {log_message}")
@@ -563,8 +548,7 @@ class Runner:
                     exception_type=type(cause).__name__,
                     message=error_message,
                 )
-                result_model_handle = locals().get("model_handle") or model_handle
-                cost = await self._compute_sample_cost(result_model_handle, agent_id, agent_usage)
+                cost = await self._compute_sample_cost(model_handle, agent_id, agent_usage)
                 prompt_tokens, completion_tokens, cached_input_tokens, cache_write_tokens, reasoning_tokens = (
                     extract_token_counts(agent_usage)
                 )
@@ -583,8 +567,8 @@ class Runner:
                 result = SampleResult(
                     sample_id=sample_id,
                     agent_id=agent_id,
-                    model_handle=result_model_handle,
-                    trajectory=partial_trajectory,
+                    model_handle=model_handle,
+                    trajectory=trajectory,
                     submissions={},
                     grades={},
                     usage=usage,
@@ -592,10 +576,10 @@ class Runner:
                     error=error,
                     agent_usage=agent_usage,
                     context=context,
-                    token_data=partial_token_data,
+                    token_data=token_data,
                 )
                 if self.progress_callback:
-                    await self.progress_callback.sample_error(result, model_handle=result_model_handle)
+                    await self.progress_callback.sample_error(result, model_handle=model_handle)
                 return result
             finally:
                 if self._should_cleanup_agent() and agent_id:
@@ -631,7 +615,6 @@ class Runner:
                 base_dir=self.suite.base_dir,
             )
         )
-        self._sample_lookup = {s.id: s for s in samples}
 
         validate_rubric_vars(self.suite, samples)
 
