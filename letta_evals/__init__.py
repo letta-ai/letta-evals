@@ -6,7 +6,6 @@ from importlib.metadata import version as _pkg_version
 from letta_evals.decorators import agent_factory, extractor, grader, reward_composer, suite_setup
 from letta_evals.graders import Grader, RubricGrader, ToolGrader
 from letta_evals.models import (
-    AgentState,
     CustomRewardSpec,
     Error,
     ErrorSummary,
@@ -47,7 +46,6 @@ except PackageNotFoundError:
     __version__ = "0.26.0"
 
 __all__ = [
-    "AgentState",
     "CustomRewardSpec",
     "Error",
     "ErrorCategory",

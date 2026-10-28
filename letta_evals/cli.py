@@ -418,9 +418,7 @@ async def _run_single_sample(
 
     output_json_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_json_path, "w") as f:
-        # agent_state is consumed inside the sandbox for grading/reward, but the
-        # host never needs to deserialize the SDK object across this boundary.
-        f.write(result.model_dump_json(exclude_none=True, exclude={"agent_state"}))
+        f.write(result.model_dump_json(exclude_none=True))
 
 
 def display_multi_run_summary(summary):

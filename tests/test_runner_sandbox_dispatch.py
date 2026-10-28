@@ -209,11 +209,11 @@ class TestRunSampleInSandbox:
         assert result.error is not None
         assert result.error.exception_type == "SuiteConfigurationError"
 
-    def test_host_drops_agent_state_before_result_validation(self, tmp_path, monkeypatch):
-        """Older/custom sandbox images may still include agent_state in
-        result.json. The host should ignore it before validating SampleResult
-        so provider enum skew in AgentState cannot lose an otherwise successful
-        sample."""
+    def test_host_keeps_context_and_ignores_legacy_agent_state(self, tmp_path, monkeypatch):
+        """Rollout context written in-sandbox survives to the host result.
+        Older sandbox images may still include agent_state in result.json;
+        SampleResult no longer has the field, so validation ignores it and
+        provider enum skew cannot lose an otherwise successful sample."""
         _write_suite_yaml(tmp_path)
         runner = _make_runner_with_sandbox(tmp_path)
 
@@ -221,6 +221,7 @@ class TestRunSampleInSandbox:
             async def download_file(self, remote: str, local: Path) -> None:
                 self.downloaded.append((remote, local))
                 payload = _canned_result("s1").model_dump(mode="json")
+                payload["context"] = {"memory_dir": "/mnt/workspace"}
                 payload["agent_state"] = {
                     "id": "agent-sandbox-1",
                     "llm_config": {"model_endpoint_type": "unknown-preview-provider"},
@@ -244,7 +245,8 @@ class TestRunSampleInSandbox:
         assert result.error is None
         assert result.sample_id == "s1"
         assert result.agent_id == "agent-sandbox-1"
-        assert result.agent_state is None
+        assert result.context == {"memory_dir": "/mnt/workspace"}
+        assert "agent_state" not in result.model_dump()
         assert result.grades["acc"].score == 1.0
         assert result.reward is not None
         assert result.reward.score == 1.0

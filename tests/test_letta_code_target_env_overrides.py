@@ -1,4 +1,5 @@
-"""Unit tests for LettaCodeTarget._build_subprocess_env per-sample env overrides."""
+"""Unit tests for LettaCodeTarget._build_subprocess_env per-sample env overrides
+and _resolve_memory_workspace_dir."""
 
 import os
 from pathlib import Path
@@ -54,45 +55,14 @@ def test_build_env_sets_base_url_when_configured(tmp_path):
     assert env["LETTA_BASE_URL"] == "https://api.example.com"
 
 
-def test_build_env_sets_memory_dir_in_memory_workspace(tmp_path, monkeypatch):
-    # Redirect HOME so the test doesn't pollute the real ~/.letta
-    monkeypatch.setenv("HOME", str(tmp_path))
-
+def test_build_env_sets_memory_dir_vars(tmp_path):
+    memory_dir = tmp_path / "workspace"
     target = _make_target(tmp_path, memory_workspace=True)
-    sample = _make_sample()
 
-    env = target._build_subprocess_env(sample, agent_id="agent-abc")
+    env = target._build_subprocess_env(_make_sample(), agent_id=None, memory_dir=memory_dir)
 
-    expected = str(Path(tmp_path) / ".letta" / "agents" / "agent-abc" / "memory")
-    assert env["MEMORY_DIR"] == expected
-    assert env["LETTA_MEMORY_DIR"] == expected
-    # mkdir(parents=True, exist_ok=True) should have created it
-    assert Path(expected).is_dir()
-
-
-def test_build_env_skips_memory_dir_without_agent_id(tmp_path, monkeypatch):
-    monkeypatch.delenv("MEMORY_DIR", raising=False)
-    monkeypatch.delenv("LETTA_MEMORY_DIR", raising=False)
-
-    target = _make_target(tmp_path, memory_workspace=True)
-    sample = _make_sample()
-
-    env = target._build_subprocess_env(sample, agent_id=None)
-
-    assert "MEMORY_DIR" not in env
-    assert "LETTA_MEMORY_DIR" not in env
-
-
-def test_build_env_sets_explicit_memory_dir_without_agent_id(tmp_path):
-    explicit = tmp_path / "seeded-memory"
-    target = _make_target(tmp_path, memory_workspace=True, memory_dir=explicit)
-    sample = _make_sample()
-
-    env = target._build_subprocess_env(sample, agent_id=None)
-
-    assert env["MEMORY_DIR"] == str(explicit)
-    assert env["LETTA_MEMORY_DIR"] == str(explicit)
-    assert explicit.is_dir()
+    assert env["MEMORY_DIR"] == str(memory_dir)
+    assert env["LETTA_MEMORY_DIR"] == str(memory_dir)
 
 
 def test_target_rejects_removed_memory_permission_mode(tmp_path):
@@ -212,59 +182,56 @@ def test_build_env_does_not_mutate_os_environ(tmp_path):
     assert "NEW_TEST_VAR" not in os.environ
 
 
-# --- _resolve_run_cwd ------------------------------------------------------
+# --- _resolve_memory_workspace_dir ------------------------------------------
 
 
-def test_run_cwd_defaults_to_base_dir_without_memory_mode(tmp_path):
+def test_memory_dir_is_none_without_memory_workspace(tmp_path):
     target = _make_target(tmp_path)
-    sample = _make_sample()
+    sample = _make_sample(extra_vars={"memory_dir": str(tmp_path / "ignored")})
 
-    assert target._resolve_run_cwd(sample, agent_id="agent-abc") == str(tmp_path)
+    assert target._resolve_memory_workspace_dir(sample, agent_id="agent-abc") is None
 
 
-def test_run_cwd_uses_agent_memory_root_in_memory_workspace(tmp_path, monkeypatch):
+def test_memory_dir_defaults_to_agent_memory_root(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     target = _make_target(tmp_path, memory_workspace=True)
-    sample = _make_sample()
 
-    expected = str(Path(tmp_path) / ".letta" / "agents" / "agent-abc" / "memory")
-    assert target._resolve_run_cwd(sample, agent_id="agent-abc") == expected
+    expected = Path(tmp_path) / ".letta" / "agents" / "agent-abc" / "memory"
+    assert target._resolve_memory_workspace_dir(_make_sample(), agent_id="agent-abc") == expected
 
 
-def test_run_cwd_honors_injected_memory_dir_env(tmp_path):
+def test_memory_dir_honors_injected_memory_dir_env(tmp_path):
     target = _make_target(tmp_path, memory_workspace=True)
-    fake = str(tmp_path / "fake" / "repo")
-    sample = _make_sample(extra_vars={"env": {"MEMORY_DIR": fake}})
+    fake = tmp_path / "fake" / "repo"
+    sample = _make_sample(extra_vars={"env": {"MEMORY_DIR": str(fake)}})
 
-    assert target._resolve_run_cwd(sample, agent_id="agent-abc") == fake
+    assert target._resolve_memory_workspace_dir(sample, agent_id="agent-abc") == fake
 
 
-def test_run_cwd_honors_injected_memory_dir_non_env_key(tmp_path):
+def test_memory_dir_honors_injected_memory_dir_non_env_key(tmp_path):
     target = _make_target(tmp_path, memory_workspace=True)
-    fake = str(tmp_path / "fake" / "repo")
-    sample = _make_sample(extra_vars={"memory_dir": fake})
+    fake = tmp_path / "fake" / "repo"
+    sample = _make_sample(extra_vars={"memory_dir": str(fake)})
 
-    assert target._resolve_run_cwd(sample, agent_id="agent-abc") == fake
+    assert target._resolve_memory_workspace_dir(sample, agent_id="agent-abc") == fake
 
 
-def test_run_cwd_without_agent_id_uses_base_dir(tmp_path):
+def test_memory_dir_is_none_without_agent_id_or_explicit_workspace(tmp_path):
     target = _make_target(tmp_path, memory_workspace=True)
-    sample = _make_sample()
 
-    # No agent id or explicit workspace -> cannot infer a memory cwd, fall back to base dir.
-    assert target._resolve_run_cwd(sample, agent_id=None) == str(tmp_path)
+    # No agent id or explicit workspace -> no memory workspace; the run falls back to base_dir.
+    assert target._resolve_memory_workspace_dir(_make_sample(), agent_id=None) is None
 
 
-def test_run_cwd_uses_injected_memory_dir_without_agent_id(tmp_path):
+def test_memory_dir_uses_injected_memory_dir_without_agent_id(tmp_path):
     target = _make_target(tmp_path, memory_workspace=True)
     sample = _make_sample(extra_vars={"env": {"MEMORY_DIR": str(tmp_path / "x")}})
 
-    assert target._resolve_run_cwd(sample, agent_id=None) == str(tmp_path / "x")
+    assert target._resolve_memory_workspace_dir(sample, agent_id=None) == tmp_path / "x"
 
 
-def test_run_cwd_uses_explicit_memory_dir_without_agent_id(tmp_path):
+def test_memory_dir_uses_explicit_memory_dir_without_agent_id(tmp_path):
     explicit = tmp_path / "seeded-memory"
     target = _make_target(tmp_path, memory_workspace=True, memory_dir=explicit)
-    sample = _make_sample()
 
-    assert target._resolve_run_cwd(sample, agent_id=None) == str(explicit)
+    assert target._resolve_memory_workspace_dir(_make_sample(), agent_id=None) == explicit

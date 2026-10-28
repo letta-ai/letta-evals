@@ -218,7 +218,22 @@ Use `setup_script: file.py:function_name` for one-time setup before a suite runs
 - `(client: AsyncLetta) -> None`
 - `(client: AsyncLetta, model_handle: str) -> None`
 
-Use `target.agent_script: file.py:function_name` to create or customize an agent per sample. Agent factories receive the Letta client and current `Sample`, and return the agent ID.
+Use `target.agent_script: file.py:function_name` to create or customize an agent per sample. Agent factories receive the Letta client and current `Sample`, and return either the agent ID or `(agent_id, context)`.
+
+`context` is a JSON-serializable dict of per-rollout values. `context["env"]` and `context["memory_dir"]` configure the Letta Code subprocess, layered over the same keys in `sample.extra_vars`. With `memory_workspace: true`, the target writes the resolved workspace path back to `context["memory_dir"]`. The dict is saved on `SampleResult.context` and passed to extractors that take a third `context` parameter and to reward composers as `ctx.context`:
+
+```python
+@agent_factory
+async def create_seeded_agent(client, sample):
+    agent_id = ...
+    return agent_id, {"memory_dir": seed_workspace(sample)}
+
+
+@extractor
+def workspace_files(trajectory, config, context):
+    root = Path(context["memory_dir"])  # per rollout
+    return "\n".join(str(p.relative_to(root)) for p in sorted(root.glob(config["glob"])))  # config: extractor_config
+```
 
 ## Examples
 

@@ -9,7 +9,7 @@ co-located), and the per-sample SampleResult written to <model>.jsonl.
 
 from typing import Any, Dict, List, Optional, Union
 
-from letta_client.types import AgentState, ToolReturnMessage
+from letta_client.types import ToolReturnMessage
 from letta_client.types.agents import (
     ApprovalRequestMessage,
     ApprovalResponseMessage,
@@ -72,14 +72,21 @@ class TargetResult(BaseModel):
     """Minimal result from invoking a target.
 
     Targets own execution and return the live ``agent_id`` plus execution
-    metadata. Server-side trace fields such as trajectory, agent state, and token
-    data are fetched by ``Runner`` and persisted on ``SampleResult``.
+    metadata. Server-side trace fields such as trajectory and token data are
+    fetched by ``Runner`` and persisted on ``SampleResult``.
     """
 
     agent_id: str = Field(description="ID of the agent created or used by the target run")
     model_handle: str = Field(description="Model handle used for this target")
     agent_usage: Optional[List[dict]] = Field(
         default=None, description="Usage statistics emitted by the agent during the run"
+    )
+    context: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description=(
+            "Per-rollout values produced at setup: the agent factory's returned context plus the "
+            "target's resolved memory_dir. Passed to extractors and reward composers."
+        ),
     )
 
 
@@ -94,9 +101,6 @@ class TargetTrace(TargetResult):
     trajectory: List[List[LettaMessageUnion]] = Field(
         default_factory=list,
         description="List of conversation turns, each containing Letta messages",
-    )
-    agent_state: Optional[AgentState] = Field(
-        default=None, description="Agent state after running the target (includes memory blocks)"
     )
     token_data: Optional[List[TurnTokenData]] = Field(
         default=None,

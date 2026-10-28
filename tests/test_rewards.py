@@ -16,7 +16,7 @@ def _ctx() -> RewardContext:
         trajectory=[[]],
         agent_id="agent-1",
         model_handle="model-1",
-        agent_state=None,
+        context={"memory_dir": "/ws"},
         usage=None,
         timing=Timing(total=1.0, target=0.9),
     )

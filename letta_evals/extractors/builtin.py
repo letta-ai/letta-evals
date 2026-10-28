@@ -1,5 +1,5 @@
 import re
-from typing import List, Optional
+from typing import List
 
 from letta_client.types import ToolReturnMessage
 from letta_client.types.agents import AssistantMessage, ToolCallMessage
@@ -10,7 +10,7 @@ from letta_evals.extractors.utils import (
     get_assistant_messages,
     get_last_turn_messages,
 )
-from letta_evals.models import AgentState, LettaMessageUnion
+from letta_evals.models import LettaMessageUnion
 
 
 @extractor
@@ -144,38 +144,4 @@ def after_marker(trajectory: List[List[LettaMessageUnion]], config: dict) -> str
             else:
                 return content[idx + len(marker) :].strip()
 
-    return ""
-
-
-@extractor
-def memory_block(trajectory: List[List[LettaMessageUnion]], config: dict, agent_state: Optional[AgentState]) -> str:
-    """Extract content from a specific memory block by label.
-
-    Config:
-        block_label (str): The label of the memory block to extract (e.g., "human", "persona")
-
-    Example usage in suite YAML:
-        graders:
-          human_memory:
-            kind: tool
-            function: exact_match
-            extractor: memory_block
-            extractor_config:
-              block_label: "human"
-    """
-    if agent_state is None:
-        raise RuntimeError("memory_block extractor requires agent_state, but it was not retrieved")
-
-    block_label = config.get("block_label")
-    if not block_label:
-        raise ValueError("memory_block extractor requires 'block_label' in config")
-
-    # search for the block with the specified label
-    # Use agent_state.blocks (SDK v1.0) instead of deprecated agent_state.memory.blocks
-    blocks = agent_state.blocks if agent_state.blocks else []
-    for block in blocks:
-        if block.label == block_label:
-            return block.value
-
-    # block not found - return empty string
     return ""
