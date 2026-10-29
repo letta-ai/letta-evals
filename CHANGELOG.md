@@ -140,6 +140,18 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.28.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.27.0...letta-evals-v0.28.0) (2026-10-29)
+
+
+### Features
+
+* **targets:** Run Letta Code on its local backend ([#346](https://github.com/letta-ai/letta-evals/issues/346)) ([907679e](https://github.com/letta-ai/letta-evals/commit/907679eb1907226c839c3250db4bfd4136fb38a5))
+
+
+### Refactors
+
+* Let the runner own the local backend store ([#348](https://github.com/letta-ai/letta-evals/issues/348)) ([95cef36](https://github.com/letta-ai/letta-evals/commit/95cef361e33a67d5116598b7be699ea1a0ef04ec))
+
 ## [0.27.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.26.0...letta-evals-v0.27.0) (2026-10-28)
 
 
