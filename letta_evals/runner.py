@@ -2,6 +2,7 @@ import inspect
 import logging
 import os
 import shutil
+import tempfile
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -179,7 +180,9 @@ class Runner:
             return [None]
         return list(self.suite.target.model_handles)
 
-    def _create_letta_code_target(self, model_handle: Optional[str] = None) -> LettaCodeTarget:
+    def _create_letta_code_target(
+        self, model_handle: Optional[str] = None, local_backend_dir: Optional[Path] = None
+    ) -> LettaCodeTarget:
         """Create the letta_code target for a model handle."""
         if not model_handle:
             raise ValueError("LettaCodeTarget requires a model_handle (string), but got None")
@@ -196,7 +199,7 @@ class Runner:
             permission_mode=self.suite.target.permission_mode,
             memory_workspace=self.suite.target.memory_workspace,
             memory_dir=self.suite.target.memory_dir,
-            backend=self.suite.target.backend,
+            local_backend_dir=local_backend_dir,
         )
 
     def _init_graders(self) -> None:
@@ -236,11 +239,6 @@ class Runner:
 
     def _should_cleanup_agent(self) -> bool:
         return self.suite.cleanup
-
-    @property
-    def _uses_server(self) -> bool:
-        """False on the local backend, where no trace fields live on a server."""
-        return self.suite.target.backend == "api"
 
     # ── setup ──
 
@@ -282,54 +280,62 @@ class Runner:
                     cache[result.sample_id][model_id] = result
         return cache
 
-    async def _get_or_run_target_trace(
+    async def _cached_target_trace(
         self,
         sample: Sample,
         model_handle: Optional[str],
         return_token_data: bool = False,
+    ) -> Optional[TargetTrace]:
+        """Return this sample's trace from the cached results, or None when it isn't cached."""
+        if not self.cached_results:
+            return None
+        sample_id = sample.id
+        cached_result: Optional[SampleResult] = None
+        cached_models = self._cached_trajectories.get(sample_id)
+
+        if cached_models:
+            lookup_key = model_handle or DEFAULT_MODEL_ID
+            if lookup_key in cached_models:
+                cached_result = cached_models[lookup_key]
+            elif len(cached_models) == 1:
+                cached_result = next(iter(cached_models.values()))
+
+        if cached_result is None:
+            return None
+        if self.progress_callback:
+            await self.progress_callback.agent_created(
+                sample_id, agent_id=cached_result.agent_id, model_handle=model_handle, from_cache=True
+            )
+        # cached_result is a SampleResult (a TargetResult subclass); the
+        # requested handle wins over whatever the cache recorded.
+        result = cached_result.model_copy(update={"model_handle": model_handle or DEFAULT_MODEL_ID})
+        token_data = result.token_data
+        if return_token_data and result.agent_id and token_data is None:
+            token_data = await fetch_token_data(self.client, result.agent_id)
+        return TargetTrace(
+            trajectory=result.trajectory,
+            agent_id=result.agent_id,
+            model_handle=result.model_handle,
+            agent_usage=result.agent_usage,
+            context=result.context,
+            token_data=token_data,
+        )
+
+    async def _run_target_trace(
+        self,
+        sample: Sample,
+        model_handle: Optional[str],
+        local_backend_dir: Optional[Path] = None,
+        return_token_data: bool = False,
     ) -> TargetTrace:
-        """Return target metadata plus fetched trace fields for this sample.
+        """Run the target and return its metadata plus fetched trace fields.
 
         Targets only execute and return ``agent_id``. Runner owns all
         server-side trace fetches so in-process and sandboxed runs share
         the same trajectory/token-data extraction layer. On the local
         backend the target returns the trace it read from the stream.
         """
-        sample_id = sample.id
-
-        if self.cached_results:
-            cached_result: Optional[SampleResult] = None
-            cached_models = self._cached_trajectories.get(sample_id)
-
-            if cached_models:
-                lookup_key = model_handle or DEFAULT_MODEL_ID
-                if lookup_key in cached_models:
-                    cached_result = cached_models[lookup_key]
-                elif len(cached_models) == 1:
-                    cached_result = next(iter(cached_models.values()))
-
-            if cached_result is not None:
-                if self.progress_callback:
-                    await self.progress_callback.agent_created(
-                        sample_id, agent_id=cached_result.agent_id, model_handle=model_handle, from_cache=True
-                    )
-                # cached_result is a SampleResult (a TargetResult subclass); the
-                # requested handle wins over whatever the cache recorded.
-                result = cached_result.model_copy(update={"model_handle": model_handle or DEFAULT_MODEL_ID})
-                token_data = result.token_data
-                if return_token_data and result.agent_id and token_data is None and self._uses_server:
-                    token_data = await fetch_token_data(self.client, result.agent_id)
-                return TargetTrace(
-                    trajectory=result.trajectory,
-                    agent_id=result.agent_id,
-                    model_handle=result.model_handle,
-                    agent_usage=result.agent_usage,
-                    context=result.context,
-                    local_backend_dir=result.local_backend_dir,
-                    token_data=token_data,
-                )
-
-        target = self._create_letta_code_target(model_handle)
+        target = self._create_letta_code_target(model_handle, local_backend_dir)
         target_result = await target.run(
             sample,
             progress_callback=self.progress_callback,
@@ -365,7 +371,7 @@ class Runner:
         if not model_handle or not agent_usage:
             return None
         identity = self._model_identities.get(model_handle)
-        if identity is None and agent_id and self._uses_server:
+        if identity is None and agent_id and self.suite.target.backend == "api":
             try:
                 cfg = (await self.client.agents.retrieve(agent_id=agent_id)).llm_config
                 endpoint_type = getattr(cfg, "api_model_endpoint_type", None)
@@ -397,12 +403,14 @@ class Runner:
     ) -> SampleResult:
         """Run a single sample through target and grader."""
         sample_id = sample.id
+        # Token data lives on the Letta server; the local backend has none.
+        return_token_data = return_token_data and self.suite.target.backend == "api"
 
         async with self.semaphore:
             agent_id = None
             agent_usage = None
             context = None
-            local_backend_dir = None
+            local_backend_dir: Optional[Path] = None
             trajectory = []
             token_data = None
             phase = ErrorCategory.UNKNOWN
@@ -418,7 +426,7 @@ class Runner:
                     # to grade/build SampleResult. Token arrays intentionally
                     # stay out of result.json; the host Runner fetches them
                     # from server-side run metadata after the sandbox returns.
-                    if return_token_data and agent_id and self._uses_server:
+                    if return_token_data and agent_id:
                         result = result.model_copy(update={"token_data": await fetch_token_data(self.client, agent_id)})
                     # Fire post-completion callbacks based on the final result —
                     # mid-sample events (grading_started, token streaming) are
@@ -432,17 +440,19 @@ class Runner:
                     return result
 
                 phase = ErrorCategory.TARGET
-                target_trace = await self._get_or_run_target_trace(
-                    sample,
-                    model_handle,
-                    return_token_data=return_token_data,
-                )
+                target_trace = await self._cached_target_trace(sample, model_handle, return_token_data)
+                if target_trace is None:
+                    if self.suite.target.backend == "local":
+                        # Each sample's agent lives in its own Letta Code store, removed on cleanup.
+                        local_backend_dir = Path(tempfile.mkdtemp(prefix=f"letta-evals-{sample_id}-"))
+                    target_trace = await self._run_target_trace(
+                        sample, model_handle, local_backend_dir, return_token_data
+                    )
                 trajectory = target_trace.trajectory
                 agent_id = target_trace.agent_id
                 model_handle = target_trace.model_handle
                 agent_usage = target_trace.agent_usage
                 context = target_trace.context
-                local_backend_dir = target_trace.local_backend_dir
                 token_data = target_trace.token_data
 
                 cost = await self._compute_sample_cost(model_handle, agent_id, agent_usage)
@@ -538,15 +548,14 @@ class Runner:
                 if isinstance(e, TargetError):
                     agent_id = e.agent_id or agent_id
                     agent_usage = e.agent_usage or agent_usage
-                    local_backend_dir = e.local_backend_dir or local_backend_dir
-                    if not self._uses_server:
+                    if local_backend_dir:
                         trajectory = e.trajectory or trajectory
                     elif agent_id:
                         try:
                             trajectory = await fetch_trajectory(self.client, agent_id)
                         except Exception as fetch_err:
                             logger.warning(f"Could not fetch partial trajectory for agent {agent_id}: {fetch_err}")
-                    if return_token_data and agent_id and self._uses_server:
+                    if return_token_data and agent_id:
                         try:
                             token_data = await fetch_token_data(self.client, agent_id)
                         except TokenDataFetchError as fetch_err:
@@ -604,7 +613,7 @@ class Runner:
                 if self._should_cleanup_agent() and local_backend_dir:
                     shutil.rmtree(local_backend_dir, ignore_errors=True)
                     logger.info(f"Removed local backend store {local_backend_dir} for sample {sample_id}")
-                elif self._should_cleanup_agent() and agent_id and self._uses_server:
+                elif self._should_cleanup_agent() and agent_id:
                     try:
                         await self.client.agents.delete(agent_id=agent_id)
                         logger.info(f"Cleaned up agent {agent_id} for sample {sample_id}")

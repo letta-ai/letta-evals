@@ -7,6 +7,7 @@ per-sample primitives (Usage, Timing, Error) plus their aggregate companions
 co-located), and the per-sample SampleResult written to <model>.jsonl.
 """
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from letta_client.types import ToolReturnMessage
@@ -87,10 +88,6 @@ class TargetResult(BaseModel):
             "Per-rollout values produced at setup: the agent factory's returned context plus the "
             "target's resolved memory_dir. Passed to extractors and reward composers."
         ),
-    )
-    local_backend_dir: Optional[str] = Field(
-        default=None,
-        description="Letta Code local store holding the agent, for targets run with backend: local",
     )
 
 
@@ -228,6 +225,10 @@ class SampleResult(TargetTrace):
     usage: Optional[Usage] = Field(default=None, description="Token usage and cost for this sample")
     timing: Timing = Field(description="Wall-clock timing for this sample")
     error: Optional[Error] = Field(default=None, description="Structured error info if this sample failed")
+    local_backend_dir: Optional[Path] = Field(
+        default=None,
+        description="Letta Code local store that held this sample's agent, for suites run with backend: local",
+    )
 
     @model_serializer(mode="wrap")
     def _serialize_identity_first(self, handler):
