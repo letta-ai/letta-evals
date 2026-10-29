@@ -110,12 +110,14 @@ CREATING_FACTORY = """    agent = await client.agents.create(name="reflector", s
 
 
 def _make_target(tmp_path: Path, **overrides) -> LettaCodeTarget:
+    store = tmp_path / "store"
+    store.mkdir(exist_ok=True)
     kwargs = dict(
         client=None,
         model_handle="llama.cpp/local-model",
         base_dir=tmp_path,
         timeout=30,
-        backend="local",
+        local_backend_dir=store,
         base_url="http://server.invalid",
     )
     kwargs.update(overrides)
@@ -148,8 +150,7 @@ async def test_factory_agent_is_created_in_the_sample_store_and_resumed(tmp_path
     assert run["argv"][run["argv"].index("--agent") + 1] == AGENT_ID
     assert "--model" not in run["argv"]
     assert run["stdin"] == "reflect"
-    store = result.local_backend_dir
-    assert store and Path(store).is_dir()
+    store = str(target.local_backend_dir)
     assert create["env"]["LETTA_LOCAL_BACKEND_DIR"] == run["env"]["LETTA_LOCAL_BACKEND_DIR"] == store
     assert run["env"]["LETTA_BASE_URL"] is None
     assert run["env"]["LETTA_DISABLE_SESSION_PERSIST"] == "1"
@@ -201,7 +202,7 @@ async def test_memory_workspace_defaults_to_the_local_agent_memory(tmp_path, mon
 
     result = await target.run(Sample(id=0, input="hi"))
 
-    expected = Path(result.local_backend_dir) / "memfs" / AGENT_ID / "memory"
+    expected = target.local_backend_dir / "memfs" / AGENT_ID / "memory"
     run = _read(record_dir, "run.json")
     assert result.context["memory_dir"] == str(expected)
     assert run["env"]["MEMORY_DIR"] == str(expected)
@@ -228,7 +229,6 @@ async def test_failed_run_keeps_the_partial_trajectory(tmp_path, monkeypatch):
     [turn] = excinfo.value.trajectory
     assert [m.message_type for m in turn] == ["user_message", "tool_call_message", "tool_return_message"]
     assert excinfo.value.agent_id == AGENT_ID
-    assert Path(excinfo.value.local_backend_dir).is_dir()
 
 
 def test_sandbox_command_carries_the_backend():
@@ -237,4 +237,4 @@ def test_sandbox_command_carries_the_backend():
     )
 
     assert "--backend local" in build_sandbox_command(mount, "m", "local")
-    assert "--backend" not in build_sandbox_command(mount, "m")
+    assert "--backend" not in build_sandbox_command(mount, "m", "api")

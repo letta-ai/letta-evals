@@ -9,10 +9,13 @@ CLI's stream-json output.
 import asyncio
 import json
 import logging
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
 from letta_client.types import AgentState
+from letta_client.types.agents import UserMessage
 from pydantic import TypeAdapter, ValidationError
 
 from letta_evals.models import LettaMessageUnion
@@ -28,9 +31,14 @@ _NON_TRAJECTORY_TYPES = frozenset({"usage_statistics", "stop_reason"})
 _SDK_MESSAGE_TYPE_ALIASES = {"summary_message": "summary", "event_message": "event"}
 
 
-def local_memory_dir(storage_dir: Path, agent_id: str) -> Path:
-    """Memory root of a local-backend agent with memfs enabled."""
-    return storage_dir / "memfs" / agent_id / "memory"
+def prompt_message(prompt: str) -> UserMessage:
+    """The trajectory's opening user message; the stream has no event for the prompt."""
+    return UserMessage(
+        id=f"message-{uuid.uuid4()}",
+        date=datetime.now(timezone.utc),
+        content=prompt,
+        message_type="user_message",
+    )
 
 
 def trajectory_message(event: dict, run_id: Optional[str]) -> Optional[Any]:

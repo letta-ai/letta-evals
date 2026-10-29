@@ -175,7 +175,8 @@ def build_sandbox_command(mount: SandboxMount, model_handle: Optional[str], back
     ]
     if isinstance(model_handle, str):
         cmd_parts += ["--model-handle", model_handle]
-    # The suite YAML in the sandbox may predate an in-memory or --backend override.
+    # The uploaded suite YAML predates any --backend override. Passed only for local
+    # so images pinned to a letta-evals without --backend keep running api suites.
     if backend != "api":
         cmd_parts += ["--backend", backend]
 

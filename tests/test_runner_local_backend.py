@@ -2,13 +2,12 @@
 from or deleted on a server, and cleanup removes the sample's local store."""
 
 from datetime import datetime, timezone
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from letta_client.types.agents import AssistantMessage
 
-from letta_evals.models import RewardOutput, Sample, TargetTrace
+from letta_evals.models import RewardOutput, Sample, SampleResult, TargetTrace, Timing
 from letta_evals.targets.errors import TargetError
 from tests.test_runner_token_data import _FakeGrader, _make_runner
 
@@ -27,6 +26,14 @@ def _local_runner(monkeypatch, target: MagicMock, *, cleanup: bool = False):
     runner.client = MagicMock()
     runner.client.agents.retrieve = AsyncMock()
     runner.client.agents.delete = AsyncMock()
+    runner.stores = []
+
+    def create_target(model_handle=None, local_backend_dir=None):
+        assert local_backend_dir is not None and local_backend_dir.is_dir()
+        runner.stores.append(local_backend_dir)
+        return target
+
+    runner._create_letta_code_target = create_target
 
     async def reward_composer(ctx):
         return RewardOutput(score=1.0)
@@ -35,22 +42,14 @@ def _local_runner(monkeypatch, target: MagicMock, *, cleanup: bool = False):
     return runner
 
 
-def _store(tmp_path: Path) -> str:
-    store = tmp_path / "store"
-    store.mkdir()
-    return str(store)
-
-
 @pytest.mark.asyncio
-async def test_trace_comes_from_the_target(tmp_path, monkeypatch):
-    store = _store(tmp_path)
+async def test_trace_comes_from_the_target(monkeypatch):
     target = MagicMock()
     target.run = AsyncMock(
         return_value=TargetTrace(
             agent_id="agent-local-1",
             model_handle="llama.cpp/local-model",
             agent_usage=USAGE,
-            local_backend_dir=store,
             trajectory=[[MESSAGE]],
         )
     )
@@ -58,42 +57,55 @@ async def test_trace_comes_from_the_target(tmp_path, monkeypatch):
 
     result = await runner.run_sample(Sample(id=0, input="hi"), model_handle=None, return_token_data=True)
 
+    [store] = runner.stores
     assert result.error is None
     assert result.trajectory == [[MESSAGE]]
     assert result.token_data is None
     assert result.local_backend_dir == store
     runner.client.agents.retrieve.assert_not_awaited()
-    assert Path(store).is_dir()
+    assert store.is_dir()
 
 
 @pytest.mark.asyncio
-async def test_failed_target_keeps_its_partial_trajectory(tmp_path, monkeypatch):
-    store = _store(tmp_path)
+async def test_failed_target_keeps_its_partial_trajectory(monkeypatch):
     target = MagicMock()
-    target.run = AsyncMock(
-        side_effect=TargetError("boom", agent_id="agent-local-1", trajectory=[[MESSAGE]], local_backend_dir=store)
-    )
+    target.run = AsyncMock(side_effect=TargetError("boom", agent_id="agent-local-1", trajectory=[[MESSAGE]]))
     runner = _local_runner(monkeypatch, target)
 
     result = await runner.run_sample(Sample(id=0, input="hi"), model_handle=None, return_token_data=True)
 
+    [store] = runner.stores
     assert result.error is not None and result.error.message == "boom"
     assert result.trajectory == [[MESSAGE]]
     assert result.local_backend_dir == store
 
 
 @pytest.mark.asyncio
-async def test_cleanup_removes_the_local_store(tmp_path, monkeypatch):
-    store = _store(tmp_path)
+async def test_cleanup_removes_the_local_store(monkeypatch):
     target = MagicMock()
-    target.run = AsyncMock(
-        return_value=TargetTrace(
-            agent_id="agent-local-1", model_handle="m", local_backend_dir=store, trajectory=[[MESSAGE]]
-        )
-    )
+    target.run = AsyncMock(return_value=TargetTrace(agent_id="agent-local-1", model_handle="m", trajectory=[[MESSAGE]]))
     runner = _local_runner(monkeypatch, target, cleanup=True)
 
     await runner.run_sample(Sample(id=0, input="hi"), model_handle=None)
 
-    assert not Path(store).exists()
+    [store] = runner.stores
+    assert not store.exists()
     runner.client.agents.delete.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cached_sample_gets_no_store(monkeypatch):
+    target = MagicMock()
+    target.run = AsyncMock(side_effect=AssertionError("target run for a cached sample"))
+    runner = _local_runner(monkeypatch, target)
+    cached = SampleResult(
+        sample_id=0, agent_id="agent-local-1", trajectory=[[MESSAGE]], timing=Timing(total=1.0, target=1.0)
+    )
+    runner.cached_results = MagicMock()
+    runner._cached_trajectories = {0: {"default": cached}}
+
+    result = await runner.run_sample(Sample(id=0, input="hi"), model_handle=None)
+
+    assert result.trajectory == [[MESSAGE]]
+    assert result.local_backend_dir is None
+    assert runner.stores == []
