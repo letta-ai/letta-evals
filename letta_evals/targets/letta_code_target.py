@@ -3,15 +3,20 @@ import json
 import logging
 import os
 import shlex
+import tempfile
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 import anyio
 from letta_client import AsyncLetta
+from letta_client.types.agents import UserMessage
 
 from letta_evals.execution.trace import extract_usage_stats
-from letta_evals.models import Sample, TargetResult
+from letta_evals.models import Sample, TargetResult, TargetTrace
 from letta_evals.targets.errors import TargetError
+from letta_evals.targets.local_backend import LocalAgentsClient, local_memory_dir, trajectory_message
 from letta_evals.utils import load_object
 from letta_evals.visualization.base import ProgressCallback
 
@@ -57,6 +62,7 @@ class LettaCodeTarget:
         permission_mode: Optional[str] = None,
         memory_workspace: bool = False,
         memory_dir: Optional[Path] = None,
+        backend: Literal["api", "local"] = "api",
     ):
         """Initialize the Letta Code target.
 
@@ -82,6 +88,11 @@ class LettaCodeTarget:
             memory_dir: Optional explicit memory workspace root. If unset,
                 memory_workspace uses a per-sample override or the factory-created
                 agent's default ~/.letta/agents/<agent_id>/memory root.
+            backend: "api" runs Letta Code against the Letta server at base_url.
+                "local" runs it on its local backend (``letta --backend local``)
+                with a fresh local store per sample: agent factories get a
+                ``LocalAgentsClient``, and the trajectory comes from the CLI's
+                stream-json output instead of the server.
 
         Agent factories may return ``(agent_id, context)``. ``context["env"]``
         (dict) and ``context["memory_dir"]`` configure the subprocess for that
@@ -115,9 +126,14 @@ class LettaCodeTarget:
         self.base_dir = base_dir or Path.cwd()
         self.flags = shlex.split(flags) if flags else []
         self.memory_dir = memory_dir
+        self.backend = backend
 
     def _resolve_memory_workspace_dir(
-        self, sample: Sample, agent_id: Optional[str], context: Optional[dict] = None
+        self,
+        sample: Sample,
+        agent_id: Optional[str],
+        context: Optional[dict] = None,
+        local_backend_dir: Optional[Path] = None,
     ) -> Optional[Path]:
         """Resolve the memory workspace root, or None when there is none.
 
@@ -145,6 +161,8 @@ class LettaCodeTarget:
             return self.memory_dir.expanduser()
 
         if agent_id:
+            if local_backend_dir is not None:
+                return local_memory_dir(local_backend_dir, agent_id)
             return Path.home() / ".letta" / "agents" / agent_id / "memory"
 
         return None
@@ -155,17 +173,26 @@ class LettaCodeTarget:
         agent_id: Optional[str],
         context: Optional[dict] = None,
         memory_dir: Optional[Path] = None,
+        local_backend_dir: Optional[Path] = None,
     ) -> dict[str, str]:
         """Build subprocess env: os.environ -> target-managed -> extra_vars/context ``env``."""
         env = os.environ.copy()
 
-        if self.base_url:
+        if local_backend_dir is not None:
+            env["LETTA_LOCAL_BACKEND_DIR"] = str(local_backend_dir)
+            # Each sample has its own store; don't record every one as a session to resume.
+            env["LETTA_DISABLE_SESSION_PERSIST"] = "1"
+        elif self.base_url:
             env["LETTA_BASE_URL"] = self.base_url
             logger.info(f"Setting LETTA_BASE_URL={self.base_url} for letta CLI")
 
         if memory_dir:
             env["MEMORY_DIR"] = str(memory_dir)
             env["LETTA_MEMORY_DIR"] = str(memory_dir)
+            if local_backend_dir is not None:
+                # Without it, the local backend drops a MEMORY_DIR outside its own store
+                # (in sessions without local memfs, e.g. --stateless).
+                env["LETTA_MEMORY_DIR_EXPLICIT"] = "1"
 
         sample_env = _rollout_vars(sample, context).get("env")
         if sample_env is not None:
@@ -199,37 +226,40 @@ class LettaCodeTarget:
 
         The target deliberately does not fetch server-side trace fields such as
         messages, agent state, or token data. ``Runner`` owns those fetches so
-        in-process and sandboxed runs share the same trace assembly path.
+        in-process and sandboxed runs share the same trace assembly path. On the
+        local backend there is no server, so the target returns a ``TargetTrace``
+        whose trajectory it read from the stream; token data stays unset.
         """
         attempt = 0
         last_error = None
+        local_backend_dir = (
+            Path(tempfile.mkdtemp(prefix=f"letta-evals-{sample.id}-")) if self.backend == "local" else None
+        )
 
         while attempt <= self.max_retries:
+            # Trajectory read from the stream on the local backend.
+            messages: list = []
             try:
                 agent_id = None
                 # Last non-blank stdout line; parsed after exit for the result event.
                 last_line = ""
-
-                # construct the letta-code CLI command (headless streaming JSON output).
-                cmd = [
-                    "letta",
-                    "--output-format",
-                    "stream-json",
-                    "--model",
-                    self.model_handle,
-                ]
-
-                # Only use --yolo when no explicit permission_mode is set,
-                # since --yolo overrides --permission-mode (sets bypassPermissions).
-                if not self.permission_mode:
-                    cmd.append("--yolo")
 
                 # If agent_script is provided, create agent via factory first
                 factory_agent_id = None
                 context: dict = {}
                 if self.agent_script:
                     agent_factory_func = load_object(self.agent_script, self.base_dir)
-                    factory_agent_id, context = _unpack_factory_result(await agent_factory_func(self.client, sample))
+                    client = (
+                        LocalAgentsClient(
+                            local_backend_dir,
+                            self._build_subprocess_env(sample, None, local_backend_dir=local_backend_dir),
+                            self.model_handle,
+                            self.timeout,
+                        )
+                        if local_backend_dir is not None
+                        else self.client
+                    )
+                    factory_agent_id, context = _unpack_factory_result(await agent_factory_func(client, sample))
                     logger.info(f"Created agent {factory_agent_id} via agent_factory for sample {sample.id}")
                     if progress_callback:
                         await progress_callback.agent_created(
@@ -243,6 +273,21 @@ class LettaCodeTarget:
                 # for multiple inputs, concatenate with newlines
                 prompt = "\n".join(str(inp) for inp in inputs)
                 prompt = prompt.replace("{pwd}", self.base_dir.resolve().as_posix())
+
+                # construct the letta-code CLI command (headless streaming JSON output).
+                cmd = ["letta"]
+                if local_backend_dir is not None:
+                    cmd.extend(["--backend", "local"])
+                cmd.extend(["--output-format", "stream-json"])
+                # A local factory agent was created with this model; --model on resume
+                # would apply the model catalog's settings over the agent's own.
+                if not (local_backend_dir is not None and factory_agent_id):
+                    cmd.extend(["--model", self.model_handle])
+
+                # Only use --yolo when no explicit permission_mode is set,
+                # since --yolo overrides --permission-mode (sets bypassPermissions).
+                if not self.permission_mode:
+                    cmd.append("--yolo")
 
                 if factory_agent_id:
                     cmd.extend(["--agent", factory_agent_id])
@@ -269,7 +314,7 @@ class LettaCodeTarget:
 
                 # The workspace sets MEMORY_DIR and the subprocess cwd, and is handed
                 # forward so extractors don't re-derive _resolve_memory_workspace_dir.
-                memory_dir = self._resolve_memory_workspace_dir(sample, factory_agent_id, context)
+                memory_dir = self._resolve_memory_workspace_dir(sample, factory_agent_id, context, local_backend_dir)
                 if memory_dir:
                     memory_dir.mkdir(parents=True, exist_ok=True)
                     context = {**context, "memory_dir": str(memory_dir)}
@@ -277,7 +322,17 @@ class LettaCodeTarget:
                 # Prepare environment variables for the subprocess.
                 # Layers target-managed env (LETTA_BASE_URL, MEMORY_DIR) and per-rollout
                 # overrides from extra_vars/context "env" (see class docstring).
-                env = self._build_subprocess_env(sample, factory_agent_id, context, memory_dir)
+                env = self._build_subprocess_env(sample, factory_agent_id, context, memory_dir, local_backend_dir)
+                if local_backend_dir is not None:
+                    # The stream has no event for the prompt itself.
+                    messages.append(
+                        UserMessage(
+                            id=f"message-{uuid.uuid4()}",
+                            date=datetime.now(timezone.utc),
+                            content=prompt,
+                            message_type="user_message",
+                        )
+                    )
 
                 agent_id = factory_agent_id
                 stderr_chunks = []
@@ -306,25 +361,34 @@ class LettaCodeTarget:
                 process.stdin.close()
                 await process.stdin.wait_closed()
 
-                # Only the init event (agent_id) and the final result event
-                # (usage, parsed from last_line after exit) are consumed from
-                # the stream — the trajectory is fetched server-side. Drain
-                # everything after init without parsing (#319).
+                # On a server, only the init event (agent_id) and the final
+                # result event (usage, parsed from last_line after exit) are
+                # consumed from the stream — the trajectory is fetched
+                # server-side, so everything after init is drained without
+                # parsing (#319). The local backend's trajectory is the stream.
                 async def _read_stdout():
                     nonlocal agent_id, last_line
                     init_seen = False
+                    run_id = None
                     async for raw_line in process.stdout:
                         line = raw_line.decode(errors="replace").strip()
                         if not line:
                             continue
                         last_line = line
-                        if init_seen:
+                        if init_seen and local_backend_dir is None:
                             continue
                         try:
                             event = json.loads(line)
                         except json.JSONDecodeError:
                             continue
-                        if isinstance(event, dict) and event.get("type") == "system" and event.get("subtype") == "init":
+                        if not isinstance(event, dict):
+                            continue
+                        if init_seen:
+                            run_id = event.get("run_id") or run_id
+                            if (message := trajectory_message(event, run_id)) is not None:
+                                messages.append(message)
+                            continue
+                        if event.get("type") == "system" and event.get("subtype") == "init":
                             init_seen = True
                             if not agent_id:
                                 agent_id = event.get("agent_id")
@@ -369,6 +433,15 @@ class LettaCodeTarget:
                 # Extract usage from the final stream result event (best-effort).
                 usage_stats = extract_usage_stats(last_line)
 
+                if local_backend_dir is not None:
+                    return TargetTrace(
+                        agent_id=agent_id,
+                        model_handle=self.model_handle,
+                        agent_usage=usage_stats,
+                        context=context or None,
+                        local_backend_dir=str(local_backend_dir),
+                        trajectory=[messages],
+                    )
                 return TargetResult(
                     agent_id=agent_id,
                     model_handle=self.model_handle,
@@ -392,6 +465,8 @@ class LettaCodeTarget:
                         msg,
                         agent_id=err_agent_id,
                         agent_usage=partial_usage,
+                        trajectory=[messages] if messages else None,
+                        local_backend_dir=str(local_backend_dir) if local_backend_dir is not None else None,
                     ) from e
 
                 backoff_time = 2 ** (attempt - 1)

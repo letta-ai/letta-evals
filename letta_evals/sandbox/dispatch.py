@@ -163,7 +163,7 @@ def sandbox_error_result(
     )
 
 
-def build_sandbox_command(mount: SandboxMount, model_handle: Optional[str]) -> str:
+def build_sandbox_command(mount: SandboxMount, model_handle: Optional[str], backend: str = "api") -> str:
     cmd_parts = [
         "letta-evals",
         "run",
@@ -175,6 +175,9 @@ def build_sandbox_command(mount: SandboxMount, model_handle: Optional[str]) -> s
     ]
     if isinstance(model_handle, str):
         cmd_parts += ["--model-handle", model_handle]
+    # The suite YAML in the sandbox may predate an in-memory or --backend override.
+    if backend != "api":
+        cmd_parts += ["--backend", backend]
 
     inner_command = " ".join(shlex.quote(p) for p in cmd_parts)
     prefix = f"cd {shlex.quote(mount.remote_root)}"
@@ -272,7 +275,7 @@ async def run_sample_in_sandbox(
         finally:
             tmp_path.unlink(missing_ok=True)
 
-        command = build_sandbox_command(mount, model_handle)
+        command = build_sandbox_command(mount, model_handle, suite.target.backend)
         exec_env = forwarded_sandbox_env(suite)
         if exec_env:
             logger.debug("Forwarding env vars to sandbox %s: %s", sandbox.sandbox_id, sorted(exec_env))

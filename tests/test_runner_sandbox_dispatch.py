@@ -99,6 +99,7 @@ def _make_runner_with_sandbox(
     runner.suite.sandbox = sandbox_spec or ModalSandboxSpec(image="img:test", timeout_sec=60)
     runner.suite.cleanup = False
     runner.suite.target = MagicMock()
+    runner.suite.target.backend = "api"
     runner.client = MagicMock()
     runner.graders = {}
     runner.results = []

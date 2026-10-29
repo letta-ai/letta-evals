@@ -97,3 +97,21 @@ def test_run_suite_without_override_preserves_declared_models(tmp_path, monkeypa
     anyio.run(run)
 
     assert captured["suite"].target.model_handles == declared
+
+
+def test_run_suite_overrides_backend(tmp_path, monkeypatch):
+    suite_path = _write_suite(tmp_path, ["llama.cpp/policy"])
+    captured = {}
+
+    async def fake_execute_runs(**kwargs):
+        captured["suite"] = kwargs["suite"]
+        return object()
+
+    monkeypatch.setattr("letta_evals.runner._execute_runs", fake_execute_runs)
+
+    async def run():
+        await run_suite(suite_path, max_concurrent=1, backend="local")
+
+    anyio.run(run)
+
+    assert captured["suite"].target.backend == "local"

@@ -88,6 +88,10 @@ class TargetResult(BaseModel):
             "target's resolved memory_dir. Passed to extractors and reward composers."
         ),
     )
+    local_backend_dir: Optional[str] = Field(
+        default=None,
+        description="Letta Code local store holding the agent, for targets run with backend: local",
+    )
 
 
 class TargetTrace(TargetResult):

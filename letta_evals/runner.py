@@ -1,6 +1,7 @@
 import inspect
 import logging
 import os
+import shutil
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -195,6 +196,7 @@ class Runner:
             permission_mode=self.suite.target.permission_mode,
             memory_workspace=self.suite.target.memory_workspace,
             memory_dir=self.suite.target.memory_dir,
+            backend=self.suite.target.backend,
         )
 
     def _init_graders(self) -> None:
@@ -234,6 +236,11 @@ class Runner:
 
     def _should_cleanup_agent(self) -> bool:
         return self.suite.cleanup
+
+    @property
+    def _uses_server(self) -> bool:
+        """False on the local backend, where no trace fields live on a server."""
+        return self.suite.target.backend == "api"
 
     # ── setup ──
 
@@ -285,7 +292,8 @@ class Runner:
 
         Targets only execute and return ``agent_id``. Runner owns all
         server-side trace fetches so in-process and sandboxed runs share
-        the same trajectory/token-data extraction layer.
+        the same trajectory/token-data extraction layer. On the local
+        backend the target returns the trace it read from the stream.
         """
         sample_id = sample.id
 
@@ -309,7 +317,7 @@ class Runner:
                 # requested handle wins over whatever the cache recorded.
                 result = cached_result.model_copy(update={"model_handle": model_handle or DEFAULT_MODEL_ID})
                 token_data = result.token_data
-                if return_token_data and result.agent_id and token_data is None:
+                if return_token_data and result.agent_id and token_data is None and self._uses_server:
                     token_data = await fetch_token_data(self.client, result.agent_id)
                 return TargetTrace(
                     trajectory=result.trajectory,
@@ -317,6 +325,7 @@ class Runner:
                     model_handle=result.model_handle,
                     agent_usage=result.agent_usage,
                     context=result.context,
+                    local_backend_dir=result.local_backend_dir,
                     token_data=token_data,
                 )
 
@@ -326,6 +335,9 @@ class Runner:
             progress_callback=self.progress_callback,
             project_id=self.project_id,
         )
+        if isinstance(target_result, TargetTrace):
+            # Local backend: the target read the trajectory from the stream.
+            return target_result
         agent_id = target_result.agent_id
         return TargetTrace(
             trajectory=await fetch_trajectory(self.client, agent_id),
@@ -353,7 +365,7 @@ class Runner:
         if not model_handle or not agent_usage:
             return None
         identity = self._model_identities.get(model_handle)
-        if identity is None and agent_id:
+        if identity is None and agent_id and self._uses_server:
             try:
                 cfg = (await self.client.agents.retrieve(agent_id=agent_id)).llm_config
                 endpoint_type = getattr(cfg, "api_model_endpoint_type", None)
@@ -390,6 +402,7 @@ class Runner:
             agent_id = None
             agent_usage = None
             context = None
+            local_backend_dir = None
             trajectory = []
             token_data = None
             phase = ErrorCategory.UNKNOWN
@@ -405,7 +418,7 @@ class Runner:
                     # to grade/build SampleResult. Token arrays intentionally
                     # stay out of result.json; the host Runner fetches them
                     # from server-side run metadata after the sandbox returns.
-                    if return_token_data and agent_id:
+                    if return_token_data and agent_id and self._uses_server:
                         result = result.model_copy(update={"token_data": await fetch_token_data(self.client, agent_id)})
                     # Fire post-completion callbacks based on the final result —
                     # mid-sample events (grading_started, token streaming) are
@@ -429,6 +442,7 @@ class Runner:
                 model_handle = target_trace.model_handle
                 agent_usage = target_trace.agent_usage
                 context = target_trace.context
+                local_backend_dir = target_trace.local_backend_dir
                 token_data = target_trace.token_data
 
                 cost = await self._compute_sample_cost(model_handle, agent_id, agent_usage)
@@ -506,6 +520,7 @@ class Runner:
                     error=error,
                     agent_usage=agent_usage,
                     context=context,
+                    local_backend_dir=local_backend_dir,
                     token_data=token_data,
                 )
                 if self.progress_callback:
@@ -523,12 +538,15 @@ class Runner:
                 if isinstance(e, TargetError):
                     agent_id = e.agent_id or agent_id
                     agent_usage = e.agent_usage or agent_usage
-                    if agent_id:
+                    local_backend_dir = e.local_backend_dir or local_backend_dir
+                    if not self._uses_server:
+                        trajectory = e.trajectory or trajectory
+                    elif agent_id:
                         try:
                             trajectory = await fetch_trajectory(self.client, agent_id)
                         except Exception as fetch_err:
                             logger.warning(f"Could not fetch partial trajectory for agent {agent_id}: {fetch_err}")
-                    if return_token_data and agent_id:
+                    if return_token_data and agent_id and self._uses_server:
                         try:
                             token_data = await fetch_token_data(self.client, agent_id)
                         except TokenDataFetchError as fetch_err:
@@ -576,13 +594,17 @@ class Runner:
                     error=error,
                     agent_usage=agent_usage,
                     context=context,
+                    local_backend_dir=local_backend_dir,
                     token_data=token_data,
                 )
                 if self.progress_callback:
                     await self.progress_callback.sample_error(result, model_handle=model_handle)
                 return result
             finally:
-                if self._should_cleanup_agent() and agent_id:
+                if self._should_cleanup_agent() and local_backend_dir:
+                    shutil.rmtree(local_backend_dir, ignore_errors=True)
+                    logger.info(f"Removed local backend store {local_backend_dir} for sample {sample_id}")
+                elif self._should_cleanup_agent() and agent_id and self._uses_server:
                     try:
                         await self.client.agents.delete(agent_id=agent_id)
                         logger.info(f"Cleaned up agent {agent_id} for sample {sample_id}")
@@ -724,13 +746,14 @@ async def run_suite(
     letta_project_id: Optional[str] = None,
     num_runs: Optional[int] = None,
     model_handle: Optional[str] = None,
+    backend: Optional[str] = None,
 ) -> RunnerResult:
     """Load and run a suite from YAML file.
 
     When ``model_handle`` is provided, the suite's ``target.model_handles``
     list is narrowed to just that single handle *before* ``SuiteSpec``
     construction, so the runner, sandbox dispatch, and streaming writer all
-    see a single-model scope.
+    see a single-model scope. ``backend`` likewise overrides ``target.backend``.
     """
     if custom_progress_callback is not None:
         style_val = progress_style if isinstance(progress_style, ProgressStyle) else ProgressStyle(progress_style)
@@ -748,6 +771,8 @@ async def run_suite(
     # single-model scope.  Mirrors the mutation in _run_single_sample.
     if model_handle is not None:
         yaml_data.setdefault("target", {})["model_handles"] = [model_handle]
+    if backend is not None:
+        yaml_data.setdefault("target", {})["backend"] = backend
 
     suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent, suite_path=suite_path)
 

@@ -101,6 +101,14 @@ def run(
             "--sample runs."
         ),
     ),
+    backend: Optional[str] = typer.Option(
+        None,
+        "--backend",
+        help=(
+            "Letta Code backend: 'api' (a Letta server) or 'local' (letta --backend local, no server). "
+            "Overrides the suite's target.backend for both full-suite and --sample runs."
+        ),
+    ),
 ):
     """Run an evaluation suite."""
 
@@ -138,6 +146,7 @@ def run(
                 base_url,
                 project_id,
                 model_handle,
+                backend,
             )
         except Exception as e:
             console.print(f"[red]Error running single sample: {e}[/red]")
@@ -159,6 +168,8 @@ def run(
         # single-model scope.  Mirrors the mutation in _run_single_sample.
         if model_handle is not None:
             yaml_data.setdefault("target", {})["model_handles"] = [model_handle]
+        if backend is not None:
+            yaml_data.setdefault("target", {})["backend"] = backend
 
         suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent, suite_path=suite_path)
 
@@ -243,6 +254,7 @@ def run(
             letta_project_id=project_id,
             num_runs=num_runs,
             model_handle=model_handle,
+            backend=backend,
         )
 
     try:
@@ -369,6 +381,7 @@ async def _run_single_sample(
     base_url: Optional[str],
     project_id: Optional[str],
     model_handle: Optional[str],
+    backend: Optional[str] = None,
 ) -> None:
     """Short-circuit entrypoint: run one Sample, write one SampleResult.
 
@@ -393,6 +406,8 @@ async def _run_single_sample(
     # so Runner.run_sample dispatches against the right config.
     if model_handle is not None:
         yaml_data.setdefault("target", {})["model_handles"] = [model_handle]
+    if backend is not None:
+        yaml_data.setdefault("target", {})["backend"] = backend
 
     suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent, suite_path=suite_path)
 

@@ -56,6 +56,14 @@ class LettaCodeTargetSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["letta_code"] = "letta_code"
+    backend: Literal["api", "local"] = Field(
+        default="api",
+        description=(
+            "'api' runs Letta Code against a Letta server. 'local' runs it on its local backend "
+            "(letta --backend local) with no server: each sample gets its own local store, and the "
+            "trajectory comes from the CLI's stream-json output. Token data is not available locally."
+        ),
+    )
     base_url: Optional[str] = Field(default=None, description="Letta server URL")
     api_key: Optional[str] = Field(default=None, description="API key for authentication")
     timeout: float = Field(default=300.0, description="Request timeout in seconds")

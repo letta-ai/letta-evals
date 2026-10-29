@@ -153,6 +153,16 @@ The supported target is `letta_code`, which runs the Letta Code CLI against a Le
 
 Do not use `permission_mode: memory`: recent Letta Code releases removed that CLI mode. Use `memory_workspace: true` for memory workspace env/cwd setup, and Modal or another external sandbox if you need strict filesystem confinement.
 
+#### Local backend
+
+`backend: local` (or `letta-evals run --backend local`) runs Letta Code on its local backend (`letta --backend local`) with no Letta server. It needs a Letta Code release with `letta agents create --body`.
+
+- Each sample gets a fresh local store in a temp directory, recorded on `SampleResult.local_backend_dir`. `cleanup: true` removes it after the sample.
+- Agent factories receive a client whose only method is `client.agents.create(...)`. It creates the agent in the sample's store with the suite's model handle, and the agent then runs with `--agent`.
+- The trajectory comes from the CLI's stream-json output. Token data, server-side pricing lookups, and server cleanup don't apply.
+- Model providers are configured the way Letta Code's local backend reads them, e.g. `LLAMA_CPP_BASE_URL` for an OpenAI-compatible endpoint.
+- Letta Code enables local memfs for its own agents and points `MEMORY_DIR` at the agent's memory. To have the agent work in a factory-seeded `memory_dir` instead, pass `--stateless` in `flags`. letta-evals sets `LETTA_MEMORY_DIR_EXPLICIT=1` with the workspace, so Letta Code keeps it.
+
 ### Graders and extractors
 
 Suites can use deterministic tool graders or model-judge graders:
