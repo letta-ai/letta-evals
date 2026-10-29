@@ -48,7 +48,7 @@ async def test_trace_comes_from_the_target(tmp_path, monkeypatch):
     target.run = AsyncMock(
         return_value=TargetTrace(
             agent_id="agent-local-1",
-            model_handle="llama.cpp/policy",
+            model_handle="llama.cpp/local-model",
             agent_usage=USAGE,
             local_backend_dir=store,
             trajectory=[[MESSAGE]],

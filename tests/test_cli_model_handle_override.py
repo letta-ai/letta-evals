@@ -100,7 +100,7 @@ def test_run_suite_without_override_preserves_declared_models(tmp_path, monkeypa
 
 
 def test_run_suite_overrides_backend(tmp_path, monkeypatch):
-    suite_path = _write_suite(tmp_path, ["llama.cpp/policy"])
+    suite_path = _write_suite(tmp_path, ["llama.cpp/local-model"])
     captured = {}
 
     async def fake_execute_runs(**kwargs):

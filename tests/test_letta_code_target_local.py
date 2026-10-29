@@ -112,7 +112,7 @@ CREATING_FACTORY = """    agent = await client.agents.create(name="reflector", s
 def _make_target(tmp_path: Path, **overrides) -> LettaCodeTarget:
     kwargs = dict(
         client=None,
-        model_handle="llama.cpp/policy",
+        model_handle="llama.cpp/local-model",
         base_dir=tmp_path,
         timeout=30,
         backend="local",
@@ -140,7 +140,7 @@ async def test_factory_agent_is_created_in_the_sample_store_and_resumed(tmp_path
         "name": "reflector",
         "system": "sys",
         "tags": ["parent:p"],
-        "model": "llama.cpp/policy",
+        "model": "llama.cpp/local-model",
         "model_settings": {"parallel_tool_calls": True, "max_tokens": 64},
         "context_window_limit": 1024,
     }
@@ -189,7 +189,7 @@ async def test_without_a_factory_letta_code_creates_the_agent(tmp_path, monkeypa
 
     run = _read(record_dir, "run.json")
     assert "--new-agent" in run["argv"]
-    assert run["argv"][run["argv"].index("--model") + 1] == "llama.cpp/policy"
+    assert run["argv"][run["argv"].index("--model") + 1] == "llama.cpp/local-model"
     assert result.agent_id == AGENT_ID
     assert not (record_dir / "create.json").exists()
 
