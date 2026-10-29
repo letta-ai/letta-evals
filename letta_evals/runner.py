@@ -733,6 +733,31 @@ class Runner:
 # ── top-level run_suite ──
 
 
+def load_suite(
+    suite_path: Path,
+    *,
+    model_handle: Optional[str] = None,
+    backend: Optional[str] = None,
+    drop_sandbox: bool = False,
+) -> SuiteSpec:
+    """Load a suite YAML with CLI-style overrides applied before ``SuiteSpec`` construction.
+
+    ``model_handle`` narrows ``target.model_handles`` to one handle and
+    ``backend`` replaces ``target.backend``, so everything built from the
+    suite (runner, sandbox dispatch, streaming writer) sees the override.
+    ``drop_sandbox`` removes the ``sandbox`` block for in-sandbox runs.
+    """
+    with open(suite_path, "r") as f:
+        yaml_data = yaml.safe_load(f)
+    if drop_sandbox:
+        yaml_data.pop("sandbox", None)
+    if model_handle is not None:
+        yaml_data.setdefault("target", {})["model_handles"] = [model_handle]
+    if backend is not None:
+        yaml_data.setdefault("target", {})["backend"] = backend
+    return SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent, suite_path=suite_path)
+
+
 async def run_suite(
     suite_path: Path,
     max_concurrent: int,
@@ -750,10 +775,7 @@ async def run_suite(
 ) -> RunnerResult:
     """Load and run a suite from YAML file.
 
-    When ``model_handle`` is provided, the suite's ``target.model_handles``
-    list is narrowed to just that single handle *before* ``SuiteSpec``
-    construction, so the runner, sandbox dispatch, and streaming writer all
-    see a single-model scope. ``backend`` likewise overrides ``target.backend``.
+    ``model_handle`` and ``backend`` override the suite as in ``load_suite``.
     """
     if custom_progress_callback is not None:
         style_val = progress_style if isinstance(progress_style, ProgressStyle) else ProgressStyle(progress_style)
@@ -763,18 +785,7 @@ async def run_suite(
                 "Use custom_progress_callback for custom implementations, or progress_style for built-in styles."
             )
 
-    with open(suite_path, "r") as f:
-        yaml_data = yaml.safe_load(f)
-
-    # Apply --model-handle override before SuiteSpec construction so the
-    # entire run (runner, sandbox dispatch, streaming writer) sees a
-    # single-model scope.  Mirrors the mutation in _run_single_sample.
-    if model_handle is not None:
-        yaml_data.setdefault("target", {})["model_handles"] = [model_handle]
-    if backend is not None:
-        yaml_data.setdefault("target", {})["backend"] = backend
-
-    suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent, suite_path=suite_path)
+    suite = load_suite(suite_path, model_handle=model_handle, backend=backend)
 
     # Record which exact dataset snapshot this run reads (HF repo/revision/commit);
     # None for local datasets. Persisted into suite.json by the streaming writer.

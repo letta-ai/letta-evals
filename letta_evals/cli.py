@@ -11,7 +11,7 @@ from rich.table import Table
 from letta_evals import __version__
 from letta_evals.datasets.loader import load_dataset
 from letta_evals.models import SuiteSpec
-from letta_evals.runner import run_suite
+from letta_evals.runner import load_suite, run_suite
 from letta_evals.streaming import _safe_segment
 from letta_evals.visualization.factory import ProgressStyle
 
@@ -160,18 +160,7 @@ def run(
     effective_output = output
 
     try:
-        with open(suite_path, "r") as f:
-            yaml_data = yaml.safe_load(f)
-
-        # Apply --model-handle override before SuiteSpec construction so the
-        # entire suite (display counts, runner, sandbox dispatch) sees a
-        # single-model scope.  Mirrors the mutation in _run_single_sample.
-        if model_handle is not None:
-            yaml_data.setdefault("target", {})["model_handles"] = [model_handle]
-        if backend is not None:
-            yaml_data.setdefault("target", {})["backend"] = backend
-
-        suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent, suite_path=suite_path)
+        suite = load_suite(suite_path, model_handle=model_handle, backend=backend)
 
         effective_max_concurrent = (
             max_concurrent
@@ -395,21 +384,9 @@ async def _run_single_sample(
     from letta_evals.models import Sample
     from letta_evals.runner import Runner
 
-    with open(suite_path, "r") as f:
-        yaml_data = yaml.safe_load(f)
-
     # Drop sandbox: on this side to prevent re-entry; the host already
     # dispatched us into this sandbox.
-    yaml_data.pop("sandbox", None)
-
-    # If a model was specified on the CLI, narrow the suite to just that one
-    # so Runner.run_sample dispatches against the right config.
-    if model_handle is not None:
-        yaml_data.setdefault("target", {})["model_handles"] = [model_handle]
-    if backend is not None:
-        yaml_data.setdefault("target", {})["backend"] = backend
-
-    suite = SuiteSpec.from_yaml(yaml_data, base_dir=suite_path.parent, suite_path=suite_path)
+    suite = load_suite(suite_path, model_handle=model_handle, backend=backend, drop_sandbox=True)
 
     with open(sample_path, "r") as f:
         sample = Sample.model_validate(_json.load(f))
