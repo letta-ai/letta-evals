@@ -86,6 +86,7 @@ def _make_runner(grader: _FakeGrader, target: MagicMock) -> Runner:
     runner.suite.sandbox = None  # _run_sample sandbox dispatch → in-process path
     runner.suite.target = MagicMock()
     runner.suite.target.kind = MagicMock()
+    runner.suite.target.backend = "api"
     runner.client = MagicMock()
     runner.graders = {"acc": grader}
     runner.results = []
