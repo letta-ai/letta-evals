@@ -140,6 +140,29 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.27.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.26.0...letta-evals-v0.27.0) (2026-10-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **extractors:** Pass agent factory context to extractors and drop agent_state ([#343](https://github.com/letta-ai/letta-evals/issues/343))
+* **grading:** Remove per-turn grading ([#341](https://github.com/letta-ai/letta-evals/issues/341))
+
+### Features
+
+* **extractors:** Pass agent factory context to extractors and drop agent_state ([#343](https://github.com/letta-ai/letta-evals/issues/343)) ([e5ccc23](https://github.com/letta-ai/letta-evals/commit/e5ccc233e4ef7c33f68b8bda12a8caf4e32bb206))
+* **grading:** Remove per-turn grading ([#341](https://github.com/letta-ai/letta-evals/issues/341)) ([deadc68](https://github.com/letta-ai/letta-evals/commit/deadc68daf7dcad39d412db32c8fdbcdbf46d957))
+
+
+### Bug Fixes
+
+* **decorators:** Accept string annotations by dropping return-annotation checks ([#345](https://github.com/letta-ai/letta-evals/issues/345)) ([6ef51e1](https://github.com/letta-ai/letta-evals/commit/6ef51e1366eeed8d15d49721fe42a144d89902d8))
+
+
+### Refactors
+
+* Remove dead code and pass-through decorator wrappers ([#344](https://github.com/letta-ai/letta-evals/issues/344)) ([8a41d72](https://github.com/letta-ai/letta-evals/commit/8a41d7214ad699badbce0e678041da5ee6985ebd))
+
 ## [0.26.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.25.3...letta-evals-v0.26.0) (2026-08-27)
 
 
