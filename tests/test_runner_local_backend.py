@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from letta_client.types.agents import AssistantMessage
 
-from letta_evals.models import RewardOutput, Sample, SampleResult, TargetTrace, Timing
+from letta_evals.models import RewardOutput, Sample, TargetTrace
 from letta_evals.targets.errors import TargetError
 from tests.test_runner_token_data import _FakeGrader, _make_runner
 
@@ -91,21 +91,3 @@ async def test_cleanup_removes_the_local_store(monkeypatch):
     [store] = runner.stores
     assert not store.exists()
     runner.client.agents.delete.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_cached_sample_gets_no_store(monkeypatch):
-    target = MagicMock()
-    target.run = AsyncMock(side_effect=AssertionError("target run for a cached sample"))
-    runner = _local_runner(monkeypatch, target)
-    cached = SampleResult(
-        sample_id=0, agent_id="agent-local-1", trajectory=[[MESSAGE]], timing=Timing(total=1.0, target=1.0)
-    )
-    runner.cached_results = MagicMock()
-    runner._cached_trajectories = {0: {"default": cached}}
-
-    result = await runner.run_sample(Sample(id=0, input="hi"), model_handle=None)
-
-    assert result.trajectory == [[MESSAGE]]
-    assert result.local_backend_dir is None
-    assert runner.stores == []

@@ -54,9 +54,6 @@ def run(
     max_concurrent: Optional[int] = typer.Option(
         None, "--max-concurrent", help="Maximum concurrent evaluations. Overrides suite config if provided."
     ),
-    cached: Optional[Path] = typer.Option(
-        None, "--cached", "-c", help="Path to cached results (JSONL) for re-grading trajectories"
-    ),
     api_key: Optional[str] = typer.Option(
         None,
         "--api-key",
@@ -199,12 +196,6 @@ def run(
             console.print(f"[cyan]Total samples: {num_samples}[/cyan]")
         console.print(f"[cyan]Max concurrent: {effective_max_concurrent}[/cyan]")
 
-        if cached:
-            console.print(f"[yellow]Using cached trajectories from: {cached}[/yellow]")
-            console.print(
-                f"[yellow]Re-grading {total_evaluations} trajectories with updated grader configuration[/yellow]"
-            )
-
     async def run_with_progress():
         # Choose built-in progress style for CLI
         if display:
@@ -227,16 +218,12 @@ def run(
 
         if not quiet:
             console.print(f"Running evaluation suite: {suite.name}")
-            if cached:
-                console.print(f"[yellow]Re-grading {total_evaluations} cached trajectories...[/yellow]")
-            else:
-                console.print(f"Evaluating {total_evaluations} samples...")
+            console.print(f"Evaluating {total_evaluations} samples...")
 
         return await run_suite(
             suite_path,
             max_concurrent=effective_max_concurrent,
             progress_style=style,
-            cached_results_path=cached,
             output_path=effective_output,
             letta_api_key=api_key,
             letta_base_url=base_url,
@@ -395,7 +382,6 @@ async def _run_single_sample(
         suite=suite,
         max_concurrent=1,
         progress_callback=None,
-        cached_results=None,
         output_path=None,
         letta_api_key=api_key,
         letta_base_url=base_url,

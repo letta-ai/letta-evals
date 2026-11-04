@@ -73,10 +73,6 @@ class ProgressStateReducer:
             sample.model_handle = model_handle
         return sample
 
-    def get_from_cache(self, sample_id: SampleId, model_handle: Optional[str] = None) -> bool:
-        sample = self.get_sample(sample_id, model_handle)
-        return sample.from_cache if sample is not None else False
-
     def get_sample(self, sample_id: SampleId, model_handle: Optional[str] = None) -> Optional[SampleProgress]:
         key = (sample_id, model_handle)
         if key in self.state.samples:

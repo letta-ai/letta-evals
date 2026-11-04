@@ -258,7 +258,7 @@ class RichProgressRenderer:
             )
 
         table = Table(
-            title=f"{title}  (♻ means cached)",
+            title=title,
             show_header=True,
             header_style="bold cyan",
             border_style="blue",
@@ -358,7 +358,7 @@ class RichProgressRenderer:
                 bar = "▰" * filled + "▱" * (bar_width - filled)
                 details = f"{bar}  msg {sample.messages_sent}/{sample.total_messages}"
             elif sample.state == SampleState.LOADING_AGENT:
-                details = Text("Loading from cache..." if sample.from_cache else "Loading agent...", style="white")
+                details = Text("Loading agent...", style="white")
             elif sample.state == SampleState.GRADING:
                 details = Text("Grading response...", style="white")
             elif sample.state == SampleState.COMPLETED:
@@ -370,12 +370,8 @@ class RichProgressRenderer:
             else:
                 details = ""
 
-            sample_num = str(sample.sample_id)
-            if sample.from_cache:
-                sample_num = f"{sample_num} ♻"
-
             row_data = [
-                sample_num,
+                str(sample.sample_id),
                 sample.agent_id or "-",
                 sample.model_handle or "-",
             ]

@@ -36,7 +36,6 @@ async def test_single_suite(request, tmp_path: Path, caplog) -> None:
         suite_path=suite_path,
         max_concurrent=10,
         progress_style=ProgressStyle.SIMPLE,
-        cached_results_path=None,
         output_path=output_path,
         letta_api_key=os.getenv("LETTA_API_KEY"),
         letta_base_url="https://api.letta.com/",

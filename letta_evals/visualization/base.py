@@ -41,10 +41,8 @@ class ProgressCallback(ABC):
         """Called when a sample evaluation starts."""
         ...
 
-    async def agent_created(
-        self, sample_id: SampleId, agent_id: str, model_handle: Optional[str] = None, from_cache: bool = False
-    ) -> None:
-        """Called when an agent has been created/provisioned or resolved from cache.
+    async def agent_created(self, sample_id: SampleId, agent_id: str, model_handle: Optional[str] = None) -> None:
+        """Called when an agent has been created/provisioned.
 
         Fires as soon as agent_id is known, before messages are sent.
         """

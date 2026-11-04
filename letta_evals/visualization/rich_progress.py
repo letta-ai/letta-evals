@@ -52,14 +52,12 @@ class EvalProgress(ProgressCallback):
         max_concurrent: int = 15,
         console: Optional[Console] = None,
         update_freq: float = 2.0,
-        cached_mode: bool = False,
         metric_labels: Optional[Dict[str, str]] = None,
     ):
         self.suite = suite
         self.total_samples = total_samples
         self.console = console or Console()
         self.frame_interval = (1.0 / update_freq) if update_freq > 0 else 0.25
-        self.cached_mode = cached_mode
         renderer_metric_labels: Dict[str, str] = metric_labels or {}
         self._runtime_state = ProgressRuntimeState()
         self._reducer = ProgressStateReducer(self._runtime_state)
@@ -112,9 +110,8 @@ class EvalProgress(ProgressCallback):
         """Start the progress display"""
         self.start_time = time.time()
         self._background_error = None
-        task_description = "Re-grading cached trajectories" if self.cached_mode else "Evaluating samples"
         self.main_task_id = self.main_progress.add_task(
-            task_description,
+            "Evaluating samples",
             total=self.total_samples,
             completed=0,
         )
@@ -270,18 +267,14 @@ class EvalProgress(ProgressCallback):
     ):
         """Mark sample as started"""
         self._reducer.ensure_sample(sample_id, agent_id=agent_id, model_handle=model_handle)
-        # skip loading state if using cached trajectories
-        if not self.cached_mode:
-            await self.update_sample_state(
-                sample_id, SampleState.LOADING_AGENT, agent_id=agent_id, model_handle=model_handle
-            )
+        await self.update_sample_state(
+            sample_id, SampleState.LOADING_AGENT, agent_id=agent_id, model_handle=model_handle
+        )
 
-    async def agent_created(
-        self, sample_id: SampleId, agent_id: str, model_handle: Optional[str] = None, from_cache: bool = False
-    ):
+    async def agent_created(self, sample_id: SampleId, agent_id: str, model_handle: Optional[str] = None):
         """Update sample with agent_id once agent is provisioned."""
         await self.update_sample_state(
-            sample_id, SampleState.LOADING_AGENT, agent_id=agent_id, model_handle=model_handle, from_cache=from_cache
+            sample_id, SampleState.LOADING_AGENT, agent_id=agent_id, model_handle=model_handle
         )
 
     async def message_sending(
@@ -306,16 +299,11 @@ class EvalProgress(ProgressCallback):
         self, sample_id: SampleId, agent_id: Optional[str] = None, model_handle: Optional[str] = None
     ):
         """Mark sample as being graded"""
-        existing_from_cache = self._reducer.get_from_cache(sample_id, model_handle)
-
-        await self.update_sample_state(
-            sample_id, SampleState.GRADING, agent_id=agent_id, model_handle=model_handle, from_cache=existing_from_cache
-        )
+        await self.update_sample_state(sample_id, SampleState.GRADING, agent_id=agent_id, model_handle=model_handle)
 
     async def sample_completed(self, result: SampleResult, model_handle: Optional[str] = None):
         """Mark sample as completed"""
         fields = sample_progress_fields(result)
-        existing_from_cache = self._reducer.get_from_cache(result.sample_id, model_handle)
 
         await self.update_sample_state(
             result.sample_id,
@@ -325,7 +313,6 @@ class EvalProgress(ProgressCallback):
             score=fields.reward,
             target_cost=fields.target_cost,
             rationale=fields.rationale,
-            from_cache=existing_from_cache,
             metric_scores=fields.metric_scores,
             metric_rationales=fields.metric_rationales,
         )
@@ -373,8 +360,6 @@ class EvalProgress(ProgressCallback):
         """Display summary and detailed results after evaluation completes"""
         self.console.print()
         self.console.print(f"[bold]Evaluation Results: {result.summary.suite}[/bold]")
-        if self.cached_mode:
-            self.console.print("[dim]Note: Results re-graded from cached trajectories[/dim]")
         self.console.print("=" * 50)
 
         summary = result.summary

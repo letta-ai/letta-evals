@@ -1,4 +1,4 @@
-"""Unit tests for letta_evals.streaming module (always-partitioned layout)."""
+"""Unit tests for letta_evals.streaming.StreamingWriter (always-partitioned layout)."""
 
 import json
 import tempfile
@@ -19,7 +19,7 @@ from letta_evals.models import (
     Timing,
     ToolGraderSpec,
 )
-from letta_evals.streaming import StreamingReader, StreamingWriter
+from letta_evals.streaming import StreamingWriter
 from letta_evals.types import RewardKind
 
 
@@ -47,6 +47,10 @@ def _make_result(sample_id, score: float) -> SampleResult:
         reward=RewardOutput(score=score),
         timing=Timing(total=1.0, target=0.8),
     )
+
+
+def _read_results(path: Path):
+    return [SampleResult.model_validate_json(line) for line in path.read_text().splitlines() if line]
 
 
 def _summary_for(model: str, results):
@@ -102,11 +106,10 @@ class TestSingleRun:
             # No legacy results.jsonl
             assert not (output_path / "results.jsonl").exists()
 
-            result = await StreamingReader.to_runner_result(output_path)
-            assert result.suite_spec.name == "test-suite"
-            assert len(result.samples) == 2
-            assert "default" in result.runs
-            assert result.runs["default"].results[0].grades["check"].score == 1.0
+            suite_obj = json.loads((output_path / "suite.json").read_text())
+            assert suite_obj["config"]["name"] == "test-suite"
+            assert len(suite_obj["samples"]) == 2
+            assert _read_results(output_path / "default.jsonl")[0].grades["check"].score == 1.0
 
     @pytest.mark.asyncio
     async def test_string_sample_id_round_trip(self):
@@ -131,9 +134,9 @@ class TestSingleRun:
                 )
             )
 
-            result = await StreamingReader.to_runner_result(output_path)
-            assert result.samples[0].id == "sample-a"
-            assert result.runs["default"].results[0].sample_id == "sample-a"
+            suite_obj = json.loads((output_path / "suite.json").read_text())
+            assert suite_obj["samples"][0]["id"] == "sample-a"
+            assert _read_results(output_path / "default.jsonl")[0].sample_id == "sample-a"
 
     @pytest.mark.asyncio
     async def test_multiple_models_round_trip(self):
@@ -165,10 +168,8 @@ class TestSingleRun:
             assert (output_path / "gpt-4o.jsonl").exists()
             assert (output_path / "claude-3-opus.jsonl").exists()
 
-            result = await StreamingReader.to_runner_result(output_path)
-            assert set(result.runs.keys()) == {"gpt-4o", "claude-3-opus"}
-            assert result.runs["gpt-4o"].results[0].grades["check"].score == 1.0
-            assert result.runs["claude-3-opus"].results[0].grades["check"].score == 0.5
+            assert _read_results(output_path / "gpt-4o.jsonl")[0].grades["check"].score == 1.0
+            assert _read_results(output_path / "claude-3-opus.jsonl")[0].grades["check"].score == 0.5
 
     @pytest.mark.asyncio
     async def test_safe_segment_for_slash_in_model(self):
@@ -194,9 +195,6 @@ class TestSingleRun:
             await writer.write_summary(summary)
 
             assert (output_path / "openai-gpt-4.jsonl").exists()
-
-            result = await StreamingReader.to_runner_result(output_path)
-            assert "openai/gpt-4" in result.runs
 
 
 # ── multi-run ──
@@ -251,27 +249,6 @@ class TestMultiRun:
                 detail_obj = json.load(f)
             assert "runs" in detail_obj and len(detail_obj["runs"]) == 3
 
-            result = await StreamingReader.to_runner_result(output_path)
-            assert result.runs["m1"].runs is not None
-            assert len(result.runs["m1"].runs) == 3
-
-
-# ── error paths ──
-
-
-class TestReaderErrors:
-    @pytest.mark.asyncio
-    async def test_missing_suite_json(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_path = Path(tmpdir)
-            (output_path / "summary.json").write_text('{"suite":"x","models":[]}')
-            with pytest.raises(FileNotFoundError):
-                await StreamingReader.to_runner_result(output_path)
-
-    @pytest.mark.asyncio
-    async def test_missing_summary_json(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_path = Path(tmpdir)
-            (output_path / "suite.json").write_text(json.dumps({"suite": "x", "config": {}, "samples": []}))
-            with pytest.raises(FileNotFoundError):
-                await StreamingReader.to_runner_result(output_path)
+            for run in (1, 2, 3):
+                [r] = _read_results(output_path / "m1" / f"run_{run}.jsonl")
+                assert r.grades["check"].score == run / 3.0
