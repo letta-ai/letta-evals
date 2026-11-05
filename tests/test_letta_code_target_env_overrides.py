@@ -20,6 +20,7 @@ def _make_target(tmp_path, **overrides) -> LettaCodeTarget:
     kwargs = dict(
         client=None,  # _build_subprocess_env never touches the client
         model_handle="anthropic/claude-sonnet-4-5-20250929",
+        default_cwd=tmp_path,
         base_dir=tmp_path,
     )
     kwargs.update(overrides)
@@ -44,6 +45,14 @@ def test_build_env_inherits_os_environ_when_no_overrides(tmp_path, monkeypatch):
     assert env["EXISTING_VAR"] == "from-os"
     assert "LETTA_BASE_URL" not in env  # no base_url configured
     assert "MEMORY_DIR" not in env  # no memory workspace
+
+
+def test_build_env_disables_session_persistence(tmp_path, monkeypatch):
+    monkeypatch.delenv("LETTA_DISABLE_SESSION_PERSIST", raising=False)
+
+    env = _make_target(tmp_path)._build_subprocess_env(_make_sample(), agent_id=None)
+
+    assert env["LETTA_DISABLE_SESSION_PERSIST"] == "1"
 
 
 def test_build_env_sets_base_url_when_configured(tmp_path):

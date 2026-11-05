@@ -76,7 +76,7 @@ def _install_fake_letta(tmp_path, monkeypatch, stdout_payload: bytes, returncode
 
 def _make_target(tmp_path) -> LettaCodeTarget:
     # client is only used by the agent_script factory path, never here.
-    return LettaCodeTarget(client=None, model_handle="test-model", base_dir=tmp_path, timeout=30)
+    return LettaCodeTarget(client=None, model_handle="test-model", default_cwd=tmp_path, base_dir=tmp_path, timeout=30)
 
 
 @pytest.mark.asyncio

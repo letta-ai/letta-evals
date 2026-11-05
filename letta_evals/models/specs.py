@@ -106,8 +106,8 @@ class LettaCodeTargetSpec(BaseModel):
     memory_workspace: bool = Field(
         default=False,
         description=(
-            "Configure MEMORY_DIR/LETTA_MEMORY_DIR and run the Letta Code subprocess from a memory "
-            "workspace. This does not pass '--permission-mode memory' to letta code."
+            "Set MEMORY_DIR/LETTA_MEMORY_DIR for the Letta Code subprocess to a memory workspace. "
+            "This does not pass '--permission-mode memory' to letta code."
         ),
     )
     memory_dir: Optional[Path] = Field(
@@ -352,7 +352,11 @@ class SuiteSpec(BaseModel):
     max_concurrent: Optional[int] = Field(default=None, description="Maximum concurrent evaluations")
     output: Optional[Path] = Field(default=None, description="Directory where evaluation results are written")
     cleanup: bool = Field(
-        default=False, description="Delete agents created during evaluation after each sample completes"
+        default=False,
+        description=(
+            "Delete agents created during evaluation, and the temporary directories letta-evals created "
+            "for them, after each sample completes"
+        ),
     )
 
     setup_script: Optional[str] = Field(
