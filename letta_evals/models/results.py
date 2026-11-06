@@ -86,8 +86,7 @@ class TargetResult(BaseModel):
         default=None,
         description=(
             "Per-rollout values produced at setup: the agent factory's returned context plus the "
-            "target's resolved memory_dir and working directory (cwd). Passed to extractors and "
-            "reward composers."
+            "agent's working directory (cwd). Passed to extractors and reward composers."
         ),
     )
 

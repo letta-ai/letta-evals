@@ -18,6 +18,9 @@ from letta_evals.visualization.base import ProgressCallback
 
 logger = logging.getLogger(__name__)
 
+# Letta Code reads the agent's memory directory from these.
+_MEMORY_DIR_VARS = ("MEMORY_DIR", "LETTA_MEMORY_DIR", "LETTA_MEMORY_DIR_EXPLICIT")
+
 
 def _unpack_factory_result(result: Any) -> tuple[str, dict]:
     """Normalize an agent factory's return value to ``(agent_id, context)``."""
@@ -42,6 +45,18 @@ def _rollout_vars(sample: Sample, context: Optional[dict]) -> dict:
     return merged
 
 
+def _resolve_memory_dir(sample: Sample, context: dict, cwd: Path) -> Optional[Path]:
+    """Resolve the rollout's memory directory, or None when it has none.
+
+    ``env["MEMORY_DIR"]`` (or ``env["LETTA_MEMORY_DIR"]``) from context layered
+    over ``sample.extra_vars``. A relative path resolves against the working
+    directory, as it would for Letta Code.
+    """
+    env = _rollout_vars(sample, context).get("env")
+    memory_dir = (env.get("MEMORY_DIR") or env.get("LETTA_MEMORY_DIR")) if isinstance(env, dict) else None
+    return (cwd / Path(str(memory_dir)).expanduser()).resolve() if memory_dir else None
+
+
 class LettaCodeTarget:
     """Letta code target that invokes the letta CLI command."""
 
@@ -57,8 +72,6 @@ class LettaCodeTarget:
         base_dir: Optional[Path] = None,
         flags: Optional[str] = None,
         permission_mode: Optional[str] = None,
-        memory_workspace: bool = False,
-        memory_dir: Optional[Path] = None,
         local_backend_dir: Optional[Path] = None,
         use_agent_model: bool = False,
     ):
@@ -82,11 +95,6 @@ class LettaCodeTarget:
             permission_mode: Permission mode to pass through to Letta Code.
                 Use a current Letta Code CLI mode such as "unrestricted",
                 "standard", or "acceptEdits".
-            memory_workspace: If true, configure MEMORY_DIR/LETTA_MEMORY_DIR
-                for the subprocess when a memory workspace can be resolved.
-            memory_dir: Optional explicit memory workspace root. If unset,
-                memory_workspace uses a per-sample override or the factory-created
-                agent's default ~/.letta/agents/<agent_id>/memory root.
             local_backend_dir: If set, run Letta Code on its local backend
                 (``letta --backend local``) with this directory as its store
                 instead of against a Letta server. Agent factories get a
@@ -98,12 +106,11 @@ class LettaCodeTarget:
                 ``model_handle`` then only labels results.
 
         Agent factories may return ``(agent_id, context)``. ``context["env"]``
-        (dict), ``context["memory_dir"]`` and ``context["cwd"]`` configure the
-        subprocess for that rollout, layered over the same keys in
-        ``sample.extra_vars``; user env keys win over target-managed ones. See
-        ``_build_subprocess_env``. The resolved memory workspace and working
-        directory are written back to ``context["memory_dir"]`` and
-        ``context["cwd"]`` so extractors can read them.
+        (dict) and ``context["cwd"]`` configure the subprocess for that rollout,
+        layered over the same keys in ``sample.extra_vars``; user env keys win
+        over target-managed ones. ``env["MEMORY_DIR"]`` gives the agent's memory
+        directory. See ``_build_subprocess_env``. The working directory is
+        written back to ``context["cwd"]`` so extractors can read it.
 
         Choosing a working directory changes where the agent starts and how
         relative paths resolve; it does not confine the agent. Configure
@@ -111,12 +118,6 @@ class LettaCodeTarget:
         """
         self.client = client
         self.model_handle = model_handle
-        if permission_mode == "memory":
-            raise ValueError(
-                "permission_mode='memory' was removed from Letta Code. "
-                "Use memory_workspace=True with a current permission_mode such as 'unrestricted'."
-            )
-        self.memory_workspace = memory_workspace
         self.permission_mode = permission_mode
         self.timeout = timeout
         self.max_retries = max_retries
@@ -127,44 +128,8 @@ class LettaCodeTarget:
         self.base_dir = base_dir or Path.cwd()
         self.default_cwd = default_cwd
         self.flags = shlex.split(flags) if flags else []
-        self.memory_dir = memory_dir
         self.local_backend_dir = local_backend_dir
         self.use_agent_model = use_agent_model
-
-    def _resolve_memory_workspace_dir(
-        self, sample: Sample, agent_id: Optional[str], context: Optional[dict] = None
-    ) -> Optional[Path]:
-        """Resolve the memory workspace root, or None when there is none.
-
-        The subprocess gets it as ``MEMORY_DIR``. Precedence:
-        ``env["MEMORY_DIR"]`` / ``env["LETTA_MEMORY_DIR"]``, then ``memory_dir``
-        (both from context layered over ``sample.extra_vars``), then the
-        target's ``memory_dir``, then the factory-created agent's own memory
-        root.
-        """
-        if not self.memory_workspace:
-            return None
-
-        rollout_vars = _rollout_vars(sample, context)
-        sample_env = rollout_vars.get("env") or {}
-        if isinstance(sample_env, dict):
-            injected = sample_env.get("MEMORY_DIR") or sample_env.get("LETTA_MEMORY_DIR")
-            if injected:
-                return Path(str(injected)).expanduser()
-
-        sample_memory_dir = rollout_vars.get("memory_dir")
-        if sample_memory_dir:
-            return Path(str(sample_memory_dir)).expanduser()
-
-        if self.memory_dir:
-            return self.memory_dir.expanduser()
-
-        if agent_id:
-            if self.local_backend_dir:
-                return self.local_backend_dir / "memfs" / agent_id / "memory"
-            return Path.home() / ".letta" / "agents" / agent_id / "memory"
-
-        return None
 
     def _resolve_cwd(self, sample: Sample, agent_id: Optional[str], context: Optional[dict] = None) -> Path:
         """Resolve the subprocess working directory.
@@ -188,8 +153,12 @@ class LettaCodeTarget:
         context: Optional[dict] = None,
         memory_dir: Optional[Path] = None,
     ) -> dict[str, str]:
-        """Build subprocess env: os.environ -> target-managed -> extra_vars/context ``env``."""
+        """Build subprocess env: os.environ -> target-managed -> extra_vars/context ``env`` -> memory directory."""
         env = os.environ.copy()
+        # A rollout's memory directory comes only from its own env, never from the
+        # environment letta-evals runs in (such as a Letta Code session's own).
+        for key in _MEMORY_DIR_VARS:
+            env.pop(key, None)
         # A rollout is never a session to resume. Without this, Letta Code records
         # each run as the last session of the working directory and of the user.
         env["LETTA_DISABLE_SESSION_PERSIST"] = "1"
@@ -199,14 +168,6 @@ class LettaCodeTarget:
         elif self.base_url:
             env["LETTA_BASE_URL"] = self.base_url
             logger.info(f"Setting LETTA_BASE_URL={self.base_url} for letta CLI")
-
-        if memory_dir:
-            env["MEMORY_DIR"] = str(memory_dir)
-            env["LETTA_MEMORY_DIR"] = str(memory_dir)
-            if self.local_backend_dir:
-                # Without it, the local backend drops a MEMORY_DIR outside its own store
-                # (in sessions without local memfs, e.g. --stateless).
-                env["LETTA_MEMORY_DIR_EXPLICIT"] = "1"
 
         sample_env = _rollout_vars(sample, context).get("env")
         if sample_env is not None:
@@ -227,6 +188,13 @@ class LettaCodeTarget:
                 applied.append(k)
             if applied:
                 logger.info(f"Applied per-sample env overrides for sample {sample.id}: keys={sorted(applied)}")
+
+        if memory_dir:
+            # The resolved path replaces a relative one. Without the marker, Letta Code
+            # drops a MEMORY_DIR outside its memory store from the tool shells of agents
+            # without MemFS (e.g. --stateless).
+            env["MEMORY_DIR"] = env["LETTA_MEMORY_DIR"] = str(memory_dir)
+            env["LETTA_MEMORY_DIR_EXPLICIT"] = "1"
 
         return env
 
@@ -277,14 +245,12 @@ class LettaCodeTarget:
                             sample.id, agent_id=factory_agent_id, model_handle=self.model_handle
                         )
 
-                # The memory workspace sets MEMORY_DIR. It and the working directory are
-                # handed forward so extractors don't re-derive them.
-                memory_dir = self._resolve_memory_workspace_dir(sample, factory_agent_id, context)
-                if memory_dir:
-                    memory_dir.mkdir(parents=True, exist_ok=True)
-                    context = {**context, "memory_dir": str(memory_dir)}
+                # The working directory is handed forward so extractors don't re-derive it.
                 cwd = self._resolve_cwd(sample, factory_agent_id, context)
                 context = {**context, "cwd": str(cwd)}
+                memory_dir = _resolve_memory_dir(sample, context, cwd)
+                if memory_dir:
+                    memory_dir.mkdir(parents=True, exist_ok=True)
 
                 # construct prompt after factory call so agent_factory can modify sample if needed
                 # handle single or multiple inputs
@@ -319,8 +285,6 @@ class LettaCodeTarget:
                 if self.flags:
                     cmd.extend(self.flags)
 
-                # permission mode passed through to Letta Code. Memory workspace
-                # behavior is handled by letta-evals and is not a CLI permission mode.
                 if self.permission_mode:
                     cmd.extend(["--permission-mode", self.permission_mode])
 
@@ -334,8 +298,8 @@ class LettaCodeTarget:
                 )
 
                 # Prepare environment variables for the subprocess.
-                # Layers target-managed env (LETTA_BASE_URL, MEMORY_DIR) and per-rollout
-                # overrides from extra_vars/context "env" (see class docstring).
+                # Layers target-managed env (LETTA_BASE_URL) and per-rollout overrides
+                # from extra_vars/context "env" (see class docstring).
                 env = self._build_subprocess_env(sample, factory_agent_id, context, memory_dir)
                 if self.local_backend_dir:
                     messages = [prompt_message(prompt)]
