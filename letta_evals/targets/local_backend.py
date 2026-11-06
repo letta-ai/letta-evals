@@ -64,18 +64,21 @@ def trajectory_message(event: dict, run_id: Optional[str]) -> Optional[Any]:
 
 
 class _LocalAgents:
-    def __init__(self, storage_dir: Path, env: dict[str, str], model_handle: str, timeout: float):
+    def __init__(self, storage_dir: Path, env: dict[str, str], model_handle: Optional[str], timeout: float):
         self._storage_dir = storage_dir
         self._env = env
         self._model_handle = model_handle
         self._timeout = timeout
 
     async def create(self, **body: Any) -> AgentState:
-        # The suite's model handle wins, as --model does for server-backed agents.
+        # The suite's model handle, when given, wins, as --model does for server-backed
+        # agents; it is None when the factory owns the model (use_agent_model).
         # parallel_tool_calls defaults on as in Letta Code's own agents; without it,
         # the first resume rewrites the agent's model settings from its model preset.
         model_settings = {"parallel_tool_calls": True, **(body.get("model_settings") or {})}
-        body = {**body, "model": self._model_handle, "model_settings": model_settings}
+        body = {**body, "model_settings": model_settings}
+        if self._model_handle:
+            body["model"] = self._model_handle
         process = await asyncio.create_subprocess_exec(
             "letta",
             "--backend",
@@ -120,7 +123,7 @@ class LocalAgentsClient:
     equivalent.
     """
 
-    def __init__(self, storage_dir: Path, env: dict[str, str], model_handle: str, timeout: float):
+    def __init__(self, storage_dir: Path, env: dict[str, str], model_handle: Optional[str], timeout: float):
         self.agents = _LocalAgents(storage_dir, env, model_handle, timeout)
 
     def __getattr__(self, name: str) -> Any:

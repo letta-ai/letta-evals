@@ -1,6 +1,7 @@
-"""Agent factory context: return forms, layering over sample.extra_vars, and
-the target's memory_dir write-back. Runs LettaCodeTarget.run() against a fake
-letta CLI that records the env and cwd it was launched with."""
+"""Agent factory context: return forms, layering over sample.extra_vars, the
+target's memory_dir and cwd write-back, and the working directory. Runs
+LettaCodeTarget.run() against a fake letta CLI that records the env, cwd and
+prompt it was launched with."""
 
 import json
 import os
@@ -16,7 +17,7 @@ FACTORY_AGENT_ID = "agent-factory-1"
 
 
 def _install_fake_letta(tmp_path, monkeypatch) -> Path:
-    """Install a fake `letta` CLI that records MEMORY_DIR/FOO/BAR and cwd."""
+    """Install a fake `letta` CLI that records MEMORY_DIR/FOO/BAR, cwd, argv and the prompt."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     record = tmp_path / "cli_record.json"
@@ -24,9 +25,10 @@ def _install_fake_letta(tmp_path, monkeypatch) -> Path:
     script.write_text(
         "#!/usr/bin/env python3\n"
         "import json, os, sys\n"
-        "sys.stdin.read()\n"
+        "prompt = sys.stdin.read()\n"
         f"with open({str(record)!r}, 'w') as f:\n"
-        "    json.dump({k: os.environ.get(k) for k in ('MEMORY_DIR', 'FOO', 'BAR')} | {'cwd': os.getcwd()}, f)\n"
+        "    json.dump({k: os.environ.get(k) for k in ('MEMORY_DIR', 'FOO', 'BAR')}"
+        " | {'cwd': os.getcwd(), 'argv': sys.argv[1:], 'prompt': prompt}, f)\n"
         "print(json.dumps({'type': 'system', 'subtype': 'init', 'agent_id': 'agent-from-stream'}))\n"
         "print(json.dumps({'type': 'result', 'usage': {}}))\n"
     )
@@ -44,21 +46,28 @@ def _write_factory(tmp_path, returns: str, ws: str = "") -> str:
     return "factory.py:factory"
 
 
+def _default_cwd(tmp_path) -> Path:
+    return tmp_path / "default-cwd"
+
+
 def _make_target(tmp_path, **overrides) -> LettaCodeTarget:
-    kwargs = dict(client=None, model_handle="test-model", base_dir=tmp_path, timeout=30)
+    _default_cwd(tmp_path).mkdir(exist_ok=True)
+    kwargs = dict(
+        client=None, model_handle="test-model", default_cwd=_default_cwd(tmp_path), base_dir=tmp_path, timeout=30
+    )
     kwargs.update(overrides)
     return LettaCodeTarget(**kwargs)
 
 
 @pytest.mark.asyncio
-async def test_bare_agent_id_return_has_no_context(tmp_path, monkeypatch):
+async def test_bare_agent_id_return_context_holds_only_cwd(tmp_path, monkeypatch):
     _install_fake_letta(tmp_path, monkeypatch)
     target = _make_target(tmp_path, agent_script=_write_factory(tmp_path, "agent_id"))
 
     result = await target.run(Sample(id=0, input="hi"))
 
     assert result.agent_id == FACTORY_AGENT_ID
-    assert result.context is None
+    assert result.context == {"cwd": str(_default_cwd(tmp_path).resolve())}
 
 
 @pytest.mark.asyncio
@@ -69,7 +78,7 @@ async def test_tuple_return_context_lands_on_result(tmp_path, monkeypatch):
     result = await target.run(Sample(id=0, input="hi"))
 
     assert result.agent_id == FACTORY_AGENT_ID
-    assert result.context == {"seed": 3}
+    assert result.context == {"seed": 3, "cwd": str(_default_cwd(tmp_path).resolve())}
 
 
 @pytest.mark.asyncio
@@ -112,7 +121,8 @@ async def test_memory_dir_write_back(tmp_path, monkeypatch, factory_returns, tar
     # The written-back path is exactly what the subprocess saw.
     cli = json.loads(record.read_text())
     assert cli["MEMORY_DIR"] == expected
-    assert os.path.realpath(cli["cwd"]) == os.path.realpath(expected)
+    # The memory workspace doesn't move the agent's working directory.
+    assert os.path.realpath(cli["cwd"]) == os.path.realpath(_default_cwd(tmp_path))
 
 
 @pytest.mark.asyncio
@@ -124,7 +134,7 @@ async def test_no_factory_explicit_memory_dir_is_written_back(tmp_path, monkeypa
     result = await target.run(Sample(id=0, input="hi"))
 
     assert result.agent_id == "agent-from-stream"
-    assert result.context == {"memory_dir": str(explicit)}
+    assert result.context == {"memory_dir": str(explicit), "cwd": str(_default_cwd(tmp_path).resolve())}
 
 
 @pytest.mark.asyncio
@@ -134,10 +144,9 @@ async def test_memory_workspace_off_leaves_context_memory_dir_alone(tmp_path, mo
 
     result = await target.run(Sample(id=0, input="hi"))
 
-    assert result.context == {"memory_dir": "/not/used"}
+    assert result.context == {"memory_dir": "/not/used", "cwd": str(_default_cwd(tmp_path).resolve())}
     cli = json.loads(record.read_text())
     assert cli["MEMORY_DIR"] is None
-    assert os.path.realpath(cli["cwd"]) == os.path.realpath(tmp_path)
 
 
 @pytest.mark.asyncio
@@ -167,3 +176,58 @@ async def test_context_layers_over_extra_vars_and_merges_env(tmp_path, monkeypat
     assert result.context["memory_dir"] == str(tmp_path / "from-factory")
     # The shared sample is not mutated by layering.
     assert sample.extra_vars["env"] == {"FOO": "from-dataset", "BAR": "from-dataset"}
+
+
+@pytest.mark.asyncio
+async def test_agent_starts_in_the_default_cwd_and_pwd_names_it(tmp_path, monkeypatch):
+    record = _install_fake_letta(tmp_path, monkeypatch)
+    target = _make_target(tmp_path)
+
+    result = await target.run(Sample(id=0, input="files are in {pwd}"))
+
+    default = _default_cwd(tmp_path).resolve()
+    cli = json.loads(record.read_text())
+    assert os.path.realpath(cli["cwd"]) == str(default)
+    assert cli["prompt"] == f"files are in {default.as_posix()}"
+    assert result.context == {"cwd": str(default)}
+
+
+@pytest.mark.asyncio
+async def test_relative_cwd_from_extra_vars_resolves_against_the_suite_dir(tmp_path, monkeypatch):
+    record = _install_fake_letta(tmp_path, monkeypatch)
+    (tmp_path / "data").mkdir()
+    target = _make_target(tmp_path)
+
+    result = await target.run(Sample(id=0, input="files are in {pwd}", extra_vars={"cwd": "data"}))
+
+    data = (tmp_path / "data").resolve()
+    cli = json.loads(record.read_text())
+    assert os.path.realpath(cli["cwd"]) == str(data)
+    assert cli["prompt"] == f"files are in {data.as_posix()}"
+    assert result.context == {"cwd": str(data)}
+
+
+@pytest.mark.asyncio
+async def test_factory_cwd_wins_over_extra_vars(tmp_path, monkeypatch):
+    record = _install_fake_letta(tmp_path, monkeypatch)
+    staged = tmp_path / "staged-task"
+    staged.mkdir()
+    (tmp_path / "data").mkdir()
+    target = _make_target(tmp_path, agent_script=_write_factory(tmp_path, "agent_id, {'cwd': WS}", str(staged)))
+
+    result = await target.run(Sample(id=0, input="hi", extra_vars={"cwd": "data"}))
+
+    cli = json.loads(record.read_text())
+    assert os.path.realpath(cli["cwd"]) == str(staged.resolve())
+    assert result.context == {"cwd": str(staged.resolve())}
+
+
+@pytest.mark.asyncio
+async def test_missing_cwd_fails_the_rollout(tmp_path, monkeypatch):
+    record = _install_fake_letta(tmp_path, monkeypatch)
+    target = _make_target(tmp_path)
+
+    with pytest.raises(TargetError, match=r"cwd .*missing for sample 0 is not a directory"):
+        await target.run(Sample(id=0, input="hi", extra_vars={"cwd": "missing"}))
+
+    assert not record.exists()

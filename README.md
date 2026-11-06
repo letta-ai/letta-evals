@@ -122,7 +122,7 @@ For multi-turn evals, set `input` to a list of user messages; `ground_truth` sta
 
 Dataset rows may also include fields such as:
 
-- `extra_vars` for custom graders
+- `extra_vars` for custom graders, and `extra_vars.cwd` for the agent's working directory (see [Working directory](#working-directory))
 - `agent_args` for programmatic agent factories
 - `rubric` or `rubric_path` for per-sample model-judge rubric overrides
 
@@ -142,20 +142,33 @@ The supported target is `letta_code`, which runs the Letta Code CLI against a Le
 - `base_url`: Letta server URL; defaults to `http://localhost:8283`
 - `model_handles`: one or more model handles to evaluate
 - `agent_script`: optional `file.py:function_name` agent factory
+- `use_agent_model`: run a factory-created agent on the model and model settings its factory gave it (context window, effort, output tokens) instead of applying the suite's model handle with `--model`. The handle then only labels results, so exactly one is allowed. Requires `agent_script`
 - `flags`: additional Letta Code CLI flags (including tool restrictions, e.g. `--allowed-tools Bash Read`)
 - `permission_mode`: optional Letta Code permission mode, such as `unrestricted`, `standard`, or `acceptEdits`
-- `memory_workspace`: configure `MEMORY_DIR` / `LETTA_MEMORY_DIR` and run the Letta Code subprocess from a memory workspace without passing the removed `--permission-mode memory` CLI mode
+- `memory_workspace`: set `MEMORY_DIR` / `LETTA_MEMORY_DIR` for the Letta Code subprocess to a memory workspace, without passing the removed `--permission-mode memory` CLI mode
 - `memory_dir`: optional explicit memory workspace root; relative paths are resolved from the suite file
 - `timeout` and `max_retries`: target execution controls
 
-Do not use `permission_mode: memory`: recent Letta Code releases removed that CLI mode. Use `memory_workspace: true` for memory workspace env/cwd setup, and Modal or another external sandbox if you need strict filesystem confinement.
+Do not use `permission_mode: memory`: recent Letta Code releases removed that CLI mode. Use `memory_workspace: true` to set the memory workspace, and Modal or another external sandbox if you need strict filesystem confinement.
+
+#### Working directory
+
+Each sample's agent starts in a fresh, empty temporary directory rather than the suite directory, which holds the dataset, graders and past results. `cleanup: true` removes the directory after the sample.
+
+To start the agent somewhere else, set `cwd` in the dataset row's `extra_vars` or in the agent factory's returned `context` (the factory wins). Relative paths resolve against the suite directory, and the directory must already exist. The `{pwd}` placeholder in a sample's input is replaced with the agent's working directory, and the directory is saved as `context["cwd"]` for extractors.
+
+```json
+{"input": "Answer using the data files in {pwd}", "ground_truth": "...", "extra_vars": {"cwd": "files"}}
+```
+
+The working directory is where the agent starts and how its relative paths resolve; it does not confine the agent. Use [`sandbox:`](docs/modal-sandbox.md) for filesystem isolation.
 
 #### Local backend
 
 `backend: local` (or `letta-evals run --backend local`) runs Letta Code on its local backend (`letta --backend local`) with no Letta server. It needs a Letta Code release with `letta agents create --body`.
 
 - Each sample gets a fresh local store in a temp directory, recorded on `SampleResult.local_backend_dir`. `cleanup: true` removes it after the sample.
-- Agent factories receive a client whose only method is `client.agents.create(...)`. It creates the agent in the sample's store with the suite's model handle, and the agent then runs with `--agent`.
+- Agent factories receive a client whose only method is `client.agents.create(...)`. It creates the agent in the sample's store with the suite's model handle (or, with `use_agent_model`, the factory's own model), and the agent then runs with `--agent`.
 - The trajectory comes from the CLI's stream-json output. Token data, server-side pricing lookups, and server cleanup don't apply.
 - Model providers are configured the way Letta Code's local backend reads them, e.g. `LLAMA_CPP_BASE_URL` for an OpenAI-compatible endpoint.
 - Letta Code enables local memfs for its own agents and points `MEMORY_DIR` at the agent's memory. To have the agent work in a factory-seeded `memory_dir` instead, pass `--stateless` in `flags`. letta-evals sets `LETTA_MEMORY_DIR_EXPLICIT=1` with the workspace, so Letta Code keeps it.
@@ -227,7 +240,7 @@ Use `setup_script: file.py:function_name` for one-time setup before a suite runs
 
 Use `target.agent_script: file.py:function_name` to create or customize an agent per sample. Agent factories receive the Letta client and current `Sample`, and return either the agent ID or `(agent_id, context)`.
 
-`context` is a JSON-serializable dict of per-rollout values. `context["env"]` and `context["memory_dir"]` configure the Letta Code subprocess, layered over the same keys in `sample.extra_vars`. With `memory_workspace: true`, the target writes the resolved workspace path back to `context["memory_dir"]`. The dict is saved on `SampleResult.context` and passed to extractors that take a third `context` parameter and to reward composers as `ctx.context`:
+`context` is a JSON-serializable dict of per-rollout values. `context["env"]`, `context["memory_dir"]` and `context["cwd"]` configure the Letta Code subprocess, layered over the same keys in `sample.extra_vars`. The target writes the agent's working directory back to `context["cwd"]`, and with `memory_workspace: true`, the resolved workspace path to `context["memory_dir"]`. The dict is saved on `SampleResult.context` and passed to extractors that take a third `context` parameter and to reward composers as `ctx.context`:
 
 ```python
 @agent_factory

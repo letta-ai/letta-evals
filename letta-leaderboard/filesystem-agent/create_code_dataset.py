@@ -50,8 +50,10 @@ def create_dataset():
             # {pwd} is resolved at runtime by LettaCodeTarget to the working directory.
             prompt = FILESYSTEM_CODE_PROMPT.replace("{{question}}", data["input"])
 
-            # Preserve all original fields, only replace input
+            # Preserve all original fields, only replace input and start the agent
+            # in the data files (relative to the suite directory).
             data["input"] = prompt
+            data["extra_vars"] = {"cwd": "files"}
 
             fout.write(json.dumps(data) + "\n")
             count += 1

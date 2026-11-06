@@ -1,5 +1,6 @@
 """Runner on backend: local — the trace comes from the target, nothing is read
-from or deleted on a server, and cleanup removes the sample's local store."""
+from or deleted on a server, and cleanup removes the sample's local store and
+working directory."""
 
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
@@ -27,9 +28,13 @@ def _local_runner(monkeypatch, target: MagicMock, *, cleanup: bool = False):
     runner.client.agents.retrieve = AsyncMock()
     runner.client.agents.delete = AsyncMock()
     runner.stores = []
+    runner.cwds = []
 
-    def create_target(model_handle=None, local_backend_dir=None):
+    def create_target(model_handle, default_cwd, local_backend_dir=None):
+        assert default_cwd.is_dir() and not any(default_cwd.iterdir())
         assert local_backend_dir is not None and local_backend_dir.is_dir()
+        assert default_cwd != local_backend_dir
+        runner.cwds.append(default_cwd)
         runner.stores.append(local_backend_dir)
         return target
 
@@ -58,12 +63,14 @@ async def test_trace_comes_from_the_target(monkeypatch):
     result = await runner.run_sample(Sample(id=0, input="hi"), model_handle=None, return_token_data=True)
 
     [store] = runner.stores
+    [cwd] = runner.cwds
     assert result.error is None
     assert result.trajectory == [[MESSAGE]]
     assert result.token_data is None
     assert result.local_backend_dir == store
     runner.client.agents.retrieve.assert_not_awaited()
     assert store.is_dir()
+    assert cwd.is_dir()
 
 
 @pytest.mark.asyncio
@@ -81,7 +88,7 @@ async def test_failed_target_keeps_its_partial_trajectory(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_cleanup_removes_the_local_store(monkeypatch):
+async def test_cleanup_removes_the_local_store_and_working_directory(monkeypatch):
     target = MagicMock()
     target.run = AsyncMock(return_value=TargetTrace(agent_id="agent-local-1", model_handle="m", trajectory=[[MESSAGE]]))
     runner = _local_runner(monkeypatch, target, cleanup=True)
@@ -89,5 +96,7 @@ async def test_cleanup_removes_the_local_store(monkeypatch):
     await runner.run_sample(Sample(id=0, input="hi"), model_handle=None)
 
     [store] = runner.stores
+    [cwd] = runner.cwds
     assert not store.exists()
+    assert not cwd.exists()
     runner.client.agents.delete.assert_not_awaited()

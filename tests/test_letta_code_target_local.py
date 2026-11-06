@@ -115,6 +115,7 @@ def _make_target(tmp_path: Path, **overrides) -> LettaCodeTarget:
     kwargs = dict(
         client=None,
         model_handle="llama.cpp/local-model",
+        default_cwd=tmp_path,
         base_dir=tmp_path,
         timeout=30,
         local_backend_dir=store,
@@ -157,8 +158,22 @@ async def test_factory_agent_is_created_in_the_sample_store_and_resumed(tmp_path
     assert run["env"]["FOO"] == "bar"
     assert isinstance(result, TargetTrace)
     assert result.agent_id == AGENT_ID
-    assert result.context == {"env": {"FOO": "bar"}}
+    assert result.context == {"env": {"FOO": "bar"}, "cwd": str(tmp_path.resolve())}
     assert result.agent_usage[0]["prompt_tokens"] == 7
+
+
+@pytest.mark.asyncio
+async def test_use_agent_model_keeps_the_factory_model(tmp_path, monkeypatch):
+    record_dir = _install_fake_letta(tmp_path, monkeypatch)
+    target = _make_target(tmp_path, agent_script=_write_factory(tmp_path, CREATING_FACTORY), use_agent_model=True)
+
+    await target.run(Sample(id=0, input="reflect"))
+
+    create = _read(record_dir, "create.json")
+    run = _read(record_dir, "run.json")
+    assert create["body"]["model"] == "server/model"
+    assert create["body"]["model_settings"] == {"parallel_tool_calls": True, "max_tokens": 64}
+    assert "--model" not in run["argv"]
 
 
 @pytest.mark.asyncio
@@ -207,7 +222,7 @@ async def test_memory_workspace_defaults_to_the_local_agent_memory(tmp_path, mon
     assert result.context["memory_dir"] == str(expected)
     assert run["env"]["MEMORY_DIR"] == str(expected)
     assert run["env"]["LETTA_MEMORY_DIR_EXPLICIT"] == "1"
-    assert Path(run["cwd"]).resolve() == expected.resolve()
+    assert Path(run["cwd"]).resolve() == tmp_path.resolve()
 
 
 @pytest.mark.asyncio

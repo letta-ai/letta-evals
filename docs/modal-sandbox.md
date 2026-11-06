@@ -195,5 +195,6 @@ sandbox:
   letta_code_version: "0.30.5"
 ```
 
-The image's `WORKDIR` (set in the Dockerfile) replaces the role of
-`working_dir`; per-sample isolation is provided by the sandbox itself.
+Per-sample isolation is provided by the sandbox itself. Inside it, the
+agent starts in a fresh empty directory; set `cwd` per sample to start it
+elsewhere (see the README's "Working directory" section).
