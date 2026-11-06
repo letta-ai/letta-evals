@@ -139,7 +139,7 @@ def agent_factory(func: Callable) -> Callable:
     Validates that the function has signature: async (client: AsyncLetta, sample: Sample).
     The factory returns either the ``agent_id`` or ``(agent_id, context)``,
     where ``context`` is a JSON-serializable dict of per-rollout values. The
-    target reads ``env`` / ``memory_dir`` from it, and extractors receive it.
+    target reads ``env`` / ``cwd`` from it, and extractors receive it.
 
     Usage:
         @agent_factory
@@ -149,8 +149,8 @@ def agent_factory(func: Callable) -> Callable:
 
         @agent_factory
         async def create_seeded_agent(client: AsyncLetta, sample: Sample) -> tuple[str, dict]:
-            # seed a workspace for the agent and hand its path forward
-            return agent_id, {"memory_dir": workspace}
+            # seed a memory directory for the agent and hand its path forward
+            return agent_id, {"env": {"MEMORY_DIR": str(memory_dir)}}
     """
     sig = inspect.signature(func)
     params = list(sig.parameters.values())

@@ -1,5 +1,5 @@
 """Agent factory context: return forms, layering over sample.extra_vars, the
-target's memory_dir and cwd write-back, and the working directory. Runs
+cwd write-back, the working directory and the memory directory. Runs
 LettaCodeTarget.run() against a fake letta CLI that records the env, cwd and
 prompt it was launched with."""
 
@@ -14,10 +14,12 @@ from letta_evals.targets.errors import TargetError
 from letta_evals.targets.letta_code_target import LettaCodeTarget
 
 FACTORY_AGENT_ID = "agent-factory-1"
+MEMORY_ENV = ("MEMORY_DIR", "LETTA_MEMORY_DIR", "LETTA_MEMORY_DIR_EXPLICIT")
+RECORDED_ENV = (*MEMORY_ENV, "FOO", "BAR")
 
 
 def _install_fake_letta(tmp_path, monkeypatch) -> Path:
-    """Install a fake `letta` CLI that records MEMORY_DIR/FOO/BAR, cwd, argv and the prompt."""
+    """Install a fake `letta` CLI that records RECORDED_ENV, cwd, argv and the prompt."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     record = tmp_path / "cli_record.json"
@@ -27,7 +29,7 @@ def _install_fake_letta(tmp_path, monkeypatch) -> Path:
         "import json, os, sys\n"
         "prompt = sys.stdin.read()\n"
         f"with open({str(record)!r}, 'w') as f:\n"
-        "    json.dump({k: os.environ.get(k) for k in ('MEMORY_DIR', 'FOO', 'BAR')}"
+        f"    json.dump({{k: os.environ.get(k) for k in {RECORDED_ENV!r}}}"
         " | {'cwd': os.getcwd(), 'argv': sys.argv[1:], 'prompt': prompt}, f)\n"
         "print(json.dumps({'type': 'system', 'subtype': 'init', 'agent_id': 'agent-from-stream'}))\n"
         "print(json.dumps({'type': 'result', 'usage': {}}))\n"
@@ -90,92 +92,80 @@ async def test_invalid_factory_return_raises_target_error(tmp_path, monkeypatch)
         await target.run(Sample(id=0, input="hi"))
 
 
+def _memory_env(cli: dict) -> tuple:
+    return tuple(cli[k] for k in MEMORY_ENV)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("factory_returns", "target_kwargs", "expected"),
+    ("factory_returns", "dataset_key"),
     [
-        # factory hands back a seeded workspace
-        ("agent_id, {'memory_dir': WS}", {}, "{ws}"),
-        # factory injects MEMORY_DIR via env; write-back normalizes to memory_dir
-        ("agent_id, {'env': {'MEMORY_DIR': WS}}", {}, "{ws}"),
-        # factory returns nothing; the agent's own memory root is used
-        ("agent_id", {}, "{home}/.letta/agents/agent-factory-1/memory"),
-        # explicit suite-level memory_dir
-        ("agent_id", {"memory_dir": "SUITE"}, "{suite}"),
+        ("agent_id, {'env': {'MEMORY_DIR': WS}}", None),
+        ("agent_id", "MEMORY_DIR"),
+        ("agent_id", "LETTA_MEMORY_DIR"),
     ],
 )
-async def test_memory_dir_write_back(tmp_path, monkeypatch, factory_returns, target_kwargs, expected):
+async def test_env_memory_dir_is_created_and_marked_explicit(tmp_path, monkeypatch, factory_returns, dataset_key):
     record = _install_fake_letta(tmp_path, monkeypatch)
-    ws = str(tmp_path / "seeded")
-    suite_dir = tmp_path / "suite-ws"
-    if target_kwargs.get("memory_dir") == "SUITE":
-        target_kwargs = {**target_kwargs, "memory_dir": suite_dir}
-    target = _make_target(
-        tmp_path, agent_script=_write_factory(tmp_path, factory_returns, ws), memory_workspace=True, **target_kwargs
-    )
+    ws = tmp_path / "seeded"
+    target = _make_target(tmp_path, agent_script=_write_factory(tmp_path, factory_returns, str(ws)))
+    extra_vars = {"env": {dataset_key: str(ws)}} if dataset_key else None
 
-    result = await target.run(Sample(id=0, input="hi"))
+    await target.run(Sample(id=0, input="hi", extra_vars=extra_vars))
 
-    expected = expected.format(ws=ws, home=tmp_path / "home", suite=suite_dir)
-    assert result.context["memory_dir"] == expected
-    # The written-back path is exactly what the subprocess saw.
     cli = json.loads(record.read_text())
-    assert cli["MEMORY_DIR"] == expected
-    # The memory workspace doesn't move the agent's working directory.
+    assert _memory_env(cli) == (str(ws), str(ws), "1")
+    assert ws.is_dir()
+    # The memory directory doesn't move the agent's working directory.
     assert os.path.realpath(cli["cwd"]) == os.path.realpath(_default_cwd(tmp_path))
 
 
 @pytest.mark.asyncio
-async def test_no_factory_explicit_memory_dir_is_written_back(tmp_path, monkeypatch):
-    _install_fake_letta(tmp_path, monkeypatch)
-    explicit = tmp_path / "explicit-ws"
-    target = _make_target(tmp_path, memory_workspace=True, memory_dir=explicit)
+async def test_relative_memory_dir_resolves_against_the_working_directory(tmp_path, monkeypatch):
+    record = _install_fake_letta(tmp_path, monkeypatch)
+    target = _make_target(tmp_path)
 
-    result = await target.run(Sample(id=0, input="hi"))
+    await target.run(Sample(id=0, input="hi", extra_vars={"env": {"MEMORY_DIR": "memory"}}))
 
-    assert result.agent_id == "agent-from-stream"
-    assert result.context == {"memory_dir": str(explicit), "cwd": str(_default_cwd(tmp_path).resolve())}
+    memory = _default_cwd(tmp_path).resolve() / "memory"
+    assert _memory_env(json.loads(record.read_text())) == (str(memory), str(memory), "1")
+    assert memory.is_dir()
 
 
 @pytest.mark.asyncio
-async def test_memory_workspace_off_leaves_context_memory_dir_alone(tmp_path, monkeypatch):
+async def test_memory_dir_is_never_inherited_from_the_runner_env(tmp_path, monkeypatch):
     record = _install_fake_letta(tmp_path, monkeypatch)
-    target = _make_target(tmp_path, agent_script=_write_factory(tmp_path, "agent_id, {'memory_dir': '/not/used'}"))
+    for key in MEMORY_ENV:
+        monkeypatch.setenv(key, "/parent-session/memory" if key != "LETTA_MEMORY_DIR_EXPLICIT" else "1")
+    target = _make_target(tmp_path, agent_script=_write_factory(tmp_path, "agent_id"))
 
-    result = await target.run(Sample(id=0, input="hi"))
+    await target.run(Sample(id=0, input="hi"))
 
-    assert result.context == {"memory_dir": "/not/used", "cwd": str(_default_cwd(tmp_path).resolve())}
-    cli = json.loads(record.read_text())
-    assert cli["MEMORY_DIR"] is None
+    assert _memory_env(json.loads(record.read_text())) == (None, None, None)
 
 
 @pytest.mark.asyncio
 async def test_context_layers_over_extra_vars_and_merges_env(tmp_path, monkeypatch):
     record = _install_fake_letta(tmp_path, monkeypatch)
+    from_factory = tmp_path / "from-factory"
     target = _make_target(
         tmp_path,
         agent_script=_write_factory(
-            tmp_path, "agent_id, {'env': {'BAR': 'from-factory'}, 'memory_dir': WS}", str(tmp_path / "from-factory")
+            tmp_path, "agent_id, {'env': {'BAR': 'from-factory', 'MEMORY_DIR': WS}}", str(from_factory)
         ),
-        memory_workspace=True,
     )
-    sample = Sample(
-        id=0,
-        input="hi",
-        extra_vars={
-            "env": {"FOO": "from-dataset", "BAR": "from-dataset"},
-            "memory_dir": str(tmp_path / "from-dataset"),
-        },
-    )
+    dataset_env = {"FOO": "from-dataset", "BAR": "from-dataset", "MEMORY_DIR": str(tmp_path / "from-dataset")}
+    sample = Sample(id=0, input="hi", extra_vars={"env": dataset_env})
 
-    result = await target.run(sample)
+    await target.run(sample)
 
     cli = json.loads(record.read_text())
     assert cli["FOO"] == "from-dataset"  # dataset env keys survive
     assert cli["BAR"] == "from-factory"  # factory wins per key
-    assert result.context["memory_dir"] == str(tmp_path / "from-factory")
+    assert cli["MEMORY_DIR"] == str(from_factory)
+    assert not (tmp_path / "from-dataset").exists()
     # The shared sample is not mutated by layering.
-    assert sample.extra_vars["env"] == {"FOO": "from-dataset", "BAR": "from-dataset"}
+    assert sample.extra_vars["env"] == dataset_env
 
 
 @pytest.mark.asyncio

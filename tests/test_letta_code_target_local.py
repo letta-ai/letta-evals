@@ -211,16 +211,15 @@ async def test_without_a_factory_letta_code_creates_the_agent(tmp_path, monkeypa
 
 
 @pytest.mark.asyncio
-async def test_memory_workspace_defaults_to_the_local_agent_memory(tmp_path, monkeypatch):
+async def test_memory_dir_outside_the_store_is_marked_explicit(tmp_path, monkeypatch):
     record_dir = _install_fake_letta(tmp_path, monkeypatch)
-    target = _make_target(tmp_path, agent_script=_write_factory(tmp_path, CREATING_FACTORY), memory_workspace=True)
+    memory = tmp_path / "seeded-memory"
+    target = _make_target(tmp_path, agent_script=_write_factory(tmp_path, CREATING_FACTORY))
 
-    result = await target.run(Sample(id=0, input="hi"))
+    await target.run(Sample(id=0, input="hi", extra_vars={"env": {"MEMORY_DIR": str(memory)}}))
 
-    expected = target.local_backend_dir / "memfs" / AGENT_ID / "memory"
     run = _read(record_dir, "run.json")
-    assert result.context["memory_dir"] == str(expected)
-    assert run["env"]["MEMORY_DIR"] == str(expected)
+    assert run["env"]["MEMORY_DIR"] == str(memory)
     assert run["env"]["LETTA_MEMORY_DIR_EXPLICIT"] == "1"
     assert Path(run["cwd"]).resolve() == tmp_path.resolve()
 
