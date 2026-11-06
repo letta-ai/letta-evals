@@ -181,7 +181,7 @@ class Runner:
         return list(self.suite.target.model_handles)
 
     def _create_letta_code_target(
-        self, model_handle: Optional[str] = None, local_backend_dir: Optional[Path] = None
+        self, model_handle: Optional[str], default_cwd: Path, local_backend_dir: Optional[Path] = None
     ) -> LettaCodeTarget:
         """Create the letta_code target for a model handle."""
         if not model_handle:
@@ -190,6 +190,7 @@ class Runner:
         return LettaCodeTarget(
             client=self.client,
             model_handle=model_handle,
+            default_cwd=default_cwd,
             timeout=int(self.suite.target.timeout),
             max_retries=self.suite.target.max_retries,
             base_url=self.letta_base_url,
@@ -236,9 +237,6 @@ class Runner:
         if isinstance(self.suite.reward, MetricRewardSpec):
             if self.graders is None or self.suite.reward.metric_key not in self.graders:
                 raise ValueError(f"reward metric_key '{self.suite.reward.metric_key}' not found in graders")
-
-    def _should_cleanup_agent(self) -> bool:
-        return self.suite.cleanup
 
     # ── setup ──
 
@@ -325,6 +323,7 @@ class Runner:
         self,
         sample: Sample,
         model_handle: Optional[str],
+        default_cwd: Path,
         local_backend_dir: Optional[Path] = None,
         return_token_data: bool = False,
     ) -> TargetTrace:
@@ -335,7 +334,7 @@ class Runner:
         the same trajectory/token-data extraction layer. On the local
         backend the target returns the trace it read from the stream.
         """
-        target = self._create_letta_code_target(model_handle, local_backend_dir)
+        target = self._create_letta_code_target(model_handle, default_cwd, local_backend_dir)
         target_result = await target.run(
             sample,
             progress_callback=self.progress_callback,
@@ -410,6 +409,7 @@ class Runner:
             agent_id = None
             agent_usage = None
             context = None
+            default_cwd: Optional[Path] = None
             local_backend_dir: Optional[Path] = None
             trajectory = []
             token_data = None
@@ -442,11 +442,14 @@ class Runner:
                 phase = ErrorCategory.TARGET
                 target_trace = await self._cached_target_trace(sample, model_handle, return_token_data)
                 if target_trace is None:
+                    # Each sample starts in its own empty directory unless its dataset
+                    # row or agent factory sets `cwd`; removed on cleanup.
+                    default_cwd = Path(tempfile.mkdtemp(prefix=f"letta-evals-cwd-{sample_id}-"))
                     if self.suite.target.backend == "local":
                         # Each sample's agent lives in its own Letta Code store, removed on cleanup.
                         local_backend_dir = Path(tempfile.mkdtemp(prefix=f"letta-evals-{sample_id}-"))
                     target_trace = await self._run_target_trace(
-                        sample, model_handle, local_backend_dir, return_token_data
+                        sample, model_handle, default_cwd, local_backend_dir, return_token_data
                     )
                 trajectory = target_trace.trajectory
                 agent_id = target_trace.agent_id
@@ -610,10 +613,13 @@ class Runner:
                     await self.progress_callback.sample_error(result, model_handle=model_handle)
                 return result
             finally:
-                if self._should_cleanup_agent() and local_backend_dir:
-                    shutil.rmtree(local_backend_dir, ignore_errors=True)
-                    logger.info(f"Removed local backend store {local_backend_dir} for sample {sample_id}")
-                elif self._should_cleanup_agent() and agent_id:
+                if self.suite.cleanup:
+                    for directory in (default_cwd, local_backend_dir):
+                        if directory:
+                            shutil.rmtree(directory, ignore_errors=True)
+                            logger.info(f"Removed {directory} for sample {sample_id}")
+                # A local agent went with its store; a server agent is deleted on the server.
+                if self.suite.cleanup and agent_id and not local_backend_dir:
                     try:
                         await self.client.agents.delete(agent_id=agent_id)
                         logger.info(f"Cleaned up agent {agent_id} for sample {sample_id}")

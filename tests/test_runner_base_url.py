@@ -39,21 +39,21 @@ def _suite_without_target_base_url() -> SuiteSpec:
     )
 
 
-def test_env_base_url_reaches_letta_code_target(monkeypatch):
+def test_env_base_url_reaches_letta_code_target(monkeypatch, tmp_path):
     monkeypatch.setenv("LETTA_BASE_URL", "https://rollouts.example.test")
     suite = _suite_without_target_base_url()
 
     runner = Runner(suite=suite, max_concurrent=1)
 
-    target = runner._create_letta_code_target("letta/auto-fast")
+    target = runner._create_letta_code_target("letta/auto-fast", tmp_path)
     assert target.base_url == "https://rollouts.example.test"
 
 
-def test_cli_base_url_override_reaches_letta_code_target(monkeypatch):
+def test_cli_base_url_override_reaches_letta_code_target(monkeypatch, tmp_path):
     monkeypatch.setenv("LETTA_BASE_URL", "https://env.example.test")
     suite = _suite_without_target_base_url()
 
     runner = Runner(suite=suite, max_concurrent=1, letta_base_url="https://cli.example.test")
 
-    target = runner._create_letta_code_target("letta/auto-fast")
+    target = runner._create_letta_code_target("letta/auto-fast", tmp_path)
     assert target.base_url == "https://cli.example.test"

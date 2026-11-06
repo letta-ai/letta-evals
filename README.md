@@ -125,7 +125,7 @@ For multi-turn evals, set `input` to a list of user messages; `ground_truth` sta
 
 Dataset rows may also include fields such as:
 
-- `extra_vars` for custom graders
+- `extra_vars` for custom graders, and `extra_vars.cwd` for the agent's working directory (see [Working directory](#working-directory))
 - `agent_args` for programmatic agent factories
 - `rubric` or `rubric_path` for per-sample model-judge rubric overrides
 
@@ -147,11 +147,23 @@ The supported target is `letta_code`, which runs the Letta Code CLI against a Le
 - `agent_script`: optional `file.py:function_name` agent factory
 - `flags`: additional Letta Code CLI flags (including tool restrictions, e.g. `--allowed-tools Bash Read`)
 - `permission_mode`: optional Letta Code permission mode, such as `unrestricted`, `standard`, or `acceptEdits`
-- `memory_workspace`: configure `MEMORY_DIR` / `LETTA_MEMORY_DIR` and run the Letta Code subprocess from a memory workspace without passing the removed `--permission-mode memory` CLI mode
+- `memory_workspace`: set `MEMORY_DIR` / `LETTA_MEMORY_DIR` for the Letta Code subprocess to a memory workspace, without passing the removed `--permission-mode memory` CLI mode
 - `memory_dir`: optional explicit memory workspace root; relative paths are resolved from the suite file
 - `timeout` and `max_retries`: target execution controls
 
-Do not use `permission_mode: memory`: recent Letta Code releases removed that CLI mode. Use `memory_workspace: true` for memory workspace env/cwd setup, and Modal or another external sandbox if you need strict filesystem confinement.
+Do not use `permission_mode: memory`: recent Letta Code releases removed that CLI mode. Use `memory_workspace: true` to set the memory workspace, and Modal or another external sandbox if you need strict filesystem confinement.
+
+#### Working directory
+
+Each sample's agent starts in a fresh, empty temporary directory rather than the suite directory, which holds the dataset, graders and past results. `cleanup: true` removes the directory after the sample.
+
+To start the agent somewhere else, set `cwd` in the dataset row's `extra_vars` or in the agent factory's returned `context` (the factory wins). Relative paths resolve against the suite directory, and the directory must already exist. The `{pwd}` placeholder in a sample's input is replaced with the agent's working directory, and the directory is saved as `context["cwd"]` for extractors.
+
+```json
+{"input": "Answer using the data files in {pwd}", "ground_truth": "...", "extra_vars": {"cwd": "files"}}
+```
+
+The working directory is where the agent starts and how its relative paths resolve; it does not confine the agent. Use [`sandbox:`](docs/modal-sandbox.md) for filesystem isolation.
 
 #### Local backend
 
@@ -230,7 +242,7 @@ Use `setup_script: file.py:function_name` for one-time setup before a suite runs
 
 Use `target.agent_script: file.py:function_name` to create or customize an agent per sample. Agent factories receive the Letta client and current `Sample`, and return either the agent ID or `(agent_id, context)`.
 
-`context` is a JSON-serializable dict of per-rollout values. `context["env"]` and `context["memory_dir"]` configure the Letta Code subprocess, layered over the same keys in `sample.extra_vars`. With `memory_workspace: true`, the target writes the resolved workspace path back to `context["memory_dir"]`. The dict is saved on `SampleResult.context` and passed to extractors that take a third `context` parameter and to reward composers as `ctx.context`:
+`context` is a JSON-serializable dict of per-rollout values. `context["env"]`, `context["memory_dir"]` and `context["cwd"]` configure the Letta Code subprocess, layered over the same keys in `sample.extra_vars`. The target writes the agent's working directory back to `context["cwd"]`, and with `memory_workspace: true`, the resolved workspace path to `context["memory_dir"]`. The dict is saved on `SampleResult.context` and passed to extractors that take a third `context` parameter and to reward composers as `ctx.context`:
 
 ```python
 @agent_factory

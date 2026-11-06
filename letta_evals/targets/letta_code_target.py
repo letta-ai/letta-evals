@@ -49,6 +49,7 @@ class LettaCodeTarget:
         self,
         client: AsyncLetta,
         model_handle: str,
+        default_cwd: Path,
         timeout: int = 300,
         max_retries: int = 0,
         base_url: Optional[str] = None,
@@ -65,22 +66,23 @@ class LettaCodeTarget:
         Args:
             client: AsyncLetta client for retrieving messages after CLI execution
             model_handle: Model handle to use with letta code
+            default_cwd: Working directory for the rollout when neither the
+                factory's context nor ``sample.extra_vars`` sets ``cwd``. The
+                runner creates a fresh empty directory per rollout.
             timeout: Command timeout in seconds (default: 300)
             max_retries: Number of retry attempts on failure
             base_url: Base URL for the Letta server (passed to CLI via env var)
             agent_script: Path to agent factory script (e.g., "setup_agent.py:setup_agent").
                 If provided, the factory function is called to create an agent per sample,
                 and --agent is used instead of --new-agent.
-            base_dir: Base directory for resolving relative paths in agent_script
+            base_dir: Suite directory; resolves relative ``agent_script`` and ``cwd`` paths
             flags: Additional CLI flags to pass to letta code, parsed with shell quoting
-                rules (e.g., "--memfs --context-window 8000").
+                rules (e.g., "--memfs --no-skills").
             permission_mode: Permission mode to pass through to Letta Code.
                 Use a current Letta Code CLI mode such as "unrestricted",
                 "standard", or "acceptEdits".
             memory_workspace: If true, configure MEMORY_DIR/LETTA_MEMORY_DIR
-                and run the subprocess from that memory workspace when one can
-                be resolved. This controls letta-evals workspace behavior only;
-                use sandboxing if strict filesystem confinement is required.
+                for the subprocess when a memory workspace can be resolved.
             memory_dir: Optional explicit memory workspace root. If unset,
                 memory_workspace uses a per-sample override or the factory-created
                 agent's default ~/.letta/agents/<agent_id>/memory root.
@@ -91,16 +93,16 @@ class LettaCodeTarget:
                 stream-json output.
 
         Agent factories may return ``(agent_id, context)``. ``context["env"]``
-        (dict) and ``context["memory_dir"]`` configure the subprocess for that
-        rollout, layered over the same keys in ``sample.extra_vars``; user env
-        keys win over target-managed ones. See ``_build_subprocess_env``. The
-        resolved memory workspace is written back to ``context["memory_dir"]``
-        so extractors can read it.
+        (dict), ``context["memory_dir"]`` and ``context["cwd"]`` configure the
+        subprocess for that rollout, layered over the same keys in
+        ``sample.extra_vars``; user env keys win over target-managed ones. See
+        ``_build_subprocess_env``. The resolved memory workspace and working
+        directory are written back to ``context["memory_dir"]`` and
+        ``context["cwd"]`` so extractors can read them.
 
-        The CLI runs in the process's current working directory. For isolated
-        execution, configure ``suite.sandbox`` to dispatch each sample to a
-        fresh Modal sandbox — the image's ``WORKDIR`` becomes the per-sample
-        working directory.
+        Choosing a working directory changes where the agent starts and how
+        relative paths resolve; it does not confine the agent. Configure
+        ``suite.sandbox`` for filesystem isolation.
         """
         self.client = client
         self.model_handle = model_handle
@@ -116,10 +118,9 @@ class LettaCodeTarget:
         self.base_url = base_url
         self.agent_script = agent_script
         # base_dir is the suite directory (set by SuiteSpec.from_yaml). It
-        # resolves agent_script paths, the `{pwd}` prompt placeholder, and the
-        # letta-code subprocess cwd. Sandbox isolation is handled by
-        # suite.sandbox (Modal), which runs the in-sandbox CLI from /mnt/suite.
+        # resolves agent_script paths and relative `cwd` values.
         self.base_dir = base_dir or Path.cwd()
+        self.default_cwd = default_cwd
         self.flags = shlex.split(flags) if flags else []
         self.memory_dir = memory_dir
         self.local_backend_dir = local_backend_dir
@@ -129,11 +130,11 @@ class LettaCodeTarget:
     ) -> Optional[Path]:
         """Resolve the memory workspace root, or None when there is none.
 
-        The subprocess gets it as ``MEMORY_DIR`` and runs from it, so relative
-        file paths resolve there. Precedence: ``env["MEMORY_DIR"]`` /
-        ``env["LETTA_MEMORY_DIR"]``, then ``memory_dir`` (both from context
-        layered over ``sample.extra_vars``), then the target's ``memory_dir``,
-        then the factory-created agent's own memory root.
+        The subprocess gets it as ``MEMORY_DIR``. Precedence:
+        ``env["MEMORY_DIR"]`` / ``env["LETTA_MEMORY_DIR"]``, then ``memory_dir``
+        (both from context layered over ``sample.extra_vars``), then the
+        target's ``memory_dir``, then the factory-created agent's own memory
+        root.
         """
         if not self.memory_workspace:
             return None
@@ -159,6 +160,21 @@ class LettaCodeTarget:
 
         return None
 
+    def _resolve_cwd(self, sample: Sample, agent_id: Optional[str], context: Optional[dict] = None) -> Path:
+        """Resolve the subprocess working directory.
+
+        ``cwd`` from context layered over ``sample.extra_vars``, resolved
+        against the suite directory when relative; otherwise ``default_cwd``.
+        An explicit ``cwd`` must already exist.
+        """
+        cwd = _rollout_vars(sample, context).get("cwd")
+        if not cwd:
+            return self.default_cwd.resolve()
+        path = (self.base_dir / Path(str(cwd)).expanduser()).resolve()
+        if not path.is_dir():
+            raise TargetError(f"cwd {path} for sample {sample.id} is not a directory", agent_id=agent_id)
+        return path
+
     def _build_subprocess_env(
         self,
         sample: Sample,
@@ -168,11 +184,12 @@ class LettaCodeTarget:
     ) -> dict[str, str]:
         """Build subprocess env: os.environ -> target-managed -> extra_vars/context ``env``."""
         env = os.environ.copy()
+        # A rollout is never a session to resume. Without this, Letta Code records
+        # each run as the last session of the working directory and of the user.
+        env["LETTA_DISABLE_SESSION_PERSIST"] = "1"
 
         if self.local_backend_dir:
             env["LETTA_LOCAL_BACKEND_DIR"] = str(self.local_backend_dir)
-            # Each sample has its own store; don't record every one as a session to resume.
-            env["LETTA_DISABLE_SESSION_PERSIST"] = "1"
         elif self.base_url:
             env["LETTA_BASE_URL"] = self.base_url
             logger.info(f"Setting LETTA_BASE_URL={self.base_url} for letta CLI")
@@ -254,13 +271,22 @@ class LettaCodeTarget:
                             sample.id, agent_id=factory_agent_id, model_handle=self.model_handle
                         )
 
+                # The memory workspace sets MEMORY_DIR. It and the working directory are
+                # handed forward so extractors don't re-derive them.
+                memory_dir = self._resolve_memory_workspace_dir(sample, factory_agent_id, context)
+                if memory_dir:
+                    memory_dir.mkdir(parents=True, exist_ok=True)
+                    context = {**context, "memory_dir": str(memory_dir)}
+                cwd = self._resolve_cwd(sample, factory_agent_id, context)
+                context = {**context, "cwd": str(cwd)}
+
                 # construct prompt after factory call so agent_factory can modify sample if needed
                 # handle single or multiple inputs
                 inputs = sample.input if isinstance(sample.input, list) else [sample.input]
 
                 # for multiple inputs, concatenate with newlines
                 prompt = "\n".join(str(inp) for inp in inputs)
-                prompt = prompt.replace("{pwd}", self.base_dir.resolve().as_posix())
+                prompt = prompt.replace("{pwd}", cwd.as_posix())
 
                 # construct the letta-code CLI command (headless streaming JSON output).
                 cmd = ["letta"]
@@ -300,13 +326,6 @@ class LettaCodeTarget:
                     f"Running letta command for sample {sample.id} (prompt via stdin, {len(prompt_bytes)} bytes)"
                 )
 
-                # The workspace sets MEMORY_DIR and the subprocess cwd, and is handed
-                # forward so extractors don't re-derive _resolve_memory_workspace_dir.
-                memory_dir = self._resolve_memory_workspace_dir(sample, factory_agent_id, context)
-                if memory_dir:
-                    memory_dir.mkdir(parents=True, exist_ok=True)
-                    context = {**context, "memory_dir": str(memory_dir)}
-
                 # Prepare environment variables for the subprocess.
                 # Layers target-managed env (LETTA_BASE_URL, MEMORY_DIR) and per-rollout
                 # overrides from extra_vars/context "env" (see class docstring).
@@ -331,7 +350,7 @@ class LettaCodeTarget:
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    cwd=str(memory_dir or self.base_dir),
+                    cwd=str(cwd),
                     env=env,
                     limit=16 * 1024 * 1024,
                 )
@@ -418,14 +437,14 @@ class LettaCodeTarget:
                         agent_id=agent_id,
                         model_handle=self.model_handle,
                         agent_usage=usage_stats,
-                        context=context or None,
+                        context=context,
                         trajectory=[messages],
                     )
                 return TargetResult(
                     agent_id=agent_id,
                     model_handle=self.model_handle,
                     agent_usage=usage_stats,
-                    context=context or None,
+                    context=context,
                 )
 
             except Exception as e:
