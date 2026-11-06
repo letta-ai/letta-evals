@@ -201,6 +201,7 @@ class Runner:
             memory_workspace=self.suite.target.memory_workspace,
             memory_dir=self.suite.target.memory_dir,
             local_backend_dir=local_backend_dir,
+            use_agent_model=self.suite.target.use_agent_model,
         )
 
     def _init_graders(self) -> None:

@@ -89,6 +89,15 @@ class LettaCodeTargetSpec(BaseModel):
     agent_script: Optional[str] = Field(
         default=None, description="Path to Python script with AgentFactory (e.g., script.py:factory_fn)"
     )
+    use_agent_model: bool = Field(
+        default=False,
+        description=(
+            "Run the factory-created agent on the model and model settings its factory gave it "
+            "(context window, effort, output tokens) instead of applying the suite's model handle "
+            "with --model. The handle then only labels results, so exactly one is allowed. "
+            "Requires agent_script."
+        ),
+    )
 
     # internal field for path resolution
     base_dir: Optional[Path] = Field(default=None, exclude=True)
@@ -117,6 +126,19 @@ class LettaCodeTargetSpec(BaseModel):
             "When unset, memory_workspace uses per-sample overrides or the factory-created agent's memory root."
         ),
     )
+
+    @model_validator(mode="after")
+    def validate_use_agent_model(self):
+        if not self.use_agent_model:
+            return self
+        if not self.agent_script:
+            raise ValueError("use_agent_model requires agent_script: only a factory-created agent has its own model")
+        if self.model_handles and len(self.model_handles) > 1:
+            raise ValueError(
+                "use_agent_model allows one model handle: the factory picks the model, so every handle "
+                "would run the same agent"
+            )
+        return self
 
     @model_validator(mode="after")
     def reject_removed_memory_permission_mode(self):
