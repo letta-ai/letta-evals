@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import io
 from types import SimpleNamespace
 
+from rich.console import Console
+
+from letta_evals.metrics import summarize_model, summarize_runs
 from letta_evals.models import (
+    Error,
     GradeResult,
     LettaCodeTargetSpec,
     MetricRewardSpec,
@@ -17,11 +22,12 @@ from letta_evals.models import (
     ToolGraderSpec,
     Usage,
 )
-from letta_evals.types import RewardKind
+from letta_evals.types import ErrorCategory, RewardKind
 from letta_evals.visualization.summary import (
     build_rich_sample_results_table,
     build_simple_sample_results_table,
     get_displayed_sample_results,
+    print_basic_overall_metrics,
 )
 
 
@@ -158,3 +164,45 @@ def test_build_rich_sample_results_table_contains_reward_and_rationales() -> Non
     assert table.columns[3]._cells == ["1.00", "0.25"]
     assert table.columns[5]._cells == ["perfect", "missed details"]
     assert table.columns[7]._cells == ["fine", "solid"]
+
+
+def _errored_sample_result(sample_id: SampleId) -> SampleResult:
+    return SampleResult(
+        sample_id=sample_id,
+        trajectory=[[]],
+        timing=Timing(total=0.0, target=0.0),
+        error=Error(category=ErrorCategory.TARGET, exception_type="TimeoutError", message="timed out"),
+    )
+
+
+def _ok_sample_result(sample_id: SampleId) -> SampleResult:
+    return _sample_result(sample_id, f"agent-{sample_id}", accuracy=1.0, acc_rat="ok", quality=1.0, q_rat="ok")
+
+
+def _overall_metrics_text(ms: ModelSummary) -> str:
+    console = Console(file=io.StringIO(), width=120, force_terminal=False)
+    print_basic_overall_metrics(console, SimpleNamespace(models=[ms]))
+    return console.file.getvalue()
+
+
+def test_print_basic_overall_metrics_single_run() -> None:
+    results = [_ok_sample_result(0), _errored_sample_result(1)]
+    ms = summarize_model(model="model-a", results=results, grader_keys=["accuracy", "quality"])
+
+    output = _overall_metrics_text(ms)
+
+    assert "Total samples: 2\n" in output
+    assert "Total attempted: 1\n" in output
+    assert "Errored: 50.0% (1/2)" in output
+
+
+def test_print_basic_overall_metrics_counts_errors_across_runs() -> None:
+    # 3 runs of 10 samples with one errored sample per run.
+    per_run_results = [[_ok_sample_result(i) for i in range(9)] + [_errored_sample_result(9)] for _ in range(3)]
+    ms = summarize_runs(model="model-a", per_run_results=per_run_results, grader_keys=["accuracy", "quality"])
+
+    output = _overall_metrics_text(ms)
+
+    assert "Total samples: 30 (3 runs)" in output
+    assert "Total attempted: 27" in output
+    assert "Errored: 10.0% (3/30)" in output
