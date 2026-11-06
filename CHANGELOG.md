@@ -140,6 +140,26 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.28.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.27.0...letta-evals-v0.28.0) (2026-11-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* Remove --cached re-grading ([#353](https://github.com/letta-ai/letta-evals/issues/353))
+* **targets:** Start each rollout in a fresh working directory ([#354](https://github.com/letta-ai/letta-evals/issues/354))
+
+### Features
+
+* **targets:** Let factory agents keep their own model settings ([#356](https://github.com/letta-ai/letta-evals/issues/356)) ([1b098b0](https://github.com/letta-ai/letta-evals/commit/1b098b00656592f2c62c5519b31f10d2117e8cb9))
+* **targets:** Run Letta Code on its local backend ([#346](https://github.com/letta-ai/letta-evals/issues/346)) ([907679e](https://github.com/letta-ai/letta-evals/commit/907679eb1907226c839c3250db4bfd4136fb38a5))
+* **targets:** Start each rollout in a fresh working directory ([#354](https://github.com/letta-ai/letta-evals/issues/354)) ([8132f89](https://github.com/letta-ai/letta-evals/commit/8132f89e05d23fc90547f98c1dc0267159cc9dd2))
+
+
+### Refactors
+
+* Let the runner own the local backend store ([#348](https://github.com/letta-ai/letta-evals/issues/348)) ([95cef36](https://github.com/letta-ai/letta-evals/commit/95cef361e33a67d5116598b7be699ea1a0ef04ec))
+* Remove --cached re-grading ([#353](https://github.com/letta-ai/letta-evals/issues/353)) ([a972cd5](https://github.com/letta-ai/letta-evals/commit/a972cd57408e92f4ec8ee6e66180979d232cfebf))
+
 ## [0.27.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.26.0...letta-evals-v0.27.0) (2026-10-28)
 
 
