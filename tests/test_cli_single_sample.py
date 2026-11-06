@@ -86,7 +86,6 @@ class TestRunSingleSampleHelper:
                 out_path,
                 None,  # api_key
                 None,  # base_url
-                None,  # project_id
                 None,  # model_handle
             )
 
@@ -118,7 +117,6 @@ class TestRunSingleSampleHelper:
                 None,
                 None,
                 None,
-                None,
             )
 
         data = json.loads(out_path.read_text())
@@ -147,7 +145,6 @@ class TestRunSingleSampleHelper:
                 suite_path,
                 sample_path,
                 out_path,
-                None,
                 None,
                 None,
                 None,
@@ -194,7 +191,6 @@ reward:
                 suite_yaml,
                 sample_path,
                 out_path,
-                None,
                 None,
                 None,
                 "openai/gpt-a",

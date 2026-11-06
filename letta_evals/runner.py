@@ -110,7 +110,6 @@ class Runner:
         output_path: Optional[Path] = None,
         letta_api_key: Optional[str] = None,
         letta_base_url: Optional[str] = None,
-        letta_project_id: Optional[str] = None,
         stream_writer: Optional[StreamingWriter] = None,
         current_run: int = 1,
     ):
@@ -118,12 +117,10 @@ class Runner:
 
         env_api_key = os.getenv("LETTA_API_KEY")
         env_base_url = os.getenv("LETTA_BASE_URL")
-        env_project_id = os.getenv("LETTA_PROJECT_ID")
 
         api_key = letta_api_key or self.suite.target.api_key or env_api_key
         base_url = letta_base_url or self.suite.target.base_url or env_base_url
         self.letta_base_url = base_url
-        self.project_id = letta_project_id or self.suite.target.project_id or env_project_id
 
         client_kwargs: dict[str, object] = {"timeout": self.suite.target.timeout}
         if base_url:
@@ -288,11 +285,7 @@ class Runner:
         backend the target returns the trace it read from the stream.
         """
         target = self._create_letta_code_target(model_handle, default_cwd, local_backend_dir)
-        target_result = await target.run(
-            sample,
-            progress_callback=self.progress_callback,
-            project_id=self.project_id,
-        )
+        target_result = await target.run(sample, progress_callback=self.progress_callback)
         if isinstance(target_result, TargetTrace):
             # Local backend: the target read the trajectory from the stream.
             return target_result
@@ -733,7 +726,6 @@ async def run_suite(
     output_path: Optional[Path] = None,
     letta_api_key: Optional[str] = None,
     letta_base_url: Optional[str] = None,
-    letta_project_id: Optional[str] = None,
     num_runs: Optional[int] = None,
     model_handle: Optional[str] = None,
     backend: Optional[str] = None,
@@ -816,7 +808,6 @@ async def run_suite(
             output_path=output_path,
             letta_api_key=letta_api_key,
             letta_base_url=letta_base_url,
-            letta_project_id=letta_project_id,
         )
     finally:
         if file_handler is not None:
@@ -833,7 +824,6 @@ async def _execute_runs(
     output_path: Optional[Path],
     letta_api_key: Optional[str],
     letta_base_url: Optional[str],
-    letta_project_id: Optional[str],
 ) -> RunnerResult:
     """Execute single or multiple evaluation runs sharing one streaming writer."""
     if suite.target.model_handles:
@@ -865,7 +855,6 @@ async def _execute_runs(
             output_path=output_path,
             letta_api_key=letta_api_key,
             letta_base_url=letta_base_url,
-            letta_project_id=letta_project_id,
             stream_writer=shared_writer,
             current_run=run_idx + 1,
         )

@@ -95,7 +95,6 @@ def _make_runner(grader: _FakeGrader, target: MagicMock) -> Runner:
     runner.model_handles = [None]
     runner.stream_writer = None
     runner.output_path = None
-    runner.project_id = None
     runner._pricing_overrides = None
     runner._model_identities = {}
 
