@@ -35,6 +35,7 @@ from letta_evals.visualization.summary import (
     print_basic_overall_metrics,
     print_remaining_samples_notice,
     print_truncated_samples_notice,
+    sample_counts,
 )
 
 
@@ -380,10 +381,11 @@ class EvalProgress(ProgressCallback):
                 model_table.add_column(label_map[metric_key], style="white")
 
             for ms in summary.models:
+                n_scheduled, n_attempted = sample_counts(ms)
                 row = [
                     ms.model,
-                    str(ms.n_total),
-                    str(ms.n_attempted),
+                    str(n_scheduled),
+                    str(n_attempted),
                     f"{ms.reward:.2f}",
                 ]
                 for metric_key in label_map.keys():
