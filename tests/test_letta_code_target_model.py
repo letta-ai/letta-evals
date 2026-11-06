@@ -1,50 +1,15 @@
 """use_agent_model: a factory-created agent runs on its own model settings, so
-the target skips --model. Runs LettaCodeTarget.run() against a fake letta CLI
-that records its argv."""
+the target skips --model. Runs LettaCodeTarget.run() against the fake letta CLI
+from the factory-context tests."""
 
 import json
-import os
 
 import pytest
 
 from letta_evals.models import LettaCodeTargetSpec, Sample
-from letta_evals.targets.letta_code_target import LettaCodeTarget
+from tests.test_letta_code_target_context import _install_fake_letta, _make_target, _write_factory
 
 HANDLE = "opus-5.5-max"
-
-
-def _install_fake_letta(tmp_path, monkeypatch):
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    record = tmp_path / "argv.json"
-    script = bin_dir / "letta"
-    script.write_text(
-        "#!/usr/bin/env python3\n"
-        "import json, sys\n"
-        "sys.stdin.read()\n"
-        f"json.dump(sys.argv[1:], open({str(record)!r}, 'w'))\n"
-        "print(json.dumps({'type': 'system', 'subtype': 'init', 'agent_id': 'agent-from-stream'}))\n"
-        "print(json.dumps({'type': 'result', 'usage': {}}))\n"
-    )
-    script.chmod(0o755)
-    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}")
-    return record
-
-
-def _make_target(tmp_path, *, factory: bool, use_agent_model: bool) -> LettaCodeTarget:
-    agent_script = None
-    if factory:
-        (tmp_path / "factory.py").write_text("async def factory(client, sample):\n    return 'agent-factory-1'\n")
-        agent_script = "factory.py:factory"
-    return LettaCodeTarget(
-        client=None,
-        model_handle=HANDLE,
-        default_cwd=tmp_path,
-        base_dir=tmp_path,
-        timeout=30,
-        agent_script=agent_script,
-        use_agent_model=use_agent_model,
-    )
 
 
 @pytest.mark.asyncio
@@ -58,11 +23,12 @@ def _make_target(tmp_path, *, factory: bool, use_agent_model: bool) -> LettaCode
 )
 async def test_model_flag(tmp_path, monkeypatch, factory, use_agent_model, passes_model):
     record = _install_fake_letta(tmp_path, monkeypatch)
-    target = _make_target(tmp_path, factory=factory, use_agent_model=use_agent_model)
+    agent_script = _write_factory(tmp_path, "agent_id") if factory else None
+    target = _make_target(tmp_path, model_handle=HANDLE, agent_script=agent_script, use_agent_model=use_agent_model)
 
     result = await target.run(Sample(id=0, input="hi"))
 
-    argv = json.loads(record.read_text())
+    argv = json.loads(record.read_text())["argv"]
     if passes_model:
         assert argv[argv.index("--model") + 1] == HANDLE
     else:
