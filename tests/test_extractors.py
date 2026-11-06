@@ -122,6 +122,19 @@ class TestPattern:
         traj = _traj([_msg("1 2 3")])
         assert pattern(traj, {"pattern": r"\d+", "search_all": True}) == "1 2 3"
 
+    def test_search_all_single_group_returns_captures(self):
+        traj = _traj([_msg("answer: 1, answer: 2")])
+        assert pattern(traj, {"pattern": r"answer: (\d+)", "search_all": True}) == "1 2"
+
+    def test_search_all_group_matches_search_group(self):
+        traj = _traj([_msg("scores: a=1, b=2, c=3")])
+        config = {"pattern": r"(\w)=(\d)", "search_all": True}
+        assert pattern(traj, {**config, "group": 0}) == "a=1 b=2 c=3"
+        assert pattern(traj, {**config, "group": 1}) == "a b c"
+        assert pattern(traj, {**config, "group": 2}) == "1 2 3"
+        # Same group numbers as without search_all.
+        assert pattern(traj, {"pattern": r"(\w)=(\d)", "group": 1}) == "a"
+
     def test_searches_from_last_message(self):
         traj = _traj([_msg("old: 10", "m1"), _msg("new: 20", "m2")])
         assert pattern(traj, {"pattern": r"\d+"}) == "20"
