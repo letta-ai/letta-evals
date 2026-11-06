@@ -140,6 +140,25 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.29.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.28.0...letta-evals-v0.29.0) (2026-11-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* Remove project_id, which never reached Letta ([#363](https://github.com/letta-ai/letta-evals/issues/363))
+* **targets:** Replace memory_workspace with the rollout's MEMORY_DIR ([#361](https://github.com/letta-ai/letta-evals/issues/361))
+
+### Bug Fixes
+
+* **runner:** Name per-sample temp directories safely for any sample id ([#359](https://github.com/letta-ai/letta-evals/issues/359)) ([a8e86b0](https://github.com/letta-ai/letta-evals/commit/a8e86b03c83097212728ef5fdb05a778b77df32e))
+
+
+### Refactors
+
+* Remove project_id, which never reached Letta ([#363](https://github.com/letta-ai/letta-evals/issues/363)) ([eda6010](https://github.com/letta-ai/letta-evals/commit/eda60108d3531ffedc72dbaffa3449333c68c406))
+* **targets:** Replace memory_workspace with the rollout's MEMORY_DIR ([#361](https://github.com/letta-ai/letta-evals/issues/361)) ([caee295](https://github.com/letta-ai/letta-evals/commit/caee295fe849e9f5a213bcc36d000a4193e50802))
+* **targets:** Split LettaCodeTarget.run() into one method per step ([#362](https://github.com/letta-ai/letta-evals/issues/362)) ([05c993a](https://github.com/letta-ai/letta-evals/commit/05c993a7834574df78b0abadce35ed8941e846c5))
+
 ## [0.28.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.27.0...letta-evals-v0.28.0) (2026-11-06)
 
 
