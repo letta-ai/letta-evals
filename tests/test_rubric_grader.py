@@ -200,6 +200,11 @@ def _patch_openai(grader: RubricGrader) -> MagicMock:
 
 @pytest.mark.asyncio
 class TestRubricGraderGrade:
+    @pytest.fixture(autouse=True)
+    def _openai_key(self, monkeypatch):
+        # The constructor needs a key; _patch_openai replaces the client before any call.
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
     async def test_uses_grader_prompt_when_sample_has_no_rubric(self):
         grader = RubricGrader(prompt="grader-level: {input}/{submission}", model="gpt-4o-mini")
         mock_client = _patch_openai(grader)
