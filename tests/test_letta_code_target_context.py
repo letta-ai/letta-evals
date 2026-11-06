@@ -17,7 +17,7 @@ FACTORY_AGENT_ID = "agent-factory-1"
 
 
 def _install_fake_letta(tmp_path, monkeypatch) -> Path:
-    """Install a fake `letta` CLI that records MEMORY_DIR/FOO/BAR, cwd and the prompt."""
+    """Install a fake `letta` CLI that records MEMORY_DIR/FOO/BAR, cwd, argv and the prompt."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     record = tmp_path / "cli_record.json"
@@ -28,7 +28,7 @@ def _install_fake_letta(tmp_path, monkeypatch) -> Path:
         "prompt = sys.stdin.read()\n"
         f"with open({str(record)!r}, 'w') as f:\n"
         "    json.dump({k: os.environ.get(k) for k in ('MEMORY_DIR', 'FOO', 'BAR')}"
-        " | {'cwd': os.getcwd(), 'prompt': prompt}, f)\n"
+        " | {'cwd': os.getcwd(), 'argv': sys.argv[1:], 'prompt': prompt}, f)\n"
         "print(json.dumps({'type': 'system', 'subtype': 'init', 'agent_id': 'agent-from-stream'}))\n"
         "print(json.dumps({'type': 'result', 'usage': {}}))\n"
     )

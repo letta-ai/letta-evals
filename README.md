@@ -145,6 +145,7 @@ The supported target is `letta_code`, which runs the Letta Code CLI against a Le
 - `base_url`: Letta server URL; defaults to `http://localhost:8283`
 - `model_handles`: one or more model handles to evaluate
 - `agent_script`: optional `file.py:function_name` agent factory
+- `use_agent_model`: run a factory-created agent on the model and model settings its factory gave it (context window, effort, output tokens) instead of applying the suite's model handle with `--model`. The handle then only labels results, so exactly one is allowed. Requires `agent_script`
 - `flags`: additional Letta Code CLI flags (including tool restrictions, e.g. `--allowed-tools Bash Read`)
 - `permission_mode`: optional Letta Code permission mode, such as `unrestricted`, `standard`, or `acceptEdits`
 - `memory_workspace`: set `MEMORY_DIR` / `LETTA_MEMORY_DIR` for the Letta Code subprocess to a memory workspace, without passing the removed `--permission-mode memory` CLI mode
@@ -170,7 +171,7 @@ The working directory is where the agent starts and how its relative paths resol
 `backend: local` (or `letta-evals run --backend local`) runs Letta Code on its local backend (`letta --backend local`) with no Letta server. It needs a Letta Code release with `letta agents create --body`.
 
 - Each sample gets a fresh local store in a temp directory, recorded on `SampleResult.local_backend_dir`. `cleanup: true` removes it after the sample.
-- Agent factories receive a client whose only method is `client.agents.create(...)`. It creates the agent in the sample's store with the suite's model handle, and the agent then runs with `--agent`.
+- Agent factories receive a client whose only method is `client.agents.create(...)`. It creates the agent in the sample's store with the suite's model handle (or, with `use_agent_model`, the factory's own model), and the agent then runs with `--agent`.
 - The trajectory comes from the CLI's stream-json output. Token data, server-side pricing lookups, and server cleanup don't apply.
 - Model providers are configured the way Letta Code's local backend reads them, e.g. `LLAMA_CPP_BASE_URL` for an OpenAI-compatible endpoint.
 - Letta Code enables local memfs for its own agents and points `MEMORY_DIR` at the agent's memory. To have the agent work in a factory-seeded `memory_dir` instead, pass `--stateless` in `flags`. letta-evals sets `LETTA_MEMORY_DIR_EXPLICIT=1` with the workspace, so Letta Code keeps it.

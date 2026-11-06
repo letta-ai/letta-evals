@@ -60,6 +60,7 @@ class LettaCodeTarget:
         memory_workspace: bool = False,
         memory_dir: Optional[Path] = None,
         local_backend_dir: Optional[Path] = None,
+        use_agent_model: bool = False,
     ):
         """Initialize the Letta Code target.
 
@@ -91,6 +92,10 @@ class LettaCodeTarget:
                 instead of against a Letta server. Agent factories get a
                 ``LocalAgentsClient``, and the trajectory comes from the CLI's
                 stream-json output.
+            use_agent_model: If true, a factory-created agent runs on the model
+                and model settings its factory gave it: no ``--model``, and on the
+                local backend the factory's model isn't replaced at creation.
+                ``model_handle`` then only labels results.
 
         Agent factories may return ``(agent_id, context)``. ``context["env"]``
         (dict), ``context["memory_dir"]`` and ``context["cwd"]`` configure the
@@ -124,6 +129,7 @@ class LettaCodeTarget:
         self.flags = shlex.split(flags) if flags else []
         self.memory_dir = memory_dir
         self.local_backend_dir = local_backend_dir
+        self.use_agent_model = use_agent_model
 
     def _resolve_memory_workspace_dir(
         self, sample: Sample, agent_id: Optional[str], context: Optional[dict] = None
@@ -258,7 +264,7 @@ class LettaCodeTarget:
                         LocalAgentsClient(
                             self.local_backend_dir,
                             self._build_subprocess_env(sample, None),
-                            self.model_handle,
+                            None if self.use_agent_model else self.model_handle,
                             self.timeout,
                         )
                         if self.local_backend_dir
@@ -293,9 +299,10 @@ class LettaCodeTarget:
                 if self.local_backend_dir:
                     cmd.extend(["--backend", "local"])
                 cmd.extend(["--output-format", "stream-json"])
-                # A local factory agent was created with this model; --model on resume
-                # would apply the model catalog's settings over the agent's own.
-                if not (self.local_backend_dir and factory_agent_id):
+                # --model on resume applies the model catalog's settings over the agent's
+                # own. A local factory agent was already created with this model, and
+                # with use_agent_model the factory owns the model and its settings.
+                if not (factory_agent_id and (self.local_backend_dir or self.use_agent_model)):
                     cmd.extend(["--model", self.model_handle])
 
                 # Only use --yolo when no explicit permission_mode is set,

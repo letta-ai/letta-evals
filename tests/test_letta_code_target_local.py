@@ -163,6 +163,20 @@ async def test_factory_agent_is_created_in_the_sample_store_and_resumed(tmp_path
 
 
 @pytest.mark.asyncio
+async def test_use_agent_model_keeps_the_factory_model(tmp_path, monkeypatch):
+    record_dir = _install_fake_letta(tmp_path, monkeypatch)
+    target = _make_target(tmp_path, agent_script=_write_factory(tmp_path, CREATING_FACTORY), use_agent_model=True)
+
+    await target.run(Sample(id=0, input="reflect"))
+
+    create = _read(record_dir, "create.json")
+    run = _read(record_dir, "run.json")
+    assert create["body"]["model"] == "server/model"
+    assert create["body"]["model_settings"] == {"parallel_tool_calls": True, "max_tokens": 64}
+    assert "--model" not in run["argv"]
+
+
+@pytest.mark.asyncio
 async def test_trajectory_comes_from_the_stream(tmp_path, monkeypatch):
     _install_fake_letta(tmp_path, monkeypatch)
 
