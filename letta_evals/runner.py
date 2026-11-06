@@ -1,6 +1,7 @@
 import inspect
 import logging
 import os
+import re
 import shutil
 import tempfile
 import time
@@ -87,6 +88,15 @@ def _build_usage(
         reasoning_tokens=reasoning_tokens or 0,
         cost=cost,
     )
+
+
+def _sample_temp_dir(prefix: str, sample_id) -> Path:
+    """Create an empty temp directory named after the sample.
+
+    Sample ids may contain path separators or be long, so only a sanitized prefix of the id is used.
+    """
+    name = re.sub(r"[^A-Za-z0-9._-]+", "_", str(sample_id))[:64]
+    return Path(tempfile.mkdtemp(prefix=f"{prefix}-{name}-"))
 
 
 class Runner:
@@ -387,10 +397,10 @@ class Runner:
                 phase = ErrorCategory.TARGET
                 # Each sample starts in its own empty directory unless its dataset
                 # row or agent factory sets `cwd`; removed on cleanup.
-                default_cwd = Path(tempfile.mkdtemp(prefix=f"letta-evals-cwd-{sample_id}-"))
+                default_cwd = _sample_temp_dir("letta-evals-cwd", sample_id)
                 if self.suite.target.backend == "local":
                     # Each sample's agent lives in its own Letta Code store, removed on cleanup.
-                    local_backend_dir = Path(tempfile.mkdtemp(prefix=f"letta-evals-{sample_id}-"))
+                    local_backend_dir = _sample_temp_dir("letta-evals", sample_id)
                 target_trace = await self._run_target_trace(
                     sample, model_handle, default_cwd, local_backend_dir, return_token_data
                 )
