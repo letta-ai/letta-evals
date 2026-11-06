@@ -107,6 +107,8 @@ cleanup: true
 
 Relative paths in suite YAML are resolved from the suite file's directory. CLI flags such as `--max-concurrent`, `--output`, `--api-key`, `--base-url`, and `--num-runs` override suite or environment defaults when provided.
 
+`letta-evals run` loads a `.env` file from the directory you run it in, without overriding variables that are already set. When you call `run_suite` or `Runner` from Python, export the variables or load your own `.env`, e.g. with `python-dotenv`'s `load_dotenv()`.
+
 ## Writing suites
 
 ### Datasets
