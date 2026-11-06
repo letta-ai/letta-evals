@@ -2,7 +2,9 @@
 from or deleted on a server, and cleanup removes the sample's local store and
 working directory."""
 
+import tempfile
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -100,3 +102,19 @@ async def test_cleanup_removes_the_local_store_and_working_directory(monkeypatch
     assert not store.exists()
     assert not cwd.exists()
     runner.client.agents.delete.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_sample_ids_with_path_separators_get_flat_temp_directories(monkeypatch):
+    target = MagicMock()
+    target.run = AsyncMock(return_value=TargetTrace(agent_id="agent-local-1", model_handle="m", trajectory=[[MESSAGE]]))
+    runner = _local_runner(monkeypatch, target)
+
+    sample_id = "collection/train/" + "x" * 300
+    result = await runner.run_sample(Sample(id=sample_id, input="hi"), model_handle=None)
+
+    [store] = runner.stores
+    [cwd] = runner.cwds
+    assert result.error is None
+    assert store.parent == cwd.parent == Path(tempfile.gettempdir())
+    assert cwd.name.startswith("letta-evals-cwd-collection_train_xxx")
