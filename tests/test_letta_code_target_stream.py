@@ -1,8 +1,9 @@
-"""Stream-json handling: the drain-only LettaCodeTarget stdout reader and
-final-line usage extraction (issue #319)."""
+"""Stream-json handling: the drain-only LettaCodeTarget stdout reader,
+final-line usage extraction (issue #319) and retries of failed attempts."""
 
 import logging
 import os
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -55,28 +56,40 @@ RESULT_LINE_B = RESULT_LINE.encode()
 TOOL_RETURN_LINE_B = b'{"type": "message", "message_type": "tool_return_message", "content": "' + b"x" * 30000 + b'"}'
 
 
-def _install_fake_letta(tmp_path, monkeypatch, stdout_payload: bytes, returncode: int = 0) -> None:
+def _install_fake_letta(tmp_path, monkeypatch, stdout_payload: bytes, returncode: int = 0, fail_first: int = 0) -> None:
     """Install a fake `letta` CLI on PATH that consumes stdin, emits a fixed
-    stdout payload byte-for-byte, and exits with the given code."""
+    stdout payload byte-for-byte, and exits with the given code, or with 1 for
+    its first ``fail_first`` calls."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
     payload = bin_dir / "stdout_payload"
     payload.write_bytes(stdout_payload)
+    calls = bin_dir / "calls"
     script = bin_dir / "letta"
     script.write_text(
         "#!/usr/bin/env python3\n"
         "import pathlib, sys\n"
         "sys.stdin.read()\n"
+        f"calls = pathlib.Path({str(calls)!r})\n"
+        "n = int(calls.read_text()) if calls.exists() else 0\n"
+        "calls.write_text(str(n + 1))\n"
         f"sys.stdout.buffer.write(pathlib.Path({str(payload)!r}).read_bytes())\n"
-        f"sys.exit({returncode})\n"
+        f"sys.exit(1 if n < {fail_first} else {returncode})\n"
     )
     script.chmod(0o755)
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}")
 
 
-def _make_target(tmp_path) -> LettaCodeTarget:
+def _make_target(tmp_path, max_retries: int = 0) -> LettaCodeTarget:
     # client is only used by the agent_script factory path, never here.
-    return LettaCodeTarget(client=None, model_handle="test-model", default_cwd=tmp_path, base_dir=tmp_path, timeout=30)
+    return LettaCodeTarget(
+        client=None,
+        model_handle="test-model",
+        default_cwd=tmp_path,
+        base_dir=tmp_path,
+        timeout=30,
+        max_retries=max_retries,
+    )
 
 
 @pytest.mark.asyncio
@@ -149,3 +162,35 @@ async def test_run_without_init_event_fails_with_no_agent_id(tmp_path, monkeypat
 
     with pytest.raises(TargetError, match="No agent_id found"):
         await _make_target(tmp_path).run(Sample(id=0, input="hello"))
+
+
+@pytest.fixture
+def backoffs(monkeypatch) -> list:
+    """The backoff of each retry, in seconds; retries don't actually sleep."""
+    slept = []
+    monkeypatch.setattr("letta_evals.targets.letta_code_target.anyio.sleep", AsyncMock(side_effect=slept.append))
+    return slept
+
+
+@pytest.mark.asyncio
+async def test_run_retries_a_failed_attempt(tmp_path, monkeypatch, backoffs):
+    _install_fake_letta(tmp_path, monkeypatch, b"\n".join([INIT_LINE_B, RESULT_LINE_B, b""]), fail_first=1)
+
+    result = await _make_target(tmp_path, max_retries=2).run(Sample(id=0, input="hello"))
+
+    assert result.agent_id == "agent-stream-test"
+    assert backoffs == [1]
+
+
+@pytest.mark.asyncio
+async def test_run_raises_the_last_attempts_error_once_retries_run_out(tmp_path, monkeypatch, backoffs):
+    _install_fake_letta(tmp_path, monkeypatch, b"\n".join([INIT_LINE_B, RESULT_LINE_B, b""]), returncode=1)
+
+    with pytest.raises(TargetError, match="return code 1") as exc_info:
+        await _make_target(tmp_path, max_retries=2).run(Sample(id=0, input="hello"))
+
+    assert (tmp_path / "bin" / "calls").read_text() == "3"
+    assert backoffs == [1, 2]
+    # What the failed attempt read from the stream comes with the error.
+    assert exc_info.value.agent_id == "agent-stream-test"
+    assert exc_info.value.agent_usage[0]["total_tokens"] == 15
