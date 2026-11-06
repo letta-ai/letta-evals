@@ -95,7 +95,7 @@ class LettaCodeTargetSpec(BaseModel):
 
     flags: Optional[str] = Field(
         default=None,
-        description="Additional CLI flags to pass to letta code (e.g., '--memfs --context-window 8000', "
+        description="Additional CLI flags to pass to letta code (e.g., '--memfs --no-skills', "
         "or tool restrictions like '--allowed-tools Bash Read'). "
         "Parsed with shell quoting rules so values with spaces can be quoted.",
     )

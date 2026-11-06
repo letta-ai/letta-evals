@@ -238,9 +238,6 @@ class Runner:
             if self.graders is None or self.suite.reward.metric_key not in self.graders:
                 raise ValueError(f"reward metric_key '{self.suite.reward.metric_key}' not found in graders")
 
-    def _should_cleanup_agent(self) -> bool:
-        return self.suite.cleanup
-
     # ── setup ──
 
     async def _run_setup(self, model_handle: Optional[str] = None) -> None:
@@ -616,12 +613,13 @@ class Runner:
                     await self.progress_callback.sample_error(result, model_handle=model_handle)
                 return result
             finally:
-                if self._should_cleanup_agent() and default_cwd:
-                    shutil.rmtree(default_cwd, ignore_errors=True)
-                if self._should_cleanup_agent() and local_backend_dir:
-                    shutil.rmtree(local_backend_dir, ignore_errors=True)
-                    logger.info(f"Removed local backend store {local_backend_dir} for sample {sample_id}")
-                elif self._should_cleanup_agent() and agent_id:
+                if self.suite.cleanup:
+                    for directory in (default_cwd, local_backend_dir):
+                        if directory:
+                            shutil.rmtree(directory, ignore_errors=True)
+                            logger.info(f"Removed {directory} for sample {sample_id}")
+                # A local agent went with its store; a server agent is deleted on the server.
+                if self.suite.cleanup and agent_id and not local_backend_dir:
                     try:
                         await self.client.agents.delete(agent_id=agent_id)
                         logger.info(f"Cleaned up agent {agent_id} for sample {sample_id}")

@@ -12,11 +12,7 @@ from letta_evals.targets.letta_code_target import LettaCodeTarget
 
 
 def _make_target(tmp_path, **overrides) -> LettaCodeTarget:
-    """Build a LettaCodeTarget with a stub client.
-
-    Note: ``working_dir`` and ``sandbox`` were removed in the Modal-sandbox
-    migration. Tests use ``base_dir=tmp_path`` for path-resolution scope.
-    """
+    """Build a LettaCodeTarget with a stub client."""
     kwargs = dict(
         client=None,  # _build_subprocess_env never touches the client
         model_handle="anthropic/claude-sonnet-4-5-20250929",

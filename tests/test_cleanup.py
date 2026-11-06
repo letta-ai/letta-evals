@@ -1,7 +1,5 @@
 """Unit tests for cleanup behavior."""
 
-from unittest.mock import MagicMock, patch
-
 from letta_evals.models import (
     LettaCodeTargetSpec,
     MetricRewardSpec,
@@ -46,47 +44,3 @@ class TestSuiteSpecCleanupField:
             cleanup=False,
         )
         assert suite.cleanup is False
-
-
-# ── Runner._should_cleanup_agent ──
-
-
-class TestShouldCleanupAgent:
-    """Test _should_cleanup_agent with various target/cleanup configurations."""
-
-    def _make_runner(self, suite: SuiteSpec):
-        """Create a Runner with mocked dependencies."""
-        with patch("letta_evals.runner.AsyncLetta"):
-            from letta_evals.runner import Runner
-
-            runner = MagicMock(spec=Runner)
-            runner.suite = suite
-            runner._should_cleanup_agent = Runner._should_cleanup_agent.__get__(runner)
-            return runner
-
-    def test_cleanup_false_letta_code(self):
-        suite = _make_suite(
-            LettaCodeTargetSpec(model_handles=["openai/gpt-4.1-mini"]),
-            cleanup=False,
-        )
-        runner = self._make_runner(suite)
-        assert runner._should_cleanup_agent() is False
-
-    def test_cleanup_true_letta_code(self):
-        suite = _make_suite(
-            LettaCodeTargetSpec(model_handles=["openai/gpt-4.1-mini"]),
-            cleanup=True,
-        )
-        runner = self._make_runner(suite)
-        assert runner._should_cleanup_agent() is True
-
-    def test_cleanup_true_letta_code_agent_script(self):
-        suite = _make_suite(
-            LettaCodeTargetSpec(
-                agent_script="setup.py:factory",
-                model_handles=["openai/gpt-4.1-mini"],
-            ),
-            cleanup=True,
-        )
-        runner = self._make_runner(suite)
-        assert runner._should_cleanup_agent() is True

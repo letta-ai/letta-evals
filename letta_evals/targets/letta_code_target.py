@@ -77,7 +77,7 @@ class LettaCodeTarget:
                 and --agent is used instead of --new-agent.
             base_dir: Suite directory; resolves relative ``agent_script`` and ``cwd`` paths
             flags: Additional CLI flags to pass to letta code, parsed with shell quoting
-                rules (e.g., "--memfs --context-window 8000").
+                rules (e.g., "--memfs --no-skills").
             permission_mode: Permission mode to pass through to Letta Code.
                 Use a current Letta Code CLI mode such as "unrestricted",
                 "standard", or "acceptEdits".
