@@ -202,7 +202,6 @@ class LettaCodeTarget:
         self,
         sample: Sample,
         progress_callback: Optional[ProgressCallback] = None,
-        project_id: Optional[str] = None,
     ) -> TargetResult:
         """Run the letta CLI command on a sample and return execution metadata.
 

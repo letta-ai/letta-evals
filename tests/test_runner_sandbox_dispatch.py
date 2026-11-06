@@ -109,7 +109,6 @@ def _make_runner_with_sandbox(
     runner.model_handles = [None]
     runner.stream_writer = None
     runner.output_path = None
-    runner.project_id = None
     return runner
 
 

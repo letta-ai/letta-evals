@@ -64,11 +64,6 @@ def run(
         "--base-url",
         help="Letta base URL override. If omitted and an API key is set, defaults to Letta Cloud",
     ),
-    project_id: Optional[str] = typer.Option(
-        None,
-        "--project-id",
-        help="Letta project ID override. If not provided, uses LETTA_PROJECT_ID from environment or suite config",
-    ),
     num_runs: Optional[int] = typer.Option(
         None,
         "--num-runs",
@@ -141,7 +136,6 @@ def run(
                 output_json,
                 api_key,
                 base_url,
-                project_id,
                 model_handle,
                 backend,
             )
@@ -227,7 +221,6 @@ def run(
             output_path=effective_output,
             letta_api_key=api_key,
             letta_base_url=base_url,
-            letta_project_id=project_id,
             num_runs=num_runs,
             model_handle=model_handle,
             backend=backend,
@@ -355,7 +348,6 @@ async def _run_single_sample(
     output_json_path: Path,
     api_key: Optional[str],
     base_url: Optional[str],
-    project_id: Optional[str],
     model_handle: Optional[str],
     backend: Optional[str] = None,
 ) -> None:
@@ -385,7 +377,6 @@ async def _run_single_sample(
         output_path=None,
         letta_api_key=api_key,
         letta_base_url=base_url,
-        letta_project_id=project_id,
     )
 
     if len(runner.model_handles) > 1:

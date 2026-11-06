@@ -67,7 +67,6 @@ class LettaCodeTargetSpec(BaseModel):
     base_url: Optional[str] = Field(default=None, description="Letta server URL")
     api_key: Optional[str] = Field(default=None, description="API key for authentication")
     timeout: float = Field(default=300.0, description="Request timeout in seconds")
-    project_id: Optional[str] = Field(default=None, description="Letta project ID")
     max_retries: int = Field(default=0, description="Maximum number of retries for failed target runs")
 
     # model handles to test (cloud-compatible model identifiers)

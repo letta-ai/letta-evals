@@ -14,7 +14,6 @@ If you are building agentic systems, high-quality evals are one of the fastest w
   - **Letta Cloud**: create an account at [app.letta.com](https://app.letta.com) and set:
     ```bash
     export LETTA_API_KEY=your-api-key
-    export LETTA_PROJECT_ID=your-project-id
     ```
     Then use `base_url: https://api.letta.com/` in your suite YAML, or pass `--base-url https://api.letta.com/` on the CLI.
 - Provider API keys for the models you use, such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_API_KEY`.
@@ -106,7 +105,7 @@ output: results/
 cleanup: true
 ```
 
-Relative paths in suite YAML are resolved from the suite file's directory. CLI flags such as `--max-concurrent`, `--output`, `--api-key`, `--base-url`, `--project-id`, and `--num-runs` override suite or environment defaults when provided.
+Relative paths in suite YAML are resolved from the suite file's directory. CLI flags such as `--max-concurrent`, `--output`, `--api-key`, `--base-url`, and `--num-runs` override suite or environment defaults when provided.
 
 ## Writing suites
 

@@ -82,7 +82,6 @@ npm install -g @letta-ai/letta-code
 2. **Set up environment variables:**
 ```bash
 export LETTA_API_KEY=your-api-key
-export LETTA_PROJECT_ID=your-project-id
 ```
 
 ### Run the evaluation:

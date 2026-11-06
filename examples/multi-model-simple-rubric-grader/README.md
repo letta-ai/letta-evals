@@ -38,7 +38,6 @@ letta-evals run suite.yaml
 Set these environment variables:
 ```bash
 export LETTA_API_KEY=your-api-key
-export LETTA_PROJECT_ID=your-project-id
 export OPENAI_API_KEY=your-openai-key
 ```
 
