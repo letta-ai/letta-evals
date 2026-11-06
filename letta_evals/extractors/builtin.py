@@ -51,7 +51,12 @@ def last_turn(trajectory: List[List[LettaMessageUnion]], config: dict) -> str:
 
 @extractor
 def pattern(trajectory: List[List[LettaMessageUnion]], config: dict) -> str:
-    """Extract content matching a regex pattern."""
+    """Extract content matching a regex pattern.
+
+    ``group`` is a regex group number (0 is the whole match), with or without
+    ``search_all``. If ``group`` is not set, ``search_all`` keeps returning what
+    ``re.findall`` returns for each match.
+    """
     pattern_str = config["pattern"]
     group = config.get("group", 0)
     search_all = config.get("search_all", False)
@@ -61,12 +66,12 @@ def pattern(trajectory: List[List[LettaMessageUnion]], config: dict) -> str:
     for msg in reversed(messages):
         content = flatten_content(msg.content)
         if search_all:
-            matches = re.findall(pattern_str, content)
+            if "group" in config:
+                matches = [m.group(group) or "" for m in re.finditer(pattern_str, content)]
+            else:
+                matches = [m[0] if isinstance(m, tuple) else m for m in re.findall(pattern_str, content)]
             if matches:
-                if isinstance(matches[0], tuple):
-                    return " ".join(m[group] for m in matches)
-                else:
-                    return " ".join(matches)
+                return " ".join(matches)
         else:
             match = re.search(pattern_str, content)
             if match:
