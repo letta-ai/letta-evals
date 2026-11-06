@@ -7,8 +7,7 @@ Three contracts:
         server-side trace metadata after the target returns an ``agent_id`` and
         surfaces it on ``SampleResult.token_data``.
   T0.2: The target's per-rollout ``context`` reaches graders and reward
-        composers and is persisted on ``SampleResult.context``, including when
-        the trace comes from cached results.
+        composers and is persisted on ``SampleResult.context``.
   T0.3: ``SampleResult`` validates with the optional ``token_data`` and
         ``context`` fields — both as ``None`` (default) and as fully
         populated objects.
@@ -94,8 +93,6 @@ def _make_runner(grader: _FakeGrader, target: MagicMock) -> Runner:
     runner.semaphore = anyio.Semaphore(1)
     runner.progress_callback = None
     runner.model_handles = [None]
-    runner.cached_results = None
-    runner._cached_trajectories = {}
     runner.stream_writer = None
     runner.output_path = None
     runner.project_id = None
@@ -152,8 +149,8 @@ def test_t0_3_sample_result_validates_with_token_data_populated():
 def test_t0_3_sample_result_round_trips_through_pydantic():
     """T0.3c: the new fields survive model_dump → model_validate.
 
-    Anyone caching SampleResults (e.g. for re-grading) needs both fields
-    to round-trip cleanly.
+    Sandboxed runs ship each SampleResult back to the host as JSON, so both
+    fields must round-trip cleanly.
     """
     original = SampleResult(
         sample_id=0,
@@ -319,39 +316,8 @@ async def test_t0_2_missing_context_gives_reward_composer_empty_dict(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_t0_2_cached_result_context_is_regraded_without_target(monkeypatch):
-    """Re-grading from cache reuses the persisted context; the factory/target does not rerun."""
-    grader = _FakeGrader()
-    target = MagicMock()
-    target.run = AsyncMock()
-    fetch_trajectory = AsyncMock()
-    monkeypatch.setattr("letta_evals.runner.fetch_trajectory", fetch_trajectory)
-
-    runner = _make_runner(grader, target)
-    cached = SampleResult(
-        sample_id=0,
-        agent_id="agent-cached",
-        model_handle="fake/model",
-        trajectory=[[]],
-        submissions={"acc": "x"},
-        grades={"acc": GradeResult(score=0.0)},
-        timing=Timing(total=0.0, target=0.0),
-        context={"memory_dir": "/ws/agent-cached"},
-    )
-    runner.cached_results = MagicMock()
-    runner._cached_trajectories = {0: {"fake/model": cached}}
-
-    result = await runner.run_sample(Sample(id=0, input="hi", ground_truth="ok"), model_handle=None)
-
-    target.run.assert_not_awaited()
-    fetch_trajectory.assert_not_awaited()
-    assert grader.last_context == {"memory_dir": "/ws/agent-cached"}
-    assert result.context == {"memory_dir": "/ws/agent-cached"}
-
-
-@pytest.mark.asyncio
 async def test_t0_2_grading_error_still_persists_context(monkeypatch):
-    """A grading failure keeps context on the result so a cached re-grade after the fix has it."""
+    """A grading failure still keeps context on the result."""
 
     class _RaisingGrader(_FakeGrader):
         async def grade(self, sample, trajectory, context=None):

@@ -73,12 +73,3 @@ def test_ensure_sample_migrates_placeholder_when_model_handle_arrives() -> None:
     assert (2, None) not in reducer.state.samples
     assert reducer.state.samples[(2, "gpt-5")] is sample
     assert sample.model_handle == "gpt-5"
-
-
-def test_get_from_cache_checks_model_specific_and_placeholder_entries() -> None:
-    reducer = ProgressStateReducer(ProgressRuntimeState())
-    reducer.ensure_sample(3, model_handle=None).from_cache = True
-
-    assert reducer.get_from_cache(3, None) is True
-    assert reducer.get_from_cache(3, "gpt-5") is True
-    assert reducer.get_from_cache(999, "gpt-5") is False

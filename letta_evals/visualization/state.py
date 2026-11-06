@@ -51,7 +51,6 @@ class SampleProgress:
     start_time: Optional[float] = None
     end_time: Optional[float] = None
     last_update_ts: Optional[float] = None
-    from_cache: bool = False
     metric_scores: Optional[Dict[str, float]] = None
     metric_rationales: Optional[Dict[str, str]] = None
 

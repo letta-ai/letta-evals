@@ -29,7 +29,6 @@ from letta_evals.models import (
     ModelSummary,
     RunnerResult,
     Sample,
-    SampleId,
     SampleResult,
     SuiteSpec,
     Summary,
@@ -41,7 +40,7 @@ from letta_evals.models import (
 from letta_evals.pricing import PricingOverrides, calculate_cost_from_agent_usage
 from letta_evals.rewards import LoadedRewardComposer, RewardContext, load_reward_composer
 from letta_evals.sandbox.dispatch import run_sample_in_sandbox
-from letta_evals.streaming import StreamingReader, StreamingWriter
+from letta_evals.streaming import StreamingWriter
 from letta_evals.targets.errors import TargetError
 from letta_evals.targets.letta_code_target import LettaCodeTarget
 from letta_evals.types import ErrorCategory
@@ -98,7 +97,6 @@ class Runner:
         suite: SuiteSpec,
         max_concurrent: int,
         progress_callback: Optional[ProgressCallback] = None,
-        cached_results: Optional[RunnerResult] = None,
         output_path: Optional[Path] = None,
         letta_api_key: Optional[str] = None,
         letta_base_url: Optional[str] = None,
@@ -151,10 +149,6 @@ class Runner:
             else None
         )
         self._model_identities: Dict[str, tuple] = {}
-        self.cached_results = cached_results
-        self._cached_trajectories: Dict[SampleId, Dict[str, SampleResult]] = (
-            self._build_trajectory_cache() if cached_results else {}
-        )
         # ``stream_writer`` is shared across runs in multi-run mode; if not
         # provided, the runner builds its own. ``current_run`` is the 1-based
         # index of this run inside that shared writer.
@@ -268,57 +262,7 @@ class Runner:
             logger.error(f"Error running setup script: {e}")
             raise RuntimeError(f"Setup failed: {e}") from e
 
-    # ── cache ──
-
-    def _build_trajectory_cache(self) -> Dict[SampleId, Dict[str, SampleResult]]:
-        """Cache previous results indexed by sample_id → model → SampleResult."""
-        cache: Dict[SampleId, Dict[str, SampleResult]] = defaultdict(dict)
-        if self.cached_results:
-            for model_id, model_run in self.cached_results.runs.items():
-                for result in model_run.results:
-                    cache[result.sample_id][model_id] = result
-        return cache
-
-    async def _cached_target_trace(
-        self,
-        sample: Sample,
-        model_handle: Optional[str],
-        return_token_data: bool = False,
-    ) -> Optional[TargetTrace]:
-        """Return this sample's trace from the cached results, or None when it isn't cached."""
-        if not self.cached_results:
-            return None
-        sample_id = sample.id
-        cached_result: Optional[SampleResult] = None
-        cached_models = self._cached_trajectories.get(sample_id)
-
-        if cached_models:
-            lookup_key = model_handle or DEFAULT_MODEL_ID
-            if lookup_key in cached_models:
-                cached_result = cached_models[lookup_key]
-            elif len(cached_models) == 1:
-                cached_result = next(iter(cached_models.values()))
-
-        if cached_result is None:
-            return None
-        if self.progress_callback:
-            await self.progress_callback.agent_created(
-                sample_id, agent_id=cached_result.agent_id, model_handle=model_handle, from_cache=True
-            )
-        # cached_result is a SampleResult (a TargetResult subclass); the
-        # requested handle wins over whatever the cache recorded.
-        result = cached_result.model_copy(update={"model_handle": model_handle or DEFAULT_MODEL_ID})
-        token_data = result.token_data
-        if return_token_data and result.agent_id and token_data is None:
-            token_data = await fetch_token_data(self.client, result.agent_id)
-        return TargetTrace(
-            trajectory=result.trajectory,
-            agent_id=result.agent_id,
-            model_handle=result.model_handle,
-            agent_usage=result.agent_usage,
-            context=result.context,
-            token_data=token_data,
-        )
+    # ── target run ──
 
     async def _run_target_trace(
         self,
@@ -441,17 +385,15 @@ class Runner:
                     return result
 
                 phase = ErrorCategory.TARGET
-                target_trace = await self._cached_target_trace(sample, model_handle, return_token_data)
-                if target_trace is None:
-                    # Each sample starts in its own empty directory unless its dataset
-                    # row or agent factory sets `cwd`; removed on cleanup.
-                    default_cwd = Path(tempfile.mkdtemp(prefix=f"letta-evals-cwd-{sample_id}-"))
-                    if self.suite.target.backend == "local":
-                        # Each sample's agent lives in its own Letta Code store, removed on cleanup.
-                        local_backend_dir = Path(tempfile.mkdtemp(prefix=f"letta-evals-{sample_id}-"))
-                    target_trace = await self._run_target_trace(
-                        sample, model_handle, default_cwd, local_backend_dir, return_token_data
-                    )
+                # Each sample starts in its own empty directory unless its dataset
+                # row or agent factory sets `cwd`; removed on cleanup.
+                default_cwd = Path(tempfile.mkdtemp(prefix=f"letta-evals-cwd-{sample_id}-"))
+                if self.suite.target.backend == "local":
+                    # Each sample's agent lives in its own Letta Code store, removed on cleanup.
+                    local_backend_dir = Path(tempfile.mkdtemp(prefix=f"letta-evals-{sample_id}-"))
+                target_trace = await self._run_target_trace(
+                    sample, model_handle, default_cwd, local_backend_dir, return_token_data
+                )
                 trajectory = target_trace.trajectory
                 agent_id = target_trace.agent_id
                 model_handle = target_trace.model_handle
@@ -780,7 +722,6 @@ async def run_suite(
     *,
     custom_progress_callback: Optional[ProgressCallback] = None,
     progress_style: ProgressStyle | str = ProgressStyle.NONE,
-    cached_results_path: Optional[Path] = None,
     output_path: Optional[Path] = None,
     letta_api_key: Optional[str] = None,
     letta_base_url: Optional[str] = None,
@@ -808,34 +749,6 @@ async def run_suite(
     suite.dataset_provenance = hf_dataset_provenance(suite.dataset)
 
     actual_num_runs = num_runs if num_runs is not None else (suite.num_runs or 1)
-
-    if actual_num_runs > 1 and cached_results_path:
-        raise ValueError("Cannot use --num-runs > 1 with --cached (results would be identical)")
-
-    cached_results = None
-    if cached_results_path:
-        if not cached_results_path.exists():
-            raise ValueError(f"Cached results file not found: {cached_results_path}")
-
-        cached_results = await StreamingReader.to_runner_result(cached_results_path)
-
-        cached_sample_map = {s.id: s for s in cached_results.samples}
-        samples = list(
-            load_dataset(
-                suite.dataset,
-                max_samples=suite.max_samples,
-                sample_tags=suite.sample_tags,
-                base_dir=suite.base_dir,
-            )
-        )
-
-        for sample in samples:
-            if sample.id in cached_sample_map:
-                cached_sample = cached_sample_map[sample.id]
-                if cached_sample.input != sample.input:
-                    raise ValueError(
-                        f"Sample ID {sample.id} input mismatch: dataset has '{sample.input}' but cache has '{cached_sample.input}'"
-                    )
 
     samples = list(
         load_dataset(
@@ -870,7 +783,6 @@ async def run_suite(
             total_evaluations=total_evaluations,
             console=Console() if style_val == ProgressStyle.RICH else None,
             max_concurrent=max_concurrent,
-            cached_mode=(cached_results_path is not None),
             metric_labels=metric_labels,
         )
 
@@ -893,7 +805,6 @@ async def run_suite(
             actual_num_runs=actual_num_runs,
             max_concurrent=max_concurrent,
             progress_cb=progress_cb,
-            cached_results=cached_results,
             output_path=output_path,
             letta_api_key=letta_api_key,
             letta_base_url=letta_base_url,
@@ -911,7 +822,6 @@ async def _execute_runs(
     actual_num_runs: int,
     max_concurrent: int,
     progress_cb: Optional[ProgressCallback],
-    cached_results: Optional[RunnerResult],
     output_path: Optional[Path],
     letta_api_key: Optional[str],
     letta_base_url: Optional[str],
@@ -944,7 +854,6 @@ async def _execute_runs(
             suite,
             max_concurrent=max_concurrent,
             progress_callback=progress_cb,
-            cached_results=cached_results,
             output_path=output_path,
             letta_api_key=letta_api_key,
             letta_base_url=letta_base_url,

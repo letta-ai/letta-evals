@@ -107,8 +107,6 @@ def _make_runner_with_sandbox(
     runner.semaphore = anyio.Semaphore(1)
     runner.progress_callback = None
     runner.model_handles = [None]
-    runner.cached_results = None
-    runner._cached_trajectories = {}
     runner.stream_writer = None
     runner.output_path = None
     runner.project_id = None

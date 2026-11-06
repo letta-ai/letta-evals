@@ -1,4 +1,4 @@
-"""Incremental writer + reader for evaluation results.
+"""Incremental writer for evaluation results.
 
 On-disk layout (always partitioned by model — there is always at least one
 model identifier, defaulting to ``"default"`` when the suite does not pin
@@ -25,14 +25,12 @@ JSON (no wrapper). ``suite.json`` and ``summary.json`` are single JSON files.
 
 import json
 from pathlib import Path
-from typing import Dict, List
+from typing import List
 
 import anyio
 
 from letta_evals.models import (
-    ModelRun,
     ModelSummary,
-    RunnerResult,
     Sample,
     SampleResult,
     SuiteSpec,
@@ -177,89 +175,6 @@ class StreamingWriter:
             path.write_text(payload, encoding="utf-8")
 
         await anyio.to_thread.run_sync(_write)
-
-
-class StreamingReader:
-    """Reads a streaming results directory back into a RunnerResult."""
-
-    @staticmethod
-    async def to_runner_result(path: Path) -> RunnerResult:
-        """Reconstruct a RunnerResult from an on-disk output directory."""
-        path = Path(path)
-
-        def _read() -> RunnerResult:
-            suite_path = path / "suite.json"
-            summary_path = path / "summary.json"
-            if not suite_path.exists():
-                raise FileNotFoundError(f"suite.json missing in {path}")
-            if not summary_path.exists():
-                raise FileNotFoundError(f"summary.json missing in {path}")
-
-            with open(suite_path, "r", encoding="utf-8") as f:
-                suite_obj = json.load(f)
-            with open(summary_path, "r", encoding="utf-8") as f:
-                summary_obj = json.load(f)
-
-            suite_spec = SuiteSpec(**suite_obj["config"])
-            samples = [Sample(**s) for s in suite_obj["samples"]]
-            summary = Summary(**summary_obj)
-
-            runs: Dict[str, ModelRun] = {}
-            for model_summary in summary.models:
-                segment = _safe_segment(model_summary.model)
-                model_dir = path / segment
-                model_jsonl = path / f"{segment}.jsonl"
-
-                if model_dir.is_dir():
-                    # Multi-run layout
-                    per_run_results: List[List[SampleResult]] = [
-                        _read_jsonl(rf) for rf in sorted(model_dir.glob("run_*.jsonl"))
-                    ]
-                    detailed_summary_path = model_dir / "summary.json"
-                    if detailed_summary_path.exists():
-                        with open(detailed_summary_path, "r", encoding="utf-8") as f:
-                            detailed_summary = ModelSummary(**json.load(f))
-                    else:
-                        detailed_summary = model_summary
-                    runs[model_summary.model] = ModelRun(
-                        model=model_summary.model,
-                        results=per_run_results[-1] if per_run_results else [],
-                        runs=per_run_results if per_run_results else None,
-                        summary=detailed_summary,
-                    )
-                elif model_jsonl.exists():
-                    # Single-run layout
-                    runs[model_summary.model] = ModelRun(
-                        model=model_summary.model,
-                        results=_read_jsonl(model_jsonl),
-                        runs=None,
-                        summary=model_summary,
-                    )
-                else:
-                    raise FileNotFoundError(
-                        f"No results file found for model {model_summary.model!r} in {path} "
-                        f"(expected {model_jsonl} or {model_dir}/run_*.jsonl)"
-                    )
-
-            return RunnerResult(
-                suite_spec=suite_spec,
-                samples=samples,
-                runs=runs,
-                summary=summary,
-            )
-
-        return await anyio.to_thread.run_sync(_read)
-
-
-def _read_jsonl(path: Path) -> List[SampleResult]:
-    out: List[SampleResult] = []
-    with open(path, "r", encoding="utf-8") as f:
-        for raw_line in f:
-            line = raw_line.strip()
-            if not line:
-                continue
-            out.append(SampleResult(**json.loads(line)))
-    return out
 
 
 def _safe_segment(name: str) -> str:

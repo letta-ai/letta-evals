@@ -90,9 +90,6 @@ letta-evals run suite.yaml --output results/
 # Run multiple times for aggregate statistics
 letta-evals run suite.yaml --num-runs 5 --output results/
 
-# Re-grade saved trajectories without re-running the target
-letta-evals run suite.yaml --cached results/openai-gpt-4.1-mini.jsonl
-
 # Validate suite configuration and list built-ins
 letta-evals validate suite.yaml
 letta-evals list-extractors
@@ -305,10 +302,6 @@ letta-evals run suite.yaml --model-handle baseten/dream-1@letta-research
 **Can I run evaluations repeatedly?**
 
 Yes. Use `--num-runs N` or `num_runs: N` to compute aggregate statistics across repeated suite runs.
-
-**Can I reuse trajectories while iterating on graders?**
-
-Yes. Save results with `--output`, then pass a saved JSONL file back with `--cached` to re-grade without re-running the target. `--num-runs > 1` is not supported with cached results because the trajectories would be identical.
 
 **Can I use this in CI/CD?**
 

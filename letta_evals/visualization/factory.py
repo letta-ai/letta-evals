@@ -27,7 +27,6 @@ def create_progress_callback(
     *,
     console: Optional[Console] = None,
     max_concurrent: int = 15,
-    cached_mode: bool = False,
     metric_labels: Optional[Dict[str, str]] = None,
 ) -> ProgressCallback:
     """Factory for built-in progress callbacks.
@@ -67,7 +66,6 @@ def create_progress_callback(
         rubric_model=rubric_model,
         max_concurrent=max_concurrent,
         console=console,
-        cached_mode=cached_mode,
         metric_labels=metric_labels,
     )
     return progress
