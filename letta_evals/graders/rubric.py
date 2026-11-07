@@ -21,17 +21,20 @@ class _JudgeResponse(PydanticBaseModel):
     ``score`` are re-applied Python-side via a post-parse clamp because
     not every provider honors numeric bound keywords (``minimum`` /
     ``maximum``) consistently.
+
+    ``rationale`` comes first: providers emit fields in schema order, so a
+    non-reasoning judge writes its reasoning before it commits to a score.
     """
 
-    score: float = PydanticField(ge=0.0, le=1.0, description="Score between 0.0 and 1.0")
     rationale: str = PydanticField(description="Explanation of the grading decision")
+    score: float = PydanticField(ge=0.0, le=1.0, description="Score between 0.0 and 1.0")
 
 
 class RubricGrader(Grader):
     """Grader that uses an LLM judge with custom rubric prompts.
 
     The rubric is sent verbatim to the judge after template substitution.
-    The framework only enforces the output schema ({score, rationale}) — it
+    The framework only enforces the output schema ({rationale, score}) — it
     does not add a system prompt, wrap the rubric, or auto-append the
     question / ground truth / submission. Use template placeholders
     ({input}, {ground_truth}, {submission}, plus keys from
