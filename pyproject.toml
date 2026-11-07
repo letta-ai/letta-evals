@@ -53,14 +53,6 @@ dev = [
     "ruff>=0.6.0",
     "pre-commit>=3.0.0",
 ]
-filesystem = [
-    "faker>=37.6.0",
-]
-skills = [
-    "pathspec>=0.12.1",
-    "openpyxl>=3.1.5",
-    "xlrd>=2.0.2",
-]
 
 [project.scripts]
 letta-evals = "letta_evals.cli:app"
@@ -75,7 +67,6 @@ target-version = "py311"
 exclude = [
     "examples/letta-code-simple-edit/sandbox", 
     "examples/letta-code-simple-edit/init_sandbox",
-    "letta-leaderboard/skills-suite/.skills",
 ]
 
 [tool.ruff.lint]
