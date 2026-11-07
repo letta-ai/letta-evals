@@ -25,8 +25,7 @@ graders:
   contains_check:
     kind: model_judge
     prompt_path: ../rubric.txt
-    model: gpt-5-mini
-    temperature: 0.0
+    model: gpt-6-luna
     provider: openai
     extractor: last_assistant
 

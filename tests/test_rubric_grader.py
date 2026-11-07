@@ -31,6 +31,7 @@ from letta_evals.models import (
     Sample,
     SuiteSpec,
 )
+from letta_evals.types import LLMProvider
 
 _FAKE_DATE = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
@@ -184,16 +185,14 @@ class TestLoaderPerSampleRubric:
 # ── RubricGrader.grade integration with a mocked OpenAI client ──────────────
 
 
-def _patch_openai(grader: RubricGrader) -> MagicMock:
-    """Replace grader.client with a mock and capture the call args."""
+def _patch_openai(grader: RubricGrader, output: dict | None = None) -> MagicMock:
+    """Replace grader.client with a mock Responses API client."""
 
-    mock_client = MagicMock()
-    mock_choice = MagicMock()
-    mock_choice.message.content = json.dumps({"score": 0.75, "rationale": "test"})
     mock_response = MagicMock()
-    mock_response.choices = [mock_choice]
-    mock_response.usage = MagicMock(model_dump=lambda: {"prompt_tokens": 1})
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    mock_response.output_text = json.dumps(output or {"score": 0.75, "rationale": "test"})
+    mock_response.usage = MagicMock(model_dump=lambda: {"input_tokens": 1})
+    mock_client = MagicMock()
+    mock_client.responses.create = AsyncMock(return_value=mock_response)
     grader.client = mock_client
     return mock_client
 
@@ -206,51 +205,45 @@ class TestRubricGraderGrade:
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
     async def test_uses_grader_prompt_when_sample_has_no_rubric(self):
-        grader = RubricGrader(prompt="grader-level: {input}/{submission}", model="gpt-4o-mini")
+        grader = RubricGrader(prompt="grader-level: {input}/{submission}")
         mock_client = _patch_openai(grader)
 
         sample = Sample(id=0, input="Q?")
         result, submission = await grader.grade(sample, _trajectory("SUB"))
 
         assert result.score == 0.75
-        call_kwargs = mock_client.chat.completions.create.call_args.kwargs
-        messages = call_kwargs["messages"]
+        call_kwargs = mock_client.responses.create.call_args.kwargs
+        assert call_kwargs["input"] == "grader-level: Q?/SUB"
         # No system prompt by default.
-        assert all(m["role"] != "system" for m in messages)
-        assert len(messages) == 1
-        assert messages[0]["content"] == "grader-level: Q?/SUB"
+        assert "instructions" not in call_kwargs
+        assert call_kwargs["store"] is False
 
     async def test_per_sample_rubric_overrides_grader_prompt(self):
-        grader = RubricGrader(prompt="grader-level: {input}", model="gpt-4o-mini")
-        _patch_openai(grader)
-        mock_client = grader.client
+        grader = RubricGrader(prompt="grader-level: {input}")
+        mock_client = _patch_openai(grader)
 
         sample = Sample(id=0, input="Q?", rubric="per-sample: {input}/{submission}")
         await grader.grade(sample, _trajectory("SUB"))
 
-        sent = mock_client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+        sent = mock_client.responses.create.call_args.kwargs["input"]
         assert sent == "per-sample: Q?/SUB"
         assert "grader-level" not in sent
 
     async def test_optional_system_prompt_threaded(self):
-        grader = RubricGrader(prompt="hi {input}", model="gpt-4o-mini", system_prompt="You are a strict judge.")
-        _patch_openai(grader)
-        mock_client = grader.client
+        grader = RubricGrader(prompt="hi {input}", system_prompt="You are a strict judge.")
+        mock_client = _patch_openai(grader)
 
         await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
-        messages = mock_client.chat.completions.create.call_args.kwargs["messages"]
-        assert messages[0]["role"] == "system"
-        assert messages[0]["content"] == "You are a strict judge."
+        assert mock_client.responses.create.call_args.kwargs["instructions"] == "You are a strict judge."
 
     async def test_no_legacy_wrapper_text_injected(self):
-        grader = RubricGrader(prompt="only-this", model="gpt-4o-mini")
-        _patch_openai(grader)
-        mock_client = grader.client
+        grader = RubricGrader(prompt="only-this")
+        mock_client = _patch_openai(grader)
 
         await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
-        sent = mock_client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+        sent = mock_client.responses.create.call_args.kwargs["input"]
         # Old wrapper headings should be entirely gone.
         for legacy in (
             "You are an evaluation judge",
@@ -264,21 +257,19 @@ class TestRubricGraderGrade:
         assert sent == "only-this"
 
     async def test_response_format_is_json_schema_non_strict(self):
-        grader = RubricGrader(prompt="x", model="gpt-4o-mini")
-        _patch_openai(grader)
-        mock_client = grader.client
+        grader = RubricGrader(prompt="x")
+        mock_client = _patch_openai(grader)
 
         await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
-        rf = mock_client.chat.completions.create.call_args.kwargs["response_format"]
-        assert rf["type"] == "json_schema"
-        js = rf["json_schema"]
+        fmt = mock_client.responses.create.call_args.kwargs["text"]["format"]
+        assert fmt["type"] == "json_schema"
         # We intentionally do NOT pass strict=true: it forbids `minimum` /
         # `maximum` keywords and would require a hand-built schema that
         # duplicates _JudgeResponse. The pydantic-derived schema is sent as
         # guidance, and the score is clamped to [0, 1] Python-side.
-        assert js.get("strict") in (None, False)
-        schema = js["schema"]
+        assert fmt["strict"] is False
+        schema = fmt["schema"]
         assert schema["type"] == "object"
         assert set(schema["required"]) == {"score", "rationale"}
         # Order matters: the judge reasons before it scores.
@@ -288,31 +279,65 @@ class TestRubricGraderGrade:
         """Belt-and-suspenders: even though the OpenAI strict schema lets
         unbounded numbers through, the grader clamps the parsed score into
         [0, 1] before returning it."""
-        grader = RubricGrader(prompt="x", model="gpt-4o-mini")
-        mock_client = MagicMock()
-        mock_choice = MagicMock()
-        mock_choice.message.content = json.dumps({"score": 2.5, "rationale": "ok"})
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-        mock_response.usage = MagicMock(model_dump=lambda: {})
-        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
-        grader.client = mock_client
+        grader = RubricGrader(prompt="x")
 
+        _patch_openai(grader, {"score": 2.5, "rationale": "ok"})
         result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
         assert result.score == 1.0
 
-        mock_choice.message.content = json.dumps({"score": -0.4, "rationale": "ok"})
+        _patch_openai(grader, {"score": -0.4, "rationale": "ok"})
         result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
         assert result.score == 0.0
 
     async def test_missing_rubric_returns_zero_with_error_metadata(self):
         # prompt=None and sample.rubric=None → graceful error result.
-        grader = RubricGrader(prompt=None, model="gpt-4o-mini")
+        grader = RubricGrader(prompt=None)
         _patch_openai(grader)
 
         result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
         assert result.score == 0.0
         assert result.metadata["error"] == "missing_rubric"
+
+
+# ── RubricGrader.grade with a mocked Anthropic client ───────────────────────
+
+
+def _anthropic_response(content: list, stop_reason: str = "end_turn") -> MagicMock:
+    response = MagicMock()
+    response.content = content
+    response.stop_reason = stop_reason
+    response.usage = MagicMock(
+        input_tokens=1, output_tokens=1, cache_creation_input_tokens=0, cache_read_input_tokens=0
+    )
+    return response
+
+
+@pytest.mark.asyncio
+class TestRubricGraderAnthropic:
+    @pytest.fixture
+    def grader(self, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+        grader = RubricGrader(prompt="x", model="claude-haiku-5-5", provider=LLMProvider.ANTHROPIC)
+        grader.client = MagicMock()
+        return grader
+
+    async def test_reads_text_after_thinking_block(self, grader):
+        thinking = MagicMock(type="thinking", spec=["type", "thinking"])
+        text = MagicMock(type="text", text=json.dumps({"score": 0.5, "rationale": "ok"}))
+        grader.client.messages.create = AsyncMock(return_value=_anthropic_response([thinking, text]))
+
+        result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
+
+        assert result.score == 0.5
+        assert result.rationale == "ok"
+
+    async def test_no_text_block_is_a_grading_error(self, grader):
+        grader.client.messages.create = AsyncMock(return_value=_anthropic_response([], stop_reason="refusal"))
+
+        result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
+
+        assert result.score == 0.0
+        assert "stop_reason=refusal" in result.metadata["error"]
 
 
 # ── Suite validator: missing rubric_vars detected pre-run ──────────────────

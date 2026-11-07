@@ -28,8 +28,7 @@ graders:
     kind: model_judge
     display_name: "task completion score"
     prompt_path: rubric_task_completion.txt
-    model: claude-haiku-4-5-20251001
-    temperature: 0.0
+    model: claude-haiku-5-5
     provider: anthropic
     max_retries: 3
     timeout: 120.0
@@ -39,8 +38,7 @@ graders:
     kind: model_judge
     display_name: "skill use score"
     prompt_path: rubric_skill_use.txt
-    model: claude-haiku-4-5-20251001
-    temperature: 0.0
+    model: claude-haiku-5-5
     provider: anthropic
     max_retries: 3
     timeout: 120.0

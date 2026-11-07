@@ -37,7 +37,6 @@ agent_question_generator:
 
   # LLM summarization settings (for context trimming)
   summary_max_tokens: 500
-  summary_temperature: 0.3
   summary_max_conversation_items: 30
 
   # Display settings
