@@ -140,6 +140,17 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.30.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.29.0...letta-evals-v0.30.0) (2026-11-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* Stop loading .env when letta_evals is imported ([#365](https://github.com/letta-ai/letta-evals/issues/365))
+
+### Bug Fixes
+
+* Stop loading .env when letta_evals is imported ([#365](https://github.com/letta-ai/letta-evals/issues/365)) ([6f332c2](https://github.com/letta-ai/letta-evals/commit/6f332c2efb0b0b854f998d85883541510a068f12))
+
 ## [0.29.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.28.0...letta-evals-v0.29.0) (2026-11-06)
 
 
