@@ -121,7 +121,7 @@ def truncate_content(content: str, max_tokens: int = 160000) -> str:
     client = anthropic.Anthropic(api_key=api_key)
 
     response = client.messages.count_tokens(
-        model="claude-haiku-4-5-20251001",
+        model="claude-haiku-5-5",
         messages=[{"role": "user", "content": content}],
     )
 

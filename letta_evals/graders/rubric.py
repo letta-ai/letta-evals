@@ -30,6 +30,11 @@ class _JudgeResponse(PydanticBaseModel):
     score: float = PydanticField(ge=0.0, le=1.0, description="Score between 0.0 and 1.0")
 
 
+# OpenAI models that accept temperature. Everything newer is a reasoning model,
+# which rejects it.
+_OPENAI_SAMPLING_MODEL_PREFIXES = ("gpt-4", "gpt-3.5")
+
+
 class RubricGrader(Grader):
     """Grader that uses an LLM judge with custom rubric prompts.
 
@@ -44,7 +49,7 @@ class RubricGrader(Grader):
     def __init__(
         self,
         prompt: Optional[str] = None,
-        model: str = "gpt-4o-mini",
+        model: str = "gpt-6-luna",
         temperature: float = 0.0,
         provider: LLMProvider = LLMProvider.OPENAI,
         max_retries: int = 5,
@@ -130,43 +135,37 @@ class RubricGrader(Grader):
 
         judge_prompt = build_judge_prompt(rubric_text, sample, submission)
 
-        temperature = self.temperature
-
         try:
             if self.provider == LLMProvider.OPENAI:
-                if (
-                    self.model.startswith("o1") or self.model.startswith("o3") or "gpt-5" in self.model.lower()
-                ) and temperature == 0.0:
-                    temperature = 1.0
-
-                messages = []
-                if self.system_prompt is not None:
-                    messages.append({"role": "system", "content": self.system_prompt})
-                messages.append({"role": "user", "content": judge_prompt})
-
-                response = await self.client.chat.completions.create(
+                kwargs = dict(
                     model=self.model,
-                    messages=messages,
-                    temperature=temperature,
-                    response_format={
-                        "type": "json_schema",
-                        "json_schema": {
+                    input=judge_prompt,
+                    text={
+                        "format": {
+                            "type": "json_schema",
                             "name": "JudgeResponse",
                             "schema": _JudgeResponse.model_json_schema(),
-                        },
+                            "strict": False,
+                        }
                     },
+                    store=False,
                 )
+                if self.system_prompt is not None:
+                    kwargs["instructions"] = self.system_prompt
+                if self.model.startswith(_OPENAI_SAMPLING_MODEL_PREFIXES):
+                    kwargs["temperature"] = self.temperature
+                response = await self.client.responses.create(**kwargs)
 
-                result_json = json.loads(response.choices[0].message.content)
+                result_json = json.loads(response.output_text)
                 usage = response.usage.model_dump() if response.usage else None
 
             elif self.provider == LLMProvider.ANTHROPIC:
                 from anthropic import transform_schema
 
+                # No temperature: current Claude models reject sampling parameters.
                 kwargs = dict(
                     model=self.model,
-                    max_tokens=4096,
-                    temperature=temperature,
+                    max_tokens=16000,
                     messages=[{"role": "user", "content": judge_prompt}],
                     output_config={"format": {"type": "json_schema", "schema": transform_schema(_JudgeResponse)}},
                 )
@@ -176,7 +175,11 @@ class RubricGrader(Grader):
                     ]
                 response = await self.client.messages.create(**kwargs)
 
-                result_json = json.loads(response.content[0].text)
+                # Models that think by default put a thinking block before the text.
+                text = next((block.text for block in response.content if block.type == "text"), None)
+                if text is None:
+                    raise ValueError(f"Judge returned no text (stop_reason={response.stop_reason})")
+                result_json = json.loads(text)
                 usage = {
                     "input_tokens": response.usage.input_tokens,
                     "output_tokens": response.usage.output_tokens,
@@ -189,7 +192,7 @@ class RubricGrader(Grader):
                 google_config_kwargs = dict(
                     response_mime_type="application/json",
                     response_schema=_JudgeResponse,
-                    temperature=temperature,
+                    temperature=self.temperature,
                 )
                 if self.system_prompt is not None:
                     google_config_kwargs["system_instruction"] = self.system_prompt
