@@ -8,8 +8,7 @@ the judge is asked again.
 Built-ins:
     score      the judge replies ``{rationale, score}`` and the score is used as is.
     checklist  the judge gives a MET/UNMET verdict on each criterion in
-               ``sample.rubric_vars["criteria"]`` (or the grader's ``criteria_var``),
-               and the score is computed from them.
+               ``sample.rubric_vars["criteria"]``, and the score is computed from them.
 """
 
 from typing import Any, Dict, List, Literal, Set
@@ -59,18 +58,16 @@ class ChecklistResponse(BaseModel):
     criteria: List[CriterionVerdict] = Field(description="One verdict per criterion, each criterion exactly once")
 
 
-def sample_criteria(sample: Sample, criteria_var: str = "criteria") -> List[Criterion]:
-    """Parse and check ``sample.rubric_vars[criteria_var]``.
+def sample_criteria(sample: Sample) -> List[Criterion]:
+    """Parse and check ``sample.rubric_vars["criteria"]``.
 
     Raises:
         ValueError: If the criteria are missing, malformed, have duplicate ids,
             or have no positive weight.
     """
-    raw = (sample.rubric_vars or {}).get(criteria_var)
+    raw = (sample.rubric_vars or {}).get("criteria")
     if not isinstance(raw, list) or not raw:
-        raise ValueError(
-            f"scorer 'checklist' needs rubric_vars['{criteria_var}']: a non-empty list of {{id, text, weight}}"
-        )
+        raise ValueError("scorer 'checklist' needs rubric_vars['criteria']: a non-empty list of {id, text, weight}")
     criteria = [Criterion.model_validate(item) for item in raw]
     ids = [c.id for c in criteria]
     duplicates = sorted({i for i in ids if ids.count(i) > 1})
@@ -81,9 +78,9 @@ def sample_criteria(sample: Sample, criteria_var: str = "criteria") -> List[Crit
     return criteria
 
 
-def checklist(sample: Sample, response: ChecklistResponse, criteria_var: str = "criteria") -> float:
+def checklist(sample: Sample, response: ChecklistResponse) -> float:
     """Weighted share of positive criteria MET, minus negative criteria MET, clipped to [0, 1]."""
-    criteria = sample_criteria(sample, criteria_var)
+    criteria = sample_criteria(sample)
     judged = [v.id for v in response.criteria]
     expected = {c.id for c in criteria}
     problems = []

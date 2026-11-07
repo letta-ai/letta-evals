@@ -208,7 +208,7 @@ Model-judge settings beyond the rubric:
 The judge replies in a fixed format, and a scorer turns the reply into the grade's score. The judge's full reply is saved in the grade's `metadata["response"]`. Set `scorer` to one of:
 
 - `score` (default): the judge replies `{rationale, score}` and the score is used as is.
-- `checklist`: the judge gives a MET or UNMET verdict on each criterion in the sample's `rubric_vars["criteria"]` (or the key named by `criteria_var`). Each criterion is `{id, text}`, with an optional `weight` (default 1). The score is the weight of positive criteria MET over the total positive weight. A negative weight marks a criterion that describes an error: when it's MET, its weight is subtracted. The score is clipped to [0, 1]. The rubric shows the judge the criteria, for example with `{% for c in criteria %}[{{ c.id }}] {{ c.text }}{% endfor %}`.
+- `checklist`: the judge gives a MET or UNMET verdict on each criterion in the sample's `rubric_vars["criteria"]`. Each criterion is `{id, text}`, with an optional `weight` (default 1). The score is the weight of positive criteria MET over the total positive weight. A negative weight marks a criterion that describes an error: when it's MET, its weight is subtracted. The score is clipped to [0, 1]. The rubric shows the judge the criteria, for example with `{% for c in criteria %}[{{ c.id }}] {{ c.text }}{% endfor %}`.
 - `file.py:function`: your own scorer, taking `(sample, response)` and returning a score in [0, 1]. It needs `response_format: file.py:ClassName`, the Pydantic model the judge replies with.
 
 ```yaml

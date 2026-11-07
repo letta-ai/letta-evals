@@ -282,10 +282,6 @@ class ModelJudgeGraderSpec(BaseGraderSpec):
             "rejects the reply, and the judge is asked again."
         ),
     )
-    criteria_var: str = Field(
-        default="criteria",
-        description="The rubric_vars key holding each sample's criteria, for scorer 'checklist'",
-    )
     response_format: Optional[str] = Field(
         default=None,
         description=(

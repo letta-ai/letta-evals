@@ -1,5 +1,4 @@
 import os
-from functools import partial
 from typing import Any, Dict, Optional, Tuple
 
 from pydantic import BaseModel
@@ -37,7 +36,7 @@ class RubricGrader(Grader):
         if spec.scorer == "score":
             self.scorer, self.response_format = score, ScoreResponse
         elif spec.scorer == "checklist":
-            self.scorer, self.response_format = partial(checklist, criteria_var=spec.criteria_var), ChecklistResponse
+            self.scorer, self.response_format = checklist, ChecklistResponse
         else:
             self.scorer = load_object(spec.scorer, base_dir=spec.base_dir)
             if not callable(self.scorer):

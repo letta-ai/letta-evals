@@ -97,6 +97,6 @@ def validate_model_judges(suite: SuiteSpec, samples: List[Sample]) -> None:
             try:
                 check_rubric(rubric, provided)
                 if grader_spec.scorer == "checklist":
-                    sample_criteria(sample, grader_spec.criteria_var)
+                    sample_criteria(sample)
             except (ValueError, TemplateSyntaxError) as e:
                 raise ValueError(f"Sample {sample.id}, grader '{grader_key}': {e}") from e

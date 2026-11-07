@@ -559,24 +559,6 @@ class TestChecklistGrader:
         assert result.metadata["rejections"] == ["each criterion must be judged exactly once: missing ['leak']"]
 
 
-@pytest.mark.asyncio
-class TestChecklistCriteriaVar:
-    @pytest.fixture(autouse=True)
-    def _openai_key(self, monkeypatch):
-        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-
-    async def test_criteria_var_names_the_list(self):
-        grader = _grader(prompt="x", scorer="checklist", criteria_var="task_criteria")
-        _patch_openai(grader, _verdicts(a="MET", b="UNMET"))
-        criteria = [{"id": "a", "text": "A"}, {"id": "b", "text": "B"}]
-
-        result, _ = await grader.grade(
-            Sample(id=0, input="Q?", rubric_vars={"task_criteria": criteria}), _trajectory("SUB")
-        )
-
-        assert result.score == 0.5
-
-
 # ── Custom response formats and scorers ─────────────────────────────────────
 
 _SCORING_PY = """
