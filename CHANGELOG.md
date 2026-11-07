@@ -140,6 +140,13 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.30.1](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.30.0...letta-evals-v0.30.1) (2026-11-07)
+
+
+### Chores
+
+* Remove the leaderboard suites and keep only the published results and site ([#374](https://github.com/letta-ai/letta-evals/issues/374)) ([db6b0f4](https://github.com/letta-ai/letta-evals/commit/db6b0f4e2e82f8cc28033ad7b9412675731dd980))
+
 ## [0.30.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.29.0...letta-evals-v0.30.0) (2026-11-07)
 
 
