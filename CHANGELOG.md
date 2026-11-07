@@ -140,6 +140,30 @@ regression test.
    prompt, either inline that text into the rubric or pass it via the new
    `system_prompt` field on the grader spec.
 
+## [0.30.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.29.0...letta-evals-v0.30.0) (2026-11-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **rubric:** Add judge response formats and scorers, including a checklist scorer ([#372](https://github.com/letta-ai/letta-evals/issues/372))
+* **rubric:** Render model-judge rubrics as sandboxed Jinja templates ([#371](https://github.com/letta-ai/letta-evals/issues/371))
+* **rubric:** Add reasoning effort, an output-token limit and a system prompt file to model judges ([#370](https://github.com/letta-ai/letta-evals/issues/370))
+* **rubric:** Use the Responses API, anthropic 2.x and current models for judges ([#368](https://github.com/letta-ai/letta-evals/issues/368))
+* Stop loading .env when letta_evals is imported ([#365](https://github.com/letta-ai/letta-evals/issues/365))
+
+### Features
+
+* **rubric:** Add judge response formats and scorers, including a checklist scorer ([#372](https://github.com/letta-ai/letta-evals/issues/372)) ([e71af89](https://github.com/letta-ai/letta-evals/commit/e71af899bc583b9dec2553aac00ffce4e2dfbce8))
+* **rubric:** Add reasoning effort, an output-token limit and a system prompt file to model judges ([#370](https://github.com/letta-ai/letta-evals/issues/370)) ([d75be83](https://github.com/letta-ai/letta-evals/commit/d75be83859826b8dadc72a1fb896e5b3ea0d44f4))
+* **rubric:** Render model-judge rubrics as sandboxed Jinja templates ([#371](https://github.com/letta-ai/letta-evals/issues/371)) ([4d3e9b5](https://github.com/letta-ai/letta-evals/commit/4d3e9b5c146c753a9fa1c225001f6ebe2fe92f04))
+* **rubric:** Use the Responses API, anthropic 2.x and current models for judges ([#368](https://github.com/letta-ai/letta-evals/issues/368)) ([1832dc7](https://github.com/letta-ai/letta-evals/commit/1832dc7661e1e096a6b8c191d3349fecf28a9f99))
+
+
+### Bug Fixes
+
+* **rubric:** Ask the judge for its rationale before its score ([#367](https://github.com/letta-ai/letta-evals/issues/367)) ([098ac73](https://github.com/letta-ai/letta-evals/commit/098ac73471a6230b36cc49984689c1dd1ad19a42))
+* Stop loading .env when letta_evals is imported ([#365](https://github.com/letta-ai/letta-evals/issues/365)) ([6f332c2](https://github.com/letta-ai/letta-evals/commit/6f332c2efb0b0b854f998d85883541510a068f12))
+
 ## [0.29.0](https://github.com/letta-ai/letta-evals/compare/letta-evals-v0.28.0...letta-evals-v0.29.0) (2026-11-06)
 
 
