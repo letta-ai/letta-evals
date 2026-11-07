@@ -65,7 +65,6 @@ Keep it brief but informative. This summary will help continue the conversation.
                 system="You are a helpful assistant that summarizes conversations.",  # System as parameter
                 messages=condensed_messages,
                 max_tokens=self.config.get("summary_max_tokens", 500),  # Keep summary concise
-                temperature=self.config.get("summary_temperature", 0.3),  # Lower temperature for factual summary
             )
 
             # Extract the summary text
