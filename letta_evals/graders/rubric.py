@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-from dotenv import load_dotenv
 from pydantic import BaseModel as PydanticBaseModel
 from pydantic import Field as PydanticField
 
@@ -12,8 +11,6 @@ from letta_evals.graders.base import Grader
 from letta_evals.graders.prompt_utils import build_judge_prompt
 from letta_evals.models import GradeResult, Sample
 from letta_evals.types import LLMProvider
-
-load_dotenv()
 
 
 class _JudgeResponse(PydanticBaseModel):
