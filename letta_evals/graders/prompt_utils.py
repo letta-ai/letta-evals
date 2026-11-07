@@ -18,7 +18,7 @@ no escaping. Referencing a variable the sample doesn't provide is an error.
 
 import re
 from functools import lru_cache
-from typing import Any, Dict, Iterable, Set
+from typing import Any, Dict, Iterable
 
 from jinja2 import StrictUndefined, Template, meta
 from jinja2.sandbox import SandboxedEnvironment
@@ -65,7 +65,10 @@ def check_rubric(rubric: str, provided: Iterable[str]) -> None:
 
     missing = template_variables(rubric) - provided
     if missing:
-        raise ValueError(f"Rubric references variables the sample doesn't provide: {sorted(missing)}")
+        raise ValueError(
+            f"Rubric references variables the sample doesn't provide: {sorted(missing)}. "
+            f"Available: {sorted(provided)}; add others via sample.rubric_vars."
+        )
 
 
 def judge_variables(sample: Sample, submission: str) -> Dict[str, Any]:
@@ -92,17 +95,10 @@ def build_judge_prompt(rubric: str, sample: Sample, submission: str) -> str:
     """Render a rubric template for one sample.
 
     Raises:
-        ValueError: If ``sample.rubric_vars`` contains a reserved variable name.
-        KeyError: If the rubric references a variable that is neither reserved
-            nor a key in ``sample.rubric_vars``.
+        ValueError: If ``sample.rubric_vars`` contains a reserved variable name,
+            or the rubric fails ``check_rubric``.
+        jinja2.TemplateError: If the rubric doesn't parse or fails while rendering.
     """
     variables = judge_variables(sample, submission)
-    missing: Set[str] = template_variables(rubric) - variables.keys()
-    if missing:
-        raise KeyError(
-            f"Rubric references {sorted(missing)} but no value was provided. "
-            f"Available variables: {sorted(variables)}. "
-            f"Reserved variables ({list(RESERVED_VARS)}) come from the Sample; "
-            f"add other variables via sample.rubric_vars."
-        )
+    check_rubric(rubric, variables)
     return _compile(rubric).render(variables)

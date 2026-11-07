@@ -75,9 +75,9 @@ class TestBuildJudgePrompt:
         assert build_judge_prompt("{{ input }}", s, "x") == "['turn1', 'turn2']"
         assert build_judge_prompt("{% for t in input %}<{{ t }}>{% endfor %}", s, "x") == "<turn1><turn2>"
 
-    def test_missing_var_raises_key_error_with_available_list(self):
+    def test_missing_var_raises_with_available_list(self):
         s = Sample(id=0, input="Q?", rubric_vars={"foo": "bar"})
-        with pytest.raises(KeyError) as exc:
+        with pytest.raises(ValueError) as exc:
             build_judge_prompt("hello {{ missing }}", s, "x")
         msg = str(exc.value)
         assert "missing" in msg
@@ -392,6 +392,26 @@ class TestRubricGraderGrade:
         assert "status=incomplete" in result.metadata["error"]
         assert mock_client.responses.parse.await_count == MAX_ATTEMPTS
 
+    @pytest.mark.parametrize(
+        "rubric, rubric_vars, error",
+        [
+            ("{{ input.__class__ }}", None, "unsafe"),
+            ("{{ input }}", {"input": "shadow"}, "collides"),
+            ("{% for c in items %}{{ c.wieght }}{% endfor %}", {"items": [{"weight": 1}]}, "wieght"),
+        ],
+    )
+    async def test_rubric_render_failure_is_a_grading_error(self, rubric, rubric_vars, error):
+        grader = _grader(prompt="x")
+        mock_client = _patch_openai(grader)
+
+        result, _ = await grader.grade(
+            Sample(id=0, input="Q?", rubric=rubric, rubric_vars=rubric_vars), _trajectory("SUB")
+        )
+
+        assert result.score == 0.0
+        assert error in result.metadata["error"]
+        mock_client.responses.parse.assert_not_awaited()
+
     async def test_api_error_is_not_asked_again(self):
         grader = _grader(prompt="x")
         mock_client = _patch_openai(grader, RuntimeError("boom"))
@@ -409,9 +429,7 @@ def _anthropic_reply(parsed, stop_reason: str = "end_turn") -> MagicMock:
     response = MagicMock()
     response.parsed_output = parsed
     response.stop_reason = stop_reason
-    response.usage = MagicMock(
-        input_tokens=1, output_tokens=1, cache_creation_input_tokens=0, cache_read_input_tokens=0
-    )
+    response.usage = MagicMock(model_dump=lambda: {"input_tokens": 1, "output_tokens": 2})
     return response
 
 
@@ -434,6 +452,7 @@ class TestRubricGraderAnthropic:
         result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
         assert result.score == 1.0
+        assert result.metadata["usage"] == {"input_tokens": 1, "output_tokens": 2}
         call_kwargs = grader.client.messages.parse.call_args.kwargs
         assert call_kwargs["output_format"] is ScoreResponse
         assert "output_config" not in call_kwargs
@@ -465,6 +484,36 @@ class TestRubricGraderAnthropic:
         assert result.score == 0.0
         assert "stop_reason=refusal" in result.metadata["error"]
         assert grader.client.messages.parse.await_count == MAX_ATTEMPTS
+
+
+# ── Judge clients ───────────────────────────────────────────────────────────
+
+
+class TestJudgeClients:
+    def test_openai_needs_a_key(self, monkeypatch):
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        with pytest.raises(Exception, match="OPENAI_API_KEY"):
+            _grader(prompt="x")
+
+    def test_anthropic_needs_a_key(self, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        with pytest.raises(ValueError, match="ANTHROPIC_API_KEY"):
+            _grader(prompt="x", model="claude-haiku-5-5", provider=LLMProvider.ANTHROPIC)
+
+    @pytest.mark.parametrize(
+        "provider, key_var, url_var",
+        [
+            (LLMProvider.OPENAI, "OPENAI_API_KEY", "OPENAI_BASE_URL"),
+            (LLMProvider.ANTHROPIC, "ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"),
+        ],
+    )
+    def test_base_url_and_client_settings(self, monkeypatch, provider, key_var, url_var):
+        monkeypatch.setenv(key_var, "sk-test")
+        monkeypatch.setenv(url_var, "http://judge-proxy.test/v1")
+        grader = _grader(prompt="x", provider=provider, max_retries=2, timeout=30.0)
+        assert str(grader.client.base_url).startswith("http://judge-proxy.test/v1")
+        assert grader.client.max_retries == 2
+        assert grader.client.timeout == 30.0
 
 
 # ── Checklist scorer ────────────────────────────────────────────────────────
@@ -699,6 +748,12 @@ class TestValidateModelJudgesPreRun:
         suite = _minimal_suite("Grade {submission}", tmp_path)
         with pytest.raises(ValueError, match="single-brace"):
             validate_model_judges(suite, [Sample(id=0, input="Q?")])
+
+    def test_reserved_rubric_var_stops_the_run(self, tmp_path: Path):
+        suite = _minimal_suite("{{ input }}", tmp_path)
+        samples = [Sample(id=3, input="Q?", rubric_vars={"submission": "shadow"})]
+        with pytest.raises(ValueError, match=r"Sample 3, grader 'g'.*collides"):
+            validate_model_judges(suite, samples)
 
     def test_syntax_error_stops_the_run(self, tmp_path: Path):
         suite = _minimal_suite("{% if %}", tmp_path)

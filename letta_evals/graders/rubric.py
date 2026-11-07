@@ -47,42 +47,19 @@ class RubricGrader(Grader):
         if spec.scorer == "score" and "score" not in self.response_format.model_fields:
             raise ValueError(f"scorer 'score' needs a score field, and {spec.response_format} has none")
 
+        # Both SDKs read their API key and base URL (OPENAI_BASE_URL / ANTHROPIC_BASE_URL) from the
+        # environment. OpenAI's raises here without a key; Anthropic's would only fail on the first call.
         if spec.provider == LLMProvider.OPENAI:
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise ValueError("OPENAI_API_KEY not found in environment variables")
-
             from openai import AsyncOpenAI
 
-            client_kwargs = {
-                "api_key": api_key,
-                "max_retries": spec.max_retries,
-                "timeout": spec.timeout,
-            }
-
-            base_url = os.getenv("OPENAI_BASE_URL")
-            if base_url:
-                client_kwargs["base_url"] = base_url
-
-            self.client = AsyncOpenAI(**client_kwargs)
+            self.client = AsyncOpenAI(max_retries=spec.max_retries, timeout=spec.timeout)
         elif spec.provider == LLMProvider.ANTHROPIC:
-            api_key = os.getenv("ANTHROPIC_API_KEY")
-            if not api_key:
+            if not os.getenv("ANTHROPIC_API_KEY"):
                 raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
 
             from anthropic import AsyncAnthropic
 
-            client_kwargs = {
-                "api_key": api_key,
-                "max_retries": spec.max_retries,
-                "timeout": spec.timeout,
-            }
-
-            base_url = os.getenv("ANTHROPIC_BASE_URL")
-            if base_url:
-                client_kwargs["base_url"] = base_url
-
-            self.client = AsyncAnthropic(**client_kwargs)
+            self.client = AsyncAnthropic(max_retries=spec.max_retries, timeout=spec.timeout)
         else:
             raise ValueError(f"Unsupported provider: {spec.provider}")
 
@@ -94,25 +71,25 @@ class RubricGrader(Grader):
         if early:
             return early
 
-        # Per-sample rubric overrides the grader-level rubric.
-        rubric_text = sample.rubric if sample.rubric is not None else self.spec.prompt
-        judge_prompt = build_judge_prompt(rubric_text, sample, submission)
-
         try:
+            # Per-sample rubric overrides the grader-level rubric.
+            rubric_text = sample.rubric if sample.rubric is not None else self.spec.prompt
+            judge_prompt = build_judge_prompt(rubric_text, sample, submission)
+
             rejections = []
             for _ in range(MAX_ATTEMPTS):
                 try:
                     response, usage = await self._ask_judge(judge_prompt)
-                    score = float(self.scorer(sample, response))
-                    if not 0.0 <= score <= 1.0:
-                        raise ValueError(f"scorer returned {score}, outside [0, 1]")
+                    value = float(self.scorer(sample, response))
+                    if not 0.0 <= value <= 1.0:
+                        raise ValueError(f"scorer returned {value}, outside [0, 1]")
                 except ValueError as e:  # includes pydantic's ValidationError
                     rejections.append(str(e))
                     continue
 
                 rationale = getattr(response, "rationale", None)
                 return GradeResult(
-                    score=score,
+                    score=value,
                     rationale=rationale if isinstance(rationale, str) else response.model_dump_json(),
                     metadata={
                         "model": self.spec.model,
@@ -169,12 +146,7 @@ class RubricGrader(Grader):
             kwargs["system"] = [{"type": "text", "text": self.system_prompt, "cache_control": {"type": "ephemeral"}}]
         response = await self.client.messages.parse(**kwargs)
 
-        usage = {
-            "input_tokens": response.usage.input_tokens,
-            "output_tokens": response.usage.output_tokens,
-            "cache_creation_input_tokens": getattr(response.usage, "cache_creation_input_tokens", 0),
-            "cache_read_input_tokens": getattr(response.usage, "cache_read_input_tokens", 0),
-        }
+        usage = response.usage.model_dump()
         # Models that think by default put a thinking block before the text; parsed_output skips it.
         if response.parsed_output is None:
             raise ValueError(f"Judge returned no reply (stop_reason={response.stop_reason})")
