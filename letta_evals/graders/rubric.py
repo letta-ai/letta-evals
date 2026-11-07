@@ -101,7 +101,7 @@ class RubricGrader(Grader):
 
         try:
             rejections = []
-            for attempt in range(1, MAX_ATTEMPTS + 1):
+            for _ in range(MAX_ATTEMPTS):
                 try:
                     response, usage = await self._ask_judge(judge_prompt)
                     score = float(self.scorer(sample, response))
@@ -118,7 +118,7 @@ class RubricGrader(Grader):
                     metadata={
                         "model": self.spec.model,
                         "response": response.model_dump(mode="json"),
-                        "attempts": attempt,
+                        "rejections": rejections,
                         "usage": usage,
                         "extraction_time": extraction_time,
                     },

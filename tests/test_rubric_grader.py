@@ -351,7 +351,7 @@ class TestRubricGraderGrade:
             assert legacy not in sent
         assert sent == "only-this"
 
-    async def test_reply_and_attempts_saved_in_metadata(self):
+    async def test_reply_saved_in_metadata(self):
         grader = _grader(prompt="x")
         _patch_openai(grader, ScoreResponse(rationale="looks right", score=1.0))
 
@@ -359,7 +359,7 @@ class TestRubricGraderGrade:
 
         assert result.rationale == "looks right"
         assert result.metadata["response"] == {"rationale": "looks right", "score": 1.0}
-        assert result.metadata["attempts"] == 1
+        assert result.metadata["rejections"] == []
         assert "error" not in result.metadata
 
     async def test_invalid_reply_is_asked_again(self):
@@ -369,7 +369,7 @@ class TestRubricGraderGrade:
         result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
         assert result.score == 0.5
-        assert result.metadata["attempts"] == 2
+        assert len(result.metadata["rejections"]) == 1
         assert mock_client.responses.parse.await_count == 2
 
     async def test_missing_reply_is_asked_again(self):
@@ -379,7 +379,7 @@ class TestRubricGraderGrade:
         result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
         assert result.score == 0.5
-        assert result.metadata["attempts"] == 2
+        assert len(result.metadata["rejections"]) == 1
 
     async def test_rejected_on_every_attempt_is_a_grading_error(self):
         grader = _grader(prompt="x")
@@ -556,7 +556,7 @@ class TestChecklistGrader:
         result, _ = await grader.grade(_checklist_sample(), _trajectory("SUB"))
 
         assert result.score == 1.0
-        assert result.metadata["attempts"] == 2
+        assert result.metadata["rejections"] == ["each criterion must be judged exactly once: missing ['leak']"]
 
 
 @pytest.mark.asyncio
@@ -649,7 +649,7 @@ class TestCustomResponseFormat:
         result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
         assert result.score == 0.0
-        assert result.metadata["attempts"] == 2
+        assert len(result.metadata["rejections"]) == 1
 
     async def test_default_scorer_with_custom_format(self, suite_dir: Path):
         grader = _grader(prompt="x", response_format="scoring.py:Bounded", base_dir=suite_dir)
