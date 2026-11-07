@@ -194,6 +194,13 @@ graders:
     extractor: last_assistant
 ```
 
+Model-judge settings beyond the rubric:
+
+- `system_prompt_path`: a file sent verbatim as the judge's system prompt. By default no system prompt is sent.
+- `reasoning_effort`: one of `none`, `minimal`, `low`, `medium`, `high`, `xhigh` or `max`, sent as `reasoning.effort` to OpenAI and `output_config.effort` to Anthropic. Each provider and model accepts a subset. Unset leaves the provider's default.
+- `max_output_tokens`: the most tokens the judge may generate, reasoning included (default 16000).
+- `max_retries` and `timeout`: retries and per-request timeout in seconds for the judge's API calls (defaults 5 and 120).
+
 Use `letta-evals list-graders` and `letta-evals list-extractors` for built-ins. You can register custom Python graders, extractors, setup hooks, and agent factories with decorators; see [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-and-extractor/) and [`examples/programmatic-agent-creation/`](examples/programmatic-agent-creation/).
 
 ### Rewards

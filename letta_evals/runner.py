@@ -216,17 +216,7 @@ class Runner:
                         base_dir=gspec.base_dir,
                     )
                 elif isinstance(gspec, ModelJudgeGraderSpec):
-                    self.graders[key] = RubricGrader(
-                        prompt=gspec.prompt,
-                        model=gspec.model,
-                        provider=gspec.provider,
-                        max_retries=gspec.max_retries,
-                        timeout=gspec.timeout,
-                        extractor=gspec.extractor,
-                        extractor_config=gspec.extractor_config,
-                        base_dir=gspec.base_dir,
-                        system_prompt=gspec.system_prompt,
-                    )
+                    self.graders[key] = RubricGrader(gspec)
                 else:
                     raise ValueError(f"Unknown grader spec type: {type(gspec)}")
         else:
