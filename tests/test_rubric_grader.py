@@ -281,7 +281,8 @@ class TestRubricGraderGrade:
         schema = js["schema"]
         assert schema["type"] == "object"
         assert set(schema["required"]) == {"score", "rationale"}
-        assert set(schema["properties"]) == {"score", "rationale"}
+        # Order matters: the judge reasons before it scores.
+        assert list(schema["properties"]) == ["rationale", "score"]
 
     async def test_score_is_clamped_to_unit_interval(self):
         """Belt-and-suspenders: even though the OpenAI strict schema lets
