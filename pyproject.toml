@@ -32,7 +32,6 @@ dependencies = [
     "jsonpath-ng>=1.6.0",
     "openai>=1.66.0",
     "anthropic>=2.6.0",
-    "google-genai>=1.0.0",
     "python-dotenv>=1.0.0",
     "modal>=1.5.4",
     "anyio==4.10.0",

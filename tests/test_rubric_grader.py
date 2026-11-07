@@ -275,14 +275,6 @@ class TestRubricGraderGrade:
         # Order matters: the judge reasons before it scores.
         assert list(schema["properties"]) == ["rationale", "score"]
 
-    async def test_temperature_not_sent(self):
-        grader = RubricGrader(prompt="x", temperature=0.3)
-        mock_client = _patch_openai(grader)
-
-        await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
-
-        assert "temperature" not in mock_client.responses.create.call_args.kwargs
-
     async def test_score_is_clamped_to_unit_interval(self):
         """Belt-and-suspenders: even though the OpenAI strict schema lets
         unbounded numbers through, the grader clamps the parsed score into
@@ -338,14 +330,6 @@ class TestRubricGraderAnthropic:
 
         assert result.score == 0.5
         assert result.rationale == "ok"
-
-    async def test_temperature_not_sent(self, grader):
-        text = MagicMock(type="text", text=json.dumps({"score": 0.5, "rationale": "ok"}))
-        grader.client.messages.create = AsyncMock(return_value=_anthropic_response([text]))
-
-        await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
-
-        assert "temperature" not in grader.client.messages.create.call_args.kwargs
 
     async def test_no_text_block_is_a_grading_error(self, grader):
         grader.client.messages.create = AsyncMock(return_value=_anthropic_response([], stop_reason="refusal"))

@@ -16,7 +16,7 @@ from letta_evals.types import LLMProvider
 class _JudgeResponse(PydanticBaseModel):
     """Shared schema for judge responses across all providers.
 
-    Sent verbatim to all three providers (OpenAI, Anthropic, Google) as a
+    Sent verbatim to both providers (OpenAI, Anthropic) as a
     JSON schema response format. The schema acts as guidance — bounds on
     ``score`` are re-applied Python-side via a post-parse clamp because
     not every provider honors numeric bound keywords (``minimum`` /
@@ -45,7 +45,6 @@ class RubricGrader(Grader):
         self,
         prompt: Optional[str] = None,
         model: str = "gpt-6-luna",
-        temperature: float = 0.0,
         provider: LLMProvider = LLMProvider.OPENAI,
         max_retries: int = 5,
         timeout: float = 120.0,
@@ -57,7 +56,6 @@ class RubricGrader(Grader):
         self.prompt = prompt
         self.system_prompt = system_prompt
         self.model = model
-        self.temperature = temperature
         self.provider = provider
         self.extractor = get_extractor(extractor, extractor_config, base_dir=base_dir)
 
@@ -97,14 +95,6 @@ class RubricGrader(Grader):
                 client_kwargs["base_url"] = base_url
 
             self.client = AsyncAnthropic(**client_kwargs)
-        elif provider == LLMProvider.GOOGLE:
-            api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-            if not api_key:
-                raise ValueError("GEMINI_API_KEY or GOOGLE_API_KEY not found in environment variables")
-
-            from google import genai
-
-            self.client = genai.Client(api_key=api_key)
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
@@ -132,7 +122,6 @@ class RubricGrader(Grader):
 
         try:
             if self.provider == LLMProvider.OPENAI:
-                # No temperature: current OpenAI models are reasoning models and reject it.
                 kwargs = dict(
                     model=self.model,
                     input=judge_prompt,
@@ -156,7 +145,6 @@ class RubricGrader(Grader):
             elif self.provider == LLMProvider.ANTHROPIC:
                 from anthropic import transform_schema
 
-                # No temperature: current Claude models reject sampling parameters.
                 kwargs = dict(
                     model=self.model,
                     max_tokens=16000,
@@ -180,30 +168,6 @@ class RubricGrader(Grader):
                     "cache_creation_input_tokens": getattr(response.usage, "cache_creation_input_tokens", 0),
                     "cache_read_input_tokens": getattr(response.usage, "cache_read_input_tokens", 0),
                 }
-            elif self.provider == LLMProvider.GOOGLE:
-                from google import genai
-
-                google_config_kwargs = dict(
-                    response_mime_type="application/json",
-                    response_schema=_JudgeResponse,
-                    temperature=self.temperature,
-                )
-                if self.system_prompt is not None:
-                    google_config_kwargs["system_instruction"] = self.system_prompt
-                response = await self.client.aio.models.generate_content(
-                    model=self.model,
-                    contents=judge_prompt,
-                    config=genai.types.GenerateContentConfig(**google_config_kwargs),
-                )
-                result_json = json.loads(response.text)
-                usage = None
-                if response.usage_metadata:
-                    usage = {
-                        "prompt_tokens": response.usage_metadata.prompt_token_count,
-                        "completion_tokens": response.usage_metadata.candidates_token_count,
-                        "total_tokens": response.usage_metadata.total_token_count,
-                        "cached_content_token_count": getattr(response.usage_metadata, "cached_content_token_count", 0),
-                    }
             else:
                 raise ValueError(f"Unsupported provider: {self.provider}")
 

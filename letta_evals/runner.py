@@ -219,7 +219,6 @@ class Runner:
                     self.graders[key] = RubricGrader(
                         prompt=gspec.prompt,
                         model=gspec.model,
-                        temperature=gspec.temperature,
                         provider=gspec.provider,
                         max_retries=gspec.max_retries,
                         timeout=gspec.timeout,

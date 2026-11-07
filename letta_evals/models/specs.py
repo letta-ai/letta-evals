@@ -265,11 +265,7 @@ class ModelJudgeGraderSpec(BaseGraderSpec):
     prompt_path: Optional[Path] = Field(default=None, description="Path to file containing prompt")
     model: str = Field(
         default="gpt-6-luna",
-        description="LLM model to use for model judge (e.g., gpt-6-luna for OpenAI, claude-haiku-5-5 for Anthropic, gemini-3-flash-preview for Google)",
-    )
-    temperature: float = Field(
-        default=0.0,
-        description="Temperature for a Google model judge. OpenAI and Anthropic judges don't send it, since their current models reject it.",
+        description="LLM model to use for model judge (e.g., gpt-6-luna for OpenAI, claude-haiku-5-5 for Anthropic)",
     )
     provider: LLMProvider = Field(default=LLMProvider.OPENAI, description="LLM provider for model judge")
     max_retries: int = Field(default=5, description="Maximum number of retries for model judge")

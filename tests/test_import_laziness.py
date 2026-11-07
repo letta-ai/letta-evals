@@ -13,7 +13,7 @@ import letta_evals
 
 unexpected = [
     module_name
-    for module_name in ("anthropic", "google.genai", "openai", "pandas")
+    for module_name in ("anthropic", "openai", "pandas")
     if module_name in sys.modules
 ]
 if unexpected:

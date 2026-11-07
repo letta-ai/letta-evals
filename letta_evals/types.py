@@ -14,7 +14,6 @@ class RewardKind(str, Enum):
 class LLMProvider(str, Enum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
-    GOOGLE = "google"
 
 
 class ErrorCategory(str, Enum):

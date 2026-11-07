@@ -189,7 +189,7 @@ graders:
   quality:
     kind: model_judge
     prompt_path: rubric.txt
-    model: gpt-5-mini
+    model: gpt-6-luna
     provider: openai
     extractor: last_assistant
 ```
