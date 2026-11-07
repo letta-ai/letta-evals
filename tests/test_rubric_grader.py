@@ -1,15 +1,15 @@
 """Tests for the redesigned rubric grader.
 
 Covers:
-- ``build_judge_prompt`` template substitution semantics.
+- ``build_judge_prompt`` Jinja rendering, and ``check_rubric``'s template checks.
 - ``Sample.rubric`` / ``Sample.rubric_path`` mutual-exclusion validation.
 - The JSONL/CSV loader resolving per-sample rubric overrides.
 - ``RubricGrader.grade`` precedence (per-sample rubric > grader prompt),
   the system prompt file, reasoning effort and output-token settings sent
   to each provider, and the absence of legacy wrapper injection in the
   prompt sent to the judge.
-- The pre-run validator (``validate_rubric_vars``) catching
-  missing ``sample.rubric_vars`` keys before any judge call.
+- The pre-run validator (``validate_rubric_templates``) checking every
+  sample's rubric before any agent runs.
 - ``ModelJudgeGraderSpec`` validation of the judge call settings.
 """
 
@@ -21,10 +21,13 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from jinja2 import TemplateSyntaxError
+from jinja2.exceptions import SecurityError
 from letta_client.types.agents import AssistantMessage
 
 from letta_evals.datasets.loader import load_csv, load_jsonl
-from letta_evals.graders.prompt_utils import RESERVED_VARS, build_judge_prompt
+from letta_evals.execution.grading import validate_rubric_templates
+from letta_evals.graders.prompt_utils import RESERVED_VARS, build_judge_prompt, check_rubric
 from letta_evals.graders.rubric import RubricGrader
 from letta_evals.models import (
     LettaCodeTargetSpec,
@@ -48,24 +51,23 @@ def _trajectory(text: str) -> list[list]:
 class TestBuildJudgePrompt:
     def test_basic_substitution(self):
         s = Sample(id=0, input="Q?", ground_truth="A", rubric_vars={"k": "v"})
-        out = build_judge_prompt("in={input} gt={ground_truth} sub={submission} k={k}", s, "SUB")
+        out = build_judge_prompt("in={{ input }} gt={{ ground_truth }} sub={{ submission }} k={{ k }}", s, "SUB")
         assert out == "in=Q? gt=A sub=SUB k=v"
 
     def test_ground_truth_none_becomes_empty_string(self):
         s = Sample(id=0, input="Q?", ground_truth=None)
-        out = build_judge_prompt("[{ground_truth}]", s, "x")
+        out = build_judge_prompt("[{{ ground_truth }}]", s, "x")
         assert out == "[]"
 
-    def test_input_list_is_stringified(self):
+    def test_input_list_renders_as_list(self):
         s = Sample(id=0, input=["turn1", "turn2"], ground_truth="A")
-        out = build_judge_prompt("{input}", s, "x")
-        # str() of a list — verbatim, no special joining
-        assert out == "['turn1', 'turn2']"
+        assert build_judge_prompt("{{ input }}", s, "x") == "['turn1', 'turn2']"
+        assert build_judge_prompt("{% for t in input %}<{{ t }}>{% endfor %}", s, "x") == "<turn1><turn2>"
 
     def test_missing_var_raises_key_error_with_available_list(self):
         s = Sample(id=0, input="Q?", rubric_vars={"foo": "bar"})
         with pytest.raises(KeyError) as exc:
-            build_judge_prompt("hello {missing}", s, "x")
+            build_judge_prompt("hello {{ missing }}", s, "x")
         msg = str(exc.value)
         assert "missing" in msg
         assert "foo" in msg
@@ -75,22 +77,58 @@ class TestBuildJudgePrompt:
     def test_reserved_collision_raises_value_error(self):
         s = Sample(id=0, input="x", rubric_vars={"input": "shadow"})
         with pytest.raises(ValueError, match="reserved"):
-            build_judge_prompt("hi {input}", s, "sub")
+            build_judge_prompt("hi {{ input }}", s, "sub")
 
-    def test_escaped_literal_braces_preserved(self):
+    def test_single_braces_are_literal(self):
         s = Sample(id=0, input="Q?")
-        out = build_judge_prompt("answer in {{brackets}} like {input}", s, "x")
-        assert out == "answer in {brackets} like Q?"
+        out = build_judge_prompt('Reply like {"score": 1} for {{ input }}', s, "x")
+        assert out == 'Reply like {"score": 1} for Q?'
 
-    def test_no_rubric_vars_only_reserved_available(self):
+    def test_structured_rubric_vars_can_be_looped_over(self):
+        criteria = [{"id": "c1", "text": "Names Paris", "weight": 2}, {"id": "c2", "text": "Is short"}]
+        s = Sample(id=0, input="Q?", rubric_vars={"criteria": criteria})
+        out = build_judge_prompt("{% for c in criteria %}- [{{ c.id }}] {{ c.text }}\n{% endfor %}", s, "x")
+        assert out == "- [c1] Names Paris\n- [c2] Is short\n"
+
+    def test_trailing_newline_kept(self):
         s = Sample(id=0, input="Q?")
-        out = build_judge_prompt("{input}/{submission}", s, "SUB")
-        assert out == "Q?/SUB"
+        assert build_judge_prompt("{{ input }}\n", s, "x") == "Q?\n"
+
+    def test_sandbox_blocks_python_internals(self):
+        s = Sample(id=0, input="Q?")
+        with pytest.raises(SecurityError):
+            build_judge_prompt("{{ input.__class__.__mro__ }}", s, "x")
 
     def test_rubric_vars_None_treated_as_empty(self):
         s = Sample(id=0, input="Q?", rubric_vars=None)
-        out = build_judge_prompt("{input}/{submission}", s, "SUB")
+        out = build_judge_prompt("{{ input }}/{{ submission }}", s, "SUB")
         assert out == "Q?/SUB"
+
+
+class TestCheckRubric:
+    PROVIDED = {"input", "ground_truth", "submission", "category"}
+
+    def test_valid_rubric_passes(self):
+        check_rubric("{{ input }} {{ category }} {% for x in [1] %}{{ x }}{% endfor %}", self.PROVIDED)
+
+    def test_single_brace_placeholder_rejected(self):
+        with pytest.raises(ValueError, match=r"\{input\} -> \{\{ input \}\}"):
+            check_rubric("Grade {input} against {{ ground_truth }}", self.PROVIDED)
+
+    def test_single_brace_rubric_var_rejected(self):
+        with pytest.raises(ValueError, match="category"):
+            check_rubric("Category: { category }", self.PROVIDED)
+
+    def test_unrelated_single_braces_allowed(self):
+        check_rubric('Reply like {"score": 1} or {score}; set {a, b}', self.PROVIDED)
+
+    def test_missing_variable_rejected(self):
+        with pytest.raises(ValueError, match="doesn't provide"):
+            check_rubric("{{ input }} {{ topic }}", self.PROVIDED)
+
+    def test_syntax_error_raised(self):
+        with pytest.raises(TemplateSyntaxError):
+            check_rubric("{% for x in %}", self.PROVIDED)
 
 
 # ── Sample rubric / rubric_path validation ─────────────────────────────────
@@ -211,7 +249,7 @@ class TestRubricGraderGrade:
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
     async def test_uses_grader_prompt_when_sample_has_no_rubric(self):
-        grader = _grader(prompt="grader-level: {input}/{submission}")
+        grader = _grader(prompt="grader-level: {{ input }}/{{ submission }}")
         mock_client = _patch_openai(grader)
 
         sample = Sample(id=0, input="Q?")
@@ -225,10 +263,10 @@ class TestRubricGraderGrade:
         assert call_kwargs["store"] is False
 
     async def test_per_sample_rubric_overrides_grader_prompt(self):
-        grader = _grader(prompt="grader-level: {input}")
+        grader = _grader(prompt="grader-level: {{ input }}")
         mock_client = _patch_openai(grader)
 
-        sample = Sample(id=0, input="Q?", rubric="per-sample: {input}/{submission}")
+        sample = Sample(id=0, input="Q?", rubric="per-sample: {{ input }}/{{ submission }}")
         await grader.grade(sample, _trajectory("SUB"))
 
         sent = mock_client.responses.create.call_args.kwargs["input"]
@@ -238,7 +276,7 @@ class TestRubricGraderGrade:
     async def test_system_prompt_read_from_file(self, tmp_path: Path):
         system_file = tmp_path / "system.txt"
         system_file.write_text("You are a strict judge.")
-        grader = _grader(prompt="hi {input}", system_prompt_path=system_file)
+        grader = _grader(prompt="hi {{ input }}", system_prompt_path=system_file)
         mock_client = _patch_openai(grader)
 
         await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
@@ -403,7 +441,9 @@ class TestRubricGraderAnthropic:
 # ── Suite validator: missing rubric_vars detected pre-run ──────────────────
 
 
-def _minimal_suite(prompt: str, dataset: Path) -> SuiteSpec:
+def _minimal_suite(prompt: str, tmp_path: Path) -> SuiteSpec:
+    dataset = tmp_path / "d.jsonl"
+    dataset.write_text(json.dumps({"input": "Q?"}) + "\n")
     return SuiteSpec(
         name="t",
         description="t",
@@ -416,39 +456,38 @@ def _minimal_suite(prompt: str, dataset: Path) -> SuiteSpec:
     )
 
 
-class TestValidateRubricVarsPreRun:
+class TestValidateRubricTemplatesPreRun:
     def test_missing_rubric_var_raises_with_clear_message(self, tmp_path: Path):
-        from letta_evals.execution.grading import validate_rubric_vars
-
-        dataset = tmp_path / "d.jsonl"
-        dataset.write_text(json.dumps({"input": "Q?"}) + "\n")
-
-        suite = _minimal_suite("rubric needs {category}", dataset)
+        suite = _minimal_suite("rubric needs {{ category }}", tmp_path)
         samples = [Sample(id=0, input="Q?")]
-        with pytest.raises(ValueError, match="missing rubric variables"):
-            validate_rubric_vars(suite, samples)
+        with pytest.raises(ValueError, match=r"Sample 0, grader 'g'.*category"):
+            validate_rubric_templates(suite, samples)
 
     def test_sample_provides_rubric_var(self, tmp_path: Path):
-        from letta_evals.execution.grading import validate_rubric_vars
-
-        dataset = tmp_path / "d.jsonl"
-        dataset.write_text(json.dumps({"input": "Q?"}) + "\n")
-
-        suite = _minimal_suite("rubric needs {category}", dataset)
+        suite = _minimal_suite("rubric needs {{ category }}", tmp_path)
         samples = [Sample(id=0, input="Q?", rubric_vars={"category": "x"})]
-        # Should not raise.
-        validate_rubric_vars(suite, samples)
+        validate_rubric_templates(suite, samples)
 
-    def test_per_sample_rubric_skips_static_validation(self, tmp_path: Path):
-        from letta_evals.execution.grading import validate_rubric_vars
-
-        dataset = tmp_path / "d.jsonl"
-        dataset.write_text(json.dumps({"input": "Q?"}) + "\n")
-
-        suite = _minimal_suite("rubric needs {category}", dataset)
-        # Sample overrides the rubric; pre-run check skips it.
+    def test_per_sample_rubric_replaces_grader_rubric(self, tmp_path: Path):
+        suite = _minimal_suite("rubric needs {{ category }}", tmp_path)
         samples = [Sample(id=0, input="Q?", rubric="no vars used")]
-        validate_rubric_vars(suite, samples)
+        validate_rubric_templates(suite, samples)
+
+    def test_per_sample_rubric_is_checked(self, tmp_path: Path):
+        suite = _minimal_suite("{{ input }}", tmp_path)
+        samples = [Sample(id="cat", input="Q?", rubric="needs {{ topic }}")]
+        with pytest.raises(ValueError, match=r"Sample cat, grader 'g'.*topic"):
+            validate_rubric_templates(suite, samples)
+
+    def test_single_brace_placeholder_stops_the_run(self, tmp_path: Path):
+        suite = _minimal_suite("Grade {submission}", tmp_path)
+        with pytest.raises(ValueError, match="single-brace"):
+            validate_rubric_templates(suite, [Sample(id=0, input="Q?")])
+
+    def test_syntax_error_stops_the_run(self, tmp_path: Path):
+        suite = _minimal_suite("{% if %}", tmp_path)
+        with pytest.raises(ValueError, match="Sample 0"):
+            validate_rubric_templates(suite, [Sample(id=0, input="Q?")])
 
 
 # ── ModelJudgeGraderSpec: judge call settings ───────────────────────────────

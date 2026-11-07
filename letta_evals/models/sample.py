@@ -23,7 +23,7 @@ class Sample(BaseModel):
     )
     agent_args: Optional[Dict[str, Any]] = Field(default=None, description="Custom arguments for agent creation")
     rubric_vars: Optional[Dict[str, Any]] = Field(
-        default=None, description="Variables for prompt substitution in rubric graders"
+        default=None, description="Variables available to model-judge rubric templates"
     )
     extra_vars: Optional[Dict[str, Any]] = Field(
         default=None, description="Custom user-supplied variables. Useful when writing custom extractors, graders, etc."
@@ -33,7 +33,7 @@ class Sample(BaseModel):
         description=(
             "Per-sample rubric text. When set, overrides the grader-level rubric "
             "(e.g. ``prompt`` / ``prompt_path``) for this sample. The rubric is "
-            "sent verbatim to the judge after template substitution."
+            "rendered as a Jinja template and sent verbatim to the judge."
         ),
     )
     rubric_path: Optional[Path] = Field(

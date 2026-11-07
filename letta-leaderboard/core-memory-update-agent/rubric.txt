@@ -62,6 +62,14 @@ Also note the following things:
     - For example, if the gold target is "Hyung Won Chung", you can consider the following predicted answers as correct: "Hyoong Won Choong", "Hyungwon Chung", or "Hyun Won Chung".
 
 
+Here is the new example to grade.
+```
+Question: {{ input }}
+Gold target: {{ ground_truth }}
+Predicted answer: {{ submission }}
+```
+
+
 Finally, reply with a score of 1 if the new example is CORRECT and 0 if INCORRECT or NOT ATTEMPTED, along with a rationale for your score. 
 
 IMPORTANT: Make sure to clearly express your rationale and scoring. Don't apologize or correct yourself if there was a mistake; just grade the answer.

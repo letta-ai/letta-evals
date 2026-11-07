@@ -1,10 +1,10 @@
 You are evaluating an ASCII art submission.
 
 Task given to the agent:
-{input}
+{{ input }}
 
 Agent's Submission:
-{submission}
+{{ submission }}
 
 This is the suite-level default rubric — used when a sample does not specify
 its own `rubric` or `rubric_path`.
