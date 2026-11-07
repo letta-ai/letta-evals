@@ -257,27 +257,40 @@ class ToolGraderSpec(BaseGraderSpec):
     function: str = Field(description="Name of grading function for tool grader")
 
 
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+
+
 class ModelJudgeGraderSpec(BaseGraderSpec):
     """Model judge grader configuration."""
 
     kind: Literal[GraderKind.MODEL_JUDGE] = GraderKind.MODEL_JUDGE
     prompt: Optional[str] = Field(default=None, description="Prompt for model judge")
     prompt_path: Optional[Path] = Field(default=None, description="Path to file containing prompt")
+    system_prompt_path: Optional[Path] = Field(
+        default=None,
+        description=(
+            "Path to a file holding a system prompt for the judge, sent verbatim. "
+            "By default no system prompt is sent and the rubric is the entire instruction."
+        ),
+    )
     model: str = Field(
         default="gpt-6-luna",
         description="LLM model to use for model judge (e.g., gpt-6-luna for OpenAI, claude-haiku-5-5 for Anthropic)",
     )
     provider: LLMProvider = Field(default=LLMProvider.OPENAI, description="LLM provider for model judge")
-    max_retries: int = Field(default=5, description="Maximum number of retries for model judge")
-    timeout: float = Field(default=120.0, description="Timeout for model judge in seconds")
-    system_prompt: Optional[str] = Field(
+    reasoning_effort: Optional[ReasoningEffort] = Field(
         default=None,
         description=(
-            "Optional system prompt sent to the judge. By default no system "
-            "prompt is sent — the rubric is the entire instruction. Set this "
-            "to opt back into a system message (e.g. role framing)."
+            "Reasoning effort for the judge, sent as reasoning.effort to OpenAI and output_config.effort "
+            "to Anthropic. Each provider and model accepts a subset of these values. "
+            "Unset leaves the provider's default."
         ),
     )
+    max_output_tokens: int = Field(
+        default=16000, gt=0, description="Maximum tokens the judge may generate, reasoning included"
+    )
+    max_retries: int = Field(default=5, description="Maximum number of retries for model judge")
+    timeout: float = Field(default=120.0, description="Timeout for model judge in seconds")
 
     @model_validator(mode="after")
     def validate_prompt_config(self):
@@ -293,6 +306,9 @@ class ModelJudgeGraderSpec(BaseGraderSpec):
         if self.prompt_path:
             with open(self.prompt_path, "r") as f:
                 self.prompt = f.read()
+
+        if self.system_prompt_path is not None and not self.system_prompt_path.is_file():
+            raise ValueError(f"system_prompt_path '{self.system_prompt_path}' does not exist")
 
         return self
 
@@ -432,9 +448,9 @@ class SuiteSpec(BaseModel):
             if "graders" in yaml_data and isinstance(yaml_data["graders"], dict):
                 resolved_graders: Dict[str, Any] = {}
                 for key, gspec in yaml_data["graders"].items():
-                    if "prompt_path" in gspec and gspec["prompt_path"]:
-                        if not Path(gspec["prompt_path"]).is_absolute():
-                            gspec["prompt_path"] = str((base_dir / gspec["prompt_path"]).resolve())
+                    for path_key in ("prompt_path", "system_prompt_path"):
+                        if gspec.get(path_key) and not Path(gspec[path_key]).is_absolute():
+                            gspec[path_key] = str((base_dir / gspec[path_key]).resolve())
                     gspec["base_dir"] = base_dir
                     resolved_graders[key] = gspec
                 yaml_data["graders"] = resolved_graders

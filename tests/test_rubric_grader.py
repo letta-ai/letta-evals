@@ -5,10 +5,12 @@ Covers:
 - ``Sample.rubric`` / ``Sample.rubric_path`` mutual-exclusion validation.
 - The JSONL/CSV loader resolving per-sample rubric overrides.
 - ``RubricGrader.grade`` precedence (per-sample rubric > grader prompt),
-  optional system prompt threading, and the absence of legacy wrapper
-  injection in the prompt sent to the judge.
+  the system prompt file, reasoning effort and output-token settings sent
+  to each provider, and the absence of legacy wrapper injection in the
+  prompt sent to the judge.
 - The pre-run validator (``validate_rubric_vars``) catching
   missing ``sample.rubric_vars`` keys before any judge call.
+- ``ModelJudgeGraderSpec`` validation of the judge call settings.
 """
 
 from __future__ import annotations
@@ -185,6 +187,10 @@ class TestLoaderPerSampleRubric:
 # ── RubricGrader.grade integration with a mocked OpenAI client ──────────────
 
 
+def _grader(**spec_kwargs) -> RubricGrader:
+    return RubricGrader(ModelJudgeGraderSpec(**spec_kwargs))
+
+
 def _patch_openai(grader: RubricGrader, output: dict | None = None) -> MagicMock:
     """Replace grader.client with a mock Responses API client."""
 
@@ -205,7 +211,7 @@ class TestRubricGraderGrade:
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
     async def test_uses_grader_prompt_when_sample_has_no_rubric(self):
-        grader = RubricGrader(prompt="grader-level: {input}/{submission}")
+        grader = _grader(prompt="grader-level: {input}/{submission}")
         mock_client = _patch_openai(grader)
 
         sample = Sample(id=0, input="Q?")
@@ -219,7 +225,7 @@ class TestRubricGraderGrade:
         assert call_kwargs["store"] is False
 
     async def test_per_sample_rubric_overrides_grader_prompt(self):
-        grader = RubricGrader(prompt="grader-level: {input}")
+        grader = _grader(prompt="grader-level: {input}")
         mock_client = _patch_openai(grader)
 
         sample = Sample(id=0, input="Q?", rubric="per-sample: {input}/{submission}")
@@ -229,16 +235,38 @@ class TestRubricGraderGrade:
         assert sent == "per-sample: Q?/SUB"
         assert "grader-level" not in sent
 
-    async def test_optional_system_prompt_threaded(self):
-        grader = RubricGrader(prompt="hi {input}", system_prompt="You are a strict judge.")
+    async def test_system_prompt_read_from_file(self, tmp_path: Path):
+        system_file = tmp_path / "system.txt"
+        system_file.write_text("You are a strict judge.")
+        grader = _grader(prompt="hi {input}", system_prompt_path=system_file)
         mock_client = _patch_openai(grader)
 
         await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
         assert mock_client.responses.create.call_args.kwargs["instructions"] == "You are a strict judge."
 
+    async def test_call_settings_default_to_provider_defaults(self):
+        grader = _grader(prompt="x")
+        mock_client = _patch_openai(grader)
+
+        await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
+
+        call_kwargs = mock_client.responses.create.call_args.kwargs
+        assert "reasoning" not in call_kwargs
+        assert call_kwargs["max_output_tokens"] == 16000
+
+    async def test_reasoning_effort_and_max_output_tokens_sent(self):
+        grader = _grader(prompt="x", reasoning_effort="low", max_output_tokens=2000)
+        mock_client = _patch_openai(grader)
+
+        await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
+
+        call_kwargs = mock_client.responses.create.call_args.kwargs
+        assert call_kwargs["reasoning"] == {"effort": "low"}
+        assert call_kwargs["max_output_tokens"] == 2000
+
     async def test_no_legacy_wrapper_text_injected(self):
-        grader = RubricGrader(prompt="only-this")
+        grader = _grader(prompt="only-this")
         mock_client = _patch_openai(grader)
 
         await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
@@ -257,7 +285,7 @@ class TestRubricGraderGrade:
         assert sent == "only-this"
 
     async def test_response_format_is_json_schema_non_strict(self):
-        grader = RubricGrader(prompt="x")
+        grader = _grader(prompt="x")
         mock_client = _patch_openai(grader)
 
         await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
@@ -279,7 +307,7 @@ class TestRubricGraderGrade:
         """Belt-and-suspenders: even though the OpenAI strict schema lets
         unbounded numbers through, the grader clamps the parsed score into
         [0, 1] before returning it."""
-        grader = RubricGrader(prompt="x")
+        grader = _grader(prompt="x")
 
         _patch_openai(grader, {"score": 2.5, "rationale": "ok"})
         result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
@@ -288,15 +316,6 @@ class TestRubricGraderGrade:
         _patch_openai(grader, {"score": -0.4, "rationale": "ok"})
         result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
         assert result.score == 0.0
-
-    async def test_missing_rubric_returns_zero_with_error_metadata(self):
-        # prompt=None and sample.rubric=None → graceful error result.
-        grader = RubricGrader(prompt=None)
-        _patch_openai(grader)
-
-        result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
-        assert result.score == 0.0
-        assert result.metadata["error"] == "missing_rubric"
 
 
 # ── RubricGrader.grade with a mocked Anthropic client ───────────────────────
@@ -314,12 +333,53 @@ def _anthropic_response(content: list, stop_reason: str = "end_turn") -> MagicMo
 
 @pytest.mark.asyncio
 class TestRubricGraderAnthropic:
-    @pytest.fixture
-    def grader(self, monkeypatch):
+    @pytest.fixture(autouse=True)
+    def _anthropic_key(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
-        grader = RubricGrader(prompt="x", model="claude-haiku-5-5", provider=LLMProvider.ANTHROPIC)
+
+    @pytest.fixture
+    def grader(self):
+        grader = _grader(prompt="x", model="claude-haiku-5-5", provider=LLMProvider.ANTHROPIC)
         grader.client = MagicMock()
         return grader
+
+    @staticmethod
+    def _ok_response() -> MagicMock:
+        text = MagicMock(type="text", text=json.dumps({"score": 1.0, "rationale": "ok"}))
+        return _anthropic_response([text])
+
+    async def test_call_settings_default_to_provider_defaults(self, grader):
+        grader.client.messages.create = AsyncMock(return_value=self._ok_response())
+
+        await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
+
+        call_kwargs = grader.client.messages.create.call_args.kwargs
+        assert "effort" not in call_kwargs["output_config"]
+        assert call_kwargs["output_config"]["format"]["type"] == "json_schema"
+        assert call_kwargs["max_tokens"] == 16000
+        assert "system" not in call_kwargs
+
+    async def test_effort_max_tokens_and_system_prompt_sent(self, tmp_path: Path):
+        system_file = tmp_path / "system.txt"
+        system_file.write_text("You are a strict judge.")
+        grader = _grader(
+            prompt="x",
+            model="claude-haiku-5-5",
+            provider=LLMProvider.ANTHROPIC,
+            reasoning_effort="medium",
+            max_output_tokens=3000,
+            system_prompt_path=system_file,
+        )
+        grader.client = MagicMock()
+        grader.client.messages.create = AsyncMock(return_value=self._ok_response())
+
+        await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
+
+        call_kwargs = grader.client.messages.create.call_args.kwargs
+        assert call_kwargs["output_config"]["effort"] == "medium"
+        assert call_kwargs["output_config"]["format"]["type"] == "json_schema"
+        assert call_kwargs["max_tokens"] == 3000
+        assert call_kwargs["system"][0]["text"] == "You are a strict judge."
 
     async def test_reads_text_after_thinking_block(self, grader):
         thinking = MagicMock(type="thinking", spec=["type", "thinking"])
@@ -389,3 +449,39 @@ class TestValidateRubricVarsPreRun:
         # Sample overrides the rubric; pre-run check skips it.
         samples = [Sample(id=0, input="Q?", rubric="no vars used")]
         validate_rubric_vars(suite, samples)
+
+
+# ── ModelJudgeGraderSpec: judge call settings ───────────────────────────────
+
+
+class TestModelJudgeGraderSpecSettings:
+    def test_unknown_reasoning_effort_rejected(self):
+        with pytest.raises(ValueError, match="reasoning_effort"):
+            ModelJudgeGraderSpec(prompt="x", reasoning_effort="hgih")
+
+    def test_max_output_tokens_must_be_positive(self):
+        with pytest.raises(ValueError, match="max_output_tokens"):
+            ModelJudgeGraderSpec(prompt="x", max_output_tokens=0)
+
+    def test_inline_system_prompt_rejected(self):
+        with pytest.raises(ValueError, match="system_prompt"):
+            ModelJudgeGraderSpec(prompt="x", system_prompt="You are a judge.")
+
+    def test_missing_system_prompt_file_rejected(self, tmp_path: Path):
+        with pytest.raises(ValueError, match="does not exist"):
+            ModelJudgeGraderSpec(prompt="x", system_prompt_path=tmp_path / "missing.txt")
+
+    def test_relative_system_prompt_path_resolves_against_suite_dir(self, tmp_path: Path):
+        (tmp_path / "system.txt").write_text("framing")
+        (tmp_path / "d.jsonl").write_text(json.dumps({"input": "Q?"}) + "\n")
+        suite = SuiteSpec.from_yaml(
+            {
+                "name": "t",
+                "dataset": "d.jsonl",
+                "target": {"kind": "letta_code", "model_handles": ["openai/gpt-4.1-mini"]},
+                "graders": {"g": {"kind": "model_judge", "prompt": "x", "system_prompt_path": "system.txt"}},
+                "reward": {"kind": "metric", "metric_key": "g"},
+            },
+            base_dir=tmp_path,
+        )
+        assert suite.graders["g"].system_prompt_path == (tmp_path / "system.txt").resolve()

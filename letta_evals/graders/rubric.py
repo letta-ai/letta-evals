@@ -1,6 +1,5 @@
 import json
 import os
-from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 from pydantic import BaseModel as PydanticBaseModel
@@ -9,7 +8,7 @@ from pydantic import Field as PydanticField
 from letta_evals.extractors import get_extractor
 from letta_evals.graders.base import Grader
 from letta_evals.graders.prompt_utils import build_judge_prompt
-from letta_evals.models import GradeResult, Sample
+from letta_evals.models import GradeResult, ModelJudgeGraderSpec, Sample
 from letta_evals.types import LLMProvider
 
 
@@ -41,25 +40,12 @@ class RubricGrader(Grader):
     ``sample.rubric_vars``) to reference those values from inside the rubric.
     """
 
-    def __init__(
-        self,
-        prompt: Optional[str] = None,
-        model: str = "gpt-6-luna",
-        provider: LLMProvider = LLMProvider.OPENAI,
-        max_retries: int = 5,
-        timeout: float = 120.0,
-        extractor: str = "last_assistant",
-        extractor_config: Optional[dict] = None,
-        base_dir: Optional[Path] = None,
-        system_prompt: Optional[str] = None,
-    ):
-        self.prompt = prompt
-        self.system_prompt = system_prompt
-        self.model = model
-        self.provider = provider
-        self.extractor = get_extractor(extractor, extractor_config, base_dir=base_dir)
+    def __init__(self, spec: ModelJudgeGraderSpec):
+        self.spec = spec
+        self.system_prompt = spec.system_prompt_path.read_text() if spec.system_prompt_path else None
+        self.extractor = get_extractor(spec.extractor, spec.extractor_config, base_dir=spec.base_dir)
 
-        if provider == LLMProvider.OPENAI:
+        if spec.provider == LLMProvider.OPENAI:
             api_key = os.getenv("OPENAI_API_KEY")
             if not api_key:
                 raise ValueError("OPENAI_API_KEY not found in environment variables")
@@ -68,8 +54,8 @@ class RubricGrader(Grader):
 
             client_kwargs = {
                 "api_key": api_key,
-                "max_retries": max_retries,
-                "timeout": timeout,
+                "max_retries": spec.max_retries,
+                "timeout": spec.timeout,
             }
 
             base_url = os.getenv("OPENAI_BASE_URL")
@@ -77,7 +63,7 @@ class RubricGrader(Grader):
                 client_kwargs["base_url"] = base_url
 
             self.client = AsyncOpenAI(**client_kwargs)
-        elif provider == LLMProvider.ANTHROPIC:
+        elif spec.provider == LLMProvider.ANTHROPIC:
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
                 raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
@@ -86,8 +72,8 @@ class RubricGrader(Grader):
 
             client_kwargs = {
                 "api_key": api_key,
-                "max_retries": max_retries,
-                "timeout": timeout,
+                "max_retries": spec.max_retries,
+                "timeout": spec.timeout,
             }
 
             base_url = os.getenv("ANTHROPIC_BASE_URL")
@@ -96,7 +82,7 @@ class RubricGrader(Grader):
 
             self.client = AsyncAnthropic(**client_kwargs)
         else:
-            raise ValueError(f"Unsupported provider: {provider}")
+            raise ValueError(f"Unsupported provider: {spec.provider}")
 
     async def grade(
         self, sample: Sample, trajectory, context: Optional[Dict[str, Any]] = None
@@ -107,23 +93,13 @@ class RubricGrader(Grader):
             return early
 
         # Per-sample rubric overrides the grader-level rubric.
-        rubric_text = sample.rubric if sample.rubric is not None else self.prompt
-        if rubric_text is None:
-            return GradeResult(
-                score=0.0,
-                rationale=(
-                    "No rubric available: neither the grader (prompt/prompt_path) "
-                    "nor the sample (rubric/rubric_path) provided one."
-                ),
-                metadata={"error": "missing_rubric", "extraction_time": extraction_time},
-            ), submission
-
+        rubric_text = sample.rubric if sample.rubric is not None else self.spec.prompt
         judge_prompt = build_judge_prompt(rubric_text, sample, submission)
 
         try:
-            if self.provider == LLMProvider.OPENAI:
+            if self.spec.provider == LLMProvider.OPENAI:
                 kwargs = dict(
-                    model=self.model,
+                    model=self.spec.model,
                     input=judge_prompt,
                     text={
                         "format": {
@@ -133,8 +109,11 @@ class RubricGrader(Grader):
                             "strict": False,
                         }
                     },
+                    max_output_tokens=self.spec.max_output_tokens,
                     store=False,
                 )
+                if self.spec.reasoning_effort is not None:
+                    kwargs["reasoning"] = {"effort": self.spec.reasoning_effort}
                 if self.system_prompt is not None:
                     kwargs["instructions"] = self.system_prompt
                 response = await self.client.responses.create(**kwargs)
@@ -142,14 +121,17 @@ class RubricGrader(Grader):
                 result_json = json.loads(response.output_text)
                 usage = response.usage.model_dump() if response.usage else None
 
-            elif self.provider == LLMProvider.ANTHROPIC:
+            elif self.spec.provider == LLMProvider.ANTHROPIC:
                 from anthropic import transform_schema
 
+                output_config = {"format": {"type": "json_schema", "schema": transform_schema(_JudgeResponse)}}
+                if self.spec.reasoning_effort is not None:
+                    output_config["effort"] = self.spec.reasoning_effort
                 kwargs = dict(
-                    model=self.model,
-                    max_tokens=16000,
+                    model=self.spec.model,
+                    max_tokens=self.spec.max_output_tokens,
                     messages=[{"role": "user", "content": judge_prompt}],
-                    output_config={"format": {"type": "json_schema", "schema": transform_schema(_JudgeResponse)}},
+                    output_config=output_config,
                 )
                 if self.system_prompt is not None:
                     kwargs["system"] = [
@@ -169,7 +151,7 @@ class RubricGrader(Grader):
                     "cache_read_input_tokens": getattr(response.usage, "cache_read_input_tokens", 0),
                 }
             else:
-                raise ValueError(f"Unsupported provider: {self.provider}")
+                raise ValueError(f"Unsupported provider: {self.spec.provider}")
 
             score = result_json.get("score")
             if score is None:
@@ -181,7 +163,7 @@ class RubricGrader(Grader):
             return GradeResult(
                 score=score,
                 rationale=result_json.get("rationale", ""),
-                metadata={"model": self.model, "usage": usage, "extraction_time": extraction_time},
+                metadata={"model": self.spec.model, "usage": usage, "extraction_time": extraction_time},
             ), submission
 
         except Exception as e:
