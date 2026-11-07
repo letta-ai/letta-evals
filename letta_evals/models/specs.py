@@ -273,6 +273,23 @@ class ModelJudgeGraderSpec(BaseGraderSpec):
             "By default no system prompt is sent and the rubric is the entire instruction."
         ),
     )
+    scorer: str = Field(
+        default="score",
+        description=(
+            "How the judge's reply becomes a score: 'score' (the reply's score field), 'checklist' "
+            "(a MET/UNMET verdict on each criterion in rubric_vars['criteria']), or file.py:function "
+            "taking (sample, response) and returning a score in [0, 1]. A scorer that raises ValueError "
+            "rejects the reply, and the judge is asked again."
+        ),
+    )
+    response_format: Optional[str] = Field(
+        default=None,
+        description=(
+            "Pydantic model the judge must reply with, as file.py:ClassName. Defaults to the scorer's own "
+            "model. Required with a custom scorer; with 'score' it must have a score field; not allowed "
+            "with 'checklist'."
+        ),
+    )
     model: str = Field(
         default="gpt-6-luna",
         description="LLM model to use for model judge (e.g., gpt-6-luna for OpenAI, claude-haiku-5-5 for Anthropic)",
@@ -309,6 +326,13 @@ class ModelJudgeGraderSpec(BaseGraderSpec):
 
         if self.system_prompt_path is not None and not self.system_prompt_path.is_file():
             raise ValueError(f"system_prompt_path '{self.system_prompt_path}' does not exist")
+
+        if ":" not in self.scorer and self.scorer not in ("score", "checklist"):
+            raise ValueError(f"scorer must be 'score', 'checklist' or file.py:function, got '{self.scorer}'")
+        if ":" in self.scorer and self.response_format is None:
+            raise ValueError("A custom scorer needs a response_format (file.py:ClassName)")
+        if self.scorer == "checklist" and self.response_format is not None:
+            raise ValueError("scorer 'checklist' uses its own response format; remove response_format")
 
         return self
 

@@ -203,6 +203,32 @@ Model-judge settings beyond the rubric:
 - `max_output_tokens`: the most tokens the judge may generate, reasoning included (default 16000).
 - `max_retries` and `timeout`: retries and per-request timeout in seconds for the judge's API calls (defaults 5 and 120).
 
+#### Judge replies and scorers
+
+The judge replies in a fixed format, and a scorer turns the reply into the grade's score. The judge's full reply is saved in the grade's `metadata["response"]`. Set `scorer` to one of:
+
+- `score` (default): the judge replies `{rationale, score}` and the score is used as is.
+- `checklist`: the judge gives a MET or UNMET verdict on each criterion in the sample's `rubric_vars["criteria"]`. Each criterion is `{id, text}`, with an optional `weight` (default 1). The score is the weight of positive criteria MET over the total positive weight. A negative weight marks a criterion that describes an error: when it's MET, its weight is subtracted. The score is clipped to [0, 1]. The rubric shows the judge the criteria, for example with `{% for c in criteria %}[{{ c.id }}] {{ c.text }}{% endfor %}`.
+- `file.py:function`: your own scorer, taking `(sample, response)` and returning a score in [0, 1]. It needs `response_format: file.py:ClassName`, the Pydantic model the judge replies with.
+
+```yaml
+graders:
+  completion:
+    kind: model_judge
+    prompt_path: checklist_rubric.txt
+    scorer: checklist
+```
+
+```json
+{"input": "...", "rubric_vars": {"criteria": [
+  {"id": "doc", "text": "A 4-6 paragraph design document is created"},
+  {"id": "seeds", "text": "Prev/next/random seed controls work", "weight": 2},
+  {"id": "copied", "text": "The piece copies an existing artist's work", "weight": -1}
+]}}
+```
+
+If the reply doesn't match the format, the scorer raises `ValueError` (the checklist scorer does when a criterion is missing, repeated or unknown), or there's no reply, the judge is asked again, up to 3 calls in all. A `response_format` can't contain a `dict` field or refer to itself: Anthropic can't serve either. Both are rejected before the run.
+
 Use `letta-evals list-graders` and `letta-evals list-extractors` for built-ins. You can register custom Python graders, extractors, setup hooks, and agent factories with decorators; see [`examples/custom-tool-grader-and-extractor/`](examples/custom-tool-grader-and-extractor/) and [`examples/programmatic-agent-creation/`](examples/programmatic-agent-creation/).
 
 ### Rewards

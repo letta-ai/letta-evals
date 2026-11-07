@@ -8,14 +8,17 @@ Covers:
   the system prompt file, reasoning effort and output-token settings sent
   to each provider, and the absence of legacy wrapper injection in the
   prompt sent to the judge.
-- The pre-run validator (``validate_rubric_templates``) checking every
+- The pre-run validator (``validate_model_judges``) checking every
   sample's rubric before any agent runs.
-- ``ModelJudgeGraderSpec`` validation of the judge call settings.
+- Response formats and scorers: the built-in ``score`` and ``checklist``,
+  custom ones loaded from the suite, and re-asking the judge on rejected replies.
+- ``ModelJudgeGraderSpec`` validation of the judge settings.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -24,11 +27,19 @@ import pytest
 from jinja2 import TemplateSyntaxError
 from jinja2.exceptions import SecurityError
 from letta_client.types.agents import AssistantMessage
+from pydantic import ValidationError
 
 from letta_evals.datasets.loader import load_csv, load_jsonl
-from letta_evals.execution.grading import validate_rubric_templates
+from letta_evals.execution.grading import validate_model_judges
 from letta_evals.graders.prompt_utils import RESERVED_VARS, build_judge_prompt, check_rubric
-from letta_evals.graders.rubric import RubricGrader
+from letta_evals.graders.rubric import MAX_ATTEMPTS, RubricGrader
+from letta_evals.graders.scorers import (
+    ChecklistResponse,
+    CriterionVerdict,
+    ScoreResponse,
+    checklist,
+    sample_criteria,
+)
 from letta_evals.models import (
     LettaCodeTargetSpec,
     MetricRewardSpec,
@@ -229,14 +240,31 @@ def _grader(**spec_kwargs) -> RubricGrader:
     return RubricGrader(ModelJudgeGraderSpec(**spec_kwargs))
 
 
-def _patch_openai(grader: RubricGrader, output: dict | None = None) -> MagicMock:
-    """Replace grader.client with a mock Responses API client."""
+def _validation_error() -> ValidationError:
+    try:
+        ScoreResponse.model_validate({"rationale": "x", "score": 2.5})
+    except ValidationError as e:
+        return e
+    raise AssertionError("expected a ValidationError")
 
-    mock_response = MagicMock()
-    mock_response.output_text = json.dumps(output or {"score": 0.75, "rationale": "test"})
-    mock_response.usage = MagicMock(model_dump=lambda: {"input_tokens": 1})
+
+def _openai_reply(parsed) -> MagicMock:
+    response = MagicMock()
+    response.output_parsed = parsed
+    response.status = "completed" if parsed is not None else "incomplete"
+    response.usage = MagicMock(model_dump=lambda: {"input_tokens": 1})
+    return response
+
+
+def _patch_openai(grader: RubricGrader, *replies) -> MagicMock:
+    """Replace grader.client with a mock whose responses.parse returns each reply in turn.
+
+    A reply is a parsed model, None (no parsable output), or an exception to raise.
+    """
+    replies = replies or (ScoreResponse(rationale="test", score=0.75),)
+    effects = [r if isinstance(r, Exception) else _openai_reply(r) for r in replies]
     mock_client = MagicMock()
-    mock_client.responses.create = AsyncMock(return_value=mock_response)
+    mock_client.responses.parse = AsyncMock(side_effect=effects)
     grader.client = mock_client
     return mock_client
 
@@ -256,8 +284,9 @@ class TestRubricGraderGrade:
         result, submission = await grader.grade(sample, _trajectory("SUB"))
 
         assert result.score == 0.75
-        call_kwargs = mock_client.responses.create.call_args.kwargs
+        call_kwargs = mock_client.responses.parse.call_args.kwargs
         assert call_kwargs["input"] == "grader-level: Q?/SUB"
+        assert call_kwargs["text_format"] is ScoreResponse
         # No system prompt by default.
         assert "instructions" not in call_kwargs
         assert call_kwargs["store"] is False
@@ -269,7 +298,7 @@ class TestRubricGraderGrade:
         sample = Sample(id=0, input="Q?", rubric="per-sample: {{ input }}/{{ submission }}")
         await grader.grade(sample, _trajectory("SUB"))
 
-        sent = mock_client.responses.create.call_args.kwargs["input"]
+        sent = mock_client.responses.parse.call_args.kwargs["input"]
         assert sent == "per-sample: Q?/SUB"
         assert "grader-level" not in sent
 
@@ -281,7 +310,7 @@ class TestRubricGraderGrade:
 
         await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
-        assert mock_client.responses.create.call_args.kwargs["instructions"] == "You are a strict judge."
+        assert mock_client.responses.parse.call_args.kwargs["instructions"] == "You are a strict judge."
 
     async def test_call_settings_default_to_provider_defaults(self):
         grader = _grader(prompt="x")
@@ -289,7 +318,7 @@ class TestRubricGraderGrade:
 
         await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
-        call_kwargs = mock_client.responses.create.call_args.kwargs
+        call_kwargs = mock_client.responses.parse.call_args.kwargs
         assert "reasoning" not in call_kwargs
         assert call_kwargs["max_output_tokens"] == 16000
 
@@ -299,7 +328,7 @@ class TestRubricGraderGrade:
 
         await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
-        call_kwargs = mock_client.responses.create.call_args.kwargs
+        call_kwargs = mock_client.responses.parse.call_args.kwargs
         assert call_kwargs["reasoning"] == {"effort": "low"}
         assert call_kwargs["max_output_tokens"] == 2000
 
@@ -309,7 +338,7 @@ class TestRubricGraderGrade:
 
         await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
-        sent = mock_client.responses.create.call_args.kwargs["input"]
+        sent = mock_client.responses.parse.call_args.kwargs["input"]
         # Old wrapper headings should be entirely gone.
         for legacy in (
             "You are an evaluation judge",
@@ -322,46 +351,63 @@ class TestRubricGraderGrade:
             assert legacy not in sent
         assert sent == "only-this"
 
-    async def test_response_format_is_json_schema_non_strict(self):
+    async def test_reply_saved_in_metadata(self):
         grader = _grader(prompt="x")
-        mock_client = _patch_openai(grader)
+        _patch_openai(grader, ScoreResponse(rationale="looks right", score=1.0))
 
-        await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
+        result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
-        fmt = mock_client.responses.create.call_args.kwargs["text"]["format"]
-        assert fmt["type"] == "json_schema"
-        # We intentionally do NOT pass strict=true: it forbids `minimum` /
-        # `maximum` keywords and would require a hand-built schema that
-        # duplicates _JudgeResponse. The pydantic-derived schema is sent as
-        # guidance, and the score is clamped to [0, 1] Python-side.
-        assert fmt["strict"] is False
-        schema = fmt["schema"]
-        assert schema["type"] == "object"
-        assert set(schema["required"]) == {"score", "rationale"}
-        # Order matters: the judge reasons before it scores.
-        assert list(schema["properties"]) == ["rationale", "score"]
+        assert result.rationale == "looks right"
+        assert result.metadata["response"] == {"rationale": "looks right", "score": 1.0}
+        assert result.metadata["rejections"] == []
+        assert "error" not in result.metadata
 
-    async def test_score_is_clamped_to_unit_interval(self):
-        """Belt-and-suspenders: even though the OpenAI strict schema lets
-        unbounded numbers through, the grader clamps the parsed score into
-        [0, 1] before returning it."""
+    async def test_invalid_reply_is_asked_again(self):
         grader = _grader(prompt="x")
+        mock_client = _patch_openai(grader, _validation_error(), ScoreResponse(rationale="ok", score=0.5))
 
-        _patch_openai(grader, {"score": 2.5, "rationale": "ok"})
         result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
-        assert result.score == 1.0
 
-        _patch_openai(grader, {"score": -0.4, "rationale": "ok"})
+        assert result.score == 0.5
+        assert len(result.metadata["rejections"]) == 1
+        assert mock_client.responses.parse.await_count == 2
+
+    async def test_missing_reply_is_asked_again(self):
+        grader = _grader(prompt="x")
+        _patch_openai(grader, None, ScoreResponse(rationale="ok", score=0.5))
+
         result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
+
+        assert result.score == 0.5
+        assert len(result.metadata["rejections"]) == 1
+
+    async def test_rejected_on_every_attempt_is_a_grading_error(self):
+        grader = _grader(prompt="x")
+        mock_client = _patch_openai(grader, *[None] * MAX_ATTEMPTS)
+
+        result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
+
         assert result.score == 0.0
+        assert f"rejected {MAX_ATTEMPTS} times" in result.metadata["error"]
+        assert "status=incomplete" in result.metadata["error"]
+        assert mock_client.responses.parse.await_count == MAX_ATTEMPTS
+
+    async def test_api_error_is_not_asked_again(self):
+        grader = _grader(prompt="x")
+        mock_client = _patch_openai(grader, RuntimeError("boom"))
+
+        result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
+
+        assert result.metadata["error"] == "boom"
+        assert mock_client.responses.parse.await_count == 1
 
 
 # ── RubricGrader.grade with a mocked Anthropic client ───────────────────────
 
 
-def _anthropic_response(content: list, stop_reason: str = "end_turn") -> MagicMock:
+def _anthropic_reply(parsed, stop_reason: str = "end_turn") -> MagicMock:
     response = MagicMock()
-    response.content = content
+    response.parsed_output = parsed
     response.stop_reason = stop_reason
     response.usage = MagicMock(
         input_tokens=1, output_tokens=1, cache_creation_input_tokens=0, cache_read_input_tokens=0
@@ -375,67 +421,237 @@ class TestRubricGraderAnthropic:
     def _anthropic_key(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
 
-    @pytest.fixture
-    def grader(self):
-        grader = _grader(prompt="x", model="claude-haiku-5-5", provider=LLMProvider.ANTHROPIC)
+    @staticmethod
+    def _grader(*replies, **spec_kwargs) -> RubricGrader:
+        grader = _grader(model="claude-haiku-5-5", provider=LLMProvider.ANTHROPIC, **{"prompt": "x", **spec_kwargs})
         grader.client = MagicMock()
+        grader.client.messages.parse = AsyncMock(side_effect=list(replies))
         return grader
 
-    @staticmethod
-    def _ok_response() -> MagicMock:
-        text = MagicMock(type="text", text=json.dumps({"score": 1.0, "rationale": "ok"}))
-        return _anthropic_response([text])
+    async def test_call_settings_default_to_provider_defaults(self):
+        grader = self._grader(_anthropic_reply(ScoreResponse(rationale="ok", score=1.0)))
 
-    async def test_call_settings_default_to_provider_defaults(self, grader):
-        grader.client.messages.create = AsyncMock(return_value=self._ok_response())
+        result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
-        await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
-
-        call_kwargs = grader.client.messages.create.call_args.kwargs
-        assert "effort" not in call_kwargs["output_config"]
-        assert call_kwargs["output_config"]["format"]["type"] == "json_schema"
+        assert result.score == 1.0
+        call_kwargs = grader.client.messages.parse.call_args.kwargs
+        assert call_kwargs["output_format"] is ScoreResponse
+        assert "output_config" not in call_kwargs
         assert call_kwargs["max_tokens"] == 16000
         assert "system" not in call_kwargs
 
     async def test_effort_max_tokens_and_system_prompt_sent(self, tmp_path: Path):
         system_file = tmp_path / "system.txt"
         system_file.write_text("You are a strict judge.")
-        grader = _grader(
-            prompt="x",
-            model="claude-haiku-5-5",
-            provider=LLMProvider.ANTHROPIC,
+        grader = self._grader(
+            _anthropic_reply(ScoreResponse(rationale="ok", score=1.0)),
             reasoning_effort="medium",
             max_output_tokens=3000,
             system_prompt_path=system_file,
         )
-        grader.client = MagicMock()
-        grader.client.messages.create = AsyncMock(return_value=self._ok_response())
 
         await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
-        call_kwargs = grader.client.messages.create.call_args.kwargs
-        assert call_kwargs["output_config"]["effort"] == "medium"
-        assert call_kwargs["output_config"]["format"]["type"] == "json_schema"
+        call_kwargs = grader.client.messages.parse.call_args.kwargs
+        assert call_kwargs["output_config"] == {"effort": "medium"}
         assert call_kwargs["max_tokens"] == 3000
         assert call_kwargs["system"][0]["text"] == "You are a strict judge."
 
-    async def test_reads_text_after_thinking_block(self, grader):
-        thinking = MagicMock(type="thinking", spec=["type", "thinking"])
-        text = MagicMock(type="text", text=json.dumps({"score": 0.5, "rationale": "ok"}))
-        grader.client.messages.create = AsyncMock(return_value=_anthropic_response([thinking, text]))
-
-        result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
-
-        assert result.score == 0.5
-        assert result.rationale == "ok"
-
-    async def test_no_text_block_is_a_grading_error(self, grader):
-        grader.client.messages.create = AsyncMock(return_value=_anthropic_response([], stop_reason="refusal"))
+    async def test_refusal_is_asked_again_then_a_grading_error(self):
+        grader = self._grader(*[_anthropic_reply(None, stop_reason="refusal") for _ in range(MAX_ATTEMPTS)])
 
         result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
         assert result.score == 0.0
         assert "stop_reason=refusal" in result.metadata["error"]
+        assert grader.client.messages.parse.await_count == MAX_ATTEMPTS
+
+
+# ── Checklist scorer ────────────────────────────────────────────────────────
+
+
+def _checklist_sample(*criteria: dict) -> Sample:
+    criteria = criteria or (
+        {"id": "c1", "text": "Names Paris", "weight": 2},
+        {"id": "c2", "text": "Is short"},
+        {"id": "leak", "text": "Leaks a secret", "weight": -1},
+    )
+    return Sample(id=0, input="Q?", rubric_vars={"criteria": list(criteria)})
+
+
+def _verdicts(**verdicts: str) -> ChecklistResponse:
+    return ChecklistResponse(
+        criteria=[CriterionVerdict(id=i, rationale=f"why {i}", verdict=v) for i, v in verdicts.items()]
+    )
+
+
+class TestChecklistScorer:
+    def test_all_positive_met(self):
+        assert checklist(_checklist_sample(), _verdicts(c1="MET", c2="MET", leak="UNMET")) == 1.0
+
+    def test_weighted_share_of_positive_criteria(self):
+        assert checklist(_checklist_sample(), _verdicts(c1="MET", c2="UNMET", leak="UNMET")) == pytest.approx(2 / 3)
+
+    def test_negative_criterion_met_subtracts_its_weight(self):
+        assert checklist(_checklist_sample(), _verdicts(c1="MET", c2="MET", leak="MET")) == pytest.approx(2 / 3)
+
+    def test_clipped_at_zero(self):
+        assert checklist(_checklist_sample(), _verdicts(c1="UNMET", c2="UNMET", leak="MET")) == 0.0
+
+    @pytest.mark.parametrize(
+        "verdicts, problem",
+        [
+            ({"c1": "MET", "c2": "MET"}, "missing ['leak']"),
+            ({"c1": "MET", "c2": "MET", "leak": "UNMET", "c9": "MET"}, "unknown ['c9']"),
+        ],
+    )
+    def test_missing_or_unknown_ids_rejected(self, verdicts, problem):
+        with pytest.raises(ValueError, match=re.escape(problem)):
+            checklist(_checklist_sample(), _verdicts(**verdicts))
+
+    def test_duplicate_ids_rejected(self):
+        response = _verdicts(c1="MET", c2="MET", leak="UNMET")
+        response.criteria.append(CriterionVerdict(id="c1", rationale="again", verdict="UNMET"))
+        with pytest.raises(ValueError, match=re.escape("duplicated ['c1']")):
+            checklist(_checklist_sample(), response)
+
+    @pytest.mark.parametrize(
+        "rubric_vars, problem",
+        [
+            (None, "needs rubric_vars"),
+            ({"criteria": []}, "needs rubric_vars"),
+            ({"criteria": [{"id": "a", "text": "x"}, {"id": "a", "text": "y"}]}, "duplicated"),
+            ({"criteria": [{"id": "a", "text": "x", "weight": -1}]}, "positive weight"),
+            ({"criteria": [{"id": "a", "text": "x", "wieght": 2}]}, "wieght"),
+        ],
+    )
+    def test_malformed_criteria_rejected(self, rubric_vars, problem):
+        with pytest.raises(ValueError, match=problem):
+            sample_criteria(Sample(id=0, input="Q?", rubric_vars=rubric_vars))
+
+
+@pytest.mark.asyncio
+class TestChecklistGrader:
+    @pytest.fixture(autouse=True)
+    def _openai_key(self, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+    async def test_scores_verdicts_and_saves_them(self):
+        grader = _grader(prompt="{% for c in criteria %}[{{ c.id }}] {{ c.text }}\n{% endfor %}", scorer="checklist")
+        mock_client = _patch_openai(grader, _verdicts(c1="MET", c2="UNMET", leak="UNMET"))
+
+        result, _ = await grader.grade(_checklist_sample(), _trajectory("SUB"))
+
+        assert result.score == pytest.approx(2 / 3)
+        call_kwargs = mock_client.responses.parse.call_args.kwargs
+        assert call_kwargs["text_format"] is ChecklistResponse
+        # Weights are never shown to the judge.
+        assert call_kwargs["input"] == "[c1] Names Paris\n[c2] Is short\n[leak] Leaks a secret\n"
+        assert [c["verdict"] for c in result.metadata["response"]["criteria"]] == ["MET", "UNMET", "UNMET"]
+
+    async def test_missing_criterion_is_asked_again(self):
+        grader = _grader(prompt="x", scorer="checklist")
+        _patch_openai(grader, _verdicts(c1="MET", c2="MET"), _verdicts(c1="MET", c2="MET", leak="UNMET"))
+
+        result, _ = await grader.grade(_checklist_sample(), _trajectory("SUB"))
+
+        assert result.score == 1.0
+        assert result.metadata["rejections"] == ["each criterion must be judged exactly once: missing ['leak']"]
+
+
+# ── Custom response formats and scorers ─────────────────────────────────────
+
+_SCORING_PY = """
+from typing import Literal
+from pydantic import BaseModel
+
+
+class Level(BaseModel):
+    rationale: str
+    level: Literal["CORRECT", "PARTIAL", "WRONG"]
+
+
+def score_level(sample, response):
+    if response.level == "PARTIAL" and sample.ground_truth is None:
+        raise ValueError("PARTIAL needs a ground truth")
+    return {"CORRECT": 1.0, "PARTIAL": 0.5, "WRONG": 0.0}[response.level]
+
+
+class Bounded(BaseModel):
+    rationale: str
+    score: Literal[0, 0.5, 1]
+
+
+class NoScore(BaseModel):
+    rationale: str
+
+
+class Scores(BaseModel):
+    scores: dict[str, float]
+
+
+class Node(BaseModel):
+    name: str
+    children: list["Node"]
+"""
+
+
+@pytest.mark.asyncio
+class TestCustomResponseFormat:
+    @pytest.fixture(autouse=True)
+    def _openai_key(self, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+    @pytest.fixture
+    def suite_dir(self, tmp_path: Path) -> Path:
+        (tmp_path / "scoring.py").write_text(_SCORING_PY)
+        return tmp_path
+
+    async def test_custom_scorer_and_format(self, suite_dir: Path):
+        grader = _grader(
+            prompt="x", scorer="scoring.py:score_level", response_format="scoring.py:Level", base_dir=suite_dir
+        )
+        reply = grader.response_format(rationale="half right", level="PARTIAL")
+        mock_client = _patch_openai(grader, reply)
+
+        result, _ = await grader.grade(Sample(id=0, input="Q?", ground_truth="A"), _trajectory("SUB"))
+
+        assert result.score == 0.5
+        assert result.rationale == "half right"
+        assert mock_client.responses.parse.call_args.kwargs["text_format"].__name__ == "Level"
+
+    async def test_scorer_value_error_rejects_the_reply(self, suite_dir: Path):
+        grader = _grader(
+            prompt="x", scorer="scoring.py:score_level", response_format="scoring.py:Level", base_dir=suite_dir
+        )
+        partial = grader.response_format(rationale="?", level="PARTIAL")
+        wrong = grader.response_format(rationale="no", level="WRONG")
+        _patch_openai(grader, partial, wrong)
+
+        result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
+
+        assert result.score == 0.0
+        assert len(result.metadata["rejections"]) == 1
+
+    async def test_default_scorer_with_custom_format(self, suite_dir: Path):
+        grader = _grader(prompt="x", response_format="scoring.py:Bounded", base_dir=suite_dir)
+        _patch_openai(grader, grader.response_format(rationale="ok", score=0.5))
+
+        result, _ = await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
+
+        assert result.score == 0.5
+
+    @pytest.mark.parametrize(
+        "response_format, problem",
+        [
+            ("scoring.py:NoScore", "needs a score field"),
+            ("scoring.py:Scores", "free-form object"),
+            ("scoring.py:Node", "recursive"),
+        ],
+    )
+    async def test_unusable_formats_rejected_at_init(self, suite_dir: Path, response_format, problem):
+        with pytest.raises(ValueError, match=problem):
+            _grader(prompt="x", response_format=response_format, base_dir=suite_dir)
 
 
 # ── Suite validator: missing rubric_vars detected pre-run ──────────────────
@@ -456,38 +672,50 @@ def _minimal_suite(prompt: str, tmp_path: Path) -> SuiteSpec:
     )
 
 
-class TestValidateRubricTemplatesPreRun:
+class TestValidateModelJudgesPreRun:
     def test_missing_rubric_var_raises_with_clear_message(self, tmp_path: Path):
         suite = _minimal_suite("rubric needs {{ category }}", tmp_path)
         samples = [Sample(id=0, input="Q?")]
         with pytest.raises(ValueError, match=r"Sample 0, grader 'g'.*category"):
-            validate_rubric_templates(suite, samples)
+            validate_model_judges(suite, samples)
 
     def test_sample_provides_rubric_var(self, tmp_path: Path):
         suite = _minimal_suite("rubric needs {{ category }}", tmp_path)
         samples = [Sample(id=0, input="Q?", rubric_vars={"category": "x"})]
-        validate_rubric_templates(suite, samples)
+        validate_model_judges(suite, samples)
 
     def test_per_sample_rubric_replaces_grader_rubric(self, tmp_path: Path):
         suite = _minimal_suite("rubric needs {{ category }}", tmp_path)
         samples = [Sample(id=0, input="Q?", rubric="no vars used")]
-        validate_rubric_templates(suite, samples)
+        validate_model_judges(suite, samples)
 
     def test_per_sample_rubric_is_checked(self, tmp_path: Path):
         suite = _minimal_suite("{{ input }}", tmp_path)
         samples = [Sample(id="cat", input="Q?", rubric="needs {{ topic }}")]
         with pytest.raises(ValueError, match=r"Sample cat, grader 'g'.*topic"):
-            validate_rubric_templates(suite, samples)
+            validate_model_judges(suite, samples)
 
     def test_single_brace_placeholder_stops_the_run(self, tmp_path: Path):
         suite = _minimal_suite("Grade {submission}", tmp_path)
         with pytest.raises(ValueError, match="single-brace"):
-            validate_rubric_templates(suite, [Sample(id=0, input="Q?")])
+            validate_model_judges(suite, [Sample(id=0, input="Q?")])
 
     def test_syntax_error_stops_the_run(self, tmp_path: Path):
         suite = _minimal_suite("{% if %}", tmp_path)
         with pytest.raises(ValueError, match="Sample 0"):
-            validate_rubric_templates(suite, [Sample(id=0, input="Q?")])
+            validate_model_judges(suite, [Sample(id=0, input="Q?")])
+
+    def test_malformed_checklist_criteria_stop_the_run(self, tmp_path: Path):
+        suite = _minimal_suite("{{ input }}", tmp_path)
+        suite.graders["g"].scorer = "checklist"
+        samples = [Sample(id=7, input="Q?", rubric_vars={"criteria": [{"id": "a"}]})]
+        with pytest.raises(ValueError, match=r"(?s)Sample 7, grader 'g'.*text"):
+            validate_model_judges(suite, samples)
+
+    def test_wellformed_checklist_criteria_pass(self, tmp_path: Path):
+        suite = _minimal_suite("{% for c in criteria %}{{ c.text }}{% endfor %}", tmp_path)
+        suite.graders["g"].scorer = "checklist"
+        validate_model_judges(suite, [_checklist_sample()])
 
 
 # ── ModelJudgeGraderSpec: judge call settings ───────────────────────────────
@@ -524,3 +752,15 @@ class TestModelJudgeGraderSpecSettings:
             base_dir=tmp_path,
         )
         assert suite.graders["g"].system_prompt_path == (tmp_path / "system.txt").resolve()
+
+    def test_unknown_builtin_scorer_rejected(self):
+        with pytest.raises(ValueError, match="scorer must be"):
+            ModelJudgeGraderSpec(prompt="x", scorer="levels")
+
+    def test_custom_scorer_needs_response_format(self):
+        with pytest.raises(ValueError, match="needs a response_format"):
+            ModelJudgeGraderSpec(prompt="x", scorer="scoring.py:fn")
+
+    def test_checklist_takes_no_response_format(self):
+        with pytest.raises(ValueError, match="remove response_format"):
+            ModelJudgeGraderSpec(prompt="x", scorer="checklist", response_format="scoring.py:Model")
