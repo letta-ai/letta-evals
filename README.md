@@ -194,6 +194,8 @@ graders:
     extractor: last_assistant
 ```
 
+A model-judge rubric is a [Jinja](https://jinja.palletsprojects.com/) template, rendered in Jinja's sandbox and sent to the judge verbatim. It can use `{{ input }}`, `{{ ground_truth }}`, `{{ submission }}` and any key in the sample's `rubric_vars`, including lists and dicts to loop over. Single braces are literal text, so JSON examples need no escaping. Before any agent runs, each sample's rubric is checked: a variable the sample doesn't provide, or a leftover `{input}`-style placeholder, stops the run.
+
 Model-judge settings beyond the rubric:
 
 - `system_prompt_path`: a file sent verbatim as the judge's system prompt. By default no system prompt is sent.

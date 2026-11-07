@@ -4,11 +4,13 @@ These helpers are extracted from ``Runner`` so the runner can focus on target
 execution, progress sequencing, result assembly, and orchestration.
 """
 
-import string
 import time
 from typing import Any, Dict, List, Optional
 
+from jinja2 import TemplateSyntaxError
+
 from letta_evals.graders.base import Grader
+from letta_evals.graders.prompt_utils import RESERVED_VARS, check_rubric
 from letta_evals.models import (
     Error,
     GradeResult,
@@ -78,37 +80,19 @@ def detect_errors(
     return None
 
 
-def validate_rubric_vars(suite: SuiteSpec, samples: List[Sample]) -> None:
-    """Validate model-judge rubric placeholders against per-sample rubric_vars."""
-    if not suite.graders:
-        return
+def validate_rubric_templates(suite: SuiteSpec, samples: List[Sample]) -> None:
+    """Check every model-judge rubric before any agent runs.
 
-    for grader_key, grader_spec in suite.graders.items():
-        if not isinstance(grader_spec, ModelJudgeGraderSpec):
-            continue
-        rubric_text = grader_spec.prompt
-        if rubric_text is None:
-            continue
-
-        referenced: set = set()
-        for _, field_name, _, _ in string.Formatter().parse(rubric_text):
-            if field_name:
-                referenced.add(field_name.split(".")[0].split("[")[0])
-
-        reserved = {"input", "ground_truth", "submission"}
-        extras_needed = referenced - reserved
-        if not extras_needed:
-            continue
-
+    For each sample, the rubric it will be judged with (its own, or the
+    grader's) must be a valid template, must not use the old single-brace
+    placeholders, and must only reference variables the sample provides.
+    """
+    judges = {key: spec for key, spec in (suite.graders or {}).items() if isinstance(spec, ModelJudgeGraderSpec)}
+    for grader_key, grader_spec in judges.items():
         for sample in samples:
-            if sample.rubric is not None:
-                continue
-            provided = set((sample.rubric_vars or {}).keys())
-            missing = extras_needed - provided
-            if missing:
-                raise ValueError(
-                    f"Sample {sample.id} is missing rubric variables required by "
-                    f"grader '{grader_key}': {sorted(missing)}. "
-                    f"Add them to sample.rubric_vars, or override the rubric "
-                    f"via sample.rubric / sample.rubric_path."
-                )
+            rubric = sample.rubric if sample.rubric is not None else grader_spec.prompt
+            provided = set(RESERVED_VARS) | set(sample.rubric_vars or {})
+            try:
+                check_rubric(rubric, provided)
+            except (ValueError, TemplateSyntaxError) as e:
+                raise ValueError(f"Sample {sample.id}, grader '{grader_key}': {e}") from e

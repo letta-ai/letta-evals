@@ -1,66 +1,108 @@
 """Prompt construction for rubric-based graders.
 
-The rubric text is treated as a template that is substituted and sent
-verbatim to the judge. The framework does not add wrapping text, headers,
-or a system prompt of its own — those concerns belong to the rubric author.
+A rubric is a Jinja template. It is rendered in Jinja's sandbox and sent
+verbatim to the judge: the framework adds no wrapping text, headers or system
+prompt of its own.
 
-Reserved template variables (always available):
-    {input}         - the original input from sample.input
-    {ground_truth}  - the expected answer (empty string if not provided)
-    {submission}    - the agent's extracted output
+Variables available to every rubric:
+    {{ input }}         the sample's input (a string, or a list of turns)
+    {{ ground_truth }}  the expected answer (empty string if not provided)
+    {{ submission }}    the agent's extracted output
 
-Additional variables: any key in sample.rubric_vars is automatically
-available as {key}. Reserved names cannot be reused in rubric_vars.
+Every key in ``sample.rubric_vars`` is also available, with its value as given,
+so lists and dicts can be looped over (``{% for c in criteria %}``).
 
-Missing placeholders raise KeyError so the failure is loud rather than
-silently leaving literal "{var}" in the prompt sent to the judge.
+Only ``{{ ... }}`` is a placeholder, so literal braces such as JSON examples need
+no escaping. Referencing a variable the sample doesn't provide is an error.
 """
 
-import string
+import re
+from functools import lru_cache
+from typing import Any, Dict, Iterable, Set
+
+from jinja2 import StrictUndefined, Template, meta
+from jinja2.sandbox import SandboxedEnvironment
 
 from letta_evals.models import Sample
 
 RESERVED_VARS = ("input", "ground_truth", "submission")
 
+# The sandbox matters: a rubric can come from a dataset row, including a
+# downloaded one, and unsandboxed Jinja can reach Python internals.
+_ENV = SandboxedEnvironment(undefined=StrictUndefined, keep_trailing_newline=True)
 
-def build_judge_prompt(rubric: str, sample: Sample, submission: str) -> str:
-    """Substitute reserved and rubric_vars placeholders into the rubric text.
+_SINGLE_BRACE = re.compile(r"(?<!\{)\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}(?!\})")
 
-    Args:
-        rubric: The rubric template. Sent verbatim to the judge after substitution.
-        sample: The evaluation sample (provides ``input``, ``ground_truth``,
-            and ``rubric_vars``).
-        submission: The extracted agent submission to evaluate.
 
-    Returns:
-        The substituted rubric text.
+@lru_cache(maxsize=256)
+def _compile(rubric: str) -> Template:
+    return _ENV.from_string(rubric)
+
+
+@lru_cache(maxsize=256)
+def template_variables(rubric: str) -> frozenset:
+    """Return the top-level variables a rubric references.
+
+    Raises:
+        jinja2.TemplateSyntaxError: If the rubric is not a valid template.
+    """
+    return frozenset(meta.find_undeclared_variables(_ENV.parse(rubric)))
+
+
+def check_rubric(rubric: str, provided: Iterable[str]) -> None:
+    """Check a rubric against the variable names a sample provides.
+
+    Raises:
+        ValueError: If the rubric uses ``{name}`` for a provided variable (the
+            pre-Jinja placeholder syntax), or references a variable that isn't provided.
+        jinja2.TemplateSyntaxError: If the rubric is not a valid template.
+    """
+    provided = set(provided)
+    legacy = sorted({name for name in _SINGLE_BRACE.findall(rubric) if name in provided})
+    if legacy:
+        examples = ", ".join(f"{{{name}}} -> {{{{ {name} }}}}" for name in legacy)
+        raise ValueError(f"Rubric uses single-brace placeholders, which are now literal text: {examples}")
+
+    missing = template_variables(rubric) - provided
+    if missing:
+        raise ValueError(f"Rubric references variables the sample doesn't provide: {sorted(missing)}")
+
+
+def judge_variables(sample: Sample, submission: str) -> Dict[str, Any]:
+    """The variables a rubric is rendered with for one sample.
 
     Raises:
         ValueError: If ``sample.rubric_vars`` contains a reserved variable name.
-        KeyError: If the rubric references a ``{placeholder}`` that is neither a
-            reserved variable nor a key in ``sample.rubric_vars``.
     """
-    substitutions = {
-        "input": str(sample.input),
-        "ground_truth": str(sample.ground_truth) if sample.ground_truth is not None else "",
+    variables: Dict[str, Any] = {
+        "input": sample.input,
+        "ground_truth": sample.ground_truth if sample.ground_truth is not None else "",
         "submission": submission,
     }
+    for key, value in (sample.rubric_vars or {}).items():
+        if key in RESERVED_VARS:
+            raise ValueError(
+                f"rubric_vars key {key!r} collides with a reserved variable. Reserved names: {RESERVED_VARS}"
+            )
+        variables[key] = value
+    return variables
 
-    if sample.rubric_vars:
-        for key, value in sample.rubric_vars.items():
-            if key in RESERVED_VARS:
-                raise ValueError(
-                    f"rubric_vars key {key!r} collides with a reserved variable. Reserved names: {RESERVED_VARS}"
-                )
-            substitutions[key] = str(value)
 
-    try:
-        return string.Formatter().vformat(rubric, (), substitutions)
-    except KeyError as e:
-        missing = e.args[0] if e.args else "?"
+def build_judge_prompt(rubric: str, sample: Sample, submission: str) -> str:
+    """Render a rubric template for one sample.
+
+    Raises:
+        ValueError: If ``sample.rubric_vars`` contains a reserved variable name.
+        KeyError: If the rubric references a variable that is neither reserved
+            nor a key in ``sample.rubric_vars``.
+    """
+    variables = judge_variables(sample, submission)
+    missing: Set[str] = template_variables(rubric) - variables.keys()
+    if missing:
         raise KeyError(
-            f"Rubric references {{{missing}}} but no value was provided. "
-            f"Available variables: {sorted(substitutions.keys())}. "
+            f"Rubric references {sorted(missing)} but no value was provided. "
+            f"Available variables: {sorted(variables)}. "
             f"Reserved variables ({list(RESERVED_VARS)}) come from the Sample; "
             f"add other variables via sample.rubric_vars."
-        ) from e
+        )
+    return _compile(rubric).render(variables)

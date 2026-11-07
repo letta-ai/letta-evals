@@ -27,18 +27,18 @@ Three samples:
    focused on dog-specific features.
 3. **Fish** — provides neither, so the suite-level rubric in `rubric.txt` is used.
 
-## Template placeholders
+## Template variables
 
-All rubrics — suite-level, inline, and file-based — are sent verbatim to the
-judge after template substitution. The following placeholders are always
-available:
+All rubrics — suite-level, inline, and file-based — are Jinja templates, rendered
+and sent verbatim to the judge. These variables are always available:
 
-- `{input}` — the original task given to the agent (`sample.input`)
-- `{ground_truth}` — the expected answer (`sample.ground_truth`); empty string if not set
-- `{submission}` — the agent's extracted output
+- `{{ input }}` — the original task given to the agent (`sample.input`)
+- `{{ ground_truth }}` — the expected answer (`sample.ground_truth`); empty string if not set
+- `{{ submission }}` — the agent's extracted output
 - Any key from `sample.rubric_vars` (per-row dict in the dataset)
 
-Missing placeholders raise `KeyError` at grade time.
+A rubric that references a variable a sample doesn't provide fails before any
+agent runs.
 
 ## Running
 

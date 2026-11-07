@@ -32,12 +32,12 @@ class _JudgeResponse(PydanticBaseModel):
 class RubricGrader(Grader):
     """Grader that uses an LLM judge with custom rubric prompts.
 
-    The rubric is sent verbatim to the judge after template substitution.
+    The rubric is a Jinja template, rendered and sent verbatim to the judge.
     The framework only enforces the output schema ({rationale, score}) — it
     does not add a system prompt, wrap the rubric, or auto-append the
-    question / ground truth / submission. Use template placeholders
-    ({input}, {ground_truth}, {submission}, plus keys from
-    ``sample.rubric_vars``) to reference those values from inside the rubric.
+    question / ground truth / submission. Reference those values from inside
+    the rubric with ``{{ input }}``, ``{{ ground_truth }}``, ``{{ submission }}``
+    and keys from ``sample.rubric_vars``.
     """
 
     def __init__(self, spec: ModelJudgeGraderSpec):
