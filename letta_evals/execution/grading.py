@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from jinja2 import TemplateSyntaxError
 
 from letta_evals.graders.base import Grader
-from letta_evals.graders.prompt_utils import RESERVED_VARS, check_rubric
+from letta_evals.graders.prompt_utils import check_rubric, judge_variables
 from letta_evals.graders.scorers import sample_criteria
 from letta_evals.models import (
     Error,
@@ -86,16 +86,16 @@ def validate_model_judges(suite: SuiteSpec, samples: List[Sample]) -> None:
 
     For each sample, the rubric it will be judged with (its own, or the
     grader's) must be a valid template, must not use the old single-brace
-    placeholders, and must only reference variables the sample provides. With
-    the checklist scorer, the sample's criteria must be well formed.
+    placeholders, and must only reference variables the sample provides, and
+    ``rubric_vars`` must not reuse a reserved name. With the checklist scorer,
+    the sample's criteria must be well formed.
     """
     judges = {key: spec for key, spec in (suite.graders or {}).items() if isinstance(spec, ModelJudgeGraderSpec)}
     for grader_key, grader_spec in judges.items():
         for sample in samples:
             rubric = sample.rubric if sample.rubric is not None else grader_spec.prompt
-            provided = set(RESERVED_VARS) | set(sample.rubric_vars or {})
             try:
-                check_rubric(rubric, provided)
+                check_rubric(rubric, judge_variables(sample, submission=""))
                 if grader_spec.scorer == "checklist":
                     sample_criteria(sample)
             except (ValueError, TemplateSyntaxError) as e:
