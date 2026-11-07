@@ -28,6 +28,8 @@ graders:
     kind: model_judge
     display_name: "task completion score"
     prompt_path: rubric_task_completion.txt
+    scorer: checklist
+    criteria_var: rubric_task_completion
     model: claude-haiku-5-5
     provider: anthropic
     max_retries: 3
@@ -38,6 +40,8 @@ graders:
     kind: model_judge
     display_name: "skill use score"
     prompt_path: rubric_skill_use.txt
+    scorer: scoring.py:skill_use
+    response_format: scoring.py:ChecklistResponse
     model: claude-haiku-5-5
     provider: anthropic
     max_retries: 3

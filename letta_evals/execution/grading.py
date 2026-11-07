@@ -11,6 +11,7 @@ from jinja2 import TemplateSyntaxError
 
 from letta_evals.graders.base import Grader
 from letta_evals.graders.prompt_utils import RESERVED_VARS, check_rubric
+from letta_evals.graders.scorers import sample_criteria
 from letta_evals.models import (
     Error,
     GradeResult,
@@ -80,12 +81,13 @@ def detect_errors(
     return None
 
 
-def validate_rubric_templates(suite: SuiteSpec, samples: List[Sample]) -> None:
-    """Check every model-judge rubric before any agent runs.
+def validate_model_judges(suite: SuiteSpec, samples: List[Sample]) -> None:
+    """Check every model judge's inputs before any agent runs.
 
     For each sample, the rubric it will be judged with (its own, or the
     grader's) must be a valid template, must not use the old single-brace
-    placeholders, and must only reference variables the sample provides.
+    placeholders, and must only reference variables the sample provides. With
+    the checklist scorer, the sample's criteria must be well formed.
     """
     judges = {key: spec for key, spec in (suite.graders or {}).items() if isinstance(spec, ModelJudgeGraderSpec)}
     for grader_key, grader_spec in judges.items():
@@ -94,5 +96,7 @@ def validate_rubric_templates(suite: SuiteSpec, samples: List[Sample]) -> None:
             provided = set(RESERVED_VARS) | set(sample.rubric_vars or {})
             try:
                 check_rubric(rubric, provided)
+                if grader_spec.scorer == "checklist":
+                    sample_criteria(sample, grader_spec.criteria_var)
             except (ValueError, TemplateSyntaxError) as e:
                 raise ValueError(f"Sample {sample.id}, grader '{grader_key}': {e}") from e

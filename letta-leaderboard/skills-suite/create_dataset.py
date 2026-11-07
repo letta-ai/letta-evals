@@ -1,9 +1,21 @@
 import argparse
 import csv
 import json
+import re
 from pathlib import Path
 
 from prompts import SKILLS_TASK_PROMPT
+
+
+def numbered_criteria(text: str) -> list[dict]:
+    """Turn a generated "1. ...\n2. ..." rubric into checklist criteria [{id, text}]."""
+    criteria = []
+    for line in filter(None, (line.strip() for line in text.split("\n"))):
+        match = re.match(r"^(\d+)\.\s+(.*)$", line)
+        if not match:
+            raise ValueError(f"Rubric line is not numbered: {line!r}")
+        criteria.append({"id": match.group(1), "text": match.group(2)})
+    return criteria
 
 
 def create_dataset(output_dir: str = "output", dataset_name: str = "dataset.csv", oracle: bool = True):
@@ -19,7 +31,8 @@ def create_dataset(output_dir: str = "output", dataset_name: str = "dataset.csv"
     - sample_id: The sample ID
     - skill: The name of the skill
     - input: The task description
-    - rubric_vars: JSON string containing rubric_task_completion, rubric_skill_use, skill, and files
+    - rubric_vars: JSON string containing rubric_task_completion and rubric_skill_use (checklist
+      criteria, each a list of {id, text}), skill, and files
     """
     # Define paths
     input_dir = Path(__file__).parent / "task_generator" / "output"
@@ -53,8 +66,8 @@ def create_dataset(output_dir: str = "output", dataset_name: str = "dataset.csv"
 
             # Extract rubric variables
             rubric_vars = {
-                "rubric_task_completion": data.get("rubric_task_completion", ""),
-                "rubric_skill_use": data.get("rubric_skill_use", ""),
+                "rubric_task_completion": numbered_criteria(data.get("rubric_task_completion", "")),
+                "rubric_skill_use": numbered_criteria(data.get("rubric_skill_use", "")),
                 "skill": skill_name,
                 "files": data.get("files", []),
             }

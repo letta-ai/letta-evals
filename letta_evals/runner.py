@@ -16,7 +16,7 @@ from rich.console import Console
 
 from letta_evals.datasets.hf import hf_dataset_provenance
 from letta_evals.datasets.loader import load_dataset
-from letta_evals.execution.grading import detect_errors, grade_sample, validate_rubric_templates
+from letta_evals.execution.grading import detect_errors, grade_sample, validate_model_judges
 from letta_evals.execution.trace import TokenDataFetchError, fetch_token_data, fetch_trajectory
 from letta_evals.graders.base import Grader
 from letta_evals.graders.rubric import RubricGrader
@@ -586,7 +586,7 @@ class Runner:
             )
         )
 
-        validate_rubric_templates(self.suite, samples)
+        validate_model_judges(self.suite, samples)
 
         self.results_by_model.clear()
         self.results = []
