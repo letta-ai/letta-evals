@@ -275,23 +275,13 @@ class TestRubricGraderGrade:
         # Order matters: the judge reasons before it scores.
         assert list(schema["properties"]) == ["rationale", "score"]
 
-    @pytest.mark.parametrize("model", ["gpt-6-luna", "gpt-5-mini", "o4-mini", "o3"])
-    async def test_temperature_not_sent_to_reasoning_models(self, model):
-        grader = RubricGrader(prompt="x", model=model, temperature=0.0)
+    async def test_temperature_not_sent(self):
+        grader = RubricGrader(prompt="x", temperature=0.3)
         mock_client = _patch_openai(grader)
 
         await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
 
         assert "temperature" not in mock_client.responses.create.call_args.kwargs
-
-    @pytest.mark.parametrize("model", ["gpt-4o-mini", "gpt-4.1"])
-    async def test_temperature_sent_to_sampling_models(self, model):
-        grader = RubricGrader(prompt="x", model=model, temperature=0.3)
-        mock_client = _patch_openai(grader)
-
-        await grader.grade(Sample(id=0, input="Q?"), _trajectory("SUB"))
-
-        assert mock_client.responses.create.call_args.kwargs["temperature"] == 0.3
 
     async def test_score_is_clamped_to_unit_interval(self):
         """Belt-and-suspenders: even though the OpenAI strict schema lets

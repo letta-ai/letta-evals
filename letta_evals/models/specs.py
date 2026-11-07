@@ -269,7 +269,7 @@ class ModelJudgeGraderSpec(BaseGraderSpec):
     )
     temperature: float = Field(
         default=0.0,
-        description="Temperature for model judge. Not sent to Anthropic or to OpenAI reasoning models, which reject it.",
+        description="Temperature for a Google model judge. OpenAI and Anthropic judges don't send it, since their current models reject it.",
     )
     provider: LLMProvider = Field(default=LLMProvider.OPENAI, description="LLM provider for model judge")
     max_retries: int = Field(default=5, description="Maximum number of retries for model judge")

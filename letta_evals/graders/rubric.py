@@ -30,11 +30,6 @@ class _JudgeResponse(PydanticBaseModel):
     score: float = PydanticField(ge=0.0, le=1.0, description="Score between 0.0 and 1.0")
 
 
-# OpenAI models that accept temperature. Everything newer is a reasoning model,
-# which rejects it.
-_OPENAI_SAMPLING_MODEL_PREFIXES = ("gpt-4", "gpt-3.5")
-
-
 class RubricGrader(Grader):
     """Grader that uses an LLM judge with custom rubric prompts.
 
@@ -137,6 +132,7 @@ class RubricGrader(Grader):
 
         try:
             if self.provider == LLMProvider.OPENAI:
+                # No temperature: current OpenAI models are reasoning models and reject it.
                 kwargs = dict(
                     model=self.model,
                     input=judge_prompt,
@@ -152,8 +148,6 @@ class RubricGrader(Grader):
                 )
                 if self.system_prompt is not None:
                     kwargs["instructions"] = self.system_prompt
-                if self.model.startswith(_OPENAI_SAMPLING_MODEL_PREFIXES):
-                    kwargs["temperature"] = self.temperature
                 response = await self.client.responses.create(**kwargs)
 
                 result_json = json.loads(response.output_text)
