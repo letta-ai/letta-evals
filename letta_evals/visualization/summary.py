@@ -8,22 +8,37 @@ from rich.table import Table
 
 from letta_evals.constants import MAX_SAMPLES_DISPLAY
 from letta_evals.models import (
+    ModelSummary,
     SampleResult,
     SuiteSpec,
     Summary,
 )
 
 
+def sample_counts(ms: ModelSummary) -> Tuple[int, int]:
+    """Return ``(scheduled, attempted)`` sample counts for one model, summed across runs.
+
+    ``ModelSummary.n_total`` is a per-run count while ``n_attempted`` is summed
+    across runs, so the two can't be compared directly when there is more than one run.
+    """
+    if ms.runs:
+        n_errors = sum(run.n_errors for run in ms.runs)
+        return ms.n_attempted + n_errors, ms.n_attempted
+    return ms.n_total, ms.n_attempted
+
+
 def print_basic_overall_metrics(console: Console, summary: Summary) -> None:
     """Print a compact overall summary, one line per model."""
     console.print("\n[bold]Overall Metrics:[/bold]")
     for ms in summary.models:
-        n_errors = ms.n_total - ms.n_attempted
-        errors_pct = (n_errors / ms.n_total * 100.0) if ms.n_total > 0 else 0.0
+        n_scheduled, n_attempted = sample_counts(ms)
+        n_errors = n_scheduled - n_attempted
+        errors_pct = (n_errors / n_scheduled * 100.0) if n_scheduled > 0 else 0.0
+        runs_note = f" ({len(ms.runs)} runs)" if ms.runs and len(ms.runs) > 1 else ""
         console.print(f"  [cyan]{ms.model}[/]")
-        console.print(f"    Total samples: {ms.n_total}")
-        console.print(f"    Total attempted: {ms.n_attempted}")
-        console.print(f"    Errored: {errors_pct:.1f}% ({n_errors}/{ms.n_total})")
+        console.print(f"    Total samples: {n_scheduled}{runs_note}")
+        console.print(f"    Total attempted: {n_attempted}")
+        console.print(f"    Errored: {errors_pct:.1f}% ({n_errors}/{n_scheduled})")
         console.print(f"    Reward: {ms.reward:.2f}")
 
 
